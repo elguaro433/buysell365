@@ -41,6 +41,9 @@ APP_URL = os.environ.get('APP_URL', 'https://Elguaro2026.pythonanywhere.com')
 # Twelve Data API
 TWELVE_API_KEY = os.environ.get('TWELVE_API_KEY', '55490f0409a44fbc83303d76771118b6')
 
+# Finnhub API (free: 60 calls/min — get key at https://finnhub.io)
+FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', '')
+
 # VAPID keys for Web Push Notifications
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BHlyq7N49mbcYbrpcQ3GKTlZgX_-CKT6hjLfLMQYBpWXOzqhnA3flHt6J8vSosKVFQg9eSm8XL4uECMLm3aMJbs')
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', 'wtu7t76iO_W8jqptjn7R8J3tBzCUw8apqZzCLTG19to')
@@ -906,26 +909,20 @@ def _generate_scalping_signals_v2():
     import math
 
     scalp_pairs = [
-        'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'EUR/GBP',
-        'USD/CAD', 'NZD/USD', 'GBP/JPY', 'EUR/JPY', 'AUD/JPY',
-        'BTC/USD', 'ETH/USD', 'XAU/USD'
+        'EUR/USD', 'USD/JPY', 'XAU/USD', 'BTC/USD', 'NQ=F', 'ES=F'
     ]
 
     # Base prices for simulation
     base_prices = {
-        'EUR/USD': 1.0850, 'GBP/USD': 1.2650, 'USD/JPY': 150.80,
-        'AUD/USD': 0.6520, 'EUR/GBP': 0.8580, 'USD/CAD': 1.3620,
-        'NZD/USD': 0.6080, 'GBP/JPY': 190.50, 'EUR/JPY': 163.60,
-        'AUD/JPY': 98.30, 'BTC/USD': 62500.0, 'ETH/USD': 3400.0,
-        'XAU/USD': 2340.0
+        'EUR/USD': 1.0850, 'USD/JPY': 150.80,
+        'XAU/USD': 2340.0, 'BTC/USD': 62500.0,
+        'NQ=F': 18500.0, 'ES=F': 5200.0
     }
 
     pip_values = {
-        'EUR/USD': 0.0001, 'GBP/USD': 0.0001, 'USD/JPY': 0.01,
-        'AUD/USD': 0.0001, 'EUR/GBP': 0.0001, 'USD/CAD': 0.0001,
-        'NZD/USD': 0.0001, 'GBP/JPY': 0.01, 'EUR/JPY': 0.01,
-        'AUD/JPY': 0.01, 'BTC/USD': 1.0, 'ETH/USD': 0.1,
-        'XAU/USD': 0.01
+        'EUR/USD': 0.0001, 'USD/JPY': 0.01,
+        'XAU/USD': 0.10, 'BTC/USD': 1.0,
+        'NQ=F': 0.25, 'ES=F': 0.25
     }
 
     signals = []
@@ -1736,62 +1733,161 @@ def delete_account():
 
 def _fetch_prices_from_api():
     """
-    Obtiene precios reales de la API de Twelve Data.
-    Falls back a precios simulados si la API falla.
-    """
-    import random
+    Obtiene precios REALES usando APIs probadas en Render (sin API key):
+    1. Open ExchangeRate API (forex EUR/USD, USD/JPY) — gratis, sin key
+    2. Coinbase API (BTC/USD) — gratis, sin key
+    3. Yahoo Finance (XAU/USD, NQ=F, ES=F) — gratis, sin key
+    4. Finnhub (opcional, si FINNHUB_API_KEY está configurada)
 
-    # Lista de pares a solicitar
+    Instrumentos: XAU/USD | BTC/USD | NQ=F (NASDAQ) | ES=F (S&P500) | EUR/USD | USD/JPY
+    """
     pairs = [
-        'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD', 'NZD/USD',
-        'EUR/GBP', 'GBP/JPY', 'EUR/JPY', 'XAU/USD', 'BTC/USD', 'ETH/USD'
+        'EUR/USD', 'USD/JPY', 'XAU/USD', 'BTC/USD', 'NQ=F', 'ES=F'
     ]
 
-    # Precios base para simulación
-    base_prices = {
-        'EUR/USD': 1.0850, 'GBP/USD': 1.2650, 'USD/JPY': 150.80,
-        'AUD/USD': 0.6520, 'EUR/GBP': 0.8580, 'USD/CAD': 1.3620,
-        'NZD/USD': 0.6080, 'GBP/JPY': 190.50, 'EUR/JPY': 163.60,
-        'XAU/USD': 2340.0, 'BTC/USD': 62500.0, 'ETH/USD': 3400.0
-    }
-
-    try:
-        # Intentar obtener datos de Twelve Data API
-        url = f"https://api.twelvedata.com/price?symbol={','.join(pairs)}&apikey={TWELVE_API_KEY}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode())
-            if 'data' in data:
-                return data['data']
-    except Exception as e:
-        print(f"⚠️ Error fetching prices from API: {e}")
-
-    # Fallback: datos simulados variados
-    # Seed con la hora para que cambien durante el día
-    seed_value = int(time.time()) // 60  # Cambia cada minuto
-    random.seed(seed_value)
-
     prices = {}
-    for pair in pairs:
-        base = base_prices.get(pair, 1.0)
-        change_percent = random.uniform(-2.5, 2.5)
-        change = base * (change_percent / 100)
-        open_price = base - change
-        high = max(base, open_price) * (1 + random.uniform(0, 0.015))
-        low = min(base, open_price) * (1 - random.uniform(0, 0.015))
+    now_iso = datetime.utcnow().isoformat()
 
-        prices[pair] = {
-            'symbol': pair,
-            'price': round(base, 5),
-            'change': round(change, 5),
-            'change_percent': round(change_percent, 2),
-            'high': round(high, 5),
-            'low': round(low, 5),
-            'open': round(open_price, 5),
-            'timestamp': datetime.utcnow().isoformat()
-        }
+    # ── FUENTE 1: Open ExchangeRate API (forex — EUR/USD, USD/JPY) ──
+    try:
+        url = "https://open.er-api.com/v6/latest/USD"
+        req = urllib.request.Request(url, headers={'User-Agent': 'BuySell365/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode())
 
-    return prices
+        if data.get('result') == 'success' and 'rates' in data:
+            rates = data['rates']
+
+            forex_map = {
+                'EUR/USD': ('EUR', 'inverse'),
+                'USD/JPY': ('JPY', 'direct'),
+            }
+
+            for pair, (currency, direction) in forex_map.items():
+                if currency in rates and rates[currency] > 0:
+                    if direction == 'inverse':
+                        price = round(1.0 / rates[currency], 5)
+                    else:
+                        price = round(rates[currency], 2)
+
+                    prices[pair] = {
+                        'symbol': pair,
+                        'price': price,
+                        'change': 0, 'change_percent': 0,
+                        'high': price, 'low': price, 'open': price,
+                        'timestamp': now_iso
+                    }
+
+            print(f"✅ ExchangeRate API: EUR/USD y USD/JPY obtenidos")
+
+    except Exception as e:
+        print(f"⚠️ ExchangeRate API error: {e}")
+
+    # ── FUENTE 2: Coinbase API (BTC/USD) ──
+    try:
+        url = "https://api.coinbase.com/v2/exchange-rates?currency=BTC"
+        req = urllib.request.Request(url, headers={'User-Agent': 'BuySell365/1.0'})
+        with urllib.request.urlopen(req, timeout=8) as response:
+            data = json.loads(response.read().decode())
+
+        if 'data' in data and 'rates' in data['data'] and 'USD' in data['data']['rates']:
+            price = round(float(data['data']['rates']['USD']), 2)
+            if price > 0:
+                prices['BTC/USD'] = {
+                    'symbol': 'BTC/USD', 'price': price,
+                    'change': 0, 'change_percent': 0,
+                    'high': price, 'low': price, 'open': price,
+                    'timestamp': now_iso
+                }
+                print(f"✅ Coinbase: BTC/USD = {price}")
+
+    except Exception as e:
+        print(f"⚠️ Coinbase API error: {e}")
+
+    # ── FUENTE 3: Yahoo Finance (XAU/USD, NQ=F NASDAQ, ES=F S&P500) ──
+    yahoo_instruments = [
+        ('GC=F',  'XAU/USD', 2),   # Oro
+        ('NQ=F',  'NQ=F',    2),   # NASDAQ 100 Futures
+        ('ES=F',  'ES=F',    2),   # S&P 500 Futures
+    ]
+    for yf_ticker, pair_name, decimals in yahoo_instruments:
+        if pair_name not in prices:
+            try:
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}?interval=1d&range=2d"
+                req = urllib.request.Request(url, headers={'User-Agent': 'BuySell365/1.0'})
+                with urllib.request.urlopen(req, timeout=8) as response:
+                    data = json.loads(response.read().decode())
+
+                meta = data.get('chart', {}).get('result', [{}])[0].get('meta', {})
+                mkt_price = meta.get('regularMarketPrice', 0)
+                prev_close = meta.get('previousClose', mkt_price)
+
+                if mkt_price and mkt_price > 0:
+                    change = round(mkt_price - prev_close, decimals) if prev_close else 0
+                    change_pct = round((change / prev_close) * 100, 2) if prev_close and prev_close > 0 else 0
+                    prices[pair_name] = {
+                        'symbol': pair_name, 'price': round(mkt_price, decimals),
+                        'change': change, 'change_percent': change_pct,
+                        'high': round(meta.get('dayHigh', mkt_price), decimals),
+                        'low': round(meta.get('dayLow', mkt_price), decimals),
+                        'open': round(prev_close, decimals),
+                        'timestamp': now_iso
+                    }
+                    print(f"✅ Yahoo Finance: {pair_name} = {mkt_price}")
+
+            except Exception as e:
+                print(f"⚠️ Yahoo Finance ({pair_name}) error: {e}")
+
+    # ── FUENTE 4 (Opcional): Finnhub para mejorar datos con OHLC real ──
+    if FINNHUB_API_KEY:
+        try:
+            finnhub_symbols = {
+                'EUR/USD': 'OANDA:EUR_USD',
+                'USD/JPY': 'OANDA:USD_JPY',
+                'XAU/USD': 'OANDA:XAU_USD',
+                'BTC/USD': 'BINANCE:BTCUSDT',
+            }
+            fh_count = 0
+            for pair in pairs:
+                fh_symbol = finnhub_symbols.get(pair, '')
+                if not fh_symbol:
+                    continue
+                try:
+                    url = f"https://finnhub.io/api/v1/quote?symbol={fh_symbol}&token={FINNHUB_API_KEY}"
+                    req = urllib.request.Request(url, headers={'User-Agent': 'BuySell365/1.0'})
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        fd = json.loads(response.read().decode())
+                        if fd.get('c') and fd['c'] > 0:
+                            current = float(fd['c'])
+                            prices[pair] = {
+                                'symbol': pair,
+                                'price': round(current, 5 if current < 100 else 2),
+                                'change': round(float(fd.get('d', 0) or 0), 5),
+                                'change_percent': round(float(fd.get('dp', 0) or 0), 2),
+                                'high': round(float(fd.get('h', current) or current), 5 if current < 100 else 2),
+                                'low': round(float(fd.get('l', current) or current), 5 if current < 100 else 2),
+                                'open': round(float(fd.get('o', current) or current), 5 if current < 100 else 2),
+                                'timestamp': now_iso
+                            }
+                            fh_count += 1
+                except Exception:
+                    pass
+            if fh_count > 0:
+                print(f"✅ Finnhub: {fh_count} precios mejorados con OHLC")
+        except Exception as e:
+            print(f"⚠️ Finnhub error: {e}")
+
+    if prices:
+        print(f"📊 Total precios obtenidos: {len(prices)}/{len(pairs)}")
+        return prices
+
+    # ── FALLBACK: Últimos precios del cache ──
+    if _price_cache:
+        print("⚠️ Usando cache de precios anteriores")
+        return _price_cache
+
+    print("❌ No se pudieron obtener precios de ninguna fuente")
+    return {}
 
 
 @app.route('/api/prices')
@@ -1809,7 +1905,7 @@ def api_prices():
         now = time.time()
 
         # Verificar si el cache es válido (menos de 60 segundos)
-        if _price_cache and (now - _price_cache_time) < 60:
+        if _price_cache and (now - _price_cache_time) < 120:
             return jsonify({
                 'ok': True,
                 'prices': _price_cache,
@@ -1958,8 +2054,7 @@ def _generate_technical_analysis():
     random.seed(seed_value)
 
     pairs = [
-        'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD', 'NZD/USD',
-        'EUR/GBP', 'GBP/JPY', 'EUR/JPY', 'XAU/USD', 'BTC/USD', 'ETH/USD'
+        'EUR/USD', 'USD/JPY', 'XAU/USD', 'BTC/USD', 'NQ=F', 'ES=F'
     ]
 
     analysis = {}
@@ -2101,6 +2196,20 @@ def manifest():
         ],
         "prefer_related_applications": False
     })
+
+@app.route('/.well-known/assetlinks.json')
+def assetlinks():
+    """Digital Asset Links for TWA/Android APK verification."""
+    return jsonify([{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.onrender.buysell365.twa",
+            "sha256_cert_fingerprints": [
+                "A5:86:55:9C:4B:EE:AB:52:94:6B:94:78:CF:C6:43:8B:98:50:6E:B0:E8:EF:41:10:BE:BE:F5:83:9B:F4:59:79"
+            ]
+        }
+    }])
 
 @app.route('/sw.js')
 def service_worker():
