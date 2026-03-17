@@ -8466,6 +8466,21 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         if not es_admin: return "⛔ Solo administradores."
         return cmd_reanudar()
 
+    # ── Scalper control ──
+    if t in ("/pausar scalper", "pausar scalper", "/stop scalper", "stop scalper",
+             "/scalper stop", "scalper stop", "/scalper pausar", "scalper pausar"):
+        if not es_admin: return "⛔ Solo administradores."
+        return _cmd_scalper_pausar()
+
+    if t in ("/play scalper", "play scalper", "/scalper play", "scalper play",
+             "/continuar scalper", "continuar scalper", "/scalper on", "scalper on",
+             "/start scalper", "start scalper", "/reanudar scalper", "reanudar scalper"):
+        if not es_admin: return "⛔ Solo administradores."
+        return _cmd_scalper_reanudar()
+
+    if t in ("/scalper", "/scalper estado", "scalper estado", "scalper status"):
+        return _cmd_scalper_estado()
+
     # ── 2. COMANDOS CON PARÁMETRO ─────────────────────────────
     if t.startswith("/precio "):
         activo = t.replace("/precio ", "").strip()
@@ -14479,6 +14494,50 @@ def loop_polling():
             time.sleep(_backoff)
             _backoff = min(_backoff * 2, _max_backoff)
 
+# ── Comandos Telegram del Scalper ──
+
+def _cmd_scalper_pausar():
+    """Pausa el scalper desde Telegram."""
+    global SCALPER_ACTIVO
+    SCALPER_ACTIVO = False
+    print("🔪 Scalper PAUSADO por comando Telegram")
+    return "🔪 *Scalper PAUSADO* ⏸️\n\nEl scalper no abrirá nuevas posiciones.\nPosiciones abiertas se seguirán gestionando.\n\n📌 Para reanudar: `play scalper`"
+
+def _cmd_scalper_reanudar():
+    """Reanuda el scalper desde Telegram."""
+    global SCALPER_ACTIVO
+    SCALPER_ACTIVO = True
+    print("🔪 Scalper REANUDADO por comando Telegram")
+    return "🔪 *Scalper ACTIVO* ▶️\n\nEl scalper está buscando señales de nuevo.\n\n📌 Para pausar: `pausar scalper`"
+
+def _cmd_scalper_estado():
+    """Muestra estado del scalper."""
+    estado = "✅ ACTIVO" if SCALPER_ACTIVO else "⏸️ PAUSADO"
+    pos_abiertas = 0
+    try:
+        if MT5_AVAILABLE:
+            with _lock_mt5:
+                positions = mt5.positions_get()
+            if positions:
+                pos_abiertas = sum(1 for p in positions if p.magic == SCALPER_MAGIC)
+    except:
+        pass
+
+    return (
+        f"🔪 *Scalper Silencioso — Estado*\n\n"
+        f"▪️ Estado: {estado}\n"
+        f"▪️ Trades hoy: {_scalper_trades_hoy}\n"
+        f"▪️ Posiciones abiertas: {pos_abiertas}\n"
+        f"▪️ P&L diario: ${_scalper_pnl_diario:+.2f}\n"
+        f"▪️ Pérdidas seguidas: {_scalper_perdidas_consecutivas}\n"
+        f"▪️ Lote: Mínimo del broker (bajo riesgo)\n"
+        f"▪️ Estrategia: BB(20,2) + RSI(7) M5\n\n"
+        f"📌 Comandos:\n"
+        f"`pausar scalper` — Detener\n"
+        f"`play scalper` — Reanudar\n"
+        f"`/scalper` — Ver estado"
+    )
+
 # ============================================================
 #  🔪 SCALPER SILENCIOSO — MT5 Only (Sin Telegram, Sin Stats)
 #  Estrategia: BB(20,2) + RSI(7) Mean Reversion en M5
@@ -14698,8 +14757,10 @@ def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
         if tick_size <= 0 or tick_value <= 0:
             return False
 
-        lote = riesgo_dinero / (sl_distance / tick_size * tick_value)
-        lote = max(symbol_info.volume_min, min(round(lote, 2), symbol_info.volume_max))
+        lote_calculado = riesgo_dinero / (sl_distance / tick_size * tick_value)
+        lote_calculado = max(symbol_info.volume_min, min(round(lote_calculado, 2), symbol_info.volume_max))
+        # SCALPER: Siempre usar lote mínimo para empezar (bajo riesgo)
+        lote = symbol_info.volume_min
         # Ajustar al step del volumen
         vol_step = symbol_info.volume_step
         if vol_step > 0:

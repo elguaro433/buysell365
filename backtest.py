@@ -120,7 +120,8 @@ def run_backtest():
         # Approach: extract specific function blocks we need
         needed_funcs = [
             "def get_categoria(", "def get_col(", "def detectar_patrones_velas(",
-            "def calcular_pivot_points_df(", "def predecir_direccion_ml(",
+            "def calcular_pivot_points_df(", "def _calcular_features_ml(",
+            "def predecir_direccion_ml(",
             "def _calcular_rango_asiatico(",
             "def calcular_indicadores_profesionales(", "def evaluar_senal_profesional(",
             "def calcular_niveles_3tp(",
@@ -392,15 +393,19 @@ def run_backtest():
                 if i + max_velas < len(df_full):
                     precio_cierre = float(df_full['Close'].iloc[i + max_velas])
 
-            # Calcular pips
+            # Calcular pips/puntos
             if "JPY" in ticker:
                 pip_mult = 100  # 1 pip = 0.01
+                unit_name = "pips"
             elif "=X" in ticker:
                 pip_mult = 10000  # 1 pip = 0.0001
+                unit_name = "pips"
             elif ticker == "GC=F":
                 pip_mult = 1  # $1 = 1 punto
+                unit_name = "pts"
             else:
                 pip_mult = 1  # Puntos para índices
+                unit_name = "pts"
 
             if tipo == "COMPRA":
                 pips = (precio_cierre - precio) * pip_mult
@@ -430,6 +435,7 @@ def run_backtest():
                 "tp3": round(tp3, 5),
                 "resultado": resultado,
                 "pips": round(pips, 1),
+                "unit": unit_name,
                 "duracion_min": duracion_min,
                 "max_favorable": round(max_favorable * pip_mult, 1),
                 "max_adverso": round(max_adverso * pip_mult, 1),
@@ -470,20 +476,29 @@ def run_backtest():
     print(f"  ✅ Wins (TP):     {total_wins} ({win_rate:.1f}%)")
     print(f"  ❌ Losses (SL):   {total_losses} ({total_losses/total_senales*100:.1f}%)")
     print(f"  ⏰ Timeout:       {total_timeout}")
-    print(f"  💰 Pips totales:  {total_pips:+.1f}")
-    print(f"  📈 Pips promedio: {total_pips/total_senales:+.1f} por señal")
+    print(f"  💰 Ganancia total: {total_pips:+.1f} (pts+pips combinados)")
+    print(f"  📈 Promedio:       {total_pips/total_senales:+.1f} por señal")
     print()
 
+    # Mapa de unidades por activo
+    _unit_map = {}
+    for nombre, ticker in ACTIVOS.items():
+        if "JPY" in ticker or ("=X" in ticker and "JPY" not in ticker):
+            _unit_map[nombre] = "pips"
+        else:
+            _unit_map[nombre] = "pts"
+
     # Por activo
-    print(f"  {'Activo':12s} {'Total':>6s} {'Win%':>6s} {'TP1':>5s} {'TP2':>5s} {'TP3':>5s} {'SL':>5s} {'Pips':>8s}")
-    print(f"  {'-'*12} {'-'*6} {'-'*6} {'-'*5} {'-'*5} {'-'*5} {'-'*5} {'-'*8}")
+    print(f"  {'Activo':12s} {'Total':>6s} {'Win%':>6s} {'TP1':>5s} {'TP2':>5s} {'TP3':>5s} {'SL':>5s} {'Ganancia':>10s} {'Unidad':>6s}")
+    print(f"  {'-'*12} {'-'*6} {'-'*6} {'-'*5} {'-'*5} {'-'*5} {'-'*5} {'-'*10} {'-'*6}")
     for nombre in ACTIVOS.keys():
         s = stats_por_activo[nombre]
         if s["total"] == 0:
             continue
         wins = s["tp1"] + s["tp2"] + s["tp3"]
         wr = wins / s["total"] * 100
-        print(f"  {nombre:12s} {s['total']:6d} {wr:5.1f}% {s['tp1']:5d} {s['tp2']:5d} {s['tp3']:5d} {s['sl']:5d} {s['pips_total']:+8.1f}")
+        unit = _unit_map.get(nombre, "pts")
+        print(f"  {nombre:12s} {s['total']:6d} {wr:5.1f}% {s['tp1']:5d} {s['tp2']:5d} {s['tp3']:5d} {s['sl']:5d} {s['pips_total']:+10.1f} {unit:>6s}")
 
     # Por estrategia
     print()
@@ -495,12 +510,12 @@ def run_backtest():
             e["wins"] += 1
         e["pips"] += s["pips"]
 
-    print(f"  {'Estrategia':15s} {'Total':>6s} {'Win%':>6s} {'Pips':>8s} {'Pips/Op':>8s}")
-    print(f"  {'-'*15} {'-'*6} {'-'*6} {'-'*8} {'-'*8}")
+    print(f"  {'Estrategia':15s} {'Total':>6s} {'Win%':>6s} {'Ganancia':>10s} {'Por Op':>8s}")
+    print(f"  {'-'*15} {'-'*6} {'-'*6} {'-'*10} {'-'*8}")
     for est, e in sorted(stats_estrat.items()):
         wr = e["wins"] / e["total"] * 100 if e["total"] > 0 else 0
         pp = e["pips"] / e["total"] if e["total"] > 0 else 0
-        print(f"  {est:15s} {e['total']:6d} {wr:5.1f}% {e['pips']:+8.1f} {pp:+8.1f}")
+        print(f"  {est:15s} {e['total']:6d} {wr:5.1f}% {e['pips']:+10.1f} {pp:+8.1f}")
 
     # Por nivel (Premium vs Standard)
     print()
@@ -512,8 +527,8 @@ def run_backtest():
             n["wins"] += 1
         n["pips"] += s["pips"]
 
-    print(f"  {'Nivel':15s} {'Total':>6s} {'Win%':>6s} {'Pips':>8s} {'Pips/Op':>8s}")
-    print(f"  {'-'*15} {'-'*6} {'-'*6} {'-'*8} {'-'*8}")
+    print(f"  {'Nivel':15s} {'Total':>6s} {'Win%':>6s} {'Ganancia':>10s} {'Por Op':>8s}")
+    print(f"  {'-'*15} {'-'*6} {'-'*6} {'-'*10} {'-'*8}")
     for niv in ["PREMIUM", "STANDARD"]:
         n = stats_nivel.get(niv, {"total": 0, "wins": 0, "pips": 0.0})
         if n["total"] == 0:
@@ -521,7 +536,7 @@ def run_backtest():
         wr = n["wins"] / n["total"] * 100
         pp = n["pips"] / n["total"]
         emoji = "⭐" if niv == "PREMIUM" else "📊"
-        print(f"  {emoji} {niv:13s} {n['total']:6d} {wr:5.1f}% {n['pips']:+8.1f} {pp:+8.1f}")
+        print(f"  {emoji} {niv:13s} {n['total']:6d} {wr:5.1f}% {n['pips']:+10.1f} {pp:+8.1f}")
 
     # ── Guardar CSV ─────────────────────────────────────────
     csv_file = os.path.join(BOT_DIR, "backtest_results.csv")
@@ -558,6 +573,7 @@ def _generate_html_report(senales, stats_activo, stats_estrat,
 
         tipo_color = "#00c853" if s["tipo"] == "COMPRA" else "#ff5252"
         pips_color = "#00c853" if s["pips"] >= 0 else "#ff5252"
+        unit = s.get("unit", "pts")
 
         rows_html += f"""
         <tr>
@@ -570,10 +586,10 @@ def _generate_html_report(senales, stats_activo, stats_estrat,
             <td>{s['sl']}</td>
             <td>{s['tp1']}</td>
             <td style="color:{color};font-weight:bold">{icon} {res}</td>
-            <td style="color:{pips_color};font-weight:bold">{s['pips']:+.1f}</td>
+            <td style="color:{pips_color};font-weight:bold">{s['pips']:+.1f} {unit}</td>
             <td>{s['duracion_min']}m</td>
-            <td>{s['max_favorable']:+.1f}</td>
-            <td>{s['max_adverso']:+.1f}</td>
+            <td>{s['max_favorable']:+.1f} {unit}</td>
+            <td>{s['max_adverso']:+.1f} {unit}</td>
         </tr>"""
 
     # Tabla por activo
@@ -624,19 +640,19 @@ def _generate_html_report(senales, stats_activo, stats_estrat,
   <div class="stat-card"><div class="value green">{wins}</div><div class="label">Wins (TP)</div></div>
   <div class="stat-card"><div class="value red">{losses}</div><div class="label">Losses (SL)</div></div>
   <div class="stat-card"><div class="value" style="color:{'#00c853' if win_rate>=50 else '#ff5252'}">{win_rate:.1f}%</div><div class="label">Win Rate</div></div>
-  <div class="stat-card"><div class="value" style="color:{pips_color}">{pips:+.1f}</div><div class="label">Pips Totales</div></div>
-  <div class="stat-card"><div class="value" style="color:{pips_color}">{pips/total:+.1f}</div><div class="label">Pips/Señal</div></div>
+  <div class="stat-card"><div class="value" style="color:{pips_color}">{pips:+.1f}</div><div class="label">Ganancia Total (pts+pips)</div></div>
+  <div class="stat-card"><div class="value" style="color:{pips_color}">{pips/total:+.1f}</div><div class="label">Promedio/Señal</div></div>
 </div>
 
 <h2>📈 Resultados por Activo</h2>
 <table>
-<tr><th>Activo</th><th>Total</th><th>Win Rate</th><th>TP1</th><th>TP2</th><th>TP3</th><th>SL</th><th>Pips</th></tr>
+<tr><th>Activo</th><th>Total</th><th>Win Rate</th><th>TP1</th><th>TP2</th><th>TP3</th><th>SL</th><th>Ganancia</th></tr>
 {activo_rows}
 </table>
 
 <h2>📋 Todas las Señales ({total})</h2>
 <table>
-<tr><th>Fecha</th><th>Activo</th><th>Tipo</th><th>Estrategia</th><th>Score</th><th>Entrada</th><th>SL</th><th>TP1</th><th>Resultado</th><th>Pips</th><th>Duración</th><th>Max Favor</th><th>Max Contra</th></tr>
+<tr><th>Fecha</th><th>Activo</th><th>Tipo</th><th>Estrategia</th><th>Score</th><th>Entrada</th><th>SL</th><th>TP1</th><th>Resultado</th><th>Ganancia</th><th>Duración</th><th>Max Favor</th><th>Max Contra</th></tr>
 {rows_html}
 </table>
 

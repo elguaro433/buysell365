@@ -399,56 +399,39 @@ def run_backtest():
     print(f"  Wins:           {wins} ({wr:.1f}%)")
     print(f"  Losses:         {losses} ({losses/total*100:.1f}%)")
     print(f"  Timeout:        {timeouts} ({timeouts/total*100:.1f}%)")
-    print(f"  Pips totales:   {total_pips:+.1f}")
-    print(f"  Pips promedio:  {total_pips/total:+.1f} por senal")
+    print(f"  Ganancia total: {total_pips:+.1f} (pts+pips combinados)")
+    print(f"  Promedio:       {total_pips/total:+.1f} por senal")
     print()
 
     # Por activo
-    print(f"  {'Activo':10s} {'Senal':>6s} {'Win%':>6s} {'Wins':>5s} {'Loss':>5s} {'T/O':>5s} {'Pips':>10s} {'Pips/Op':>8s}")
-    print(f"  {'-'*10} {'-'*6} {'-'*6} {'-'*5} {'-'*5} {'-'*5} {'-'*10} {'-'*8}")
+    print(f"  {'Activo':10s} {'Senal':>6s} {'Win%':>6s} {'Wins':>5s} {'Loss':>5s} {'T/O':>5s} {'Ganancia':>10s} {'Por Op':>8s} {'Unidad':>6s}")
+    print(f"  {'-'*10} {'-'*6} {'-'*6} {'-'*5} {'-'*5} {'-'*5} {'-'*10} {'-'*8} {'-'*6}")
     for nombre in ACTIVOS.keys():
         s = stats_activo[nombre]
+        unit = ACTIVOS[nombre]["pip_name"]
         if s["total"] == 0:
-            print(f"  {nombre:10s} {'0':>6s} {'--':>6s} {'--':>5s} {'--':>5s} {'--':>5s} {'--':>10s} {'--':>8s}")
+            print(f"  {nombre:10s} {'0':>6s} {'--':>6s} {'--':>5s} {'--':>5s} {'--':>5s} {'--':>10s} {'--':>8s} {unit:>6s}")
             continue
         w = s["wins"] / s["total"] * 100
         pp = s["pips"] / s["total"]
-        print(f"  {nombre:10s} {s['total']:6d} {w:5.1f}% {s['wins']:5d} {s['losses']:5d} {s['timeout']:5d} {s['pips']:+10.1f} {pp:+8.1f}")
+        print(f"  {nombre:10s} {s['total']:6d} {w:5.1f}% {s['wins']:5d} {s['losses']:5d} {s['timeout']:5d} {s['pips']:+10.1f} {pp:+8.1f} {unit:>6s}")
 
-    # Por direccion
+    # Por direccion y activo
     print()
-    print("  Por direccion:")
-    total_buy = sum(s["buy"] for s in stats_activo.values())
-    total_sell = sum(s["sell"] for s in stats_activo.values())
-    total_buy_wins = sum(s["buy_wins"] for s in stats_activo.values())
-    total_sell_wins = sum(s["sell_wins"] for s in stats_activo.values())
-    total_buy_pips = sum(s["buy_pips"] for s in stats_activo.values())
-    total_sell_pips = sum(s["sell_pips"] for s in stats_activo.values())
-
-    if total_buy > 0:
-        buy_wr = total_buy_wins / total_buy * 100
-        print(f"  BUY  -- {total_buy:3d} senales, {buy_wr:5.1f}% WR, {total_buy_pips:+.1f} pips ({total_buy_pips/total_buy:+.1f}/op)")
-    else:
-        print(f"  BUY  -- 0 senales")
-
-    if total_sell > 0:
-        sell_wr = total_sell_wins / total_sell * 100
-        print(f"  SELL -- {total_sell:3d} senales, {sell_wr:5.1f}% WR, {total_sell_pips:+.1f} pips ({total_sell_pips/total_sell:+.1f}/op)")
-    else:
-        print(f"  SELL -- 0 senales")
-
-    # Por activo y direccion detallado
+    print("  Por direccion (desglosado por activo):")
     print()
-    print("  Detalle por activo y direccion:")
-    print(f"  {'Activo':10s} {'BUY':>5s} {'BuyWR':>6s} {'BuyPips':>9s} {'SELL':>5s} {'SellWR':>7s} {'SellPips':>9s}")
-    print(f"  {'-'*10} {'-'*5} {'-'*6} {'-'*9} {'-'*5} {'-'*7} {'-'*9}")
     for nombre in ACTIVOS.keys():
         s = stats_activo[nombre]
+        unit = ACTIVOS[nombre]["pip_name"]
         if s["total"] == 0:
             continue
         bwr = (s["buy_wins"] / s["buy"] * 100) if s["buy"] > 0 else 0
         swr = (s["sell_wins"] / s["sell"] * 100) if s["sell"] > 0 else 0
-        print(f"  {nombre:10s} {s['buy']:5d} {bwr:5.1f}% {s['buy_pips']:+9.1f} {s['sell']:5d} {swr:6.1f}% {s['sell_pips']:+9.1f}")
+        buy_pp = s["buy_pips"] / s["buy"] if s["buy"] > 0 else 0
+        sell_pp = s["sell_pips"] / s["sell"] if s["sell"] > 0 else 0
+        print(f"  {nombre:10s}  BUY: {s['buy']:3d} senales, {bwr:5.1f}% WR, {s['buy_pips']:+9.1f} {unit} ({buy_pp:+.1f}/{unit[0]})")
+        print(f"  {'':10s} SELL: {s['sell']:3d} senales, {swr:5.1f}% WR, {s['sell_pips']:+9.1f} {unit} ({sell_pp:+.1f}/{unit[0]})")
+        print()
 
     # -- Guardar CSV --
     csv_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backtest_scalper_results.csv")
@@ -461,13 +444,15 @@ def run_backtest():
     print("  Top 5 mejores senales:")
     sorted_best = sorted(todas_senales, key=lambda x: x["pips"], reverse=True)[:5]
     for s in sorted_best:
-        print(f"    {s['fecha']} {s['activo']:10s} {s['tipo']:4s} {s['pips']:+.1f} pips (RSI:{s['rsi_prev']:.0f}->{s['rsi']:.0f}, ADX:{s['adx']:.0f})")
+        unit = ACTIVOS[s['activo']]["pip_name"]
+        print(f"    {s['fecha']} {s['activo']:10s} {s['tipo']:4s} {s['pips']:+.1f} {unit} (RSI:{s['rsi_prev']:.0f}->{s['rsi']:.0f}, ADX:{s['adx']:.0f})")
 
     print()
     print("  Top 5 peores senales:")
     sorted_worst = sorted(todas_senales, key=lambda x: x["pips"])[:5]
     for s in sorted_worst:
-        print(f"    {s['fecha']} {s['activo']:10s} {s['tipo']:4s} {s['pips']:+.1f} pips (RSI:{s['rsi_prev']:.0f}->{s['rsi']:.0f}, ADX:{s['adx']:.0f})")
+        unit = ACTIVOS[s['activo']]["pip_name"]
+        print(f"    {s['fecha']} {s['activo']:10s} {s['tipo']:4s} {s['pips']:+.1f} {unit} (RSI:{s['rsi_prev']:.0f}->{s['rsi']:.0f}, ADX:{s['adx']:.0f})")
 
     print()
     print(f"  Backtest completado. {total} senales analizadas.")
