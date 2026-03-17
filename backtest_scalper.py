@@ -45,18 +45,17 @@ BB_STD = 2.0
 RSI_PERIOD = 7
 EMA_PERIOD = 50
 ADX_PERIOD = 10
-ADX_MIN = 12
-ADX_MAX = 35
+ADX_MIN = 10
+ADX_MAX = 40
 ATR_PERIOD = 14
 SL_ATR_MULT = 1.5
 TP_ATR_MULT = 2.0
 TIMEOUT_CANDLES = 12  # 60 min / 5 min = 12 velas
+COOLDOWN_CANDLES = 3  # Minimo 3 velas (15 min) entre senales del mismo activo
 
-# RSI thresholds (relajados para mas senales)
-RSI_BUY_PREV = 30   # RSI <= 30 en vela anterior
-RSI_BUY_CURR = 32   # RSI > 32 en vela actual
-RSI_SELL_PREV = 70   # RSI >= 70 en vela anterior
-RSI_SELL_CURR = 68   # RSI < 68 en vela actual
+# RSI thresholds — nivel simple, sin requerir cruce
+RSI_BUY_ZONE = 38     # RSI < 38 = zona oversold para scalp
+RSI_SELL_ZONE = 62    # RSI > 62 = zona overbought para scalp
 
 
 def get_col(df, prefijo):
@@ -151,6 +150,7 @@ def run_backtest():
         hora_fin = cfg["hora_fin"]
         pip_mult = cfg["pip_mult"]
         n_senales = 0
+        last_signal_idx = -999  # Para cooldown
 
         # Filtrar solo horario de trading
         # Primero calculamos indicadores sobre todo el dataset
@@ -187,14 +187,20 @@ def run_backtest():
                 if ts.weekday() >= 5:
                     continue
 
-            # Valores actuales y anteriores
+            # Cooldown: no repetir senal del mismo activo en menos de N velas
+            if n_senales > 0 and (i - last_signal_idx) < COOLDOWN_CANDLES:
+                continue
+
+            # Valores actuales
             curr_close = float(df_calc['Close'].iloc[i])
+            curr_open = float(df_calc['Open'].iloc[i])
             curr_low = float(df_calc['Low'].iloc[i])
             curr_high = float(df_calc['High'].iloc[i])
             curr_rsi = float(rsi.iloc[i])
             prev_rsi = float(rsi.iloc[i - 1])
             curr_bbl = float(bbl.iloc[i])
             curr_bbu = float(bbu.iloc[i])
+            bbm = (curr_bbl + curr_bbu) / 2  # BB media
             curr_ema = float(ema.iloc[i])
             curr_adx = float(adx.iloc[i])
             curr_atr = float(atr.iloc[i])
@@ -207,27 +213,58 @@ def run_backtest():
             if curr_atr <= 0:
                 continue
 
-            # -- Condiciones de entrada --
+            # -- Condiciones de entrada (3 variantes) --
             tipo = None
+            variante = ""
 
-            # Margen EMA: permitir precio cercano al EMA (0.3%)
-            ema_margin = curr_ema * 0.003
-
-            # BUY: Low toca/perfora BB inferior + RSI rebota + precio >= EMA50-margen + ADX
-            if (curr_low <= curr_bbl and
-                    prev_rsi <= RSI_BUY_PREV and
-                    curr_rsi > RSI_BUY_CURR and
-                    curr_close >= (curr_ema - ema_margin) and
-                    ADX_MIN <= curr_adx <= ADX_MAX):
+            # Variante A: BB touch + RSI en zona oversold/overbought (principal)
+            # BUY: Low toca BB inferior + RSI < 38 + ADX ok
+            if (curr_low <= curr_bbl
+                    and curr_rsi < RSI_BUY_ZONE
+                    and ADX_MIN <= curr_adx <= ADX_MAX):
                 tipo = "BUY"
+                variante = "A"
 
-            # SELL: High toca/perfora BB superior + RSI rebota + precio <= EMA50+margen + ADX
-            elif (curr_high >= curr_bbu and
-                  prev_rsi >= RSI_SELL_PREV and
-                  curr_rsi < RSI_SELL_CURR and
-                  curr_close <= (curr_ema + ema_margin) and
-                  ADX_MIN <= curr_adx <= ADX_MAX):
+            # SELL: High toca BB superior + RSI > 62 + ADX ok
+            elif (curr_high >= curr_bbu
+                  and curr_rsi > RSI_SELL_ZONE
+                  and ADX_MIN <= curr_adx <= ADX_MAX):
                 tipo = "SELL"
+                variante = "A"
+
+            # Variante B: Rechazo fuerte de BB (vela cierra lejos del extremo)
+            # BUY: Low perforo BB inferior pero cerro por encima (mecha larga abajo)
+            elif (curr_low < curr_bbl
+                  and curr_close > curr_bbl
+                  and (curr_close - curr_low) > (curr_high - curr_close) * 1.5  # mecha inferior > 1.5x cuerpo superior
+                  and curr_rsi < 45
+                  and ADX_MIN <= curr_adx <= ADX_MAX):
+                tipo = "BUY"
+                variante = "B"
+
+            # SELL: High perforo BB superior pero cerro por debajo (mecha larga arriba)
+            elif (curr_high > curr_bbu
+                  and curr_close < curr_bbu
+                  and (curr_high - curr_close) > (curr_close - curr_low) * 1.5
+                  and curr_rsi > 55
+                  and ADX_MIN <= curr_adx <= ADX_MAX):
+                tipo = "SELL"
+                variante = "B"
+
+            # Variante C: RSI extremo + precio cerca de BB (sin necesidad de tocar)
+            # BUY: RSI < 25 + precio dentro de 20% del rango BB inferior
+            elif (curr_rsi < 25
+                  and curr_close < (curr_bbl + (bbm - curr_bbl) * 0.2)
+                  and ADX_MIN <= curr_adx <= ADX_MAX):
+                tipo = "BUY"
+                variante = "C"
+
+            # SELL: RSI > 75 + precio dentro de 20% del rango BB superior
+            elif (curr_rsi > 75
+                  and curr_close > (curr_bbu - (curr_bbu - bbm) * 0.2)
+                  and ADX_MIN <= curr_adx <= ADX_MAX):
+                tipo = "SELL"
+                variante = "C"
 
             if tipo is None:
                 continue
@@ -305,6 +342,7 @@ def run_backtest():
                 "rsi": round(curr_rsi, 1),
                 "rsi_prev": round(prev_rsi, 1),
                 "adx": round(curr_adx, 1),
+                "variante": variante,
                 "resultado": resultado,
                 "pips": round(pips, 1),
                 "duracion_min": duracion_min,
@@ -334,6 +372,7 @@ def run_backtest():
                 s["timeout"] += 1
 
             n_senales += 1
+            last_signal_idx = i  # Cooldown
 
         print(f"  {nombre:10s} -- {n_senales} senales encontradas")
 

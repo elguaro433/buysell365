@@ -14574,9 +14574,12 @@ def _scalper_calcular_indicadores(df):
 
 def _scalper_evaluar_senal(ind, config):
     """
-    Evalúa señal de scalping: BB(20,2) + RSI(7) Mean Reversion.
-    BUY: Low toca BB inferior + RSI cruza de <25 a >30 + precio > EMA50 + ADX 15-30
-    SELL: High toca BB superior + RSI cruza de >75 a <70 + precio < EMA50 + ADX 15-30
+    Evalúa señal de scalping: BB(20,2) + RSI(7) Mean Reversion M5.
+    3 variantes de entrada:
+      A: BB touch + RSI en zona extrema (principal)
+      B: Rechazo fuerte de BB (mecha larga)
+      C: RSI extremo + precio cerca de BB
+    Filtros por backtest: bloquea NASDAQ SELL y GOLD BUY (perdedores).
     Retorna: ("BUY"/"SELL", razón) o (None, razón)
     """
     if not ind:
@@ -14584,35 +14587,76 @@ def _scalper_evaluar_senal(ind, config):
 
     adx = ind['adx']
     rsi = ind['rsi']
-    rsi_prev = ind['rsi_prev']
+    rsi_prev = ind.get('rsi_prev', rsi)
     precio = ind['precio']
+    symbol = config.get('mt5_symbol', '')
 
-    # Filtro ADX: entre 12 y 35 (mercado con movimiento pero no tendencia extrema)
-    if adx < 12:
-        return None, f"ADX={adx:.0f} muy bajo (mercado dormido)"
-    if adx > 35:
-        return None, f"ADX={adx:.0f} muy alto (tendencia fuerte, no mean reversion)"
+    # Filtro ADX: entre 10 y 40
+    if adx < 10:
+        return None, f"ADX={adx:.0f} muy bajo"
+    if adx > 40:
+        return None, f"ADX={adx:.0f} muy alto"
 
-    # Filtro ATR mínimo (mercado debe moverse)
+    # Filtro ATR mínimo
     if ind['atr'] <= 0:
         return None, "ATR=0"
 
-    # Margen EMA: permitir precio cercano al EMA (0.3%)
-    ema_margin = ind['ema50'] * 0.003
+    bb_lo = ind['bb_lo']
+    bb_up = ind['bb_up']
+    bb_mid = (bb_lo + bb_up) / 2
+    low = ind['low']
+    high = ind['high']
+    close = ind.get('close', precio)
 
-    # ── BUY: Mean Reversion desde BB inferior ──
-    if (ind['low'] <= ind['bb_lo']              # Low toca/perfora BB inferior
-        and rsi_prev <= 30 and rsi > 32         # RSI cruza de oversold a >32
-        and precio >= (ind['ema50'] - ema_margin)  # Tendencia alcista o cercana
-    ):
-        return "BUY", f"BB+RSI Buy | RSI {rsi_prev:.0f}→{rsi:.0f} | ADX={adx:.0f}"
+    # ── Variante A: BB touch + RSI en zona extrema (principal) ──
+    # BUY
+    if (low <= bb_lo and rsi < 38 and 10 <= adx <= 40):
+        # Bloquear GOLD BUY (backtest: -83 pips, 36.4% WR)
+        if 'XAUUSD' in symbol or 'GC' in symbol:
+            return None, "Gold BUY bloqueado (backtest negativo)"
+        return "BUY", f"BB+RSI-A Buy | RSI={rsi:.0f} | ADX={adx:.0f}"
 
-    # ── SELL: Mean Reversion desde BB superior ──
-    if (ind['high'] >= ind['bb_up']             # High toca/perfora BB superior
-        and rsi_prev >= 70 and rsi < 68         # RSI cruza de overbought a <68
-        and precio <= (ind['ema50'] + ema_margin)  # Tendencia bajista o cercana
-    ):
-        return "SELL", f"BB+RSI Sell | RSI {rsi_prev:.0f}→{rsi:.0f} | ADX={adx:.0f}"
+    # SELL
+    if (high >= bb_up and rsi > 62 and 10 <= adx <= 40):
+        # Bloquear NASDAQ SELL (backtest: -393 pips, 23.9% WR)
+        if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
+            return None, "NASDAQ SELL bloqueado (backtest negativo)"
+        return "SELL", f"BB+RSI-A Sell | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+    # ── Variante B: Rechazo fuerte de BB (mecha larga) ──
+    body_up = high - close
+    body_down = close - low
+
+    # BUY: mecha inferior larga (rechazo)
+    if (low < bb_lo and close > bb_lo
+            and body_down > body_up * 1.5
+            and rsi < 45 and 10 <= adx <= 40):
+        if 'XAUUSD' in symbol or 'GC' in symbol:
+            return None, "Gold BUY-B bloqueado"
+        return "BUY", f"BB+RSI-B Buy (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+    # SELL: mecha superior larga (rechazo)
+    if (high > bb_up and close < bb_up
+            and body_up > body_down * 1.5
+            and rsi > 55 and 10 <= adx <= 40):
+        if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
+            return None, "NASDAQ SELL-B bloqueado"
+        return "SELL", f"BB+RSI-B Sell (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+    # ── Variante C: RSI extremo + precio cerca de BB ──
+    # BUY: RSI < 25 + precio en zona baja
+    if (rsi < 25 and close < (bb_lo + (bb_mid - bb_lo) * 0.2)
+            and 10 <= adx <= 40):
+        if 'XAUUSD' in symbol or 'GC' in symbol:
+            return None, "Gold BUY-C bloqueado"
+        return "BUY", f"BB+RSI-C Buy (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+    # SELL: RSI > 75 + precio en zona alta
+    if (rsi > 75 and close > (bb_up - (bb_up - bb_mid) * 0.2)
+            and 10 <= adx <= 40):
+        if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
+            return None, "NASDAQ SELL-C bloqueado"
+        return "SELL", f"BB+RSI-C Sell (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f}"
 
     return None, "Sin señal scalping"
 
