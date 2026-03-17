@@ -14587,27 +14587,30 @@ def _scalper_evaluar_senal(ind, config):
     rsi_prev = ind['rsi_prev']
     precio = ind['precio']
 
-    # Filtro ADX: entre 15 y 30 (mercado con movimiento pero no tendencia fuerte)
-    if adx < 15:
+    # Filtro ADX: entre 12 y 35 (mercado con movimiento pero no tendencia extrema)
+    if adx < 12:
         return None, f"ADX={adx:.0f} muy bajo (mercado dormido)"
-    if adx > 30:
+    if adx > 35:
         return None, f"ADX={adx:.0f} muy alto (tendencia fuerte, no mean reversion)"
 
     # Filtro ATR mínimo (mercado debe moverse)
     if ind['atr'] <= 0:
         return None, "ATR=0"
 
+    # Margen EMA: permitir precio cercano al EMA (0.3%)
+    ema_margin = ind['ema50'] * 0.003
+
     # ── BUY: Mean Reversion desde BB inferior ──
     if (ind['low'] <= ind['bb_lo']              # Low toca/perfora BB inferior
-        and rsi_prev <= 25 and rsi > 30         # RSI cruza de oversold a >30
-        and precio > ind['ema50']               # Solo comprar en tendencia alcista
+        and rsi_prev <= 30 and rsi > 32         # RSI cruza de oversold a >32
+        and precio >= (ind['ema50'] - ema_margin)  # Tendencia alcista o cercana
     ):
         return "BUY", f"BB+RSI Buy | RSI {rsi_prev:.0f}→{rsi:.0f} | ADX={adx:.0f}"
 
     # ── SELL: Mean Reversion desde BB superior ──
     if (ind['high'] >= ind['bb_up']             # High toca/perfora BB superior
-        and rsi_prev >= 75 and rsi < 70         # RSI cruza de overbought a <70
-        and precio < ind['ema50']               # Solo vender en tendencia bajista
+        and rsi_prev >= 70 and rsi < 68         # RSI cruza de overbought a <68
+        and precio <= (ind['ema50'] + ema_margin)  # Tendencia bajista o cercana
     ):
         return "SELL", f"BB+RSI Sell | RSI {rsi_prev:.0f}→{rsi:.0f} | ADX={adx:.0f}"
 

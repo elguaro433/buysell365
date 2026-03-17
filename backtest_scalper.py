@@ -45,18 +45,18 @@ BB_STD = 2.0
 RSI_PERIOD = 7
 EMA_PERIOD = 50
 ADX_PERIOD = 10
-ADX_MIN = 15
-ADX_MAX = 30
+ADX_MIN = 12
+ADX_MAX = 35
 ATR_PERIOD = 14
 SL_ATR_MULT = 1.5
 TP_ATR_MULT = 2.0
 TIMEOUT_CANDLES = 12  # 60 min / 5 min = 12 velas
 
-# RSI thresholds
-RSI_BUY_PREV = 25   # RSI <= 25 en vela anterior
-RSI_BUY_CURR = 30   # RSI > 30 en vela actual
-RSI_SELL_PREV = 75   # RSI >= 75 en vela anterior
-RSI_SELL_CURR = 70   # RSI < 70 en vela actual
+# RSI thresholds (relajados para mas senales)
+RSI_BUY_PREV = 30   # RSI <= 30 en vela anterior
+RSI_BUY_CURR = 32   # RSI > 32 en vela actual
+RSI_SELL_PREV = 70   # RSI >= 70 en vela anterior
+RSI_SELL_CURR = 68   # RSI < 68 en vela actual
 
 
 def get_col(df, prefijo):
@@ -72,30 +72,30 @@ def get_col(df, prefijo):
 
 def calcular_indicadores(df):
     """Calcula BB, RSI, EMA, ADX, ATR sobre el DataFrame."""
-    # Bollinger Bands
-    bb = df.ta.bbands(length=BB_PERIOD, std=BB_STD)
+    # Bollinger Bands — uso directo de funciones pandas_ta (no .ta accessor)
+    bb = ta.bbands(df["Close"], length=BB_PERIOD, std=BB_STD)
     if bb is not None:
         df = pd.concat([df, bb], axis=1)
 
     # RSI
-    rsi = df.ta.rsi(length=RSI_PERIOD)
+    rsi = ta.rsi(df["Close"], length=RSI_PERIOD)
     if rsi is not None:
-        df = pd.concat([df, rsi.to_frame()], axis=1)
+        df[f"RSI_{RSI_PERIOD}"] = rsi
 
     # EMA 50
-    ema = df.ta.ema(length=EMA_PERIOD)
+    ema = ta.ema(df["Close"], length=EMA_PERIOD)
     if ema is not None:
-        df = pd.concat([df, ema.to_frame()], axis=1)
+        df[f"EMA_{EMA_PERIOD}"] = ema
 
     # ADX
-    adx = df.ta.adx(length=ADX_PERIOD)
+    adx = ta.adx(df["High"], df["Low"], df["Close"], length=ADX_PERIOD)
     if adx is not None:
         df = pd.concat([df, adx], axis=1)
 
     # ATR
-    atr = df.ta.atr(length=ATR_PERIOD)
+    atr = ta.atr(df["High"], df["Low"], df["Close"], length=ATR_PERIOD)
     if atr is not None:
-        df = pd.concat([df, atr.to_frame()], axis=1)
+        df[f"ATRr_{ATR_PERIOD}"] = atr
 
     return df
 
@@ -210,19 +210,22 @@ def run_backtest():
             # -- Condiciones de entrada --
             tipo = None
 
-            # BUY: Low toca/perfora BB inferior + RSI rebota + precio > EMA50 + ADX 15-30
+            # Margen EMA: permitir precio cercano al EMA (0.3%)
+            ema_margin = curr_ema * 0.003
+
+            # BUY: Low toca/perfora BB inferior + RSI rebota + precio >= EMA50-margen + ADX
             if (curr_low <= curr_bbl and
                     prev_rsi <= RSI_BUY_PREV and
                     curr_rsi > RSI_BUY_CURR and
-                    curr_close > curr_ema and
+                    curr_close >= (curr_ema - ema_margin) and
                     ADX_MIN <= curr_adx <= ADX_MAX):
                 tipo = "BUY"
 
-            # SELL: High toca/perfora BB superior + RSI rebota + precio < EMA50 + ADX 15-30
+            # SELL: High toca/perfora BB superior + RSI rebota + precio <= EMA50+margen + ADX
             elif (curr_high >= curr_bbu and
                   prev_rsi >= RSI_SELL_PREV and
                   curr_rsi < RSI_SELL_CURR and
-                  curr_close < curr_ema and
+                  curr_close <= (curr_ema + ema_margin) and
                   ADX_MIN <= curr_adx <= ADX_MAX):
                 tipo = "SELL"
 
