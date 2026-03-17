@@ -1,0 +1,677 @@
+// ============================================================
+// BuySell365 PRO · 4 PAIRS v3 — EURUSD · USDJPY · GBPJPY · US500
+// v3: Fix señales Premium bloqueadas + backtest mejorado:
+//   ✅ baseScore >= 3 (era 4) → OB/FVG/CHOCH pueden ser Premium
+//   ✅ CHOCH ahora respeta filtro EMA200 (antes no lo tenía)
+//   ✅ Backtest trend confirm relajado (ema20/50, no ema9)
+//   ✅ Todas las mejoras de v2 mantenidas
+// v2: EMA200 ON, scores per-asset, cooldowns per-asset,
+//     divergencias estrictas JPY/SP500, labels pequeños
+// ============================================================
+// NOTA: ORO y NASDAQ tienen sus propios scripts dedicados
+// ============================================================
+
+//@version=6
+indicator("BuySell365 PRO · 4 PAIRS v3", overlay=true, max_labels_count=500, max_lines_count=500, max_boxes_count=200)
+
+// ═══════════════════════════════════════════════════
+// AUTO-DETECCIÓN DE MERCADO (solo 4 pares)
+// ═══════════════════════════════════════════════════
+
+_tid = str.upper(syminfo.tickerid)
+isEURUSD = str.contains(_tid, "EURUSD")
+isUSDJPY = str.contains(_tid, "USDJPY")
+isGBPJPY = str.contains(_tid, "GBPJPY")
+isSP500  = str.contains(_tid, "US500") or str.contains(_tid, "SPX") or str.contains(_tid, "SP500") or str.contains(_tid, "ES1")
+isForex  = isEURUSD or isUSDJPY or isGBPJPY
+isJPY    = isUSDJPY or isGBPJPY
+isValid  = isEURUSD or isUSDJPY or isGBPJPY or isSP500
+
+if not isValid
+    runtime.error("⚠️ BuySell365 PRO 4 PAIRS: Solo para EURUSD / USDJPY / GBPJPY / US500. ORO y NASDAQ tienen scripts propios.")
+
+marketName = isEURUSD ? "EURUSD" : isUSDJPY ? "USDJPY" : isGBPJPY ? "GBPJPY" : isSP500 ? "US500" : syminfo.tickerid
+mt5Symbol  = isEURUSD ? "EURUSD" : isUSDJPY ? "USDJPY" : isGBPJPY ? "GBPJPY" : isSP500 ? "US500Cash" : "?"
+pFmt       = isEURUSD ? "#.00000" : isJPY ? "#.000" : "#.00"
+
+// ═══════════════════════════════════════════════════
+// CALIBRACIÓN POR ACTIVO (bot.py líneas 2359-2393)
+// ═══════════════════════════════════════════════════
+
+// RSI thresholds (bot.py exacto)
+RSI_OS = isEURUSD ? 35 : isUSDJPY ? 33 : isGBPJPY ? 30 : isSP500 ? 44 : 35
+RSI_OB = isEURUSD ? 65 : isUSDJPY ? 67 : isGBPJPY ? 70 : isSP500 ? 56 : 65
+
+// ADX mínimo (bot.py exacto)
+ADX_MIN = isEURUSD ? 15 : isUSDJPY ? 16 : isGBPJPY ? 18 : isSP500 ? 16 : 15
+
+// Bollinger squeeze (bot.py exacto)
+BB_SQUEEZE = isEURUSD ? 0.008 : isUSDJPY ? 0.010 : isGBPJPY ? 0.012 : isSP500 ? 0.010 : 0.008
+
+// Volumen mínimo
+VOL_MIN = isEURUSD ? 0.7 : isUSDJPY ? 0.7 : isGBPJPY ? 0.8 : isSP500 ? 1.0 : 0.8
+
+// ATR mínimo (bot.py exacto)
+MIN_ATR = isEURUSD ? 0.0003 : isJPY ? 0.004 : isSP500 ? 0.8 : 0.0003
+
+// TP/SL multiplicadores ATR 1H (bot.py líneas 2624-2665)
+SL_MULT  = isEURUSD ? 1.5 : isJPY ? 0.5 : isSP500 ? 1.5 : 1.5
+TP1_MULT = isEURUSD ? 2.1 : isJPY ? 0.7 : isSP500 ? 2.2 : 2.1
+TP2_MULT = isEURUSD ? 3.0 : isJPY ? 1.5 : isSP500 ? 3.5 : 3.0
+TP3_MULT = isEURUSD ? 4.5 : isJPY ? 2.5 : isSP500 ? 5.5 : 4.5
+
+// SL mínimo por activo (bot.py líneas 2682-2689)
+MIN_SL      = isEURUSD ? 0.00025 : isUSDJPY ? 0.035 : isGBPJPY ? 0.045 : isSP500 ? 8.0 : 0.00025
+MAX_SL_MULT = 2.0
+
+// Impulso SMC
+IMPULSE_THR = isGBPJPY ? 0.5 : isSP500 ? 0.5 : isForex ? 0.3 : 0.5
+
+// ═══════════════════════════════════════════════════
+// v2: SCORE THRESHOLDS PER-ASSET
+// JPY y SP500 necesitan más puntos para Premium (eran 8, ahora 9)
+// ═══════════════════════════════════════════════════
+
+PREM_SCORE  = isJPY ? 9 : isSP500 ? 9 : 8
+VALID_SCORE = isJPY ? 7 : isSP500 ? 7 : 6
+
+// ═══════════════════════════════════════════════════
+// INPUTS OPCIONALES
+// ═══════════════════════════════════════════════════
+
+grpAdj      = "Ajustes TP/SL"
+tpAdj       = input.float(1.0, "Multiplicar TP", minval=0.5, maxval=2.0, step=0.1, group=grpAdj)
+slAdj       = input.float(1.0, "Multiplicar SL", minval=0.5, maxval=2.0, step=0.1, group=grpAdj)
+
+grpLvl      = "Niveles de Señal"
+showPremium = input.bool(true,  "Mostrar PREMIUM", group=grpLvl)
+showValid   = input.bool(true,  "Mostrar VÁLIDA",  group=grpLvl)
+
+grpSMC      = "Smart Money"
+smcEnabled  = input.bool(true,  "Activar SMC",           group=grpSMC)
+obLookback  = input.int(10,     "OB Lookback", minval=5, maxval=30, group=grpSMC)
+
+grpFilt     = "Filtros"
+sessionFilt = input.bool(true,  "Solo London/NY (recomendado)", group=grpFilt)
+ema200Filt  = input.bool(true,  "Filtro EMA200 (recomendado)", group=grpFilt)  // v2: ON por defecto (era OFF)
+volFilterOn = input.bool(true,  "Filtro Volumen",               group=grpFilt)
+
+grpVis      = "Visual"
+showEMAs    = input.bool(true,  "EMAs",          group=grpVis)
+showOB      = input.bool(true,  "Order Blocks",  group=grpVis)
+showFVG     = input.bool(true,  "FVGs",          group=grpVis)
+showTPSL    = input.bool(true,  "TP/SL lines",   group=grpVis)
+showTable   = input.bool(true,  "Tabla Info",    group=grpVis)
+showStats   = input.bool(true,  "Tabla Stats",   group=grpVis)
+
+finalTp1 = TP1_MULT * tpAdj
+finalTp2 = TP2_MULT * tpAdj
+finalTp3 = TP3_MULT * tpAdj
+finalSl  = SL_MULT  * slAdj
+
+// ═══════════════════════════════════════════════════
+// INDICADORES BASE (bot.py líneas 2065-2295)
+// ═══════════════════════════════════════════════════
+
+ema9   = ta.ema(close, 9)
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+
+rsiVal = ta.rsi(close, 14)
+
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+
+atrVal = ta.atr(14)
+atrPct = (atrVal / close) * 100
+
+// ta.bb() retorna [basis, upper, lower]
+[bbBasis, bbUpper, bbLower] = ta.bb(close, 20, 2.0)
+bbWidthPct = (bbUpper - bbLower) / close
+
+[diPlus, diMinus, adxVal] = ta.dmi(14, 14)
+
+// Estocástico REAL (no StochRSI)
+_stochRaw = ta.stoch(close, high, low, 14)
+stochK    = ta.sma(_stochRaw, 3)
+stochD    = ta.sma(stochK, 3)
+
+// Volumen con proxy ATR para brokers sin volumen
+volSMA     = ta.sma(volume, 20)
+_atrRecent = ta.sma(atrVal, 5)
+_atrAvg    = ta.sma(atrVal, 20)
+volRatio   = volume > 0 ? nz(volume / volSMA, 1.0) : nz(_atrRecent / _atrAvg, 1.0)
+
+vwapVal = ta.vwap(close)
+
+bodyPct    = math.abs(close - open) / math.max(high - low, 0.00001)
+velaCuerpo = bodyPct > 0.3
+
+// ═══════════════════════════════════════════════════
+// MULTI-TIMEFRAME 1H
+// ═══════════════════════════════════════════════════
+
+atr1H = request.security(syminfo.tickerid, "60", ta.atr(14))
+
+ema20_1h = request.security(syminfo.tickerid, "60", ta.ema(close, 20))
+ema50_1h = request.security(syminfo.tickerid, "60", ta.ema(close, 50))
+rsi_1h   = request.security(syminfo.tickerid, "60", ta.rsi(close, 14))
+[_dp1h, _dm1h, adx_1h] = request.security(syminfo.tickerid, "60", ta.dmi(14, 14))
+[macd_1h, signal_1h, _hist1h] = request.security(syminfo.tickerid, "60", ta.macd(close, 12, 26, 9))
+
+mtf1hBull = ema20_1h > ema50_1h and macd_1h > signal_1h and rsi_1h > 40 and rsi_1h < 75
+mtf1hBear = ema20_1h < ema50_1h and macd_1h < signal_1h and rsi_1h > 25 and rsi_1h < 60
+
+// ═══════════════════════════════════════════════════
+// DIVERGENCIAS RSI — v2: Sensibilidad per-asset
+// JPY y SP500 necesitan divergencias MÁS CLARAS
+// ═══════════════════════════════════════════════════
+
+_precio20  = ta.lowest(low, 20)
+_precio20H = ta.highest(high, 20)
+_rsi20L    = ta.lowest(rsiVal, 20)
+_rsi20H    = ta.highest(rsiVal, 20)
+
+// v2: JPY y SP500 → tolerancia más estricta (0.1% vs 0.2%, RSI 20% vs 15%)
+_divPriceTol = isJPY ? 1.001 : isSP500 ? 1.001 : 1.002
+_divRsiMult  = isJPY ? 1.20 : isSP500 ? 1.20 : 1.15
+
+divAlcista = (low <= _precio20 * _divPriceTol) and (rsiVal > _rsi20L * _divRsiMult)
+divBajista = (high >= _precio20H * (2.0 - _divPriceTol)) and (rsiVal < _rsi20H * (2.0 - _divRsiMult))
+
+// ═══════════════════════════════════════════════════
+// SOPORTE / RESISTENCIA
+// ═══════════════════════════════════════════════════
+
+swingHigh = ta.pivothigh(high, 5, 5)
+swingLow  = ta.pivotlow(low, 5, 5)
+
+var float lastSH = na
+var float lastSL_pivot = na
+if not na(swingHigh)
+    lastSH := swingHigh
+if not na(swingLow)
+    lastSL_pivot := swingLow
+
+cercaSoporte     = not na(lastSL_pivot) and (close - lastSL_pivot) / close < 0.005 and close > lastSL_pivot
+cercaResistencia = not na(lastSH) and (lastSH - close) / close < 0.005 and close < lastSH
+
+// ═══════════════════════════════════════════════════
+// RÉGIMEN DE MERCADO (con bloqueos)
+// ═══════════════════════════════════════════════════
+
+_bbWidthThr = isForex ? 0.8 : isSP500 ? 2.0 : 2.5
+regimeTend  = adxVal > 25
+regimeRang  = adxVal < 20
+regimeVol   = bbWidthPct * 100 > _bbWidthThr
+regimeTran  = not regimeTend and not regimeRang and not regimeVol
+
+regimeBlockTran = regimeTran and adxVal < 18
+regimeBlockVol  = regimeVol and volRatio < 1.0
+regimeBlockRang = regimeRang and not (divAlcista or divBajista or rsiVal < RSI_OS or rsiVal > RSI_OB)
+
+regimeOK = not regimeBlockTran and not regimeBlockVol and not regimeBlockRang
+
+// ═══════════════════════════════════════════════════
+// SMART MONEY CONCEPTS
+// ═══════════════════════════════════════════════════
+
+bosUp   = smcEnabled and not na(lastSH) and close > lastSH and close[1] <= lastSH
+bosDown = smcEnabled and not na(lastSL_pivot) and close < lastSL_pivot and close[1] >= lastSL_pivot
+
+var int mktTrend = 0
+if bosUp
+    mktTrend := 1
+if bosDown
+    mktTrend := -1
+
+chochUp   = bosUp   and mktTrend[1] == -1
+chochDown = bosDown and mktTrend[1] == 1
+
+var float obBullH = na, var float obBullL = na, var int obBullBar = na
+var float obBearH = na, var float obBearL = na, var int obBearBar = na
+
+impulsoUp   = close > open and close[1] > open[1] and (close - open) > atrVal * IMPULSE_THR
+impulsoDown = close < open and close[1] < open[1] and (open - close) > atrVal * IMPULSE_THR
+
+if smcEnabled and impulsoUp
+    for i = 2 to obLookback
+        if close[i] < open[i]
+            obBullH := high[i], obBullL := low[i], obBullBar := bar_index - i
+            break
+if smcEnabled and impulsoDown
+    for i = 2 to obLookback
+        if close[i] > open[i]
+            obBearH := high[i], obBearL := low[i], obBearBar := bar_index - i
+            break
+
+inBullOB = not na(obBullL) and low <= obBullH and close >= obBullL and (bar_index - nz(obBullBar, 0)) < 40
+inBearOB = not na(obBearL) and high >= obBearL and close <= obBearH and (bar_index - nz(obBearBar, 0)) < 40
+
+fvgBull = low > high[2] and close[1] > open[1] and (close[1] - open[1]) > atrVal * 0.3
+fvgBear = high < low[2] and close[1] < open[1] and (open[1] - close[1]) > atrVal * 0.3
+
+var float lfvgBullB = na, var float lfvgBullT = na
+var float lfvgBearB = na, var float lfvgBearT = na
+if fvgBull
+    lfvgBullB := high[2], lfvgBullT := low
+if fvgBear
+    lfvgBearB := high, lfvgBearT := low[2]
+
+inFvgBull = not na(lfvgBullB) and low <= lfvgBullT and close >= lfvgBullB
+inFvgBear = not na(lfvgBearT) and high >= lfvgBearB and close <= lfvgBearT
+
+// ═══════════════════════════════════════════════════
+// SESIONES
+// ═══════════════════════════════════════════════════
+
+london = hour >= 8  and hour < 16
+ny     = hour >= 13 and hour < 21
+asia   = hour >= 0  and hour < 8
+active = london or ny
+sessOK = sessionFilt ? active : true
+
+// ═══════════════════════════════════════════════════
+// LAS 3 ESTRATEGIAS DEL BOT (bot.py líneas 2430-2586)
+// ═══════════════════════════════════════════════════
+
+_tendBullFuerte = ema20 > ema50 and ema50 > ema200
+_tendBearFuerte = ema20 < ema50 and ema50 < ema200
+
+ema200BuyOK  = ema200Filt ? close > ema200 : true
+ema200SellOK = ema200Filt ? close < ema200 : true
+atrOK = atrVal >= MIN_ATR
+
+// ── ESTRATEGIA 1: PULLBACK A TENDENCIA (Score 4) ──
+pullBuy = close > ema200
+     and ema20 > ema50
+     and macdLine > signalLine
+     and low <= ema50 * 1.010
+     and close > ema50
+     and rsiVal < (RSI_OS + 15)
+     and stochK < 50
+     and volRatio >= VOL_MIN
+     and atrOK and ema200BuyOK
+
+pullSell = close < ema200
+     and ema20 < ema50
+     and macdLine < signalLine
+     and high >= ema50 * 0.990
+     and close < ema50
+     and rsiVal > (RSI_OB - 15)
+     and stochK > 50
+     and volRatio >= VOL_MIN
+     and atrOK and ema200SellOK
+
+// ── ESTRATEGIA 2: BREAKOUT (Score 4) ──
+brkBuy = bbWidthPct < BB_SQUEEZE
+     and close > bbUpper
+     and volRatio > 1.5
+     and macdLine > signalLine
+     and rsiVal < 75
+     and adxVal > ADX_MIN
+     and velaCuerpo
+     and atrOK and ema200BuyOK
+
+brkSell = bbWidthPct < BB_SQUEEZE
+     and close < bbLower
+     and volRatio > 1.5
+     and macdLine < signalLine
+     and rsiVal > 25
+     and adxVal > ADX_MIN
+     and velaCuerpo
+     and atrOK and ema200SellOK
+
+// ── ESTRATEGIA 3: REVERSIÓN EXTREMA (Score 4-5) ──
+// v2: REV_DIV requiere volumen mínimo per-asset (JPY: 1.2x, SP500: 1.0x)
+_revVolReq = isJPY ? 1.2 : isSP500 ? 1.0 : 0.8
+revDivBuy  = divAlcista and not _tendBearFuerte and velaCuerpo and volRatio >= _revVolReq
+revDivSell = divBajista and not _tendBullFuerte and velaCuerpo and volRatio >= _revVolReq
+revExtBuy  = rsiVal < RSI_OS and cercaSoporte and not _tendBearFuerte and velaCuerpo
+revExtSell = rsiVal > RSI_OB and cercaResistencia and not _tendBullFuerte and velaCuerpo
+revBuy  = revDivBuy  or revExtBuy
+revSell = revDivSell or revExtSell
+
+// ── SEÑALES SMC ──
+obBuy    = smcEnabled and inBullOB and rsiVal < 65 and rsiVal > 30 and macdLine > macdLine[1] and volRatio > 0.7 and ema200BuyOK
+obSell   = smcEnabled and inBearOB and rsiVal > 35 and rsiVal < 70 and macdLine < macdLine[1] and volRatio > 0.7 and ema200SellOK
+fvgBuyS  = smcEnabled and inFvgBull and rsiVal > 35 and rsiVal < 65 and close > close[1] and ema200BuyOK
+fvgSellS = smcEnabled and inFvgBear and rsiVal > 35 and rsiVal < 65 and close < close[1] and ema200SellOK
+// v3: CHOCH ahora respeta filtro EMA200 (antes no lo tenía → generaba señales contra tendencia)
+chochBuyS  = smcEnabled and chochUp and volRatio > 0.9 and rsiVal > 30 and rsiVal < 65 and macdLine > signalLine and ema200BuyOK
+chochSellS = smcEnabled and chochDown and volRatio > 0.9 and rsiVal > 35 and rsiVal < 70 and macdLine < signalLine and ema200SellOK
+
+// ── SEÑALES AGREGADAS ──
+anyBuy  = pullBuy  or brkBuy  or revBuy  or obBuy  or fvgBuyS  or chochBuyS
+anySell = pullSell or brkSell or revSell or obSell or fvgSellS or chochSellS
+
+buyTypeTxt  = pullBuy?"PULLBACK":brkBuy?"BREAKOUT":revDivBuy?"REV_DIV":revExtBuy?"REV_EXT":obBuy?"OB":fvgBuyS?"FVG":chochBuyS?"CHOCH":"MIX"
+sellTypeTxt = pullSell?"PULLBACK":brkSell?"BREAKOUT":revDivSell?"REV_DIV":revExtSell?"REV_EXT":obSell?"OB":fvgSellS?"FVG":chochSellS?"CHOCH":"MIX"
+
+// v3: baseScore mantiene jerarquía pero OB/FVG/CHOCH = 3 ahora SÍ puede ser Premium
+//     (Premium requiere >= 3, antes requería >= 4 → bloqueaba OB/FVG/CHOCH)
+buyBaseScore  = revDivBuy  ? 5 : (pullBuy or brkBuy or revExtBuy) ? 4 : anyBuy ? 3 : 0
+sellBaseScore = revDivSell ? 5 : (pullSell or brkSell or revExtSell) ? 4 : anySell ? 3 : 0
+
+// ═══════════════════════════════════════════════════
+// SCORING 0-12
+// ═══════════════════════════════════════════════════
+
+buyScore = 0
+buyScore := buyScore + (ema9 > ema20 and ema20 > ema50 ? 1 : 0)
+buyScore := buyScore + (close > ema200 ? 1 : 0)
+buyScore := buyScore + (rsiVal > 35 and rsiVal < 65 ? 1 : 0)
+buyScore := buyScore + (macdLine > signalLine ? 1 : 0)
+buyScore := buyScore + (histLine > histLine[1] ? 1 : 0)
+buyScore := buyScore + (volRatio > VOL_MIN ? 1 : 0)
+buyScore := buyScore + (adxVal > ADX_MIN ? 1 : 0)
+buyScore := buyScore + (smcEnabled and (inBullOB or inFvgBull) ? 1 : 0)
+buyScore := buyScore + (close > vwapVal ? 1 : 0)
+buyScore := buyScore + (mtf1hBull ? 1 : 0)
+buyScore := buyScore + (divAlcista ? 1 : 0)
+buyScore := buyScore + (stochK < 50 and stochK > stochD ? 1 : 0)
+
+sellScore = 0
+sellScore := sellScore + (ema9 < ema20 and ema20 < ema50 ? 1 : 0)
+sellScore := sellScore + (close < ema200 ? 1 : 0)
+sellScore := sellScore + (rsiVal > 35 and rsiVal < 65 ? 1 : 0)
+sellScore := sellScore + (macdLine < signalLine ? 1 : 0)
+sellScore := sellScore + (histLine < histLine[1] ? 1 : 0)
+sellScore := sellScore + (volRatio > VOL_MIN ? 1 : 0)
+sellScore := sellScore + (adxVal > ADX_MIN ? 1 : 0)
+sellScore := sellScore + (smcEnabled and (inBearOB or inFvgBear) ? 1 : 0)
+sellScore := sellScore + (close < vwapVal ? 1 : 0)
+sellScore := sellScore + (mtf1hBear ? 1 : 0)
+sellScore := sellScore + (divBajista ? 1 : 0)
+sellScore := sellScore + (stochK > 50 and stochK < stochD ? 1 : 0)
+
+// ═══════════════════════════════════════════════════
+// CLASIFICACIÓN PREMIUM / VÁLIDA
+// v2: Per-asset scores + EMA200 OBLIGATORIO para Premium
+// ═══════════════════════════════════════════════════
+
+volOK = volFilterOn ? volRatio > VOL_MIN : true
+
+// v3: baseScore >= 3 (era 4) → OB/FVG/CHOCH con score alto PUEDEN ser Premium
+//     El score alto (8-9/12) + MTF + EMA200 + sesión ya garantizan calidad
+//     Antes: OB/FVG/CHOCH (baseScore=3) NUNCA podían ser Premium → fix crítico
+buyPremium  = anyBuy  and buyBaseScore >= 3 and buyScore >= PREM_SCORE and sessOK and volOK and regimeOK and mtf1hBull and close > ema200
+sellPremium = anySell and sellBaseScore >= 3 and sellScore >= PREM_SCORE and sessOK and volOK and regimeOK and mtf1hBear and close < ema200
+
+// v2: Válida usa VALID_SCORE per-asset (JPY/SP500: 7, EUR: 6)
+buyValid    = anyBuy  and buyScore >= VALID_SCORE and volOK and regimeOK and not buyPremium
+sellValid   = anySell and sellScore >= VALID_SCORE and volOK and regimeOK and not sellPremium
+
+// ═══════════════════════════════════════════════════
+// ANTI-SPAM — v2: Cooldowns PER-ASSET (separado BUY/SELL)
+// ═══════════════════════════════════════════════════
+
+var int lastBuyPBar  = 0, var int lastSellPBar = 0
+var int lastBuyVBar  = 0, var int lastSellVBar = 0
+
+// v2: JPY = 30 bars Premium (7.5h), SP500 = 25 bars (6.25h), EUR = 15 bars (3.75h)
+coolP = isJPY ? 30 : isSP500 ? 25 : 15
+coolV = isJPY ? 50 : isSP500 ? 40 : 25
+
+fBuyP  = buyPremium  and showPremium and (bar_index - lastBuyPBar)  > coolP
+fSellP = sellPremium and showPremium and (bar_index - lastSellPBar) > coolP
+fBuyV  = buyValid    and showValid   and (bar_index - lastBuyVBar)  > coolV and not fBuyP
+fSellV = sellValid   and showValid   and (bar_index - lastSellVBar) > coolV and not fSellP
+
+if fBuyP
+    lastBuyPBar := bar_index
+if fSellP
+    lastSellPBar := bar_index
+if fBuyV
+    lastBuyVBar := bar_index
+if fSellV
+    lastSellVBar := bar_index
+
+// ═══════════════════════════════════════════════════
+// TP / SL DINÁMICO (bot.py líneas 2624-2665)
+// ═══════════════════════════════════════════════════
+
+_atr1h = nz(atr1H, atrVal * 4)
+
+_slRaw   = _atr1h * finalSl
+_slFinal = math.max(_slRaw, MIN_SL)
+_slMax   = _atr1h * MAX_SL_MULT
+_slUse   = math.min(_slFinal, _slMax)
+_slUse  := math.max(_slUse, MIN_SL)
+
+slBuy  = close - _slUse
+slSell = close + _slUse
+
+tp1B = close + _atr1h * finalTp1
+tp2B = close + _atr1h * finalTp2
+tp3B = close + _atr1h * finalTp3
+tp1S = close - _atr1h * finalTp1
+tp2S = close - _atr1h * finalTp2
+tp3S = close - _atr1h * finalTp3
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING ($640 capital, solo PREMIUM)
+// v2: Trend confirm INCLUYE EMA200
+// ═══════════════════════════════════════════════════
+
+var int   totB = 0, var int totS = 0
+var int   wins = 0, var int losses = 0
+var float eq   = 640.0, var float peakEq = 640.0, var float maxDD = 0.0
+var float ePx  = na, var int eDir = 0, var float eSL = na, var float eTP = na
+var int   bse  = 0
+
+_riskAmt = 25.6
+
+anyBF = fBuyP
+anySF = fSellP
+
+// v3: Trend confirm usa ema20/ema50 + ema200 (sin ema9 que es muy ruidosa)
+//     En downtrends fuertes, ema9 oscila mucho en rebotes → bloqueaba SELL entries
+//     ema20 vs ema50 es más estable para confirmar dirección
+_trendConfirmBuy  = ema20 > ema50 and close > ema200
+_trendConfirmSell = ema20 < ema50 and close < ema200
+
+if anyBF and eDir == 0 and _trendConfirmBuy
+    ePx := close, eDir := 1, eSL := slBuy, eTP := tp1B, totB += 1, bse := 0
+if anySF and eDir == 0 and _trendConfirmSell
+    ePx := close, eDir := -1, eSL := slSell, eTP := tp1S, totS += 1, bse := 0
+if eDir != 0
+    bse += 1
+
+if eDir == 1
+    if high >= eTP
+        _rrW = math.abs(eTP - ePx) / math.max(math.abs(ePx - eSL), 0.00001)
+        wins += 1, eq += _riskAmt * _rrW, eDir := 0
+    else if low <= eSL
+        losses += 1, eq -= _riskAmt, eDir := 0
+    else if bse >= 40
+        _pR = (close - ePx) / math.max(math.abs(ePx - eSL), 0.00001)
+        eq += _riskAmt * _pR
+        if _pR > 0
+            wins += 1
+        else
+            losses += 1
+        eDir := 0
+
+if eDir == -1
+    if low <= eTP
+        _rrW2 = math.abs(ePx - eTP) / math.max(math.abs(eSL - ePx), 0.00001)
+        wins += 1, eq += _riskAmt * _rrW2, eDir := 0
+    else if high >= eSL
+        losses += 1, eq -= _riskAmt, eDir := 0
+    else if bse >= 40
+        _pR2 = (ePx - close) / math.max(math.abs(eSL - ePx), 0.00001)
+        eq += _riskAmt * _pR2
+        if _pR2 > 0
+            wins += 1
+        else
+            losses += 1
+        eDir := 0
+
+peakEq := math.max(peakEq, eq)
+dd      = peakEq > 0 ? ((peakEq - eq) / peakEq) * 100 : 0
+maxDD  := math.max(maxDD, dd)
+wr      = (wins + losses) > 0 ? (wins / (wins + losses)) * 100.0 : 0.0
+
+// ═══════════════════════════════════════════════════
+// VISUALIZACIÓN
+// ═══════════════════════════════════════════════════
+
+plot(showEMAs ? ema9   : na, "EMA 9",   color.new(color.yellow, 0), 1)
+plot(showEMAs ? ema20  : na, "EMA 20",  color.new(color.aqua,   0), 1)
+plot(showEMAs ? ema50  : na, "EMA 50",  color.new(color.orange, 0), 2)
+plot(showEMAs ? ema200 : na, "EMA 200", color.new(color.red,   30), 3)
+
+bgcolor(regimeTend ? color.new(color.green,  95) :
+        regimeRang ? color.new(color.orange, 95) :
+        regimeVol  ? color.new(color.red,    95) : na)
+
+if showFVG and fvgBull
+    box.new(bar_index-2, low, bar_index+5, high[2], color.new(color.green, 60), bgcolor=color.new(color.green, 88))
+if showFVG and fvgBear
+    box.new(bar_index-2, low[2], bar_index+5, high, color.new(color.red, 60), bgcolor=color.new(color.red, 88))
+
+if showOB and smcEnabled and impulsoUp and not na(obBullL)
+    box.new(bar_index-obLookback, obBullH, bar_index+2, obBullL,
+        color.new(color.blue, 50), bgcolor=color.new(color.blue, 88),
+        text="OB+", text_color=color.blue, text_size=size.tiny)
+if showOB and smcEnabled and impulsoDown and not na(obBearL)
+    box.new(bar_index-obLookback, obBearH, bar_index+2, obBearL,
+        color.new(color.purple, 50), bgcolor=color.new(color.purple, 88),
+        text="OB-", text_color=color.purple, text_size=size.tiny)
+
+plotshape(bosUp   and not chochUp,   "BOS+",   shape.triangleup,   location.belowbar, color.new(color.teal, 40),    size=size.tiny)
+plotshape(bosDown and not chochDown, "BOS-",   shape.triangledown, location.abovebar, color.new(color.maroon, 40),  size=size.tiny)
+plotshape(chochUp,                   "CHoCH+", shape.diamond,      location.belowbar, color.new(color.lime, 0),     size=size.small)
+plotshape(chochDown,                 "CHoCH-", shape.diamond,      location.abovebar, color.new(color.fuchsia, 0),  size=size.small)
+
+ext = 20
+
+if fBuyP
+    txt = "💎 PREMIUM BUY [" + str.tostring(buyScore) + "/" + str.tostring(PREM_SCORE) + "+]\n" + buyTypeTxt + "\nENTRADA: " + str.tostring(close, pFmt) + "\nTP1: " + str.tostring(tp1B, pFmt) + "\nTP2: " + str.tostring(tp2B, pFmt) + "\nTP3: " + str.tostring(tp3B, pFmt) + "\nSL: " + str.tostring(slBuy, pFmt)
+    label.new(bar_index, low - atrVal * 0.5, txt, style=label.style_label_up, color=color.new(color.orange, 0), textcolor=color.black, size=size.normal)
+    if showTPSL
+        line.new(bar_index, close, bar_index+ext, close, color=color.new(color.blue, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, close, "ENT " + str.tostring(close, pFmt), style=label.style_label_left, color=color.new(color.blue, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp1B, bar_index+ext, tp1B, color=color.new(color.lime, 0), style=line.style_dotted, width=1)
+        label.new(bar_index+ext, tp1B, "TP1 " + str.tostring(tp1B, pFmt), style=label.style_label_left, color=color.new(color.lime, 20), textcolor=color.black, size=size.tiny)
+        line.new(bar_index, tp2B, bar_index+ext, tp2B, color=color.new(color.green, 0), style=line.style_dotted, width=2)
+        label.new(bar_index+ext, tp2B, "TP2 " + str.tostring(tp2B, pFmt), style=label.style_label_left, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp3B, bar_index+ext, tp3B, color=color.new(color.teal, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, tp3B, "TP3 " + str.tostring(tp3B, pFmt), style=label.style_label_left, color=color.new(color.teal, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, slBuy, bar_index+ext, slBuy, color=color.new(color.red, 0), style=line.style_dashed, width=2)
+        label.new(bar_index+ext, slBuy, "SL " + str.tostring(slBuy, pFmt), style=label.style_label_left, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
+
+if fSellP
+    txt = "💎 PREMIUM SELL [" + str.tostring(sellScore) + "/" + str.tostring(PREM_SCORE) + "+]\n" + sellTypeTxt + "\nENTRADA: " + str.tostring(close, pFmt) + "\nTP1: " + str.tostring(tp1S, pFmt) + "\nTP2: " + str.tostring(tp2S, pFmt) + "\nTP3: " + str.tostring(tp3S, pFmt) + "\nSL: " + str.tostring(slSell, pFmt)
+    label.new(bar_index, high + atrVal * 0.5, txt, style=label.style_label_down, color=color.new(color.red, 0), textcolor=color.white, size=size.normal)
+    if showTPSL
+        line.new(bar_index, close, bar_index+ext, close, color=color.new(color.blue, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, close, "ENT " + str.tostring(close, pFmt), style=label.style_label_left, color=color.new(color.blue, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp1S, bar_index+ext, tp1S, color=color.new(color.lime, 0), style=line.style_dotted, width=1)
+        label.new(bar_index+ext, tp1S, "TP1 " + str.tostring(tp1S, pFmt), style=label.style_label_left, color=color.new(color.lime, 20), textcolor=color.black, size=size.tiny)
+        line.new(bar_index, tp2S, bar_index+ext, tp2S, color=color.new(color.green, 0), style=line.style_dotted, width=2)
+        label.new(bar_index+ext, tp2S, "TP2 " + str.tostring(tp2S, pFmt), style=label.style_label_left, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp3S, bar_index+ext, tp3S, color=color.new(color.teal, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, tp3S, "TP3 " + str.tostring(tp3S, pFmt), style=label.style_label_left, color=color.new(color.teal, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, slSell, bar_index+ext, slSell, color=color.new(color.red, 0), style=line.style_dashed, width=2)
+        label.new(bar_index+ext, slSell, "SL " + str.tostring(slSell, pFmt), style=label.style_label_left, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
+
+// v2: Labels Válida con size.small (menos ruido visual, antes era size.normal)
+if fBuyV
+    txt = "✅ BUY [" + str.tostring(buyScore) + "/12]\n" + buyTypeTxt + "\nENT: " + str.tostring(close, pFmt) + " | TP1: " + str.tostring(tp1B, pFmt) + " | SL: " + str.tostring(slBuy, pFmt)
+    label.new(bar_index, low - atrVal * 0.4, txt, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white, size=size.small)
+
+if fSellV
+    txt = "✅ SELL [" + str.tostring(sellScore) + "/12]\n" + sellTypeTxt + "\nENT: " + str.tostring(close, pFmt) + " | TP1: " + str.tostring(tp1S, pFmt) + " | SL: " + str.tostring(slSell, pFmt)
+    label.new(bar_index, high + atrVal * 0.4, txt, style=label.style_label_down, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+
+// ═══════════════════════════════════════════════════
+// TABLAS INFO + STATS
+// ═══════════════════════════════════════════════════
+
+if showTable
+    var table t = table.new(position.top_right, 2, 15, bgcolor=color.new(color.black, 80), border_width=1)
+    if barstate.islast
+        reg  = regimeTend ? "TENDENCIA" : regimeRang ? "RANGO" : regimeVol ? "VOLATIL" : "TRANSICIÓN"
+        smc  = inBullOB ? "OB+" : inBearOB ? "OB-" : inFvgBull ? "FVG+" : inFvgBear ? "FVG-" : "-"
+        ses  = london ? "LONDON" : ny ? "NEW YORK" : asia ? "ASIA" : "-"
+        mtf  = mtf1hBull ? "BULL ✅" : mtf1hBear ? "BEAR ✅" : "NEUTRAL"
+
+        table.cell(t, 0, 0,  "BuySell365 v3", text_color=color.yellow, text_size=size.small)
+        table.cell(t, 1, 0,  marketName,        text_color=color.aqua,   text_size=size.small)
+        table.cell(t, 0, 1,  "Régimen",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 1,  reg,        text_color=regimeTend?color.green:regimeRang?color.orange:color.red, text_size=size.tiny)
+        table.cell(t, 0, 2,  "RSI",      text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 2,  str.tostring(rsiVal, "#.1"), text_color=rsiVal>RSI_OB?color.red:rsiVal<RSI_OS?color.green:color.white, text_size=size.tiny)
+        table.cell(t, 0, 3,  "ADX",      text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 3,  str.tostring(adxVal, "#.1"), text_color=adxVal>ADX_MIN?color.green:color.orange, text_size=size.tiny)
+        table.cell(t, 0, 4,  "ATR 15m",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 4,  str.tostring(atrVal, isForex?"#.00000":"#.2"), text_color=color.white, text_size=size.tiny)
+        table.cell(t, 0, 5,  "ATR 1H",   text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 5,  str.tostring(_atr1h, isForex?"#.00000":"#.2"), text_color=color.aqua, text_size=size.tiny)
+        table.cell(t, 0, 6,  "Volumen",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 6,  str.tostring(volRatio, "#.1") + "x", text_color=volRatio>1.3?color.green:color.white, text_size=size.tiny)
+        table.cell(t, 0, 7,  "SMC",      text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 7,  smc,        text_color=color.white, text_size=size.tiny)
+        table.cell(t, 0, 8,  "Score BUY",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 8,  str.tostring(buyScore) + "/12", text_color=buyScore>=PREM_SCORE?color.orange:buyScore>=VALID_SCORE?color.green:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 9,  "Score SELL", text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 9,  str.tostring(sellScore) + "/12", text_color=sellScore>=PREM_SCORE?color.orange:sellScore>=VALID_SCORE?color.green:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 10, "MTF 1H",   text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 10, mtf,        text_color=mtf1hBull?color.green:mtf1hBear?color.red:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 11, "Sesión",   text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 11, ses,        text_color=active?color.green:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 12, "Diverge",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 12, divAlcista?"ALCISTA":divBajista?"BAJISTA":"-", text_color=divAlcista?color.green:divBajista?color.red:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 13, "Prem Req", text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 13, str.tostring(PREM_SCORE) + "+/12", text_color=color.orange, text_size=size.tiny)
+        table.cell(t, 0, 14, "Señal",    text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 14, fBuyP?"💎 PREM BUY":fSellP?"💎 PREM SELL":fBuyV?"✅ VAL BUY":fSellV?"✅ VAL SELL":"-",
+            text_color=fBuyP?color.green:fSellP?color.red:fBuyV?color.green:fSellV?color.red:color.gray, text_size=size.tiny)
+
+if showStats
+    var table s = table.new(position.bottom_right, 2, 7, bgcolor=color.new(color.black, 80), border_width=1)
+    if barstate.islast
+        wrTxt = (wins+losses) > 0 ? str.tostring(wr, "#.1") + "%" : "N/A"
+        table.cell(s, 0, 0, "STATS v3",    text_color=color.yellow, text_size=size.small)
+        table.cell(s, 1, 0, marketName,     text_color=color.aqua,   text_size=size.tiny)
+        table.cell(s, 0, 1, "Win Rate",    text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 1, wrTxt,         text_color=wr>55?color.green:wr>45?color.orange:color.red, text_size=size.tiny)
+        table.cell(s, 0, 2, "W / L",       text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 2, str.tostring(wins) + " / " + str.tostring(losses), text_color=color.white, text_size=size.tiny)
+        table.cell(s, 0, 3, "Max DD",      text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 3, str.tostring(maxDD, "#.1") + "%", text_color=maxDD>15?color.red:color.green, text_size=size.tiny)
+        table.cell(s, 0, 4, "Equity",      text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 4, "$" + str.tostring(eq, "#.0"), text_color=eq>640?color.green:color.red, text_size=size.tiny)
+        table.cell(s, 0, 5, "Señales",     text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 5, str.tostring(totB) + "B / " + str.tostring(totS) + "S", text_color=color.white, text_size=size.tiny)
+        table.cell(s, 0, 6, "MT5 Symbol",  text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 6, mt5Symbol,     text_color=color.aqua,   text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════
+// ALERTAS WEBHOOK (solo PREMIUM)
+// ═══════════════════════════════════════════════════
+
+regStr = regimeTend?"TREND":regimeRang?"RANGE":regimeVol?"VOLATILE":"TRANSITION"
+smcBS  = inBullOB?"OB":inFvgBull?"FVG":chochUp?"CHOCH":bosUp?"BOS":"NONE"
+smcSS  = inBearOB?"OB":inFvgBear?"FVG":chochDown?"CHOCH":bosDown?"BOS":"NONE"
+mtfStr = mtf1hBull?"BULLISH":mtf1hBear?"BEARISH":"NEUTRAL"
+
+if fBuyP
+    alert('{"secret":"guaro_secreto_777","signal":"BUY","quality":"PREMIUM","source":"BuySell365_PRO_PAIRS","ticker":"' + syminfo.tickerid + '","market":"' + marketName + '","price":' + str.tostring(close) + ',"sl":' + str.tostring(slBuy, "#.5") + ',"tp1":' + str.tostring(tp1B, "#.5") + ',"tp2":' + str.tostring(tp2B, "#.5") + ',"tp3":' + str.tostring(tp3B, "#.5") + ',"score":' + str.tostring(buyScore) + ',"type":"' + buyTypeTxt + '","rsi":' + str.tostring(rsiVal, "#.1") + ',"adx":' + str.tostring(adxVal, "#.1") + ',"vol":' + str.tostring(volRatio, "#.1") + ',"regime":"' + regStr + '","smc":"' + smcBS + '","mtf1h":"' + mtfStr + '"}', alert.freq_once_per_bar)
+
+if fSellP
+    alert('{"secret":"guaro_secreto_777","signal":"SELL","quality":"PREMIUM","source":"BuySell365_PRO_PAIRS","ticker":"' + syminfo.tickerid + '","market":"' + marketName + '","price":' + str.tostring(close) + ',"sl":' + str.tostring(slSell, "#.5") + ',"tp1":' + str.tostring(tp1S, "#.5") + ',"tp2":' + str.tostring(tp2S, "#.5") + ',"tp3":' + str.tostring(tp3S, "#.5") + ',"score":' + str.tostring(sellScore) + ',"type":"' + sellTypeTxt + '","rsi":' + str.tostring(rsiVal, "#.1") + ',"adx":' + str.tostring(adxVal, "#.1") + ',"vol":' + str.tostring(volRatio, "#.1") + ',"regime":"' + regStr + '","smc":"' + smcSS + '","mtf1h":"' + mtfStr + '"}', alert.freq_once_per_bar)
+
+alertcondition(fBuyP,
+    title   = "BuySell365 PRO PAIRS — BUY PREMIUM",
+    message = '{"signal":"BUY","quality":"PREMIUM","source":"BuySell365_PRO_PAIRS","ticker":"{{ticker}}","price":{{close}}}')
+
+alertcondition(fSellP,
+    title   = "BuySell365 PRO PAIRS — SELL PREMIUM",
+    message = '{"signal":"SELL","quality":"PREMIUM","source":"BuySell365_PRO_PAIRS","ticker":"{{ticker}}","price":{{close}}}')
+
+alertcondition(fBuyP or fSellP,
+    title   = "BuySell365 PRO PAIRS — CUALQUIER PREMIUM",
+    message = '{"signal":"ANY","quality":"PREMIUM","source":"BuySell365_PRO_PAIRS","ticker":"{{ticker}}","price":{{close}}}')

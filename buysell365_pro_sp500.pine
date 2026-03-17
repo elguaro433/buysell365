@@ -1,0 +1,611 @@
+// ============================================================
+// BuySell365 PRO · SP500 — Script Dedicado
+// v6 ULTIMO INTENTO vs v5 (37.1% WR, equity $596, DD 21%):
+//   ROOT CAUSE ENCONTRADO: TP/SL usaba ATR 1H (~25 pts) como base
+//     TP1 = 2.8 x 25 = 70 pts → INALCANZABLE en 30 velas 15min
+//     Resultado: trades no resolvian, timeouts destruian equity
+//   FIX: Cambiar a ATR 15min (~11 pts) como base (igual que bot.py)
+//     TP1 = 3.0 x 11 = 33 pts → Alcanzable en UNA sesion
+//     SL  = 2.0 x 11 = 22 pts → Razonable, no ruido
+//   CAMBIOS v6:
+//   1. ATR base: ATR1H → ATR15m (ROOT FIX)
+//   2. Multipliers: bot.py exactos (SL 2.0, TP1 3.0, TP2 7.0, TP3 12.0)
+//   3. RR = 3.0/2.0 = 1.5 → break-even = 40% WR
+//   4. Timeout: 30→25 bars + timeout = HALF LOSS siempre
+//   5. BUY Premium: baseScore >= 4 (no OB/FVG BUYs)
+//   6. Pullback BUY: EMA9 cascade obligatorio
+// ============================================================
+
+//@version=6
+indicator("BuySell365 PRO · SP500", overlay=true, max_labels_count=500, max_lines_count=500, max_boxes_count=200)
+
+// ═══════════════════════════════════════════════════
+// DETECCION — Solo SP500/US500
+// ═══════════════════════════════════════════════════
+
+_tid = str.upper(syminfo.tickerid)
+if not (str.contains(_tid, "US500") or str.contains(_tid, "SPX") or str.contains(_tid, "SP500") or str.contains(_tid, "ES1"))
+    runtime.error("Este script es SOLO para SP500/US500.")
+
+// ═══════════════════════════════════════════════════
+// PARAMETROS — v6 BOT.PY EXACTOS PARA SP500
+// ═══════════════════════════════════════════════════
+
+RSI_OS     = 44
+RSI_OB     = 56
+ADX_MIN    = 20
+BB_SQUEEZE = 0.010
+VOL_MIN    = 1.0
+MIN_ATR    = 0.8
+
+// v6: bot.py exactos — BASE = ATR 15min (NO ATR 1H)
+// Con ATR15m ~11 pts: SL=22, TP1=33, TP2=77, TP3=132
+SL_MULT  = 2.0     // bot.py SP500 exacto
+TP1_MULT = 3.0     // bot.py SP500 exacto
+TP2_MULT = 7.0     // bot.py SP500 exacto
+TP3_MULT = 12.0    // bot.py SP500 exacto
+// RR = 3.0/2.0 = 1.5 → break-even = 40% WR
+
+MIN_SL      = 10.0
+MAX_SL_MULT = 4.0   // v6: mas holgura con ATR15m base
+IMPULSE_THR = 0.5
+
+PREM_SCORE  = 9
+VALID_SCORE = 7
+
+// ═══════════════════════════════════════════════════
+// INPUTS OPCIONALES
+// ═══════════════════════════════════════════════════
+
+grpAdj      = "Ajustes TP/SL"
+tpAdj       = input.float(1.0, "Multiplicar TP", minval=0.5, maxval=2.0, step=0.1, group=grpAdj)
+slAdj       = input.float(1.0, "Multiplicar SL", minval=0.5, maxval=2.0, step=0.1, group=grpAdj)
+
+grpLvl      = "Niveles de Senal"
+showPremium = input.bool(true,  "Mostrar PREMIUM", group=grpLvl)
+showValid   = input.bool(true,  "Mostrar VALIDA",  group=grpLvl)
+
+grpSMC      = "Smart Money"
+smcEnabled  = input.bool(true,  "Activar SMC",           group=grpSMC)
+obLookback  = input.int(10,     "OB Lookback", minval=5, maxval=30, group=grpSMC)
+
+grpFilt     = "Filtros"
+sessionFilt = input.bool(true,  "Solo London/NY (recomendado)", group=grpFilt)
+ema200Filt  = input.bool(true,  "Filtro EMA200 (recomendado)", group=grpFilt)
+volFilterOn = input.bool(true,  "Filtro Volumen",               group=grpFilt)
+
+grpVis      = "Visual"
+showEMAs    = input.bool(true,  "EMAs",          group=grpVis)
+showOB      = input.bool(true,  "Order Blocks",  group=grpVis)
+showFVG     = input.bool(true,  "FVGs",          group=grpVis)
+showTPSL    = input.bool(true,  "TP/SL lines",   group=grpVis)
+showTable   = input.bool(true,  "Tabla Info",    group=grpVis)
+showStats   = input.bool(true,  "Tabla Stats",   group=grpVis)
+
+finalTp1 = TP1_MULT * tpAdj
+finalTp2 = TP2_MULT * tpAdj
+finalTp3 = TP3_MULT * tpAdj
+finalSl  = SL_MULT  * slAdj
+
+// ═══════════════════════════════════════════════════
+// INDICADORES BASE
+// ═══════════════════════════════════════════════════
+
+ema9   = ta.ema(close, 9)
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+
+rsiVal = ta.rsi(close, 14)
+
+[macdLine, signalLine, histLine] = ta.macd(close, 12, 26, 9)
+
+atrVal = ta.atr(14)
+
+[bbBasis, bbUpper, bbLower] = ta.bb(close, 20, 2.0)
+bbWidthPct = (bbUpper - bbLower) / close
+
+[diPlus, diMinus, adxVal] = ta.dmi(14, 14)
+
+_stochRaw = ta.stoch(close, high, low, 14)
+stochK    = ta.sma(_stochRaw, 3)
+stochD    = ta.sma(stochK, 3)
+
+volSMA     = ta.sma(volume, 20)
+_atrRecent = ta.sma(atrVal, 5)
+_atrAvg    = ta.sma(atrVal, 20)
+volRatio   = volume > 0 ? nz(volume / volSMA, 1.0) : nz(_atrRecent / _atrAvg, 1.0)
+
+vwapVal = ta.vwap(close)
+
+bodyPct    = math.abs(close - open) / math.max(high - low, 0.00001)
+velaCuerpo = bodyPct > 0.3
+
+// ═══════════════════════════════════════════════════
+// MULTI-TIMEFRAME 1H
+// ═══════════════════════════════════════════════════
+
+atr1H = request.security(syminfo.tickerid, "60", ta.atr(14))
+
+ema20_1h = request.security(syminfo.tickerid, "60", ta.ema(close, 20))
+ema50_1h = request.security(syminfo.tickerid, "60", ta.ema(close, 50))
+rsi_1h   = request.security(syminfo.tickerid, "60", ta.rsi(close, 14))
+[_dp1h, _dm1h, adx_1h] = request.security(syminfo.tickerid, "60", ta.dmi(14, 14))
+[macd_1h, signal_1h, _hist1h] = request.security(syminfo.tickerid, "60", ta.macd(close, 12, 26, 9))
+
+mtf1hBull = ema20_1h > ema50_1h and macd_1h > signal_1h and rsi_1h > 40 and rsi_1h < 75
+mtf1hBear = ema20_1h < ema50_1h and macd_1h < signal_1h and rsi_1h > 25 and rsi_1h < 60
+
+// ═══════════════════════════════════════════════════
+// DIVERGENCIAS RSI
+// ═══════════════════════════════════════════════════
+
+_precio20  = ta.lowest(low, 20)
+_precio20H = ta.highest(high, 20)
+_rsi20L    = ta.lowest(rsiVal, 20)
+_rsi20H    = ta.highest(rsiVal, 20)
+
+divAlcista = (low <= _precio20 * 1.001) and (rsiVal > _rsi20L * 1.20)
+divBajista = (high >= _precio20H * 0.999) and (rsiVal < _rsi20H * 0.80)
+
+// ═══════════════════════════════════════════════════
+// SOPORTE / RESISTENCIA
+// ═══════════════════════════════════════════════════
+
+swingHigh = ta.pivothigh(high, 5, 5)
+swingLow  = ta.pivotlow(low, 5, 5)
+
+var float lastSH = na
+var float lastSL_pivot = na
+if not na(swingHigh)
+    lastSH := swingHigh
+if not na(swingLow)
+    lastSL_pivot := swingLow
+
+cercaSoporte     = not na(lastSL_pivot) and (close - lastSL_pivot) / close < 0.005 and close > lastSL_pivot
+cercaResistencia = not na(lastSH) and (lastSH - close) / close < 0.005 and close < lastSH
+
+// ═══════════════════════════════════════════════════
+// REGIMEN DE MERCADO
+// ═══════════════════════════════════════════════════
+
+regimeTend  = adxVal > 25
+regimeRang  = adxVal < 20
+regimeVol   = bbWidthPct * 100 > 2.0
+regimeTran  = not regimeTend and not regimeRang and not regimeVol
+
+regimeBlockTran = regimeTran and adxVal < 20
+regimeBlockVol  = regimeVol and volRatio < 1.0
+regimeBlockRang = regimeRang and not (divAlcista or divBajista)
+
+regimeOK = not regimeBlockTran and not regimeBlockVol and not regimeBlockRang
+
+// ═══════════════════════════════════════════════════
+// SMART MONEY CONCEPTS
+// ═══════════════════════════════════════════════════
+
+bosUp   = smcEnabled and not na(lastSH) and close > lastSH and close[1] <= lastSH
+bosDown = smcEnabled and not na(lastSL_pivot) and close < lastSL_pivot and close[1] >= lastSL_pivot
+
+var int mktTrend = 0
+if bosUp
+    mktTrend := 1
+if bosDown
+    mktTrend := -1
+
+chochUp   = bosUp   and mktTrend[1] == -1
+chochDown = bosDown and mktTrend[1] == 1
+
+var float obBullH = na, var float obBullL = na, var int obBullBar = na
+var float obBearH = na, var float obBearL = na, var int obBearBar = na
+
+impulsoUp   = close > open and close[1] > open[1] and (close - open) > atrVal * IMPULSE_THR
+impulsoDown = close < open and close[1] < open[1] and (open - close) > atrVal * IMPULSE_THR
+
+if smcEnabled and impulsoUp
+    for i = 2 to obLookback
+        if close[i] < open[i]
+            obBullH := high[i], obBullL := low[i], obBullBar := bar_index - i
+            break
+if smcEnabled and impulsoDown
+    for i = 2 to obLookback
+        if close[i] > open[i]
+            obBearH := high[i], obBearL := low[i], obBearBar := bar_index - i
+            break
+
+inBullOB = not na(obBullL) and low <= obBullH and close >= obBullL and (bar_index - nz(obBullBar, 0)) < 40
+inBearOB = not na(obBearL) and high >= obBearL and close <= obBearH and (bar_index - nz(obBearBar, 0)) < 40
+
+fvgBull = low > high[2] and close[1] > open[1] and (close[1] - open[1]) > atrVal * 0.3
+fvgBear = high < low[2] and close[1] < open[1] and (open[1] - close[1]) > atrVal * 0.3
+
+var float lfvgBullB = na, var float lfvgBullT = na
+var float lfvgBearB = na, var float lfvgBearT = na
+if fvgBull
+    lfvgBullB := high[2], lfvgBullT := low
+if fvgBear
+    lfvgBearB := high, lfvgBearT := low[2]
+
+inFvgBull = not na(lfvgBullB) and low <= lfvgBullT and close >= lfvgBullB
+inFvgBear = not na(lfvgBearT) and high >= lfvgBearB and close <= lfvgBearT
+
+// ═══════════════════════════════════════════════════
+// SESIONES
+// ═══════════════════════════════════════════════════
+
+london = hour >= 8  and hour < 16
+ny     = hour >= 13 and hour < 21
+asia   = hour >= 0  and hour < 8
+active = london or ny
+sessOK = sessionFilt ? active : true
+
+// ═══════════════════════════════════════════════════
+// LAS 3 ESTRATEGIAS DEL BOT
+// ═══════════════════════════════════════════════════
+
+_tendBullFuerte = ema20 > ema50 and ema50 > ema200
+_tendBearFuerte = ema20 < ema50 and ema50 < ema200
+
+ema200BuyOK  = ema200Filt ? close > ema200 : true
+ema200SellOK = ema200Filt ? close < ema200 : true
+atrOK = atrVal >= MIN_ATR
+
+// -- ESTRATEGIA 1: PULLBACK (Score 4) --
+pullBuy = close > ema200 and ema9 > ema20 and ema20 > ema50 and macdLine > signalLine
+     and low <= ema50 * 1.010 and close > ema50
+     and rsiVal < (RSI_OS + 15) and stochK < 50
+     and volRatio >= VOL_MIN and atrOK and ema200BuyOK
+
+pullSell = close < ema200 and ema9 < ema20 and ema20 < ema50 and macdLine < signalLine
+     and high >= ema50 * 0.990 and close < ema50
+     and rsiVal > (RSI_OB - 15) and stochK > 50
+     and volRatio >= VOL_MIN and atrOK and ema200SellOK
+
+// -- ESTRATEGIA 2: BREAKOUT (Score 4) --
+brkBuy = bbWidthPct < BB_SQUEEZE and close > bbUpper
+     and volRatio > 1.5 and macdLine > signalLine
+     and rsiVal < 75 and adxVal > ADX_MIN and velaCuerpo
+     and atrOK and ema200BuyOK
+
+brkSell = bbWidthPct < BB_SQUEEZE and close < bbLower
+     and volRatio > 1.5 and macdLine < signalLine
+     and rsiVal > 25 and adxVal > ADX_MIN and velaCuerpo
+     and atrOK and ema200SellOK
+
+// -- ESTRATEGIA 3: REVERSION (Score 4-5) --
+revDivBuy  = divAlcista and not _tendBearFuerte and velaCuerpo and volRatio >= 1.0
+revDivSell = divBajista and not _tendBullFuerte and velaCuerpo and volRatio >= 1.0
+revExtBuy  = rsiVal < RSI_OS and cercaSoporte and not _tendBearFuerte and velaCuerpo
+revExtSell = rsiVal > RSI_OB and cercaResistencia and not _tendBullFuerte and velaCuerpo
+revBuy  = revDivBuy  or revExtBuy
+revSell = revDivSell or revExtSell
+
+// -- SENALES SMC --
+obBuy    = smcEnabled and inBullOB and rsiVal < 65 and rsiVal > 30 and macdLine > macdLine[1] and volRatio > 0.7 and ema200BuyOK
+obSell   = smcEnabled and inBearOB and rsiVal > 35 and rsiVal < 70 and macdLine < macdLine[1] and volRatio > 0.7 and ema200SellOK
+fvgBuyS  = smcEnabled and inFvgBull and rsiVal > 35 and rsiVal < 65 and close > close[1] and ema200BuyOK
+fvgSellS = smcEnabled and inFvgBear and rsiVal > 35 and rsiVal < 65 and close < close[1] and ema200SellOK
+chochBuyS  = smcEnabled and chochUp and volRatio > 0.9 and rsiVal > 30 and rsiVal < 65 and macdLine > signalLine and ema200BuyOK
+chochSellS = smcEnabled and chochDown and volRatio > 0.9 and rsiVal > 35 and rsiVal < 70 and macdLine < signalLine and ema200SellOK
+
+// -- SENALES AGREGADAS --
+anyBuy  = pullBuy  or brkBuy  or revBuy  or obBuy  or fvgBuyS  or chochBuyS
+anySell = pullSell or brkSell or revSell or obSell or fvgSellS or chochSellS
+
+buyTypeTxt  = pullBuy?"PULLBACK":brkBuy?"BREAKOUT":revDivBuy?"REV_DIV":revExtBuy?"REV_EXT":obBuy?"OB":fvgBuyS?"FVG":chochBuyS?"CHOCH":"MIX"
+sellTypeTxt = pullSell?"PULLBACK":brkSell?"BREAKOUT":revDivSell?"REV_DIV":revExtSell?"REV_EXT":obSell?"OB":fvgSellS?"FVG":chochSellS?"CHOCH":"MIX"
+
+// v6: BUY requiere baseScore >= 4 (no OB/FVG BUYs — solo estrategias fuertes)
+// SELL mantiene >= 3 (OB/FVG necesarios en bear market)
+buyBaseScore  = revDivBuy  ? 5 : (pullBuy or brkBuy or revExtBuy) ? 4 : anyBuy ? 3 : 0
+sellBaseScore = revDivSell ? 5 : (pullSell or brkSell or revExtSell) ? 4 : anySell ? 3 : 0
+
+// ═══════════════════════════════════════════════════
+// SCORING 0-12
+// ═══════════════════════════════════════════════════
+
+buyScore = 0
+buyScore := buyScore + (ema9 > ema20 and ema20 > ema50 ? 1 : 0)
+buyScore := buyScore + (close > ema200 ? 1 : 0)
+buyScore := buyScore + (rsiVal > 35 and rsiVal < 65 ? 1 : 0)
+buyScore := buyScore + (macdLine > signalLine ? 1 : 0)
+buyScore := buyScore + (histLine > histLine[1] ? 1 : 0)
+buyScore := buyScore + (volRatio > VOL_MIN ? 1 : 0)
+buyScore := buyScore + (adxVal > ADX_MIN ? 1 : 0)
+buyScore := buyScore + (smcEnabled and (inBullOB or inFvgBull) ? 1 : 0)
+buyScore := buyScore + (close > vwapVal ? 1 : 0)
+buyScore := buyScore + (mtf1hBull ? 1 : 0)
+buyScore := buyScore + (divAlcista ? 1 : 0)
+buyScore := buyScore + (stochK < 50 and stochK > stochD ? 1 : 0)
+
+sellScore = 0
+sellScore := sellScore + (ema9 < ema20 and ema20 < ema50 ? 1 : 0)
+sellScore := sellScore + (close < ema200 ? 1 : 0)
+sellScore := sellScore + (rsiVal > 35 and rsiVal < 65 ? 1 : 0)
+sellScore := sellScore + (macdLine < signalLine ? 1 : 0)
+sellScore := sellScore + (histLine < histLine[1] ? 1 : 0)
+sellScore := sellScore + (volRatio > VOL_MIN ? 1 : 0)
+sellScore := sellScore + (adxVal > ADX_MIN ? 1 : 0)
+sellScore := sellScore + (smcEnabled and (inBearOB or inFvgBear) ? 1 : 0)
+sellScore := sellScore + (close < vwapVal ? 1 : 0)
+sellScore := sellScore + (mtf1hBear ? 1 : 0)
+sellScore := sellScore + (divBajista ? 1 : 0)
+sellScore := sellScore + (stochK > 50 and stochK < stochD ? 1 : 0)
+
+// ═══════════════════════════════════════════════════
+// CLASIFICACION PREMIUM / VALIDA
+// ═══════════════════════════════════════════════════
+
+volOK = volFilterOn ? volRatio > VOL_MIN : true
+
+_noContratendBuy  = not _tendBearFuerte
+_noContratendSell = not _tendBullFuerte
+
+// v6: BUY Premium requiere baseScore >= 4 (no OB/FVG sueltos)
+buyPremium  = anyBuy  and buyBaseScore >= 4 and buyScore >= PREM_SCORE and sessOK and volOK and regimeOK and mtf1hBull and close > ema200 and _noContratendBuy
+sellPremium = anySell and sellBaseScore >= 3 and sellScore >= PREM_SCORE and sessOK and volOK and regimeOK and mtf1hBear and close < ema200 and _noContratendSell
+
+buyValid    = anyBuy  and buyScore >= VALID_SCORE and volOK and regimeOK and not buyPremium
+sellValid   = anySell and sellScore >= VALID_SCORE and volOK and regimeOK and not sellPremium
+
+// ═══════════════════════════════════════════════════
+// ANTI-SPAM
+// ═══════════════════════════════════════════════════
+
+var int lastBuyPBar  = 0, var int lastSellPBar = 0
+var int lastBuyVBar  = 0, var int lastSellVBar = 0
+
+coolP = 35
+coolV = 50
+
+fBuyP  = buyPremium  and showPremium and (bar_index - lastBuyPBar)  > coolP
+fSellP = sellPremium and showPremium and (bar_index - lastSellPBar) > coolP
+fBuyV  = buyValid    and showValid   and (bar_index - lastBuyVBar)  > coolV and not fBuyP
+fSellV = sellValid   and showValid   and (bar_index - lastSellVBar) > coolV and not fSellP
+
+if fBuyP
+    lastBuyPBar := bar_index
+if fSellP
+    lastSellPBar := bar_index
+if fBuyV
+    lastBuyVBar := bar_index
+if fSellV
+    lastSellVBar := bar_index
+
+// ═══════════════════════════════════════════════════
+// TP / SL DINAMICO — v6: BASE = ATR 15min (ROOT FIX)
+// ═══════════════════════════════════════════════════
+
+// v6 ROOT FIX: usar ATR 15min como base (NO ATR 1H)
+// Con ATR15m ~11: TP1=33pts (alcanzable), SL=22pts (razonable)
+// Antes con ATR1H ~25: TP1=70pts (inalcanzable!) = timeouts
+_atrBase = atrVal   // ATR14 en 15min — la clave del v6
+
+_slRaw   = _atrBase * finalSl
+_slFinal = math.max(_slRaw, MIN_SL)
+_slMax   = _atrBase * MAX_SL_MULT
+_slUse   = math.min(_slFinal, _slMax)
+_slUse  := math.max(_slUse, MIN_SL)
+
+slBuy  = close - _slUse
+slSell = close + _slUse
+
+tp1B = close + _atrBase * finalTp1
+tp2B = close + _atrBase * finalTp2
+tp3B = close + _atrBase * finalTp3
+tp1S = close - _atrBase * finalTp1
+tp2S = close - _atrBase * finalTp2
+tp3S = close - _atrBase * finalTp3
+
+// ═══════════════════════════════════════════════════
+// BACKTESTING ($640 capital, solo PREMIUM)
+// v6: ATR15m base + timeout = HALF LOSS siempre
+// ═══════════════════════════════════════════════════
+
+var int   totB = 0, var int totS = 0
+var int   wins = 0, var int losses = 0
+var float eq   = 640.0, var float peakEq = 640.0, var float maxDD = 0.0
+var float ePx  = na, var int eDir = 0, var float eSL = na, var float eTP = na
+var int   bse  = 0
+
+_riskAmt = 25.6
+
+_trendConfirmBuy  = ema9 > ema20 and ema20 > ema50 and close > ema200 and mtf1hBull
+_trendConfirmSell = ema9 < ema20 and ema20 < ema50 and close < ema200 and mtf1hBear
+
+if fBuyP and eDir == 0 and _trendConfirmBuy
+    ePx := close, eDir := 1, eSL := slBuy, eTP := tp1B, totB += 1, bse := 0
+if fSellP and eDir == 0 and _trendConfirmSell
+    ePx := close, eDir := -1, eSL := slSell, eTP := tp1S, totS += 1, bse := 0
+if eDir != 0
+    bse += 1
+
+// v6: timeout 25 bars (6.25h) — con TP/SL cercanos, deberian resolver rapido
+// v6: timeout = HALF LOSS (-$12.8) SIEMPRE — backtest conservador y honesto
+if eDir == 1
+    if high >= eTP
+        _rrW = math.abs(eTP - ePx) / math.max(math.abs(ePx - eSL), 0.00001)
+        wins += 1, eq += _riskAmt * _rrW, eDir := 0
+    else if low <= eSL
+        losses += 1, eq -= _riskAmt, eDir := 0
+    else if bse >= 25
+        // v6: timeout = HALF LOSS siempre (no checking P/L)
+        losses += 1, eq -= _riskAmt * 0.5, eDir := 0
+
+if eDir == -1
+    if low <= eTP
+        _rrW2 = math.abs(ePx - eTP) / math.max(math.abs(eSL - ePx), 0.00001)
+        wins += 1, eq += _riskAmt * _rrW2, eDir := 0
+    else if high >= eSL
+        losses += 1, eq -= _riskAmt, eDir := 0
+    else if bse >= 25
+        // v6: timeout = HALF LOSS siempre
+        losses += 1, eq -= _riskAmt * 0.5, eDir := 0
+
+peakEq := math.max(peakEq, eq)
+dd      = peakEq > 0 ? ((peakEq - eq) / peakEq) * 100 : 0
+maxDD  := math.max(maxDD, dd)
+wr      = (wins + losses) > 0 ? (wins / (wins + losses)) * 100.0 : 0.0
+
+// ═══════════════════════════════════════════════════
+// VISUALIZACION
+// ═══════════════════════════════════════════════════
+
+pFmt = "#.00"
+_atr1h_display = nz(atr1H, atrVal * 4)
+
+plot(showEMAs ? ema9   : na, "EMA 9",   color.new(color.yellow, 0), 1)
+plot(showEMAs ? ema20  : na, "EMA 20",  color.new(color.aqua,   0), 1)
+plot(showEMAs ? ema50  : na, "EMA 50",  color.new(color.orange, 0), 2)
+plot(showEMAs ? ema200 : na, "EMA 200", color.new(color.red,   30), 3)
+
+bgcolor(regimeTend ? color.new(color.green,  95) :
+        regimeRang ? color.new(color.orange, 95) :
+        regimeVol  ? color.new(color.red,    95) : na)
+
+if showFVG and fvgBull
+    box.new(bar_index-2, low, bar_index+5, high[2], color.new(color.green, 60), bgcolor=color.new(color.green, 88))
+if showFVG and fvgBear
+    box.new(bar_index-2, low[2], bar_index+5, high, color.new(color.red, 60), bgcolor=color.new(color.red, 88))
+
+if showOB and smcEnabled and impulsoUp and not na(obBullL)
+    box.new(bar_index-obLookback, obBullH, bar_index+2, obBullL,
+        color.new(color.blue, 50), bgcolor=color.new(color.blue, 88),
+        text="OB+", text_color=color.blue, text_size=size.tiny)
+if showOB and smcEnabled and impulsoDown and not na(obBearL)
+    box.new(bar_index-obLookback, obBearH, bar_index+2, obBearL,
+        color.new(color.purple, 50), bgcolor=color.new(color.purple, 88),
+        text="OB-", text_color=color.purple, text_size=size.tiny)
+
+plotshape(bosUp   and not chochUp,   "BOS+",   shape.triangleup,   location.belowbar, color.new(color.teal, 40),    size=size.tiny)
+plotshape(bosDown and not chochDown, "BOS-",   shape.triangledown, location.abovebar, color.new(color.maroon, 40),  size=size.tiny)
+plotshape(chochUp,                   "CHoCH+", shape.diamond,      location.belowbar, color.new(color.lime, 0),     size=size.small)
+plotshape(chochDown,                 "CHoCH-", shape.diamond,      location.abovebar, color.new(color.fuchsia, 0),  size=size.small)
+
+ext = 20
+
+if fBuyP
+    txt = "PREMIUM BUY [" + str.tostring(buyScore) + "/9+]\n" + buyTypeTxt + "\nENTRADA: " + str.tostring(close, pFmt) + "\nTP1: " + str.tostring(tp1B, pFmt) + "\nTP2: " + str.tostring(tp2B, pFmt) + "\nTP3: " + str.tostring(tp3B, pFmt) + "\nSL: " + str.tostring(slBuy, pFmt)
+    label.new(bar_index, low - atrVal * 0.5, txt, style=label.style_label_up, color=color.new(color.orange, 0), textcolor=color.black, size=size.normal)
+    if showTPSL
+        line.new(bar_index, close, bar_index+ext, close, color=color.new(color.blue, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, close, "ENT " + str.tostring(close, pFmt), style=label.style_label_left, color=color.new(color.blue, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp1B, bar_index+ext, tp1B, color=color.new(color.lime, 0), style=line.style_dotted, width=1)
+        label.new(bar_index+ext, tp1B, "TP1 " + str.tostring(tp1B, pFmt), style=label.style_label_left, color=color.new(color.lime, 20), textcolor=color.black, size=size.tiny)
+        line.new(bar_index, tp2B, bar_index+ext, tp2B, color=color.new(color.green, 0), style=line.style_dotted, width=2)
+        label.new(bar_index+ext, tp2B, "TP2 " + str.tostring(tp2B, pFmt), style=label.style_label_left, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp3B, bar_index+ext, tp3B, color=color.new(color.teal, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, tp3B, "TP3 " + str.tostring(tp3B, pFmt), style=label.style_label_left, color=color.new(color.teal, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, slBuy, bar_index+ext, slBuy, color=color.new(color.red, 0), style=line.style_dashed, width=2)
+        label.new(bar_index+ext, slBuy, "SL " + str.tostring(slBuy, pFmt), style=label.style_label_left, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
+
+if fSellP
+    txt = "PREMIUM SELL [" + str.tostring(sellScore) + "/9+]\n" + sellTypeTxt + "\nENTRADA: " + str.tostring(close, pFmt) + "\nTP1: " + str.tostring(tp1S, pFmt) + "\nTP2: " + str.tostring(tp2S, pFmt) + "\nTP3: " + str.tostring(tp3S, pFmt) + "\nSL: " + str.tostring(slSell, pFmt)
+    label.new(bar_index, high + atrVal * 0.5, txt, style=label.style_label_down, color=color.new(color.red, 0), textcolor=color.white, size=size.normal)
+    if showTPSL
+        line.new(bar_index, close, bar_index+ext, close, color=color.new(color.blue, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, close, "ENT " + str.tostring(close, pFmt), style=label.style_label_left, color=color.new(color.blue, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp1S, bar_index+ext, tp1S, color=color.new(color.lime, 0), style=line.style_dotted, width=1)
+        label.new(bar_index+ext, tp1S, "TP1 " + str.tostring(tp1S, pFmt), style=label.style_label_left, color=color.new(color.lime, 20), textcolor=color.black, size=size.tiny)
+        line.new(bar_index, tp2S, bar_index+ext, tp2S, color=color.new(color.green, 0), style=line.style_dotted, width=2)
+        label.new(bar_index+ext, tp2S, "TP2 " + str.tostring(tp2S, pFmt), style=label.style_label_left, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, tp3S, bar_index+ext, tp3S, color=color.new(color.teal, 0), style=line.style_solid, width=2)
+        label.new(bar_index+ext, tp3S, "TP3 " + str.tostring(tp3S, pFmt), style=label.style_label_left, color=color.new(color.teal, 0), textcolor=color.white, size=size.tiny)
+        line.new(bar_index, slSell, bar_index+ext, slSell, color=color.new(color.red, 0), style=line.style_dashed, width=2)
+        label.new(bar_index+ext, slSell, "SL " + str.tostring(slSell, pFmt), style=label.style_label_left, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
+
+if fBuyV
+    txt = "BUY [" + str.tostring(buyScore) + "/12]\n" + buyTypeTxt + "\nENT: " + str.tostring(close, pFmt) + " | TP1: " + str.tostring(tp1B, pFmt) + " | SL: " + str.tostring(slBuy, pFmt)
+    label.new(bar_index, low - atrVal * 0.4, txt, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white, size=size.small)
+
+if fSellV
+    txt = "SELL [" + str.tostring(sellScore) + "/12]\n" + sellTypeTxt + "\nENT: " + str.tostring(close, pFmt) + " | TP1: " + str.tostring(tp1S, pFmt) + " | SL: " + str.tostring(slSell, pFmt)
+    label.new(bar_index, high + atrVal * 0.4, txt, style=label.style_label_down, color=color.new(color.lime, 20), textcolor=color.black, size=size.small)
+
+// ═══════════════════════════════════════════════════
+// TABLAS INFO + STATS
+// ═══════════════════════════════════════════════════
+
+if showTable
+    var table t = table.new(position.top_right, 2, 14, bgcolor=color.new(color.black, 80), border_width=1)
+    if barstate.islast
+        reg  = regimeTend ? "TENDENCIA" : regimeRang ? "RANGO" : regimeVol ? "VOLATIL" : "TRANSICION"
+        smc  = inBullOB ? "OB+" : inBearOB ? "OB-" : inFvgBull ? "FVG+" : inFvgBear ? "FVG-" : "-"
+        ses  = london ? "LONDON" : ny ? "NEW YORK" : asia ? "ASIA" : "-"
+        mtf  = mtf1hBull ? "BULL" : mtf1hBear ? "BEAR" : "NEUTRAL"
+
+        table.cell(t, 0, 0,  "BuySell365", text_color=color.yellow, text_size=size.small)
+        table.cell(t, 1, 0,  "US500 v6",   text_color=color.aqua,   text_size=size.small)
+        table.cell(t, 0, 1,  "Regimen",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 1,  reg,        text_color=regimeTend?color.green:regimeRang?color.orange:color.red, text_size=size.tiny)
+        table.cell(t, 0, 2,  "RSI",      text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 2,  str.tostring(rsiVal, "#.1"), text_color=rsiVal>RSI_OB?color.red:rsiVal<RSI_OS?color.green:color.white, text_size=size.tiny)
+        table.cell(t, 0, 3,  "ADX",      text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 3,  str.tostring(adxVal, "#.1"), text_color=adxVal>ADX_MIN?color.green:color.orange, text_size=size.tiny)
+        table.cell(t, 0, 4,  "ATR 15m",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 4,  str.tostring(atrVal, "#.2"), text_color=color.white, text_size=size.tiny)
+        table.cell(t, 0, 5,  "ATR 1H",   text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 5,  str.tostring(_atr1h_display, "#.2"), text_color=color.aqua, text_size=size.tiny)
+        table.cell(t, 0, 6,  "Volumen",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 6,  str.tostring(volRatio, "#.1") + "x", text_color=volRatio>1.3?color.green:color.white, text_size=size.tiny)
+        table.cell(t, 0, 7,  "SMC",      text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 7,  smc,        text_color=color.white, text_size=size.tiny)
+        table.cell(t, 0, 8,  "Score BUY",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 8,  str.tostring(buyScore) + "/12", text_color=buyScore>=PREM_SCORE?color.orange:buyScore>=VALID_SCORE?color.green:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 9,  "Score SELL", text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 9,  str.tostring(sellScore) + "/12", text_color=sellScore>=PREM_SCORE?color.orange:sellScore>=VALID_SCORE?color.green:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 10, "MTF 1H",   text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 10, mtf,        text_color=mtf1hBull?color.green:mtf1hBear?color.red:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 11, "Sesion",   text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 11, ses,        text_color=active?color.green:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 12, "Diverge",  text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 12, divAlcista?"ALCISTA":divBajista?"BAJISTA":"-", text_color=divAlcista?color.green:divBajista?color.red:color.gray, text_size=size.tiny)
+        table.cell(t, 0, 13, "Senal",    text_color=color.gray, text_size=size.tiny)
+        table.cell(t, 1, 13, fBuyP?"PREM BUY":fSellP?"PREM SELL":fBuyV?"VAL BUY":fSellV?"VAL SELL":"-",
+            text_color=fBuyP?color.green:fSellP?color.red:fBuyV?color.green:fSellV?color.red:color.gray, text_size=size.tiny)
+
+if showStats
+    var table s = table.new(position.bottom_right, 2, 7, bgcolor=color.new(color.black, 80), border_width=1)
+    if barstate.islast
+        wrTxt = (wins+losses) > 0 ? str.tostring(wr, "#.1") + "%" : "N/A"
+        table.cell(s, 0, 0, "STATS",       text_color=color.yellow, text_size=size.small)
+        table.cell(s, 1, 0, "US500 v6",    text_color=color.aqua,   text_size=size.tiny)
+        table.cell(s, 0, 1, "Win Rate",    text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 1, wrTxt,         text_color=wr>55?color.green:wr>45?color.orange:color.red, text_size=size.tiny)
+        table.cell(s, 0, 2, "W / L",       text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 2, str.tostring(wins) + " / " + str.tostring(losses), text_color=color.white, text_size=size.tiny)
+        table.cell(s, 0, 3, "Max DD",      text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 3, str.tostring(maxDD, "#.1") + "%", text_color=maxDD>15?color.red:color.green, text_size=size.tiny)
+        table.cell(s, 0, 4, "Equity",      text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 4, "$" + str.tostring(eq, "#.0"), text_color=eq>640?color.green:color.red, text_size=size.tiny)
+        table.cell(s, 0, 5, "Senales",     text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 5, str.tostring(totB) + "B / " + str.tostring(totS) + "S", text_color=color.white, text_size=size.tiny)
+        table.cell(s, 0, 6, "MT5 Symbol",  text_color=color.gray,   text_size=size.tiny)
+        table.cell(s, 1, 6, "US500Cash",   text_color=color.aqua,   text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════
+// ALERTAS WEBHOOK (solo PREMIUM)
+// ═══════════════════════════════════════════════════
+
+regStr = regimeTend?"TREND":regimeRang?"RANGE":regimeVol?"VOLATILE":"TRANSITION"
+smcBS  = inBullOB?"OB":inFvgBull?"FVG":chochUp?"CHOCH":bosUp?"BOS":"NONE"
+smcSS  = inBearOB?"OB":inFvgBear?"FVG":chochDown?"CHOCH":bosDown?"BOS":"NONE"
+mtfStr = mtf1hBull?"BULLISH":mtf1hBear?"BEARISH":"NEUTRAL"
+
+if fBuyP
+    alert('{"secret":"guaro_secreto_777","signal":"BUY","quality":"PREMIUM","source":"BuySell365_PRO_SP500","ticker":"' + syminfo.tickerid + '","market":"US500","price":' + str.tostring(close) + ',"sl":' + str.tostring(slBuy, "#.2") + ',"tp1":' + str.tostring(tp1B, "#.2") + ',"tp2":' + str.tostring(tp2B, "#.2") + ',"tp3":' + str.tostring(tp3B, "#.2") + ',"score":' + str.tostring(buyScore) + ',"type":"' + buyTypeTxt + '","rsi":' + str.tostring(rsiVal, "#.1") + ',"adx":' + str.tostring(adxVal, "#.1") + ',"vol":' + str.tostring(volRatio, "#.1") + ',"regime":"' + regStr + '","smc":"' + smcBS + '","mtf1h":"' + mtfStr + '"}', alert.freq_once_per_bar)
+
+if fSellP
+    alert('{"secret":"guaro_secreto_777","signal":"SELL","quality":"PREMIUM","source":"BuySell365_PRO_SP500","ticker":"' + syminfo.tickerid + '","market":"US500","price":' + str.tostring(close) + ',"sl":' + str.tostring(slSell, "#.2") + ',"tp1":' + str.tostring(tp1S, "#.2") + ',"tp2":' + str.tostring(tp2S, "#.2") + ',"tp3":' + str.tostring(tp3S, "#.2") + ',"score":' + str.tostring(sellScore) + ',"type":"' + sellTypeTxt + '","rsi":' + str.tostring(rsiVal, "#.1") + ',"adx":' + str.tostring(adxVal, "#.1") + ',"vol":' + str.tostring(volRatio, "#.1") + ',"regime":"' + regStr + '","smc":"' + smcSS + '","mtf1h":"' + mtfStr + '"}', alert.freq_once_per_bar)
+
+alertcondition(fBuyP,
+    title   = "BuySell365 SP500 — BUY PREMIUM",
+    message = '{"signal":"BUY","quality":"PREMIUM","source":"BuySell365_PRO_SP500","ticker":"{{ticker}}","price":{{close}}}')
+
+alertcondition(fSellP,
+    title   = "BuySell365 SP500 — SELL PREMIUM",
+    message = '{"signal":"SELL","quality":"PREMIUM","source":"BuySell365_PRO_SP500","ticker":"{{ticker}}","price":{{close}}}')
+
+alertcondition(fBuyP or fSellP,
+    title   = "BuySell365 SP500 — CUALQUIER PREMIUM",
+    message = '{"signal":"ANY","quality":"PREMIUM","source":"BuySell365_PRO_SP500","ticker":"{{ticker}}","price":{{close}}}')

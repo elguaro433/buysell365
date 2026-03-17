@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+env_local.txt
+env_vps.txt
+env_local.txt.enc
+env_vps.txt.enc
+ssl_cert.pem
+ssl_key.pem
+
+# Bot runtime
+.bot.pid
+.launcher.lock
+estado.json
+estado.json.bak
+bot_output.log
+mt5_trades_sync.json
+winning_trades.json
+historial_trades.csv
+logs/
+
+# Backtest outputs
+backtest_output.txt
+backtest_results.csv
+backtest_results.html
+backtest_report.pdf
+backtest_report_v2.pdf
+
+# IDE / System
+.vscode/
+.claude/
+*.spec
+*.lnk
+*.bat
+desktop.ini
+
+# Build artifacts
+installer_output/
+INICIAR_BOT.bat
+
+# Sensitive
+CLAVE_RECUPERACION_DISCO_D.txt
+MANUAL_PROPIETARIO.pdf
+
+# Generated
+archivo/
+*.png
+*.jpg
+*.pptx
