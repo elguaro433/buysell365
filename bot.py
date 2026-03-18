@@ -2489,8 +2489,8 @@ def calcular_indicadores_profesionales(df, precio, ticker=""):
             # Pivot Points del día anterior
             "pivots": calcular_pivot_points_df(df),
 
-            # Probabilidad de Machine Learning
-            "ml_prob_alcista": predecir_direccion_ml(df, ticker),
+            # ML DESACTIVADO — accuracy 44-52% no aporta valor, ahorra CPU
+            "ml_prob_alcista": 50.0,  # Neutral fijo, sin reentrenamiento
             # FIX: eliminadas claves "high" y "low" duplicadas (ya existen arriba en el dict)
 
             # 🌏 RANGO ASIÁTICO (para Asian Range Breakout — ORO y USD/JPY)
