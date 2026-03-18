@@ -108,7 +108,7 @@ def _log(msg):
 # ============================================================
 def load_config() -> dict:
     defaults = {
-        "autostart_bot": True,
+        "autostart_bot": False,
         "minimize_to_tray": True,
         "auto_restart": True,
         "first_run": True,
