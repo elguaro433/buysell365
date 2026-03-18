@@ -3884,19 +3884,25 @@ def _texto_activos_disponibles() -> str:
     return txt
 
 
+_lock_noticias = threading.Lock()
+
 def cargar_calendario_economico():
-    """Descarga el calendario semanal de ForexFactory (caché 30min)."""
+    """Descarga el calendario semanal de ForexFactory (caché 30min, thread-safe)."""
     global _cache_noticias
     if time.time() - _cache_noticias["ts"] < 1800 and _cache_noticias["datos"]:
         return _cache_noticias["datos"]
-    try:
-        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-        r = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200:
-            _cache_noticias = {"datos": r.json(), "ts": time.time()}
+    with _lock_noticias:
+        # Double-check after acquiring lock (otro hilo pudo haberlo cargado)
+        if time.time() - _cache_noticias["ts"] < 1800 and _cache_noticias["datos"]:
             return _cache_noticias["datos"]
-    except Exception:
-        pass
+        try:
+            url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+            r = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                _cache_noticias = {"datos": r.json(), "ts": time.time()}
+                return _cache_noticias["datos"]
+        except Exception:
+            pass
     return _cache_noticias["datos"] or []
 
 # Noticias de MÁXIMO impacto que causan movimientos extremos
@@ -15355,7 +15361,8 @@ def _arrancar_interno():
     # 🔪 SCALPER SILENCIOSO — solo MT5, sin Telegram
     if MT5_AVAILABLE and SCALPER_ACTIVO:
         _iniciar_hilo("scalper", loop_scalper)
-        log_sistema("🔪 Scalper Silencioso activado — BB+RSI M5 | ORO, EUR/USD, GBP/USD, NASDAQ")
+        _sc_names = ", ".join(SCALPER_ACTIVOS.keys())
+        log_sistema(f"🔪 Scalper Silencioso activado — {len(SCALPER_ACTIVOS)} activos | {_sc_names}")
 
     log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog")
 
