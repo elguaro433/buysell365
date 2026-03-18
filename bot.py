@@ -14581,17 +14581,21 @@ SCALPER_ACTIVO = True  # Master switch para activar/desactivar scalper
 SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
 
 SCALPER_ACTIVOS = {
-    "GOLD":      {"mt5": "GOLD",       "tipo": "commodity", "horario": (9, 19),  "max_spread": 45,  "tp_atr": 2.0, "sl_atr": 1.5},
-    "EURUSD":    {"mt5": "EURUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 20,  "tp_atr": 2.0, "sl_atr": 1.5},
-    "GBPUSD":    {"mt5": "GBPUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 2.0, "sl_atr": 1.5},
-    "US100Cash": {"mt5": "US100Cash",  "tipo": "indice",    "horario": (15, 22), "max_spread": 500, "tp_atr": 2.0, "sl_atr": 1.5},
+    "GOLD":      {"mt5": "GOLD",       "tipo": "commodity", "horario": (9, 19),  "max_spread": 45,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
+    "EURUSD":    {"mt5": "EURUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 20,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
+    "GBPUSD":    {"mt5": "GBPUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
+    "US100Cash": {"mt5": "US100Cash",  "tipo": "indice",    "horario": (15, 22), "max_spread": 500, "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
+    # Fibonacci Mean Reversion — pares de rango (backtest 70-82% WR)
+    "AUDCAD":    {"mt5": "AUDCAD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 30,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
+    "EURCHF":    {"mt5": "EURCHF",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
+    "USDCAD":    {"mt5": "USDCAD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
 }
 
 # Risk Management del Scalper
 SCALPER_RIESGO_POR_TRADE = 0.005   # 0.5% del capital por trade
 SCALPER_MAX_LOSS_DIARIO = 0.03     # 3% máximo pérdida diaria → para todo
 SCALPER_MAX_CONSECUTIVAS = 4       # 4 pérdidas seguidas → pausa 30 min
-SCALPER_MAX_POSICIONES = 3         # Máximo 3 posiciones abiertas simultáneas
+SCALPER_MAX_POSICIONES = 5         # Máximo 5 posiciones abiertas simultáneas (7 activos)
 SCALPER_TIMEOUT_MINUTOS = 60       # Cerrar trade si no toca TP/SL en 60 min
 SCALPER_BREAKEVEN_PCT = 0.4        # Mover SL a breakeven al 40% del TP
 SCALPER_INTERVALO = 30             # Segundos entre escaneos (rápido para scalping)
@@ -14643,6 +14647,15 @@ def _scalper_calcular_indicadores(df):
         if rsi is None or bb is None or ema50 is None:
             return None
 
+        # Fibonacci: rango de últimas 20 velas H1 (240 M5 = 20 H1)
+        fib_lookback = min(240, len(close) - 1)
+        fib_high = float(high.iloc[-fib_lookback:].max())
+        fib_low = float(low.iloc[-fib_lookback:].min())
+        fib_range = fib_high - fib_low
+        fib_pos = (float(close.iloc[-1]) - fib_low) / fib_range if fib_range > 0 else 0.5
+        fib_236 = fib_low + fib_range * 0.236
+        fib_764 = fib_low + fib_range * 0.764
+
         return {
             "precio": float(close.iloc[-1]),
             "open": float(df['Open'].iloc[-1]),
@@ -14656,6 +14669,11 @@ def _scalper_calcular_indicadores(df):
             "ema50": float(ema50.iloc[-1]),
             "adx": float(get_col(adx_df, 'ADX_').iloc[-1]),
             "atr": float(atr.iloc[-1]),
+            "fib_pos": fib_pos,
+            "fib_236": fib_236,
+            "fib_764": fib_764,
+            "fib_high": fib_high,
+            "fib_low": fib_low,
         }
     except Exception as e:
         logger.warning(f"⚠️ Scalper: Error calculando indicadores: {e}")
@@ -14747,6 +14765,23 @@ def _scalper_evaluar_senal(ind, config):
         if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
             return None, "NASDAQ SELL-C bloqueado"
         return "SELL", f"BB+RSI-C Sell (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+    # ── Variante D: FIBONACCI Mean Reversion (nuevos pares de rango) ──
+    estrategia = config.get('estrategia', 'bb_rsi')
+    if estrategia == 'fibonacci':
+        fib_pos = ind.get('fib_pos', 0.5)
+        fib_236 = ind.get('fib_236', 0)
+        fib_764 = ind.get('fib_764', 0)
+
+        # BUY: precio por debajo del 23.6% del rango + RSI < 40
+        if fib_pos < 0.236 and rsi < 40 and 10 <= adx <= 35:
+            return "BUY", f"FIB Buy | Pos={fib_pos:.1%} < 23.6% | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+        # SELL: precio por encima del 76.4% del rango + RSI > 60
+        if fib_pos > 0.764 and rsi > 60 and 10 <= adx <= 35:
+            return "SELL", f"FIB Sell | Pos={fib_pos:.1%} > 76.4% | RSI={rsi:.0f} | ADX={adx:.0f}"
+
+        return None, f"FIB neutral (pos={fib_pos:.1%})"
 
     return None, "Sin señal scalping"
 
