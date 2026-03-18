@@ -79,8 +79,8 @@ def descargar_cot_cftc():
                         neta = long_spec - short_spec
                         total = long_spec + short_spec
                         ratio = long_spec / total if total > 0 else 0.5
-                        long_change = float(cols[15].strip()) if len(cols) > 16 else 0
-                        short_change = float(cols[16].strip()) if len(cols) > 17 else 0
+                        long_change = float(cols[15].strip()) if len(cols) >= 16 else 0
+                        short_change = float(cols[16].strip()) if len(cols) >= 17 else 0
                         cambio_neto = long_change - short_change
                         if ratio > 0.60:
                             sesgo = 'LARGO'

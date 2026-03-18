@@ -11,7 +11,7 @@ _SENT_TTL = 1800  # Cache de sentimiento: 30 min
 _HF_ERROR_TTL = 900  # Si HF falla, NO reintentar por 15 min
 _ultimo_error_hf = 0  # Timestamp del último fallo HF
 
-FINNHUB_KEY = os.getenv("FINNHUB_KEY", "d6jksn1r01qkvh5qbdvgd6jksn1r01qkvh5qbe00")
+FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 
 # URLs de HuggingFace — fallback si la principal falla
 HF_API_URLS = [

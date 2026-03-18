@@ -2348,88 +2348,114 @@ class ManagementConsole:
         self._refresh_scalper()
 
     def _refresh_scalper(self):
-        """Actualiza los datos de la pestaña Scalper leyendo estado del bot."""
-        try:
-            import subprocess
-            # Leer estado del scalper desde el bot via API interna
-            now = datetime.now()
-            hora = now.hour
+        """Actualiza la pestaña Scalper. MT5 I/O en background thread."""
+        self._sc_estrategia.config(text="BB(20,2) + RSI(7) Mean Rev. M5")
+        self._sc_riesgo.config(text="0.5% por trade")
+        self._sc_max_loss.config(text="3% diario")
 
-            # Estado basico
-            self._sc_estrategia.config(text="BB(20,2) + RSI(7) Mean Rev. M5")
-            self._sc_riesgo.config(text="0.5% por trade")
-            self._sc_max_loss.config(text="3% diario")
+        _bot_running = self.bot.is_running if hasattr(self, 'bot') else False
+        if not _bot_running:
+            self._sc_estado.config(text="Bot detenido", fg=ERR)
+            for lbl in (self._sc_trades_hoy, self._sc_posiciones, self._sc_pnl_hoy, self._sc_racha):
+                lbl.config(text="--")
+            return
 
-            # Intentar leer del bot si esta corriendo
-            _bot_running = self.bot.is_running if hasattr(self, 'bot') else False
-            if _bot_running:
-                self._sc_estado.config(text="Activo", fg=WIN_COLOR)
-                self._scalper_status_lbl.config(text=f"Actualizado: {now.strftime('%H:%M:%S')}")
+        self._sc_estado.config(text="Activo", fg=WIN_COLOR)
 
-                # Leer posiciones MT5 del scalper (magic 20260318)
-                try:
-                    import MetaTrader5 as mt5
-                    if mt5.initialize():
-                        positions = mt5.positions_get()
-                        scalper_pos = [p for p in (positions or []) if p.magic == 20260318]
+        def _mt5_fetch():
+            """Lee datos de MT5 en background y devuelve resultados."""
+            try:
+                import MetaTrader5 as mt5
+                if not mt5.initialize():
+                    return None
+                positions = mt5.positions_get()
+                scalper_pos = [p for p in (positions or []) if p.magic == 20260318]
+                now = datetime.now()
+                from_dt = datetime(now.year, now.month, now.day)
+                to_dt = now + timedelta(hours=1)
+                deals = mt5.history_deals_get(from_dt, to_dt)
+                sc_deals = [d for d in (deals or []) if d.magic == 20260318 and d.entry == 1]
+                # Preparar datos serializados (no objetos MT5 crudos)
+                pos_data = []
+                total_profit = 0
+                for p in scalper_pos:
+                    profit = p.profit
+                    total_profit += profit
+                    mins = int((now - datetime.fromtimestamp(p.time)).total_seconds() / 60)
+                    pos_data.append({
+                        'ticket': p.ticket, 'symbol': p.symbol,
+                        'tipo': "BUY" if p.type == 0 else "SELL",
+                        'open': f"{p.price_open:.5g}", 'sl': f"{p.sl:.5g}", 'tp': f"{p.tp:.5g}",
+                        'profit': profit, 'mins': mins
+                    })
+                deal_data = []
+                for d in sc_deals[-20:]:
+                    deal_data.append({
+                        'time': datetime.fromtimestamp(d.time).strftime("%H:%M"),
+                        'symbol': d.symbol,
+                        'tipo': "BUY" if d.type == 0 else "SELL",
+                        'volume': d.volume, 'profit': d.profit
+                    })
+                return {'pos': pos_data, 'deals': deal_data,
+                        'total_profit': total_profit, 'n_pos': len(scalper_pos),
+                        'n_deals': len(sc_deals), 'now': now}
+            except ImportError:
+                return 'no_mt5'
+            except Exception as e:
+                return f'error:{e}'
 
-                        self._sc_posiciones.config(text=str(len(scalper_pos)))
-
-                        # Actualizar tabla de posiciones
-                        for item in self._sc_tree_pos.get_children():
-                            self._sc_tree_pos.delete(item)
-
-                        total_profit = 0
-                        for p in scalper_pos:
-                            tipo = "BUY" if p.type == 0 else "SELL"
-                            profit = p.profit
-                            total_profit += profit
-                            mins = int((now - datetime.fromtimestamp(p.time)).total_seconds() / 60)
-                            tag = "profit_pos" if profit >= 0 else "profit_neg"
-                            self._sc_tree_pos.insert("", "end", values=(
-                                p.ticket, p.symbol, tipo,
-                                f"{p.price_open:.5g}", f"{p.sl:.5g}", f"{p.tp:.5g}",
-                                f"${profit:.2f}", f"{mins}m"
-                            ), tags=(tag,))
-
-                        # P&L color
-                        pnl_text = f"${total_profit:.2f}"
-                        pnl_color = WIN_COLOR if total_profit >= 0 else LOSS_COLOR
-                        self._sc_pnl_hoy.config(text=pnl_text, fg=pnl_color)
-
-                        # Contar trades del scalper hoy en historial
-                        from_dt = datetime(now.year, now.month, now.day)
-                        to_dt = now + timedelta(hours=1)
-                        deals = mt5.history_deals_get(from_dt, to_dt)
-                        if deals:
-                            sc_deals = [d for d in deals if d.magic == 20260318 and d.entry == 1]
-                            self._sc_trades_hoy.config(text=str(len(sc_deals)))
-
-                            # Log de trades
-                            self._sc_log_text.config(state="normal")
-                            self._sc_log_text.delete("1.0", "end")
-                            for d in sc_deals[-20:]:
-                                t = datetime.fromtimestamp(d.time).strftime("%H:%M")
-                                tipo = "BUY" if d.type == 0 else "SELL"
-                                profit_str = f"+${d.profit:.2f}" if d.profit >= 0 else f"-${abs(d.profit):.2f}"
-                                self._sc_log_text.insert("end",
-                                    f"[{t}] {d.symbol} {tipo} | Vol:{d.volume} | {profit_str}\n")
-                            self._sc_log_text.config(state="disabled")
-                        else:
-                            self._sc_trades_hoy.config(text="0")
-                except ImportError:
+        def _update_gui(result):
+            """Actualiza widgets en el main thread."""
+            try:
+                if result == 'no_mt5':
                     self._sc_posiciones.config(text="MT5 no disponible")
-                except Exception as e:
-                    self._sc_posiciones.config(text=f"Error: {e}")
+                    return
+                if isinstance(result, str) and result.startswith('error:'):
+                    self._sc_posiciones.config(text=result)
+                    return
+                if result is None:
+                    self._sc_posiciones.config(text="MT5 sin conexión")
+                    return
 
-                # Estado de activos segun hora
+                now = result['now']
+                hora = now.hour
+                self._scalper_status_lbl.config(text=f"Actualizado: {now.strftime('%H:%M:%S')}")
+                self._sc_posiciones.config(text=str(result['n_pos']))
+                self._sc_trades_hoy.config(text=str(result['n_deals']))
+
+                # Tabla posiciones
+                for item in self._sc_tree_pos.get_children():
+                    self._sc_tree_pos.delete(item)
+                for p in result['pos']:
+                    tag = "profit_pos" if p['profit'] >= 0 else "profit_neg"
+                    self._sc_tree_pos.insert("", "end", values=(
+                        p['ticket'], p['symbol'], p['tipo'],
+                        p['open'], p['sl'], p['tp'],
+                        f"${p['profit']:.2f}", f"{p['mins']}m"
+                    ), tags=(tag,))
+
+                # P&L
+                tp = result['total_profit']
+                self._sc_pnl_hoy.config(text=f"${tp:.2f}",
+                                         fg=WIN_COLOR if tp >= 0 else LOSS_COLOR)
+
+                # Historial
+                self._sc_log_text.config(state="normal")
+                self._sc_log_text.delete("1.0", "end")
+                for d in result['deals']:
+                    ps = f"+${d['profit']:.2f}" if d['profit'] >= 0 else f"-${abs(d['profit']):.2f}"
+                    self._sc_log_text.insert("end",
+                        f"[{d['time']}] {d['symbol']} {d['tipo']} | Vol:{d['volume']} | {ps}\n")
+                self._sc_log_text.config(state="disabled")
+
+                # Estado activos por hora
                 for item in self._sc_tree_activos.get_children():
                     vals = list(self._sc_tree_activos.item(item, "values"))
-                    horario = vals[2]  # "09:00 - 19:00"
+                    horario = vals[2]
                     try:
-                        h_start = int(horario.split("-")[0].strip().split(":")[0])
-                        h_end = int(horario.split("-")[1].strip().split(":")[0])
-                        if h_start <= hora < h_end:
+                        h_s = int(horario.split("-")[0].strip().split(":")[0])
+                        h_e = int(horario.split("-")[1].strip().split(":")[0])
+                        if h_s <= hora < h_e:
                             vals[4] = "ACTIVO"
                             self._sc_tree_activos.item(item, values=vals, tags=("activo",))
                         else:
@@ -2437,18 +2463,15 @@ class ManagementConsole:
                             self._sc_tree_activos.item(item, values=vals, tags=("inactivo",))
                     except Exception:
                         pass
-
                 self._sc_racha.config(text="0")
+            except Exception as e:
+                self._scalper_status_lbl.config(text=f"Error: {e}")
 
-            else:
-                self._sc_estado.config(text="Bot detenido", fg=ERR)
-                self._sc_trades_hoy.config(text="--")
-                self._sc_posiciones.config(text="--")
-                self._sc_pnl_hoy.config(text="--")
-                self._sc_racha.config(text="--")
+        def _bg_worker():
+            result = _mt5_fetch()
+            self.root.after(0, lambda: _update_gui(result))
 
-        except Exception as e:
-            self._scalper_status_lbl.config(text=f"Error: {e}")
+        threading.Thread(target=_bg_worker, daemon=True).start()
 
     def _open_dashboard(self):
         env = load_env()

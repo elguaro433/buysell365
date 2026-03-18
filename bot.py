@@ -2190,13 +2190,18 @@ def _calcular_rango_asiatico(df, ticker=""):
         if hasattr(idx, 'tz') and idx.tz is not None:
             idx_utc = idx.tz_convert('UTC')
         else:
-            # MT5 data: tz-naive, servidor típico UTC+2
-            # yfinance backtest: tz-naive pero suele ser UTC o exchange tz
+            # MT5 XM: UTC+2 invierno, UTC+3 verano (Europe/Helsinki)
+            # Detectar automáticamente según fecha
             try:
-                idx_utc = idx.tz_localize('Etc/GMT-2').tz_convert('UTC')
+                import pytz as _pytz_ar
+                _hel = _pytz_ar.timezone('Europe/Helsinki')
+                _sample = idx[-1].to_pydatetime() if hasattr(idx[-1], 'to_pydatetime') else idx[-1]
+                _offset_h = _hel.localize(_sample).utcoffset().total_seconds() / 3600
+                _tz_str = f'Etc/GMT-{int(_offset_h)}'
+                idx_utc = idx.tz_localize(_tz_str).tz_convert('UTC')
             except Exception:
                 try:
-                    idx_utc = idx.tz_localize('UTC')
+                    idx_utc = idx.tz_localize('Etc/GMT-2').tz_convert('UTC')
                 except Exception:
                     idx_utc = idx
 
@@ -11192,6 +11197,15 @@ def limpiar_caches_memoria():
     except Exception:
         pass
 
+    # Limpiar _rate_limit_web: IPs sin actividad en >5 min
+    try:
+        _rl_expired = [ip for ip, ts_list in _rate_limit_web.items()
+                       if not ts_list or ahora_ts - max(ts_list) > 300]
+        for ip in _rl_expired:
+            _rate_limit_web.pop(ip, None)
+    except Exception:
+        pass
+
     # Limpiar rate limit de usuarios expirados
     try:
         _rl_expired = [k for k, v in _rate_limit_usuarios.items() if not v or ahora_ts - max(v) > 60]
@@ -14947,8 +14961,8 @@ def _scalper_modificar_sl(pos, nuevo_sl):
             result = mt5.order_send(request)
         if result and result.retcode == mt5.TRADE_RETCODE_DONE:
             print(f"🔪 Scalper BE: {pos.symbol} SL movido a breakeven {nuevo_sl:.5g}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"🔪 Scalper: Error moviendo SL {pos.ticket}: {e}")
 
 
 def _scalper_reset_diario():

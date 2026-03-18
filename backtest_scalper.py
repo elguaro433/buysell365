@@ -266,6 +266,12 @@ def run_backtest():
                 tipo = "SELL"
                 variante = "C"
 
+            # Filtros por backtest: bloquear GOLD BUY y NASDAQ SELL (negativos)
+            if tipo == "BUY" and nombre == "GOLD":
+                tipo = None
+            if tipo == "SELL" and nombre == "NASDAQ":
+                tipo = None
+
             if tipo is None:
                 continue
 
