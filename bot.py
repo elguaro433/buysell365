@@ -7046,7 +7046,7 @@ def _generar_reporte_diario():
             admin_id,
             teclado={"inline_keyboard": [
                 [{"text": "📊 TRADING EN VIVO", "url": "https://buysell365.pro/dashboard"}],
-                [{"text": "📋 LOGS", "url": f"https://buysell365.pro/logs?key={LOGS_PASSWORD}"}],
+                [{"text": "📋 LOGS", "url": f"https://buysell365.pro/dashboard#logs"}],
                 [{"text": "👑 VIP LISTA", "callback_data": "/vip_lista_cb"}],
             ]}
         )
@@ -7069,7 +7069,7 @@ def cmd_admin_logs():
         "━━━━━━━━━━\n\n"
         "👇 Accede desde cualquier dispositivo:",
         {"inline_keyboard": [[
-            {"text": "📋 ABRIR LOGS", "url": f"https://buysell365.pro/logs?key={LOGS_PASSWORD}"}
+            {"text": "📋 ABRIR LOGS", "url": f"https://buysell365.pro/dashboard#logs"}
         ]]}
     )
 

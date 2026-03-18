@@ -52,6 +52,7 @@ LAUNCHER_LOG = os.path.join(BASE_DIR, "logs", "launcher.log")
 ESTADO_FILE = os.path.join(BASE_DIR, "estado.json")
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 ICON_PATH = os.path.join(BASE_DIR, "static", "bull-logo.png")
+ICO_PATH = os.path.join(BASE_DIR, "static", "bull-logo.ico")
 
 # ============================================================
 #  ASSET NAME NORMALIZATION
@@ -569,9 +570,11 @@ class ManagementConsole:
         self.root.minsize(1100, 700)
         self.root.configure(bg=BG_MAIN)
 
-        # Try to set icon
+        # Try to set icon (.ico for taskbar, .png for window)
         try:
-            if os.path.exists(ICON_PATH):
+            if os.path.exists(ICO_PATH):
+                self.root.iconbitmap(ICO_PATH)
+            elif os.path.exists(ICON_PATH):
                 icon_img = tk.PhotoImage(file=ICON_PATH)
                 self.root.iconphoto(True, icon_img)
                 self._icon_img = icon_img  # prevent GC
