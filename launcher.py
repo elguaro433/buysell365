@@ -16,6 +16,7 @@ import urllib.request
 import urllib.error
 import webbrowser
 import csv
+import winsound
 from datetime import datetime, timedelta
 
 # Force UTF-8 output
@@ -32,13 +33,17 @@ if sys.stdout and hasattr(sys.stdout, 'encoding') and sys.stdout.encoding != 'ut
 BG_MAIN = "#0d1117"
 BG_PANEL = "#161b22"
 BG_INPUT = "#21262d"
+BG_ROW_ALT = "#1c2333"  # alternating row background
 TEXT = "#e6edf3"
+TEXT_PRI = "#e6edf3"
 TEXT_SEC = "#8b949e"
-ACCENT = "#00d2d3"
-WARN = "#f0ad4e"
+ACCENT = "#00d4aa"
+ACCENT_BRIGHT = "#00f5c4"
+WARN = "#f5c842"
 ERR = "#ff6b6b"
-WIN_COLOR = "#00d2d3"
+WIN_COLOR = "#00d4aa"
 LOSS_COLOR = "#ff6b6b"
+PREMIUM_COLOR = "#FFD700"
 
 # ============================================================
 #  PATHS
@@ -562,6 +567,11 @@ class ManagementConsole:
         self._tick_count = 0
         self._scan_countdown = 120
         self._last_analisis_time = ""
+        self._last_active_ops_keys = set()  # for trade alert detection
+        self._pnl_history = []  # list of (timestamp, pnl_value) for chart
+        self._equity_history = []  # list of (timestamp, capital) for equity curve
+        self._scalper_paused = False
+        self._tab_flash_state = {}  # tab_name -> bool for flashing
 
         # Build root window
         self.root = tk.Tk()
@@ -599,15 +609,15 @@ class ManagementConsole:
         self._tab_web = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_scalper = tk.Frame(self.notebook, bg=BG_MAIN)
 
-        self.notebook.add(self._tab_dashboard, text="  Dashboard  ")
-        self.notebook.add(self._tab_senales, text="  Senales  ")
-        self.notebook.add(self._tab_scalper, text="  Scalper  ")
-        self.notebook.add(self._tab_analisis, text="  Analisis  ")
-        self.notebook.add(self._tab_trading, text="  Trading Config  ")
-        self.notebook.add(self._tab_conexiones, text="  Conexiones  ")
-        self.notebook.add(self._tab_vip, text="  VIP  ")
-        self.notebook.add(self._tab_logs, text="  Logs  ")
-        self.notebook.add(self._tab_web, text="  Web  ")
+        self.notebook.add(self._tab_dashboard, text=" \U0001F4CA Dashboard ")
+        self.notebook.add(self._tab_senales, text=" \U0001F4E1 Se\u00f1ales ")
+        self.notebook.add(self._tab_scalper, text=" \U0001FA92 Scalper ")
+        self.notebook.add(self._tab_analisis, text=" \U0001F50D Analisis ")
+        self.notebook.add(self._tab_trading, text=" \u2699 Trading Config ")
+        self.notebook.add(self._tab_conexiones, text=" \U0001F517 Conexiones ")
+        self.notebook.add(self._tab_vip, text=" \u2B50 VIP ")
+        self.notebook.add(self._tab_logs, text=" \U0001F4DD Logs ")
+        self.notebook.add(self._tab_web, text=" \U0001F310 Web ")
 
         # Scrollable canvases dict for mousewheel binding
         self._scroll_canvases = {}
@@ -671,7 +681,7 @@ class ManagementConsole:
 
         style.configure("Treeview", background=BG_PANEL, foreground=TEXT,
                         fieldbackground=BG_PANEL, borderwidth=0,
-                        font=("Segoe UI", 10), rowheight=26)
+                        font=("Segoe UI", 10), rowheight=28)
         style.configure("Treeview.Heading", background=BG_INPUT, foreground=TEXT,
                         font=("Segoe UI", 10, "bold"), borderwidth=1,
                         relief="flat")
@@ -787,7 +797,7 @@ class ManagementConsole:
         canvas, scroll_frame = _make_scrollable(self._tab_dashboard)
         self._scroll_canvases[str(self._tab_dashboard)] = canvas
 
-        # === Barra superior con botón Actualizar ===
+        # === Barra superior con boton Actualizar ===
         dash_header = tk.Frame(scroll_frame, bg=BG_MAIN)
         dash_header.pack(fill="x", padx=10, pady=(10, 0))
         _make_button(dash_header, "Actualizar", lambda: self._update_dashboard(),
@@ -795,6 +805,11 @@ class ManagementConsole:
         self._dash_last_update_lbl = _make_label(dash_header, "", fg=TEXT_SEC,
                                                   font=("Segoe UI", 9))
         self._dash_last_update_lbl.pack(side="left", padx=10)
+
+        # Real-time capital from MT5
+        self._dash_mt5_capital_lbl = _make_label(dash_header, "MT5 Capital: --", fg=ACCENT_BRIGHT,
+                                                  font=("Segoe UI", 10, "bold"))
+        self._dash_mt5_capital_lbl.pack(side="right", padx=10)
 
         # === Section 1: Estado + Controles ===
         top_frame = tk.Frame(scroll_frame, bg=BG_MAIN)
@@ -844,6 +859,24 @@ class ManagementConsole:
                              font=("Segoe UI", 9))
         chk.pack(anchor="w", pady=(5, 0))
 
+        # === Quick Controls (improvement 5) ===
+        qctrl_frame = _make_section_frame(scroll_frame, "Controles Rapidos")
+        qctrl_frame.pack(fill="x", padx=10, pady=5)
+
+        qctrl_row = tk.Frame(qctrl_frame, bg=BG_PANEL)
+        qctrl_row.pack(fill="x", pady=3)
+
+        self._btn_scalper_toggle = _make_button(
+            qctrl_row, "\u23F8 Pausar Scalper", self._cmd_toggle_scalper,
+            bg="#6e40c9", fg="#ffffff")
+        self._btn_scalper_toggle.pack(side="left", padx=5, pady=3)
+
+        _make_button(qctrl_row, "\u26A0 Cerrar Todo", self._cmd_cerrar_todo,
+                     bg="#b91c1c", fg="#ffffff").pack(side="left", padx=5, pady=3)
+
+        _make_button(qctrl_row, "\U0001F50D Escanear Ahora", self._cmd_escanear_ahora,
+                     bg="#1d4ed8", fg="#ffffff").pack(side="left", padx=5, pady=3)
+
         # === Section 2: Estadisticas en Vivo ===
         stats_frame = _make_section_frame(scroll_frame, "Estadisticas en Vivo")
         stats_frame.pack(fill="x", padx=10, pady=5)
@@ -880,6 +913,25 @@ class ManagementConsole:
             val_lbl.grid(row=i, column=3, sticky="w", pady=2)
             setattr(self, attr, val_lbl)
 
+        # === Traffic Light Asset Status ===
+        traffic_frame = _make_section_frame(scroll_frame, "Estado de Activos")
+        traffic_frame.pack(fill="x", padx=10, pady=5)
+
+        self._traffic_lights = {}
+        tl_row = tk.Frame(traffic_frame, bg=BG_PANEL)
+        tl_row.pack(fill="x", pady=3)
+
+        all_assets = ["ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"]
+        for asset in all_assets:
+            af = tk.Frame(tl_row, bg=BG_PANEL)
+            af.pack(side="left", padx=8, pady=2)
+            light_canvas = tk.Canvas(af, width=16, height=16, bg=BG_PANEL,
+                                     highlightthickness=0)
+            light_canvas.pack(side="left", padx=(0, 4))
+            oval_id = light_canvas.create_oval(2, 2, 14, 14, fill=TEXT_SEC, outline="")
+            _make_label(af, asset, fg=TEXT, font=("Segoe UI", 9, "bold")).pack(side="left")
+            self._traffic_lights[asset] = (light_canvas, oval_id)
+
         # === Section 3: Conexiones ===
         conn_frame = _make_section_frame(scroll_frame, "Conexiones")
         conn_frame.pack(fill="x", padx=10, pady=5)
@@ -895,6 +947,14 @@ class ManagementConsole:
         self._conn_web = _make_label(conn_row, "Web Sync  --", fg=TEXT_SEC,
                                      font=("Segoe UI", 11))
         self._conn_web.pack(side="left", padx=20)
+
+        # === P&L Chart (Today) ===
+        pnl_frame = _make_section_frame(scroll_frame, "P&L Hoy (Linea)")
+        pnl_frame.pack(fill="x", padx=10, pady=5)
+
+        self._pnl_canvas = tk.Canvas(pnl_frame, bg=BG_INPUT, height=120,
+                                      highlightthickness=0)
+        self._pnl_canvas.pack(fill="x", pady=(0, 5))
 
         # === Section 4: Rendimiento por Activo ===
         rend_frame = _make_section_frame(scroll_frame, "Rendimiento por Activo")
@@ -919,14 +979,62 @@ class ManagementConsole:
         self._dash_tree.tag_configure("positive", foreground=WIN_COLOR)
         self._dash_tree.tag_configure("negative", foreground=LOSS_COLOR)
         self._dash_tree.tag_configure("neutral", foreground=TEXT)
+        self._dash_tree.tag_configure("alt_positive", foreground=WIN_COLOR, background=BG_ROW_ALT)
+        self._dash_tree.tag_configure("alt_negative", foreground=LOSS_COLOR, background=BG_ROW_ALT)
+        self._dash_tree.tag_configure("alt_neutral", foreground=TEXT, background=BG_ROW_ALT)
 
         self._dash_tree.pack(fill="x", pady=(0, 5))
+
+        # === Performance Panel (improvement 4) ===
+        perf_frame = _make_section_frame(scroll_frame, "Rendimiento Detallado")
+        perf_frame.pack(fill="x", padx=10, pady=5)
+
+        perf_grid = tk.Frame(perf_frame, bg=BG_PANEL)
+        perf_grid.pack(fill="x")
+        perf_grid.columnconfigure(1, weight=1)
+        perf_grid.columnconfigure(3, weight=1)
+
+        perf_left = [
+            ("Win Rate Hoy:", "_perf_wr_today"),
+            ("Win Rate Semana:", "_perf_wr_week"),
+            ("Win Rate Mes:", "_perf_wr_month"),
+        ]
+        perf_right = [
+            ("Mejor Trade Hoy:", "_perf_best_trade"),
+            ("Peor Trade Hoy:", "_perf_worst_trade"),
+            ("Total Pips Hoy:", "_perf_total_pips"),
+        ]
+
+        for i, (lbl_text, attr) in enumerate(perf_left):
+            _make_label(perf_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
+                row=i, column=0, sticky="w", padx=(0, 8), pady=2)
+            val_lbl = _make_label(perf_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
+            val_lbl.grid(row=i, column=1, sticky="w", pady=2)
+            setattr(self, attr, val_lbl)
+
+        for i, (lbl_text, attr) in enumerate(perf_right):
+            _make_label(perf_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
+                row=i, column=2, sticky="w", padx=(30, 8), pady=2)
+            val_lbl = _make_label(perf_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
+            val_lbl.grid(row=i, column=3, sticky="w", pady=2)
+            setattr(self, attr, val_lbl)
+
+        # Equity Curve
+        eq_frame = _make_section_frame(scroll_frame, "Curva de Capital")
+        eq_frame.pack(fill="x", padx=10, pady=5)
+
+        self._equity_canvas = tk.Canvas(eq_frame, bg=BG_INPUT, height=120,
+                                         highlightthickness=0)
+        self._equity_canvas.pack(fill="x", pady=(0, 5))
 
         # Footer: Acerca de
         footer = tk.Frame(scroll_frame, bg=BG_MAIN)
         footer.pack(fill="x", padx=10, pady=(5, 15))
         _make_button(footer, "Acerca de", self._show_about, bg=BG_INPUT, fg=TEXT).pack(
             side="right")
+
+        # Start MT5 capital refresh timer (every 30s)
+        self.root.after(5000, self._refresh_mt5_capital_loop)
 
     def _show_about(self):
         messagebox.showinfo(
@@ -938,6 +1046,417 @@ class ManagementConsole:
             "https://buysell365.pro\n\n"
             "(c) 2026 BuySell365. Todos los derechos reservados."
         )
+
+    # --------------------------------------------------------
+    #  QUICK CONTROLS (improvement 5)
+    # --------------------------------------------------------
+    def _cmd_toggle_scalper(self):
+        """Toggle scalper pause state via estado.json."""
+        estado = load_estado()
+        currently_paused = estado.get("scalper_pausado", False)
+        estado["scalper_pausado"] = not currently_paused
+        save_estado(estado)
+        self._estado_mtime = 0
+        self._scalper_paused = not currently_paused
+        if self._scalper_paused:
+            self._btn_scalper_toggle.config(text="\u25B6 Play Scalper", bg="#238636")
+            _log("Scalper PAUSADO por usuario")
+        else:
+            self._btn_scalper_toggle.config(text="\u23F8 Pausar Scalper", bg="#6e40c9")
+            _log("Scalper REANUDADO por usuario")
+
+    def _cmd_cerrar_todo(self):
+        """Emergency close all positions via MT5 in background."""
+        if not messagebox.askyesno("Cerrar Todo",
+                                   "\u26A0 ATENCION: Esto cerrara TODAS las posiciones abiertas en MT5.\n\n"
+                                   "Esta seguro?"):
+            return
+
+        def _close_all():
+            try:
+                import MetaTrader5 as mt5
+                if not mt5.initialize():
+                    self.root.after(0, lambda: messagebox.showerror(
+                        "Error", "No se pudo conectar a MT5."))
+                    return
+                positions = mt5.positions_get()
+                if not positions:
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        "Cerrar Todo", "No hay posiciones abiertas."))
+                    return
+                closed = 0
+                for pos in positions:
+                    close_type = mt5.ORDER_TYPE_SELL if pos.type == 0 else mt5.ORDER_TYPE_BUY
+                    symbol_info = mt5.symbol_info(pos.symbol)
+                    if not symbol_info:
+                        continue
+                    price = symbol_info.bid if pos.type == 0 else symbol_info.ask
+                    request = {
+                        "action": mt5.TRADE_ACTION_DEAL,
+                        "symbol": pos.symbol,
+                        "volume": pos.volume,
+                        "type": close_type,
+                        "position": pos.ticket,
+                        "price": price,
+                        "deviation": 20,
+                        "magic": pos.magic,
+                        "comment": "BuySell365 emergency close",
+                        "type_time": mt5.ORDER_TIME_GTC,
+                        "type_filling": mt5.ORDER_FILLING_IOC,
+                    }
+                    result = mt5.order_send(request)
+                    if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                        closed += 1
+                self.root.after(0, lambda: messagebox.showinfo(
+                    "Cerrar Todo", f"Se cerraron {closed} de {len(positions)} posiciones."))
+                _log(f"Emergency close: {closed}/{len(positions)} posiciones cerradas")
+            except ImportError:
+                self.root.after(0, lambda: messagebox.showerror(
+                    "Error", "MetaTrader5 no esta instalado."))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror(
+                    "Error", f"Error cerrando posiciones: {e}"))
+
+        threading.Thread(target=_close_all, daemon=True).start()
+
+    def _cmd_escanear_ahora(self):
+        """Trigger immediate scan by setting scan_countdown to 0 in estado."""
+        estado = load_estado()
+        estado["_force_scan"] = True
+        save_estado(estado)
+        self._estado_mtime = 0
+        self._scan_countdown = 0
+        _log("Escaneo inmediato solicitado por usuario")
+        messagebox.showinfo("Escanear", "Se solicitara un escaneo inmediato en el proximo ciclo.")
+
+    # --------------------------------------------------------
+    #  MT5 CAPITAL REFRESH (every 30s)
+    # --------------------------------------------------------
+    def _refresh_mt5_capital_loop(self):
+        """Read MT5 account balance in background, update label."""
+        def _fetch():
+            try:
+                import MetaTrader5 as mt5
+                if not mt5.initialize():
+                    return None
+                info = mt5.account_info()
+                if info:
+                    return {"balance": info.balance, "equity": info.equity,
+                            "profit": info.profit}
+                return None
+            except Exception:
+                return None
+
+        def _update(result):
+            if result:
+                bal = result["balance"]
+                eq = result["equity"]
+                profit = result["profit"]
+                color = WIN_COLOR if profit >= 0 else LOSS_COLOR
+                self._dash_mt5_capital_lbl.config(
+                    text=f"MT5: ${eq:,.2f} (P&L: ${profit:+,.2f})", fg=color)
+                # Track equity history for curve
+                self._equity_history.append((time.time(), eq))
+                # Keep last 200 data points
+                if len(self._equity_history) > 200:
+                    self._equity_history = self._equity_history[-200:]
+            else:
+                self._dash_mt5_capital_lbl.config(text="MT5 Capital: sin conexion", fg=TEXT_SEC)
+
+        def _bg():
+            result = _fetch()
+            self.root.after(0, lambda: _update(result))
+
+        threading.Thread(target=_bg, daemon=True).start()
+        self.root.after(30000, self._refresh_mt5_capital_loop)
+
+    # --------------------------------------------------------
+    #  P&L CHART DRAWING
+    # --------------------------------------------------------
+    def _draw_pnl_chart(self, pnl_points):
+        """Draw a simple line chart on self._pnl_canvas.
+        pnl_points: list of (label, value) where value is cumulative pips."""
+        c = self._pnl_canvas
+        c.delete("all")
+        w = c.winfo_width() or 600
+        h = c.winfo_height() or 120
+
+        if len(pnl_points) < 2:
+            c.create_text(w // 2, h // 2, text="Sin datos suficientes",
+                          fill=TEXT_SEC, font=("Segoe UI", 10))
+            return
+
+        values = [p[1] for p in pnl_points]
+        min_v = min(values)
+        max_v = max(values)
+        spread = max_v - min_v if max_v != min_v else 1
+
+        pad_x = 30
+        pad_y = 15
+        chart_w = w - 2 * pad_x
+        chart_h = h - 2 * pad_y
+
+        # Zero line
+        zero_y = pad_y + chart_h * (1 - (0 - min_v) / spread) if min_v < 0 else h - pad_y
+        if min_v >= 0:
+            zero_y = h - pad_y
+        elif max_v <= 0:
+            zero_y = pad_y
+        else:
+            zero_y = pad_y + chart_h * (max_v / spread)
+        c.create_line(pad_x, zero_y, w - pad_x, zero_y, fill="#30363d", dash=(4, 4))
+        c.create_text(pad_x - 5, zero_y, text="0", fill=TEXT_SEC,
+                       font=("Segoe UI", 7), anchor="e")
+
+        # Plot points
+        n = len(pnl_points)
+        step_x = chart_w / max(n - 1, 1)
+        coords = []
+        for i, (lbl, val) in enumerate(pnl_points):
+            x = pad_x + i * step_x
+            y = pad_y + chart_h * (1 - (val - min_v) / spread)
+            coords.append((x, y))
+
+        # Fill area
+        if len(coords) >= 2:
+            fill_coords = [(coords[0][0], zero_y)]
+            fill_coords.extend(coords)
+            fill_coords.append((coords[-1][0], zero_y))
+            flat = [c for pt in fill_coords for c in pt]
+            c.create_polygon(flat, fill="#00d4aa20", outline="")
+
+        # Line
+        for i in range(len(coords) - 1):
+            color = WIN_COLOR if coords[i + 1][1] <= coords[i][1] else LOSS_COLOR
+            c.create_line(coords[i][0], coords[i][1],
+                          coords[i + 1][0], coords[i + 1][1],
+                          fill=color, width=2)
+
+        # End value
+        last_val = values[-1]
+        last_color = WIN_COLOR if last_val >= 0 else LOSS_COLOR
+        c.create_text(w - pad_x + 5, coords[-1][1],
+                       text=f"{last_val:+.1f}", fill=last_color,
+                       font=("Segoe UI", 8, "bold"), anchor="w")
+
+    # --------------------------------------------------------
+    #  EQUITY CURVE DRAWING
+    # --------------------------------------------------------
+    def _draw_equity_curve(self):
+        """Draw equity curve from self._equity_history on self._equity_canvas."""
+        c = self._equity_canvas
+        c.delete("all")
+        w = c.winfo_width() or 600
+        h = c.winfo_height() or 120
+
+        if len(self._equity_history) < 2:
+            c.create_text(w // 2, h // 2, text="Esperando datos de MT5...",
+                          fill=TEXT_SEC, font=("Segoe UI", 10))
+            return
+
+        values = [p[1] for p in self._equity_history]
+        min_v = min(values) * 0.999
+        max_v = max(values) * 1.001
+        spread = max_v - min_v if max_v != min_v else 1
+
+        pad_x = 40
+        pad_y = 15
+        chart_w = w - 2 * pad_x
+        chart_h = h - 2 * pad_y
+
+        n = len(values)
+        step_x = chart_w / max(n - 1, 1)
+        coords = []
+        for i, val in enumerate(values):
+            x = pad_x + i * step_x
+            y = pad_y + chart_h * (1 - (val - min_v) / spread)
+            coords.append((x, y))
+
+        # Fill
+        if len(coords) >= 2:
+            fill_coords = [(coords[0][0], h - pad_y)]
+            fill_coords.extend(coords)
+            fill_coords.append((coords[-1][0], h - pad_y))
+            flat = [c for pt in fill_coords for c in pt]
+            c.create_polygon(flat, fill="#00d4aa15", outline="")
+
+        # Line
+        for i in range(len(coords) - 1):
+            c.create_line(coords[i][0], coords[i][1],
+                          coords[i + 1][0], coords[i + 1][1],
+                          fill=ACCENT_BRIGHT, width=2)
+
+        # Labels
+        c.create_text(pad_x - 5, pad_y, text=f"${max_v:,.0f}", fill=TEXT_SEC,
+                       font=("Segoe UI", 7), anchor="e")
+        c.create_text(pad_x - 5, h - pad_y, text=f"${min_v:,.0f}", fill=TEXT_SEC,
+                       font=("Segoe UI", 7), anchor="e")
+        c.create_text(w - pad_x + 5, coords[-1][1],
+                       text=f"${values[-1]:,.2f}", fill=ACCENT_BRIGHT,
+                       font=("Segoe UI", 8, "bold"), anchor="w")
+
+    # --------------------------------------------------------
+    #  TRAFFIC LIGHT UPDATE
+    # --------------------------------------------------------
+    def _update_traffic_lights(self, estado):
+        """Update traffic light indicators for each asset."""
+        ops_activas = estado.get("operaciones_activas", {})
+        now = datetime.now()
+        hora = now.hour
+
+        # Horarios por activo (Andorra time)
+        horarios = {
+            "ORO": (8, 20), "EUR/USD": (8, 18), "USD/JPY": (8, 18),
+            "GBP/JPY": (9, 18), "NASDAQ": (15, 22), "S&P 500": (15, 22),
+        }
+
+        # Assets with open positions
+        active_assets = set()
+        for key, op in ops_activas.items():
+            asset = _normalize_asset(op.get("nombre", op.get("ticker", "")))
+            if asset in _VALID_ASSETS:
+                active_assets.add(asset)
+
+        for asset, (light_canvas, oval_id) in self._traffic_lights.items():
+            h_open, h_close = horarios.get(asset, (0, 24))
+            if asset in active_assets:
+                color = "#00ff66"  # bright green = has position
+            elif h_open <= hora < h_close and now.weekday() < 5:
+                color = WARN  # yellow = scanning
+            else:
+                color = ERR  # red = outside hours
+            light_canvas.itemconfig(oval_id, fill=color)
+
+    # --------------------------------------------------------
+    #  PERFORMANCE PANEL UPDATE
+    # --------------------------------------------------------
+    def _update_performance_panel(self, historial):
+        """Update win rate by period and best/worst trade."""
+        now = datetime.now()
+        today_str = now.strftime("%d/%m/%Y")
+
+        # Parse dates
+        today_ops = []
+        week_ops = []
+        month_ops = []
+        for op in historial:
+            fecha_str = op.get("fecha", "")
+            try:
+                op_date = datetime.strptime(fecha_str, "%d/%m/%Y")
+            except Exception:
+                continue
+            delta = (now - op_date).days
+            if fecha_str == today_str:
+                today_ops.append(op)
+            if delta <= 7:
+                week_ops.append(op)
+            if delta <= 30:
+                month_ops.append(op)
+
+        def _wr(ops):
+            total = len(ops)
+            if total == 0:
+                return "--"
+            wins = sum(1 for o in ops if o.get("resultado") == "WIN")
+            return f"{wins / total * 100:.1f}% ({wins}/{total})"
+
+        self._perf_wr_today.config(text=_wr(today_ops))
+        self._perf_wr_week.config(text=_wr(week_ops))
+        self._perf_wr_month.config(text=_wr(month_ops))
+
+        # Best and worst trade today
+        if today_ops:
+            pips_list = [(op.get("pips", 0), _normalize_asset(op.get("nombre", ""))) for op in today_ops]
+            best = max(pips_list, key=lambda x: x[0])
+            worst = min(pips_list, key=lambda x: x[0])
+            self._perf_best_trade.config(
+                text=f"{best[1]} +{best[0]:.1f} pips", fg=WIN_COLOR)
+            self._perf_worst_trade.config(
+                text=f"{worst[1]} {worst[0]:.1f} pips", fg=LOSS_COLOR)
+            total_pips = sum(p[0] for p in pips_list)
+            pip_color = WIN_COLOR if total_pips >= 0 else LOSS_COLOR
+            self._perf_total_pips.config(text=f"{total_pips:+.1f} pips", fg=pip_color)
+        else:
+            self._perf_best_trade.config(text="--", fg=TEXT)
+            self._perf_worst_trade.config(text="--", fg=TEXT)
+            self._perf_total_pips.config(text="--", fg=TEXT)
+
+    # --------------------------------------------------------
+    #  VISUAL ALERTS (improvement 3)
+    # --------------------------------------------------------
+    def _show_trade_alert(self, asset, tipo, score):
+        """Show a small popup notification when a trade opens."""
+        alert = tk.Toplevel(self.root)
+        alert.overrideredirect(True)
+        alert.attributes("-topmost", True)
+        alert.configure(bg="#1a1a2e")
+
+        # Position at top-right of screen
+        screen_w = self.root.winfo_screenwidth()
+        alert.geometry(f"320x80+{screen_w - 340}+40")
+
+        color = WIN_COLOR if tipo.upper() == "COMPRA" else LOSS_COLOR
+        premium_text = " PREMIUM" if isinstance(score, (int, float)) and score >= 4 else ""
+
+        tk.Label(alert, text=f"\U0001F4E2 Nueva Operacion{premium_text}",
+                 bg="#1a1a2e", fg=ACCENT_BRIGHT, font=("Segoe UI", 11, "bold")).pack(
+                     anchor="w", padx=10, pady=(8, 0))
+        tk.Label(alert, text=f"{asset} - {tipo} (Score: {score})",
+                 bg="#1a1a2e", fg=color, font=("Segoe UI", 10)).pack(
+                     anchor="w", padx=10, pady=(2, 8))
+
+        # Auto-close after 5 seconds
+        alert.after(5000, alert.destroy)
+
+        # Play beep for premium signals
+        if premium_text:
+            try:
+                winsound.Beep(1200, 300)
+                winsound.Beep(1500, 200)
+            except Exception:
+                pass
+
+    def _check_new_trades(self, estado):
+        """Detect new trades and fire alerts."""
+        ops_activas = estado.get("operaciones_activas", {})
+        current_keys = set(ops_activas.keys())
+        new_keys = current_keys - self._last_active_ops_keys
+
+        for key in new_keys:
+            op = ops_activas[key]
+            asset = _normalize_asset(op.get("nombre", op.get("ticker", key)))
+            tipo = op.get("tipo", "?")
+            score = op.get("score", 0)
+            self._show_trade_alert(asset, tipo, score)
+
+        self._last_active_ops_keys = current_keys
+
+    def _update_tab_flash(self, estado):
+        """Flash tab text color when there are active positions."""
+        ops_activas = estado.get("operaciones_activas", {})
+        scalper_state = estado.get("scalper_estado", {})
+        has_main_ops = len(ops_activas) > 0
+        has_scalper_ops = scalper_state.get("posiciones_abiertas", 0) > 0
+
+        # Flash senales tab
+        tick_even = (self._tick_count % 2 == 0)
+        if has_main_ops:
+            count = len(ops_activas)
+            if tick_even:
+                self.notebook.tab(self._tab_senales, text=f" \U0001F4E1 Se\u00f1ales ({count}) ")
+            else:
+                self.notebook.tab(self._tab_senales, text=f" \U0001F534 Se\u00f1ales ({count}) ")
+        else:
+            self.notebook.tab(self._tab_senales, text=" \U0001F4E1 Se\u00f1ales ")
+
+        # Flash scalper tab
+        if has_scalper_ops:
+            if tick_even:
+                self.notebook.tab(self._tab_scalper, text=" \U0001FA92 Scalper \u25CF ")
+            else:
+                self.notebook.tab(self._tab_scalper, text=" \U0001FA92 Scalper \u26A1 ")
+        else:
+            self.notebook.tab(self._tab_scalper, text=" \U0001FA92 Scalper ")
 
     # ============================================================
     #  TAB 2: SENALES
@@ -980,7 +1499,7 @@ class ManagementConsole:
 
         self._senales_active_tree.tag_configure("COMPRA", foreground=WIN_COLOR)
         self._senales_active_tree.tag_configure("VENTA", foreground=LOSS_COLOR)
-        self._senales_active_tree.tag_configure("PREMIUM", foreground="#FFD700")
+        self._senales_active_tree.tag_configure("PREMIUM", foreground=PREMIUM_COLOR)
         self._senales_active_tree.pack(fill="x", pady=(0, 5))
 
         # Closed Signals Treeview
@@ -2243,6 +2762,11 @@ class ManagementConsole:
                                                 font=("Segoe UI", 9))
         self._scalper_status_lbl.pack(side="left", padx=10)
 
+        # Scalper P&L separate display
+        self._sc_pnl_header = _make_label(header, "Scalper P&L: --", fg=ACCENT_BRIGHT,
+                                           font=("Segoe UI", 10, "bold"))
+        self._sc_pnl_header.pack(side="right", padx=10)
+
         # === Seccion 1: Estado del Scalper ===
         estado_frame = _make_section_frame(scroll_frame, "Scalper Silencioso - BB+RSI Mean Reversion M5")
         estado_frame.pack(fill="x", padx=10, pady=5)
@@ -2259,7 +2783,7 @@ class ManagementConsole:
             ("Posiciones Abiertas:", "_sc_posiciones"),
         ]
         scalper_right = [
-            ("P&L Hoy:", "_sc_pnl_hoy"),
+            ("P&L Scalper Hoy:", "_sc_pnl_hoy"),
             ("Perdidas Seguidas:", "_sc_racha"),
             ("Riesgo/Trade:", "_sc_riesgo"),
             ("Max Loss Diario:", "_sc_max_loss"),
@@ -2277,19 +2801,19 @@ class ManagementConsole:
             val.grid(row=i, column=3, sticky="w", pady=2)
             setattr(self, attr, val)
 
-        # === Seccion 2: Activos del Scalper ===
-        activos_frame = _make_section_frame(scroll_frame, "Activos Scalping")
+        # === Seccion 2: Activos del Scalper (all 7) ===
+        activos_frame = _make_section_frame(scroll_frame, "Activos Scalping (7 pares)")
         activos_frame.pack(fill="x", padx=10, pady=5)
 
         cols_sc = ("activo", "mt5", "horario", "spread_max", "estado")
-        self._sc_tree_activos = ttk.Treeview(activos_frame, columns=cols_sc, show="headings", height=4)
+        self._sc_tree_activos = ttk.Treeview(activos_frame, columns=cols_sc, show="headings", height=7)
         self._sc_tree_activos.heading("activo", text="Activo")
         self._sc_tree_activos.heading("mt5", text="Simbolo MT5")
         self._sc_tree_activos.heading("horario", text="Horario (Andorra)")
         self._sc_tree_activos.heading("spread_max", text="Spread Max")
         self._sc_tree_activos.heading("estado", text="Estado")
 
-        self._sc_tree_activos.column("activo", width=120, anchor="w")
+        self._sc_tree_activos.column("activo", width=140, anchor="w")
         self._sc_tree_activos.column("mt5", width=120, anchor="center")
         self._sc_tree_activos.column("horario", width=140, anchor="center")
         self._sc_tree_activos.column("spread_max", width=100, anchor="center")
@@ -2297,16 +2821,22 @@ class ManagementConsole:
 
         self._sc_tree_activos.tag_configure("activo", foreground=WIN_COLOR)
         self._sc_tree_activos.tag_configure("inactivo", foreground=TEXT_SEC)
+        self._sc_tree_activos.tag_configure("alt_activo", foreground=WIN_COLOR, background=BG_ROW_ALT)
+        self._sc_tree_activos.tag_configure("alt_inactivo", foreground=TEXT_SEC, background=BG_ROW_ALT)
 
-        # Llenar activos
+        # All 7 scalper activos
         activos_data = [
-            ("ORO (XAUUSD)", "GOLD", "09:00 - 19:00", "45", ""),
             ("EUR/USD", "EURUSD", "09:00 - 18:00", "20", ""),
             ("GBP/USD", "GBPUSD", "09:00 - 18:00", "25", ""),
-            ("NASDAQ", "US100Cash", "15:30 - 22:00", "500", ""),
+            ("NASDAQ (US100)", "US100Cash", "15:30 - 22:00", "500", ""),
+            ("ORO (XAUUSD)", "GOLD", "09:00 - 19:00", "45", ""),
+            ("AUD/CAD", "AUDCAD", "09:00 - 18:00", "25", ""),
+            ("EUR/CHF", "EURCHF", "09:00 - 18:00", "20", ""),
+            ("USD/CAD", "USDCAD", "09:00 - 18:00", "22", ""),
         ]
-        for row in activos_data:
-            self._sc_tree_activos.insert("", "end", values=row)
+        for idx, row in enumerate(activos_data):
+            tag_prefix = "alt_" if idx % 2 == 1 else ""
+            self._sc_tree_activos.insert("", "end", values=row, tags=(f"{tag_prefix}inactivo",))
 
         self._sc_tree_activos.pack(fill="x", pady=(0, 5))
 
@@ -2339,34 +2869,50 @@ class ManagementConsole:
 
         self._sc_tree_pos.pack(fill="x", pady=(0, 5))
 
-        # === Seccion 4: Historial Scalper Hoy ===
+        # === Seccion 4: Historial Scalper Hoy (color-coded) ===
         hist_frame = _make_section_frame(scroll_frame, "Historial Scalper (Hoy)")
         hist_frame.pack(fill="x", padx=10, pady=(5, 15))
 
         self._sc_log_text = tk.Text(
             hist_frame, bg=BG_INPUT, fg=TEXT, font=("Consolas", 9),
-            wrap="word", height=10, state="disabled", insertbackground=TEXT,
+            wrap="word", height=12, state="disabled", insertbackground=TEXT,
             highlightthickness=0,
         )
+        self._sc_log_text.tag_configure("win", foreground=WIN_COLOR)
+        self._sc_log_text.tag_configure("loss", foreground=LOSS_COLOR)
+        self._sc_log_text.tag_configure("header", foreground=ACCENT_BRIGHT, font=("Consolas", 9, "bold"))
         self._sc_log_text.pack(fill="both", expand=True, pady=(0, 5))
 
         # Refresh inicial
         self._refresh_scalper()
 
     def _refresh_scalper(self):
-        """Actualiza la pestaña Scalper. MT5 I/O en background thread."""
+        """Actualiza la pestana Scalper. MT5 I/O en background thread."""
         self._sc_estrategia.config(text="BB(20,2) + RSI(7) Mean Rev. M5")
         self._sc_riesgo.config(text="0.5% por trade")
         self._sc_max_loss.config(text="3% diario")
+
+        # Check if scalper is paused
+        estado = self._get_estado()
+        if estado.get("scalper_pausado", False):
+            self._scalper_paused = True
+            self._btn_scalper_toggle.config(text="\u25B6 Play Scalper", bg="#238636")
+        else:
+            self._scalper_paused = False
+            self._btn_scalper_toggle.config(text="\u23F8 Pausar Scalper", bg="#6e40c9")
 
         _bot_running = self.bot.is_running if hasattr(self, 'bot') else False
         if not _bot_running:
             self._sc_estado.config(text="Bot detenido", fg=ERR)
             for lbl in (self._sc_trades_hoy, self._sc_posiciones, self._sc_pnl_hoy, self._sc_racha):
                 lbl.config(text="--")
+            self._sc_pnl_header.config(text="Scalper P&L: Bot OFF", fg=TEXT_SEC)
             return
 
-        self._sc_estado.config(text="Activo", fg=WIN_COLOR)
+        if self._scalper_paused:
+            self._sc_estado.config(text="PAUSADO", fg=WARN)
+        else:
+            self._sc_estado.config(text="Activo", fg=WIN_COLOR)
 
         def _mt5_fetch():
             """Lee datos de MT5 en background y devuelve resultados."""
@@ -2395,16 +2941,26 @@ class ManagementConsole:
                         'profit': profit, 'mins': mins
                     })
                 deal_data = []
-                for d in sc_deals[-20:]:
+                deal_profit_total = 0
+                wins = 0
+                losses = 0
+                for d in sc_deals[-30:]:
                     deal_data.append({
                         'time': datetime.fromtimestamp(d.time).strftime("%H:%M"),
                         'symbol': d.symbol,
                         'tipo': "BUY" if d.type == 0 else "SELL",
                         'volume': d.volume, 'profit': d.profit
                     })
+                    deal_profit_total += d.profit
+                    if d.profit >= 0:
+                        wins += 1
+                    else:
+                        losses += 1
                 return {'pos': pos_data, 'deals': deal_data,
-                        'total_profit': total_profit, 'n_pos': len(scalper_pos),
-                        'n_deals': len(sc_deals), 'now': now}
+                        'total_profit': total_profit, 'deal_profit': deal_profit_total,
+                        'n_pos': len(scalper_pos),
+                        'n_deals': len(sc_deals), 'now': now,
+                        'wins': wins, 'losses': losses}
             except ImportError:
                 return 'no_mt5'
             except Exception as e:
@@ -2415,19 +2971,21 @@ class ManagementConsole:
             try:
                 if result == 'no_mt5':
                     self._sc_posiciones.config(text="MT5 no disponible")
+                    self._sc_pnl_header.config(text="Scalper P&L: MT5 N/A", fg=TEXT_SEC)
                     return
                 if isinstance(result, str) and result.startswith('error:'):
                     self._sc_posiciones.config(text=result)
                     return
                 if result is None:
-                    self._sc_posiciones.config(text="MT5 sin conexión")
+                    self._sc_posiciones.config(text="MT5 sin conexion")
+                    self._sc_pnl_header.config(text="Scalper P&L: sin conexion", fg=TEXT_SEC)
                     return
 
                 now = result['now']
                 hora = now.hour
                 self._scalper_status_lbl.config(text=f"Actualizado: {now.strftime('%H:%M:%S')}")
                 self._sc_posiciones.config(text=str(result['n_pos']))
-                self._sc_trades_hoy.config(text=str(result['n_deals']))
+                self._sc_trades_hoy.config(text=f"{result['n_deals']} ({result['wins']}W / {result['losses']}L)")
 
                 # Tabla posiciones
                 for item in self._sc_tree_pos.get_children():
@@ -2440,33 +2998,48 @@ class ManagementConsole:
                         f"${p['profit']:.2f}", f"{p['mins']}m"
                     ), tags=(tag,))
 
-                # P&L
+                # P&L (separated from main bot)
                 tp = result['total_profit']
-                self._sc_pnl_hoy.config(text=f"${tp:.2f}",
-                                         fg=WIN_COLOR if tp >= 0 else LOSS_COLOR)
+                dp = result['deal_profit']
+                total_sc_pnl = tp + dp
+                self._sc_pnl_hoy.config(text=f"${total_sc_pnl:.2f}",
+                                         fg=WIN_COLOR if total_sc_pnl >= 0 else LOSS_COLOR)
+                pnl_color = WIN_COLOR if total_sc_pnl >= 0 else LOSS_COLOR
+                self._sc_pnl_header.config(
+                    text=f"Scalper P&L: ${total_sc_pnl:+,.2f} ({result['wins']}W/{result['losses']}L)",
+                    fg=pnl_color)
 
-                # Historial
+                # Color-coded historial
                 self._sc_log_text.config(state="normal")
                 self._sc_log_text.delete("1.0", "end")
-                for d in result['deals']:
-                    ps = f"+${d['profit']:.2f}" if d['profit'] >= 0 else f"-${abs(d['profit']):.2f}"
+                if result['deals']:
                     self._sc_log_text.insert("end",
-                        f"[{d['time']}] {d['symbol']} {d['tipo']} | Vol:{d['volume']} | {ps}\n")
+                        f"{'Hora':<8} {'Simbolo':<12} {'Tipo':<6} {'Vol':<6} {'Profit':>10}\n", "header")
+                    self._sc_log_text.insert("end", "-" * 50 + "\n", "header")
+                for d in result['deals']:
+                    ps = f"${d['profit']:+.2f}"
+                    tag = "win" if d['profit'] >= 0 else "loss"
+                    self._sc_log_text.insert("end",
+                        f"[{d['time']}] {d['symbol']:<12} {d['tipo']:<6} {d['volume']:<6.2f} {ps:>10}\n", tag)
                 self._sc_log_text.config(state="disabled")
 
-                # Estado activos por hora
-                for item in self._sc_tree_activos.get_children():
+                # Estado activos por hora (update all 7)
+                items = self._sc_tree_activos.get_children()
+                for idx, item in enumerate(items):
                     vals = list(self._sc_tree_activos.item(item, "values"))
                     horario = vals[2]
+                    tag_prefix = "alt_" if idx % 2 == 1 else ""
                     try:
                         h_s = int(horario.split("-")[0].strip().split(":")[0])
                         h_e = int(horario.split("-")[1].strip().split(":")[0])
-                        if h_s <= hora < h_e:
+                        if h_s <= hora < h_e and now.weekday() < 5:
                             vals[4] = "ACTIVO"
-                            self._sc_tree_activos.item(item, values=vals, tags=("activo",))
+                            self._sc_tree_activos.item(item, values=vals,
+                                                        tags=(f"{tag_prefix}activo",))
                         else:
                             vals[4] = "Fuera horario"
-                            self._sc_tree_activos.item(item, values=vals, tags=("inactivo",))
+                            self._sc_tree_activos.item(item, values=vals,
+                                                        tags=(f"{tag_prefix}inactivo",))
                     except Exception:
                         pass
                 self._sc_racha.config(text="0")
@@ -2634,6 +3207,13 @@ class ManagementConsole:
             except Exception:
                 pass
 
+        # Scalper (every 10s)
+        if self._tick_count % 5 == 0:
+            try:
+                self._refresh_scalper()
+            except Exception:
+                pass
+
         # Countdown
         self._scan_countdown = max(0, self._scan_countdown - 2)
         if self._scan_countdown <= 0:
@@ -2715,7 +3295,51 @@ class ManagementConsole:
         # Performance by asset
         self._update_rendimiento(historial)
 
-        # Timestamp de última actualización
+        # Traffic lights
+        try:
+            self._update_traffic_lights(estado)
+        except Exception:
+            pass
+
+        # Performance panel (win rate by period, best/worst trade)
+        try:
+            self._update_performance_panel(historial)
+        except Exception:
+            pass
+
+        # P&L chart - build cumulative pips from today's ops
+        try:
+            pnl_points = []
+            cumulative = 0.0
+            for op in today_ops:
+                cumulative += op.get("pips", 0)
+                label = op.get("hora_salida", op.get("hora", ""))
+                pnl_points.append((label, cumulative))
+            if not pnl_points:
+                pnl_points = [("inicio", 0)]
+            self._draw_pnl_chart(pnl_points)
+        except Exception:
+            pass
+
+        # Equity curve
+        try:
+            self._draw_equity_curve()
+        except Exception:
+            pass
+
+        # Check for new trades and fire alerts
+        try:
+            self._check_new_trades(estado)
+        except Exception:
+            pass
+
+        # Tab flash for active positions
+        try:
+            self._update_tab_flash(estado)
+        except Exception:
+            pass
+
+        # Timestamp de ultima actualizacion
         if hasattr(self, '_dash_last_update_lbl'):
             self._dash_last_update_lbl.config(text=f"Actualizado: {datetime.now().strftime('%H:%M:%S')}")
 
@@ -2782,16 +3406,17 @@ class ManagementConsole:
         # Sort by pips descending
         sorted_assets = sorted(stats.items(), key=lambda x: x[1]["pips"], reverse=True)
 
-        for asset, s in sorted_assets:
+        for idx, (asset, s) in enumerate(sorted_assets):
             ops = s["ops"]
             wins = s["wins"]
             losses = s["losses"]
             pips = s["pips"]
             wp = (wins / ops * 100) if ops > 0 else 0
 
-            tag = "positive" if pips >= 0 else "negative"
+            base_tag = "positive" if pips >= 0 else "negative"
             if ops == 0:
-                tag = "neutral"
+                base_tag = "neutral"
+            tag = f"alt_{base_tag}" if idx % 2 == 1 else base_tag
 
             self._dash_tree.insert("", "end",
                                    values=(asset, ops, wins, losses,
@@ -2900,11 +3525,7 @@ class ManagementConsole:
                  f"Pips hoy: {pips_today:+.1f}"
         )
 
-        # Update tab title
-        if active_count > 0:
-            self.notebook.tab(self._tab_senales, text=f"  Senales ({active_count})  ")
-        else:
-            self.notebook.tab(self._tab_senales, text="  Senales  ")
+        # Tab title update is handled by _update_tab_flash
 
     # ============================================================
     #  ANALISIS UPDATE

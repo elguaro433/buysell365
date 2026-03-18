@@ -14681,6 +14681,7 @@ SCALPER_ACTIVOS = {
     "EURUSD":    {"mt5": "EURUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 20,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
     "GBPUSD":    {"mt5": "GBPUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
     "US100Cash": {"mt5": "US100Cash",  "tipo": "indice",    "horario": (15, 22), "max_spread": 500, "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
+    "GOLD":      {"mt5": "GOLD",       "tipo": "commodity", "horario": (9, 19),  "max_spread": 40,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi", "solo_sell": True},
     # Fibonacci Mean Reversion — pares de rango (backtest 70-82% WR)
     "AUDCAD":    {"mt5": "AUDCAD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 30,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
     "EURCHF":    {"mt5": "EURCHF",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
