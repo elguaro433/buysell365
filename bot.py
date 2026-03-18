@@ -433,7 +433,12 @@ MT5_TICKER_MAP = {
     'USDJPY':   'USDJPY',
     'GBPJPY=X': 'GBPJPY',
     'GBPJPY':   'GBPJPY',
-    # Solo activos tradicionales
+    # Scalper Fibonacci pairs
+    'AUDCAD':   'AUDCAD',
+    'EURCHF':   'EURCHF',
+    'USDCAD':   'USDCAD',
+    'GBPUSD':   'GBPUSD',
+    'GBPUSD=X': 'GBPUSD',
 }
 
 # Mapa inverso: MT5/webhook ticker → yfinance ticker (para cooldown consistente)
@@ -442,6 +447,7 @@ _TICKER_TO_YFINANCE = {
     'US100CASH': 'NQ=F', 'NAS100': 'NQ=F', 'US100': 'NQ=F', 'NASDAQ': 'NQ=F', 'NQ': 'NQ=F',
     'US500CASH': 'ES=F', 'US500': 'ES=F', 'SP500': 'ES=F', 'SPX500USD': 'ES=F', 'SPX': 'ES=F',
     'EURUSD': 'EURUSD=X', 'USDJPY': 'USDJPY=X', 'GBPJPY': 'GBPJPY=X',
+    'AUDCAD': 'AUDCAD', 'EURCHF': 'EURCHF', 'USDCAD': 'USDCAD', 'GBPUSD': 'GBPUSD=X',
     # Tickers yfinance ya correctos (pass-through)
     'GC=F': 'GC=F',
     'NQ=F': 'NQ=F', 'ES=F': 'ES=F', 'EURUSD=X': 'EURUSD=X', 'USDJPY=X': 'USDJPY=X', 'GBPJPY=X': 'GBPJPY=X',
@@ -1033,6 +1039,96 @@ def _descargar_intento(ticker, period, interval):
         print(f"⚠️ Error descargando {ticker}: {e}")
         return None
 
+
+
+# ============================================================
+#  DESCARGA OHLCV UNIFICADA — MT5 primero, yfinance fallback
+# ============================================================
+
+# Mapa de periodo texto → número de barras necesarias para MT5
+_PERIOD_TO_BARS = {
+    "1d": 24, "2d": 48, "5d": 120, "10d": 240,
+    "30d": 720, "60d": 1440, "90d": 2160, "6mo": 4320,
+    "1y": 8760, "max": 10000,
+}
+
+def descargar_ohlcv(ticker, period="60d", interval="1h"):
+    """
+    Descarga datos OHLCV priorizando MT5 (real-time) con fallback a yfinance.
+    Retorna DataFrame con columnas [Open, High, Low, Close, Volume] y DateTimeIndex.
+    Compatible 1:1 con el formato que espera el resto del bot.
+    """
+    import pandas as pd
+
+    # === 1. INTENTO MT5 (datos en tiempo real, sin delay) ===
+    if MT5_AVAILABLE:
+        try:
+            mt5_ticker = MT5_TICKER_MAP.get(ticker, ticker)
+            timeframes = {
+                "1m": mt5.TIMEFRAME_M1,
+                "5m": mt5.TIMEFRAME_M5,
+                "15m": mt5.TIMEFRAME_M15,
+                "30m": mt5.TIMEFRAME_M30,
+                "60m": mt5.TIMEFRAME_H1,
+                "1h": mt5.TIMEFRAME_H1,
+                "4h": mt5.TIMEFRAME_H4,
+                "1d": mt5.TIMEFRAME_D1,
+            }
+            tf = timeframes.get(interval, mt5.TIMEFRAME_H1)
+
+            # Calcular cuántas barras necesitamos según el periodo solicitado
+            bars_needed = _PERIOD_TO_BARS.get(period, 1440)
+            # Pedir un 10% extra por huecos de fin de semana
+            bars_request = min(int(bars_needed * 1.1) + 50, 10000)
+
+            with _lock_mt5:
+                mt5.symbol_select(mt5_ticker, True)
+                rates = mt5.copy_rates_from_pos(mt5_ticker, tf, 0, bars_request)
+
+            if rates is not None and len(rates) > 0:
+                df = pd.DataFrame(rates)
+                df['datetime'] = pd.to_datetime(df['time'], unit='s')
+
+                for c in ['time', 'spread', 'real_volume']:
+                    if c in df.columns:
+                        df.drop(c, axis=1, inplace=True)
+
+                df.set_index('datetime', inplace=True)
+                df.rename(columns={
+                    'open': 'Open', 'high': 'High', 'low': 'Low',
+                    'close': 'Close', 'tick_volume': 'Volume'
+                }, inplace=True)
+
+                for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+                df_final = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+                if not df_final.empty:
+                    return df_final
+        except Exception as e:
+            print(f"[descargar_ohlcv] MT5 error [{ticker}→{MT5_TICKER_MAP.get(ticker, ticker)}]: {e}")
+
+    # === 2. FALLBACK YFINANCE (15-20 min delay, rate limited) ===
+    try:
+        with _lock_yf:
+            df = yf.download(ticker, period=period, interval=interval,
+                             progress=False, timeout=15)
+        if df is not None and not df.empty:
+            # Aplanar MultiIndex si yfinance devuelve columnas multi-nivel
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            # Normalizar columnas
+            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            df_final = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+            if not df_final.empty:
+                return df_final
+    except Exception as e:
+        print(f"[descargar_ohlcv] yfinance error [{ticker}]: {e}")
+
+    return pd.DataFrame()
 
 
 _TV_HEADERS = {
@@ -4536,23 +4632,12 @@ def cmd_precio(activo_raw: str):
             apertura = cotizacion['apertura']
             fuente   = cotizacion.get('fuente', 'TradingView')
         else:
-            # Cascada de intervalos: evitar '1m' que requiere Yahoo Finance Premium
-            hist = None
-            fuente_hist = "yfinance"
-            for _inv in ('60m', '1h', '30m', '15m', '5m'):
-                try:
-                    _h = yf.Ticker(ticker).history(period='5d', interval=_inv, threads=False)
-                    if _h is not None and not _h.empty:
-                        hist = _h
-                        fuente_hist = f"yfinance {_inv}"
-                        break
-                except Exception:
-                    continue
-
-            if hist is not None and not hist.empty:
-                precio   = float(hist['Close'].iloc[-1])
-                apertura = float(hist['Open'].iloc[0])
-                fuente   = fuente_hist
+            # Intentar MT5 primero, luego yfinance como fallback
+            df = descargar_ohlcv(ticker, period="5d", interval="15m")
+            if df is not None and not df.empty:
+                precio   = float(df['Close'].iloc[-1])
+                apertura = float(df['Open'].iloc[0])
+                fuente   = "MT5" if MT5_AVAILABLE else "yfinance 15m"
             else:
                 df = descargar_datos_seguro(ticker, period="5d", interval="15m")
                 if df is None or df.empty:
@@ -12732,13 +12817,9 @@ def obtener_tendencia_4h(ticker):
         return cached['tendencia']
 
     try:
-        df_4h = yf.download(ticker, period="60d", interval="1h", progress=False, timeout=10)
+        df_4h = descargar_ohlcv(ticker, period="60d", interval="1h")
         if df_4h is None or len(df_4h) < 200:
             return "NEUTRAL"
-
-        # Aplanar MultiIndex si yfinance devuelve columnas multi-nivel
-        if isinstance(df_4h.columns, pd.MultiIndex):
-            df_4h.columns = df_4h.columns.get_level_values(0)
 
         # Simular 4H agrupando cada 4 velas de 1H
         df_4h = df_4h.resample('4h').agg({
