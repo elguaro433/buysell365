@@ -3421,7 +3421,16 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
 
         # Calcular riesgo real en USD para el log
         _pips_sl = abs(price_norm - sl_norm)
-        _riesgo_estimado_usd = lote_val * _pips_sl * (100 if "GOLD" in mt5_ticker.upper() or ticker == "GC=F" else 100000 if get_categoria(ticker) == "forex" else 1)
+        if "GOLD" in mt5_ticker.upper() or ticker == "GC=F":
+            _riesgo_estimado_usd = lote_val * _pips_sl * 100  # Gold: $100/punto/lote
+        elif get_categoria(ticker) == "forex":
+            if "JPY" in mt5_ticker.upper() or "JPY" in (ticker or "").upper():
+                # JPY: 1 lote = 100k unidades, valor pip = 1000 JPY / rate
+                _riesgo_estimado_usd = lote_val * _pips_sl * (1000.0 / max(1, price_norm))
+            else:
+                _riesgo_estimado_usd = lote_val * _pips_sl * 100000  # Forex: $10/pip/lote
+        else:
+            _riesgo_estimado_usd = lote_val * _pips_sl * 1  # Índices: $1/punto/lote
         _riesgo_pct_real = (_riesgo_estimado_usd / capital_real * 100) if capital_real > 0 else 0
         logger.info(f"📋 MT5 ORDER [{cuenta_name}]: {mt5_ticker} {tipo} | Price:{price_norm} SL:{sl_norm} TP:{tp_norm} | Vol:{lote_val} | Equity:${capital_real:.0f} | Riesgo:~${_riesgo_estimado_usd:.1f} ({_riesgo_pct_real:.1f}%)")
 
