@@ -3018,9 +3018,10 @@ class ManagementConsole:
 def _single_instance_check():
     """Prevent multiple instances using Windows Mutex (atomic, no race condition)."""
     import ctypes
-    kernel32 = ctypes.windll.kernel32
+    import ctypes.wintypes
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
     _launcher_mutex = kernel32.CreateMutexW(None, True, "BuySell365_Launcher_Mutex")
-    last_err = ctypes.get_last_error() if hasattr(ctypes, 'get_last_error') else kernel32.GetLastError()
+    last_err = ctypes.get_last_error()
     if last_err == 183:  # ERROR_ALREADY_EXISTS
         kernel32.CloseHandle(_launcher_mutex)
         import tkinter as tk
