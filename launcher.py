@@ -3016,79 +3016,32 @@ class ManagementConsole:
 #  MAIN ENTRY POINT
 # ============================================================
 def _single_instance_check():
-    """Prevent multiple instances using a lock file with PID validation."""
-    lock_file = os.path.join(BASE_DIR, ".launcher.lock")
-    try:
-        if os.path.exists(lock_file):
-            with open(lock_file, "r") as f:
-                old_pid = int(f.read().strip())
-            # Check if that PID is actually BuySell365 Pro still running
-            is_running = False
-            try:
-                import psutil
-                if psutil.pid_exists(old_pid):
-                    proc = psutil.Process(old_pid)
-                    proc_name = proc.name().lower()
-                    # Only block if it's actually our process
-                    if "buysell365" in proc_name or "launcher" in proc_name or "python" in proc_name:
-                        # Extra check: verify command line contains launcher
-                        try:
-                            cmdline = " ".join(proc.cmdline()).lower()
-                            if "launcher" in cmdline or "buysell365" in cmdline:
-                                is_running = True
-                        except (psutil.AccessDenied, psutil.NoSuchProcess):
-                            is_running = True  # Can't check cmdline, assume it's ours
-            except ImportError:
-                # psutil not available, use ctypes fallback
-                import ctypes
-                kernel32 = ctypes.windll.kernel32
-                handle = kernel32.OpenProcess(0x1000, False, old_pid)
-                if handle:
-                    kernel32.CloseHandle(handle)
-                    is_running = True
-            except Exception:
-                pass  # On any error, allow launch
-
-            if is_running and old_pid != os.getpid():
-                import tkinter as tk
-                from tkinter import messagebox
-                root = tk.Tk()
-                root.withdraw()
-                messagebox.showwarning(
-                    "BuySell365 Pro",
-                    "BuySell365 Pro ya esta ejecutandose.\n\n"
-                    f"PID existente: {old_pid}\n"
-                    "Cierra la instancia actual antes de abrir otra."
-                )
-                root.destroy()
-                return False
-            # PID doesn't exist or is a different program — stale lock, remove it
-        # Write our PID
-        with open(lock_file, "w") as f:
-            f.write(str(os.getpid()))
-        return True
-    except Exception:
-        return True  # Allow launch on any error
-
-
-def _remove_lock():
-    """Remove the lock file on exit."""
-    lock_file = os.path.join(BASE_DIR, ".launcher.lock")
-    try:
-        if os.path.exists(lock_file):
-            with open(lock_file, "r") as f:
-                pid = int(f.read().strip())
-            if pid == os.getpid():
-                os.remove(lock_file)
-    except Exception:
-        pass
+    """Prevent multiple instances using Windows Mutex (atomic, no race condition)."""
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    _launcher_mutex = kernel32.CreateMutexW(None, True, "BuySell365_Launcher_Mutex")
+    last_err = ctypes.get_last_error() if hasattr(ctypes, 'get_last_error') else kernel32.GetLastError()
+    if last_err == 183:  # ERROR_ALREADY_EXISTS
+        kernel32.CloseHandle(_launcher_mutex)
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showwarning(
+            "BuySell365 Pro",
+            "BuySell365 Pro ya esta ejecutandose.\n\n"
+            "Cierra la instancia actual antes de abrir otra."
+        )
+        root.destroy()
+        return False
+    # Store mutex handle globally so it persists for the process lifetime
+    _single_instance_check._mutex_handle = _launcher_mutex
+    return True
 
 
 def main():
     if not _single_instance_check():
         return
-    import atexit
-    atexit.register(_remove_lock)
     _log("=== BuySell365 Pro Launcher iniciando ===")
     config = load_config()
     bot = BotManager()
