@@ -196,15 +196,15 @@ MIN_SCORE = 3                   # Score mínimo para enviar señal (auto-calibra
 
 # ✅ PARÁMETROS INSTITUCIONALES
 CAPITAL_USUARIO   = 576.63      # Capital base (se actualiza automáticamente con equity real de MT5)
-RIESGO_POR_TRADE  = 0.025       # 2.5% para TODOS los activos (~$16 por trade con $640)
-RIESGO_ORO        = 0.025       # 2.5% para ORO
-RIESGO_USDJPY     = 0.025       # 2.5% para USD/JPY (igualado con todos)
-RIESGO_GBPJPY     = 0.025       # 2.5% para GBP/JPY (igualado con todos)
-RIESGO_PREMIUM    = 0.04        # 4% para señales premium ($25.60 por trade — solo score≥4 + conf≥40%)
+RIESGO_POR_TRADE  = 0.01        # 1% para TODOS los activos (~$5.4 por trade con $543)
+RIESGO_ORO        = 0.01        # 1% para ORO
+RIESGO_USDJPY     = 0.01        # 1% para USD/JPY
+RIESGO_GBPJPY     = 0.01        # 1% para GBP/JPY
+RIESGO_PREMIUM    = 0.015       # 1.5% para señales premium (~$8 por trade — solo score≥4)
 BOT_TZ = pytz.timezone('Europe/Andorra')  # Zona horaria del usuario (CET/CEST)
 HORA_APERTURA_LOCAL = 8         # 08:00 hora Andorra: inicio de ejecución MT5
 HORA_CORTE_LOCAL = 18           # 18:00 hora Andorra: fin de ejecución MT5 (L-V uniforme)
-MAX_PERDIDA_DIARIA = 0.12       # Detener bot si perdemos 12% en un día (~$77 con $640) — subido de 8% porque ORO/JPY usan 2-2.5%
+MAX_PERDIDA_DIARIA = 0.05       # 5% máximo diario (~$27 con $543) — estándar prop firms
 MAX_TRADES_SIMULTANEOS = 6      # Máx 1 por activo × 6 activos = 6 simultáneas
 MIN_RR_RATIO = 1.0              # Mínimo Risk:Reward — no abrir si TP1/SL < 1.0
 
@@ -2524,14 +2524,12 @@ def evaluar_senal_profesional(ind, ticker=""):
     prob_alcista = ind.get('ml_prob_alcista', 50.0)
     prob_bajista = round(100.0 - prob_alcista, 1)
 
-    # ── ML COMO FACTOR SUAVE (no bloqueante) ──
-    # Si ML devuelve exactamente 50.0 (fallo/neutral), no bloquear señales técnicas.
-    # ML_DISPONIBLE: True si el modelo funcionó y dio una predicción real (≠ 50.0).
-    _ml_disponible = (prob_alcista != 50.0)
-    # Cuando ML no está disponible, tratamos como si cumpliera el umbral
-    # para que las señales técnicas fuertes puedan pasar.
-    _ml_pass_alcista = lambda umbral: prob_alcista >= umbral if _ml_disponible else True
-    _ml_pass_bajista = lambda umbral: prob_bajista >= umbral if _ml_disponible else True
+    # ── ML DESACTIVADO (2026-03-18) ──
+    # Accuracy 48-52% = coin flip. No aporta edge, solo bloquea señales buenas.
+    # Bypass completo: siempre retorna True para no filtrar nada.
+    _ml_disponible = False
+    _ml_pass_alcista = lambda umbral: True
+    _ml_pass_bajista = lambda umbral: True
 
     # ━━━━━━━━━━
     # 0. FILTROS DE RÉGIMEN DE MERCADO (Brain v2.5)
@@ -2540,8 +2538,8 @@ def evaluar_senal_profesional(ind, ticker=""):
     adx_val = ind.get('adx', 0)
     
     # Bloqueo preventivo: Evitar operar en indecisión total - Relajado
-    if regimen == "TRANSICIÓN" and adx_val < 18:
-        return None, 0, [f"⚠️ Mercado en Transición extrema (ADX {adx_val:.1f}). Esperando claridad."]
+    if regimen == "TRANSICIÓN" and adx_val < 15:
+        return None, 0, [f"⚠️ Transición extrema (ADX {adx_val:.1f}<15)"]
 
     # Bloqueo de Volatilidad Extrema: Evita 'muertes por látigo'
     if regimen == "VOLATILIDAD" and ind.get('vol_ratio', 1) < 1.0:
@@ -2922,9 +2920,9 @@ def evaluar_senal_profesional(ind, ticker=""):
     _diag.append(f"MACD{'>' if ind['macd']>ind['signal'] else '<'}Signal")
     _diag.append(f"P{'>' if ind['precio']>ind['ema50'] else '<'}EMA50")
     _diag.append(f"Vol={ind.get('vol_ratio',0):.1f}x")
-    print(f"📋 DIAGNÓSTICO {ticker}: {' | '.join(_diag)}")
+    logger.info(f"📋 DIAGNÓSTICO {ticker}: {' | '.join(_diag)}")
 
-    return None, 0, ["⚠️ Analizando... Buscando confluencia técnica de calidad."]
+    return None, 0, [f"📋 {' | '.join(_diag)}"]
 
 # ============================================================
 #  CÁLCULO DE NIVELES - 3 TAKE PROFITS
@@ -3096,6 +3094,15 @@ def _calcular_racha_perdidas_actual():
             else:
                 break
     return racha
+
+def _get_last_loss_time():
+    """Retorna el timestamp de la última pérdida, o None."""
+    with _lock_ops:
+        for op in reversed(historial_operaciones):
+            if op.get('resultado') == 'LOSS':
+                return op.get('timestamp_cierre', op.get('timestamp', 0))
+            break
+    return None
 
 def calcular_lote_sugerido(capital, riesgo_pct, entrada, sl, ticker):
     """
@@ -12859,9 +12866,17 @@ def analizar_activo(nombre, ticker):
 
         precio = precio_mon
 
+        # ── 🛑 CIRCUIT BREAKER: pausa 1h tras 2 pérdidas consecutivas ──
+        _racha = _calcular_racha_perdidas_actual()
+        if _racha >= 2:
+            _last_loss_time = _get_last_loss_time()
+            if _last_loss_time and (time.time() - _last_loss_time) < 3600:
+                logger.info(f"🛑 CIRCUIT BREAKER: {nombre} — {_racha} pérdidas seguidas, pausa 1h")
+                return
+
         # ── 🚨 FILTRO DE NOTICIAS (ANTES de generar señales) ────────────
         if hay_noticia_alto_impacto(ticker, horas_antes=2, horas_despues=1):
-            print(f"🚨 {nombre}: BLOQUEADO por noticia 🔴 ROJA de alto impacto — no se genera señal")
+            logger.info(f"🚨 {nombre}: BLOQUEADO por noticia 🔴 ROJA de alto impacto")
             return
 
         # ── BUSCAR NUEVAS SEÑALES ────────────────────────
@@ -12874,7 +12889,7 @@ def analizar_activo(nombre, ticker):
         min_score = get_min_score_efectivo()
 
         if tipo is None:
-            print(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
+            logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
             return
 
         # 🛡️ FILTRO ANTI-CONTRADICCIÓN TÉCNICA: NO dar SELL cuando 15m es claramente alcista (y viceversa)
