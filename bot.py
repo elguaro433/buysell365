@@ -14581,7 +14581,7 @@ SCALPER_ACTIVO = True  # Master switch para activar/desactivar scalper
 SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
 
 SCALPER_ACTIVOS = {
-    "GOLD":      {"mt5": "GOLD",       "tipo": "commodity", "horario": (9, 19),  "max_spread": 45,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
+    # BB+RSI Mean Reversion M5
     "EURUSD":    {"mt5": "EURUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 20,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
     "GBPUSD":    {"mt5": "GBPUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
     "US100Cash": {"mt5": "US100Cash",  "tipo": "indice",    "horario": (15, 22), "max_spread": 500, "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
