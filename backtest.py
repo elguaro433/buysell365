@@ -338,10 +338,10 @@ def run_backtest():
                         precio_cierre = sl
                         velas_hasta_cierre = j
                         break
-                    # TP3
-                    if high_j >= tp3:
-                        resultado = "TP3"
-                        precio_cierre = tp3
+                    # TP1 primero (conservador: nearest target first)
+                    if high_j >= tp1:
+                        resultado = "TP1"
+                        precio_cierre = tp1
                         velas_hasta_cierre = j
                         break
                     # TP2
@@ -350,10 +350,10 @@ def run_backtest():
                         precio_cierre = tp2
                         velas_hasta_cierre = j
                         break
-                    # TP1
-                    if high_j >= tp1:
-                        resultado = "TP1"
-                        precio_cierre = tp1
+                    # TP3
+                    if high_j >= tp3:
+                        resultado = "TP3"
+                        precio_cierre = tp3
                         velas_hasta_cierre = j
                         break
                 else:  # VENTA
@@ -368,10 +368,10 @@ def run_backtest():
                         precio_cierre = sl
                         velas_hasta_cierre = j
                         break
-                    # TP3
-                    if low_j <= tp3:
-                        resultado = "TP3"
-                        precio_cierre = tp3
+                    # TP1 primero (conservador)
+                    if low_j <= tp1:
+                        resultado = "TP1"
+                        precio_cierre = tp1
                         velas_hasta_cierre = j
                         break
                     # TP2
@@ -380,10 +380,10 @@ def run_backtest():
                         precio_cierre = tp2
                         velas_hasta_cierre = j
                         break
-                    # TP1
-                    if low_j <= tp1:
-                        resultado = "TP1"
-                        precio_cierre = tp1
+                    # TP3
+                    if low_j <= tp3:
+                        resultado = "TP3"
+                        precio_cierre = tp3
                         velas_hasta_cierre = j
                         break
 

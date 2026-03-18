@@ -2358,8 +2358,8 @@ class ManagementConsole:
             self._sc_max_loss.config(text="3% diario")
 
             # Intentar leer del bot si esta corriendo
-            pid = self._get_bot_pid()
-            if pid and self._is_pid_running(pid):
+            _bot_running = self.bot.is_running if hasattr(self, 'bot') else False
+            if _bot_running:
                 self._sc_estado.config(text="Activo", fg=WIN_COLOR)
                 self._scalper_status_lbl.config(text=f"Actualizado: {now.strftime('%H:%M:%S')}")
 
@@ -2407,7 +2407,7 @@ class ManagementConsole:
                             self._sc_log_text.delete("1.0", "end")
                             for d in sc_deals[-20:]:
                                 t = datetime.fromtimestamp(d.time).strftime("%H:%M")
-                                tipo = "BUY" if d.type <= 1 else "SELL"
+                                tipo = "BUY" if d.type == 0 else "SELL"
                                 profit_str = f"+${d.profit:.2f}" if d.profit >= 0 else f"-${abs(d.profit):.2f}"
                                 self._sc_log_text.insert("end",
                                     f"[{t}] {d.symbol} {tipo} | Vol:{d.volume} | {profit_str}\n")

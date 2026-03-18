@@ -12893,6 +12893,14 @@ def analizar_activo(nombre, ticker):
         if nombre in activos_desactivados:
             return
 
+        # Detectar estrategia temprano (necesario para filtros)
+        _estrategia_tipo = ""
+        for _r in razones:
+            if "Asian Range" in _r: _estrategia_tipo = "asian_breakout"; break
+            elif "Breakout" in _r: _estrategia_tipo = "breakout"; break
+            elif "Pullback" in _r: _estrategia_tipo = "pullback"; break
+            elif "Reversi" in _r or "Divergencia" in _r: _estrategia_tipo = "reversion"; break
+
         # 📉 FILTRO EUR/USD: backtest mostró 24.7% win rate
         # Permitir: Breakout (score 4) + Reversión con divergencia (score 5)
         # Bloquear: Pullback (score 4) + Reversión sin divergencia (score 4)
@@ -12973,13 +12981,7 @@ def analizar_activo(nombre, ticker):
         # Cooldown y Registro (60 min entre señales del mismo activo+dirección)
         # Backtest mostró que re-entrar rápido tras SL = más pérdidas
         cooldown_seg = 3600
-        # Detectar estrategia para ajuste de SL
-        _estrategia_tipo = ""
-        for _r in razones:
-            if "Asian Range" in _r: _estrategia_tipo = "asian_breakout"; break
-            elif "Breakout" in _r: _estrategia_tipo = "breakout"; break
-            elif "Pullback" in _r: _estrategia_tipo = "pullback"; break
-            elif "Reversi" in _r or "Divergencia" in _r: _estrategia_tipo = "reversion"; break
+        # _estrategia_tipo ya detectado arriba
         niveles = calcular_niveles_3tp(precio, tipo, ind['atr_1h'], ticker, estrategia=_estrategia_tipo)
 
         # 🚫 Validar R:R mínimo
@@ -14648,7 +14650,7 @@ def _scalper_evaluar_senal(ind, config):
     rsi = ind['rsi']
     rsi_prev = ind.get('rsi_prev', rsi)
     precio = ind['precio']
-    symbol = config.get('mt5_symbol', '')
+    symbol = config.get('mt5', '')
 
     # Filtro ADX: entre 10 y 40
     if adx < 10:
@@ -14683,12 +14685,12 @@ def _scalper_evaluar_senal(ind, config):
         return "SELL", f"BB+RSI-A Sell | RSI={rsi:.0f} | ADX={adx:.0f}"
 
     # ── Variante B: Rechazo fuerte de BB (mecha larga) ──
-    body_up = high - close
-    body_down = close - low
+    wick_upper = high - close   # mecha superior
+    wick_lower = close - low    # mecha inferior
 
     # BUY: mecha inferior larga (rechazo)
     if (low < bb_lo and close > bb_lo
-            and body_down > body_up * 1.5
+            and wick_lower > wick_upper * 1.5
             and rsi < 45 and 10 <= adx <= 40):
         if 'XAUUSD' in symbol or 'GC' in symbol:
             return None, "Gold BUY-B bloqueado"
@@ -14696,7 +14698,7 @@ def _scalper_evaluar_senal(ind, config):
 
     # SELL: mecha superior larga (rechazo)
     if (high > bb_up and close < bb_up
-            and body_up > body_down * 1.5
+            and wick_upper > wick_lower * 1.5
             and rsi > 55 and 10 <= adx <= 40):
         if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
             return None, "NASDAQ SELL-B bloqueado"
@@ -14880,12 +14882,18 @@ def _scalper_gestionar_posiciones():
                     avance = info['entrada'] - pos.price_current
 
                 if avance > tp_dist * SCALPER_BREAKEVEN_PCT:
-                    # Mover SL a breakeven (+ 1 pip de margen)
-                    nuevo_sl = info['entrada']
-                    if info['tipo'] == "BUY" and pos.sl < nuevo_sl:
-                        _scalper_modificar_sl(pos, nuevo_sl)
-                    elif info['tipo'] == "SELL" and pos.sl > nuevo_sl:
-                        _scalper_modificar_sl(pos, nuevo_sl)
+                    # Mover SL a breakeven (+ spread buffer)
+                    with _lock_mt5:
+                        _tick_be = mt5.symbol_info_tick(pos.symbol)
+                    _spread_be = (_tick_be.ask - _tick_be.bid) if _tick_be else 0
+                    if info['tipo'] == "BUY":
+                        nuevo_sl = info['entrada'] + _spread_be
+                        if pos.sl < nuevo_sl:
+                            _scalper_modificar_sl(pos, nuevo_sl)
+                    elif info['tipo'] == "SELL":
+                        nuevo_sl = info['entrada'] - _spread_be
+                        if pos.sl > nuevo_sl:
+                            _scalper_modificar_sl(pos, nuevo_sl)
 
     except Exception as e:
         logger.error(f"🔪 Scalper: Error gestionando posiciones: {e}")
@@ -14914,7 +14922,12 @@ def _scalper_cerrar_posicion(pos):
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
         with _lock_mt5:
-            mt5.order_send(request)
+            result = mt5.order_send(request)
+        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"🔪 Scalper: Posición {pos.ticket} cerrada OK")
+        else:
+            rc = result.retcode if result else "None"
+            logger.warning(f"🔪 Scalper: Error cerrando {pos.ticket} — retcode={rc}")
     except Exception as e:
         logger.error(f"🔪 Scalper: Error cerrando posición {pos.ticket}: {e}")
 

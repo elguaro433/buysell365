@@ -30,8 +30,8 @@ logs/
 backtest_output.txt
 backtest_results.csv
 backtest_results.html
-backtest_report.pdf
-backtest_report_v2.pdf
+backtest_scalper_results.csv
+backtest_report*.pdf
 
 # IDE / System
 .vscode/
