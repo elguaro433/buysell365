@@ -565,7 +565,7 @@ class ManagementConsole:
 
         # Build root window
         self.root = tk.Tk()
-        self.root.title("BuySell365 Pro - Consola de Control")
+        self.root.title("BuySell365 Pro - Consola de Control | Creado por Emmanuel Diaz")
         self.root.geometry("1400x850")
         self.root.minsize(1100, 700)
         self.root.configure(bg=BG_MAIN)
