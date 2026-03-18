@@ -2612,6 +2612,13 @@ def evaluar_senal_profesional(ind, ticker=""):
     if not ind:
         return None, 0, []
 
+    # [5] CIRCUIT BREAKER GLOBAL: bloquear si está activo
+    try:
+        if _circuit_breaker_check():
+            return None, 0, ["🚨 Circuit Breaker activo — trading pausado"]
+    except Exception:
+        pass
+
     # 📉 EUR/USD: backtest mostró 24.7% WR — solo permitir score 5 (divergencia)
     # Este filtro se aplica AQUÍ para que el backtest también lo capture
     _eurusd_solo_score5 = (ticker == "EURUSD=X")
@@ -3103,6 +3110,34 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
 
     sl = atr * sl_mult
 
+    # [1] SL ADAPTATIVO AL RANGO ASIÁTICO
+    # Para asian_breakout: usar asian high/low + 20% buffer como SL
+    # Cap máximo: 2.5x ATR (no exceder)
+    if estrategia == "asian_breakout" and ticker in ("GC=F", "USDJPY=X"):
+        try:
+            _cached_ind = _cache_ind.get(ticker, {})
+            _a_high = _cached_ind.get('asian_high', 0)
+            _a_low = _cached_ind.get('asian_low', 0)
+            _a_valid = _cached_ind.get('asian_range_valid', False)
+            if _a_valid and _a_high > 0 and _a_low > 0:
+                _a_range = _a_high - _a_low
+                _buffer = _a_range * 0.20  # 20% buffer
+                if tipo.upper() in ("COMPRA", "BUY", "LONG"):
+                    # Compra: SL debajo del mínimo asiático con buffer
+                    sl_asian = precio - (_a_low - _buffer)
+                else:
+                    # Venta: SL encima del máximo asiático con buffer
+                    sl_asian = (_a_high + _buffer) - precio
+                # Cap a 2.5x ATR máximo
+                sl_max = atr * 2.5
+                sl_asian = min(sl_asian, sl_max)
+                # Solo usar si es mayor que el SL base (más protección)
+                if sl_asian > 0:
+                    sl = sl_asian
+                    logger.info(f"🌏 SL ADAPTATIVO ASIÁTICO {ticker}: SL={sl:.5g} (rango={_a_range:.5g}, buffer={_buffer:.5g}, cap={sl_max:.5g})")
+        except Exception as e:
+            logger.warning(f"⚠️ Error SL asiático adaptativo {ticker}: {e}")
+
     # FIX 2: MIN_SL floor por activo — evita SL ridículos cuando ATR es bajo
     MIN_SL = {
         "EURUSD=X": 0.00150,   # 15 pips mínimo (1 pip = 0.0001)
@@ -3218,6 +3253,22 @@ def calcular_lote_sugerido(capital, riesgo_pct, entrada, sl, ticker):
 
         if racha_perdidas >= 1:
             logger.info(f"📉 Racha de {racha_perdidas} pérdidas — riesgo reducido a {riesgo_pct_efectivo*100:.1f}%")
+
+        # [2] RIESGO DINÁMICO POR NOTICIAS — multiplicador 0.0-1.0
+        try:
+            _mult_noticias = _ajustar_riesgo_por_noticias(ticker)
+            if _mult_noticias <= 0:
+                return "0.00 (Bloqueado por noticias)"
+            riesgo_pct_efectivo *= _mult_noticias
+        except Exception:
+            pass  # Si falla, continuar sin ajuste
+
+        # [7] FILTRO DE SESIÓN MEJORADO — multiplicador de sesión
+        try:
+            _mult_sesion = _factor_sesion(ticker)
+            riesgo_pct_efectivo *= _mult_sesion
+        except Exception:
+            pass  # Si falla, continuar sin ajuste
 
         riesgo_usd = capital * riesgo_pct_efectivo
         pips_riesgo = abs(calcular_pips(entrada, sl, ticker))
@@ -3581,6 +3632,14 @@ def ejecutar_orden_mt5(ticker, tipo, capital, riesgo_pct, entrada, sl, tp1, es_p
             return None
 
     mt5_ticker = MT5_TICKER_MAP.get(ticker, ticker)
+
+    # [8] ANÁLISIS DE SPREAD EN TIEMPO REAL: verificar vs promedio histórico
+    try:
+        if not _spread_aceptable(ticker):
+            logger.warning(f"🔴 SPREAD EXCESIVO: {mt5_ticker} — spread > 2x promedio histórico → orden cancelada")
+            return False
+    except Exception:
+        pass  # Si falla la verificación, continuar con la validación normal
 
     # Validar spread una sola vez antes de ejecutar en cualquier cuenta
     with _lock_mt5:
@@ -12564,6 +12623,45 @@ def revisar_niveles_operaciones():
         # TRAILING STOP VIRTUAL eliminado — tp2_hit nunca se activa (cierre completo en TP1)
         # Si en el futuro se implementa cierre parcial, rehabilitar este bloque.
 
+        # [6] TRAILING STOP INTELIGENTE: mover SL dinámicamente basado en ADX/ATR
+        try:
+            _cached_ind_trail = _cache_ind.get(ticker, {})
+            if _cached_ind_trail and op.get('mt5_ejecutado', False):
+                _pips_trail = calcular_pips(op['entrada'], precio_mon, ticker, tipo)
+                # Solo activar trailing si está en profit y ha pasado breakeven
+                if _pips_trail > 0:
+                    _nuevo_sl = _trailing_stop_dinamico(op, precio_mon, _cached_ind_trail)
+                    if _nuevo_sl is not None:
+                        # Mover SL en MT5
+                        _ticket_trail = op.get('ticket_mt5')
+                        if _ticket_trail and MT5_AVAILABLE:
+                            try:
+                                mt5_sym_trail = MT5_TICKER_MAP.get(ticker, ticker)
+                                with _lock_mt5:
+                                    _si_trail = mt5.symbol_info(mt5_sym_trail)
+                                if _si_trail:
+                                    _digits_trail = _si_trail.digits
+                                    _nuevo_sl_norm = round(_nuevo_sl, _digits_trail)
+                                    _req_trail = {
+                                        "action": mt5.TRADE_ACTION_SLTP,
+                                        "position": _ticket_trail,
+                                        "symbol": mt5_sym_trail,
+                                        "sl": _nuevo_sl_norm,
+                                        "tp": round(float(op.get('tp1', 0)), _digits_trail),
+                                    }
+                                    with _lock_mt5:
+                                        _res_trail = mt5.order_send(_req_trail)
+                                    if _res_trail and _res_trail.retcode == mt5.TRADE_RETCODE_DONE:
+                                        logger.info(f"📈 TRAILING STOP: {ticker} SL movido a {_nuevo_sl_norm}")
+                                        with _lock_ops:
+                                            if op_id in operaciones_activas:
+                                                operaciones_activas[op_id]['sl'] = _nuevo_sl_norm
+                                                operaciones_activas[op_id]['trailing_activo'] = True
+                            except Exception as e_trail:
+                                logger.warning(f"⚠️ Error trailing stop {ticker}: {e_trail}")
+        except Exception:
+            pass
+
         # 🔒 BREAKEVEN SL — Mover SL a entrada + buffer tras 3h en profit (NO cierra posición)
         _edad_op = time.time() - op.get('timestamp', time.time())
         _pips_actual = calcular_pips(op['entrada'], precio_mon, ticker, tipo)
@@ -12631,6 +12729,21 @@ def revisar_niveles_operaciones():
                     "timestamp_cierre": time.time(),
                 }
                 historial_operaciones.append(_hist_data)
+                # [3] TRACKING POR ESTRATEGIA: registrar resultado
+                try:
+                    _estr = _hist_data.get('estrategia', '')
+                    _registrar_resultado_estrategia(_estr, resultado, pips)
+                except Exception:
+                    pass
+                # [5] CIRCUIT BREAKER: registrar resultado P&L
+                try:
+                    _sl_pips_cb = abs(calcular_pips(op['entrada'], op['sl'], ticker))
+                    _riesgo_cb = op.get('riesgo_usado', RIESGO_POR_TRADE)
+                    _capital_cb = CAPITAL_USUARIO
+                    _pnl_usd_est = (_riesgo_cb * (pips / _sl_pips_cb) * _capital_cb) if _sl_pips_cb > 0 else 0
+                    _cb_registrar_resultado(_pnl_usd_est, resultado == "LOSS")
+                except Exception:
+                    pass
                 # Guardar en CSV permanente (nunca se borra)
                 _guardar_historial_csv(_hist_data)
                 if pips > 0:
@@ -12988,6 +13101,43 @@ def analizar_activo(nombre, ticker):
             logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
             return
 
+        # [4] CONFIRMACIÓN INTER-MERCADO: +1 al score si el activo correlacionado confirma
+        try:
+            if _confirmar_inter_mercado(ticker, tipo):
+                score = min(5, score + 1)
+                razones.append("🔗 Confirmación inter-mercado positiva (+1 score)")
+        except Exception:
+            pass
+
+        # [3] TRACKING POR ESTRATEGIA: verificar si la estrategia está permitida
+        _estrategia_temprana = ""
+        for _r in razones:
+            if "Asian Range" in _r: _estrategia_temprana = "asian_breakout"; break
+            elif "Breakout" in _r: _estrategia_temprana = "breakout"; break
+            elif "Reversi" in _r or "Divergencia" in _r: _estrategia_temprana = "reversion"; break
+        if _estrategia_temprana:
+            try:
+                if not _estrategia_permitida(_estrategia_temprana):
+                    logger.info(f"⏸️ {nombre}: estrategia {_estrategia_temprana} auto-pausada por bajo WR")
+                    return
+            except Exception:
+                pass
+
+        # [10] AUTO-OPTIMIZACIÓN: verificar si el activo está desactivado por optimización
+        try:
+            if ticker in _activos_desactivados_auto:
+                logger.info(f"🔧 {nombre}: desactivado por auto-optimización semanal (WR < 30%)")
+                return
+        except Exception:
+            pass
+
+        # [9] SCORE DE CONFIANZA 0-100: calcular y adjuntar a indicadores
+        try:
+            _confianza_score = _calcular_confianza(ind, ticker, tipo)
+            ind['confianza_score_100'] = _confianza_score
+        except Exception:
+            ind['confianza_score_100'] = 0
+
         # 🛡️ FILTRO ANTI-CONTRADICCIÓN TÉCNICA: NO dar SELL cuando 15m es claramente alcista (y viceversa)
         # EXCEPCIÓN: Estrategia Reversión Extrema (score 5 con divergencia) SÍ puede ir contra técnicos
         _ema20_gt_50 = ind['ema20'] > ind['ema50']
@@ -13303,6 +13453,8 @@ def analizar_activo(nombre, ticker):
                 'tp1_hit': False, 'tp2_hit': False, 'aviso_sl_enviado': False, 'trailing_activo': False,
                 'confianza_multi_ia': confianza_total,
                 'confianza': confianza_total,
+                'confianza_score_100': ind.get('confianza_score_100', 0),  # [9] Score 0-100
+                'estrategia': _estrategia_tipo,  # [3] Para tracking por estrategia
                 'mt5_ejecutado': False,
                 'ticket_mt5': None,
                 'skip_mt5_razon': _skip_mt5_razon if _skip_mt5 else '',
@@ -13796,6 +13948,16 @@ def loop_escaneo():
             try:
                 # 💰 ACTUALIZAR CAPITAL DESDE MT5 (cada ciclo = cada 3 min)
                 _actualizar_capital_desde_mt5()
+
+                # [10] AUTO-OPTIMIZACIÓN SEMANAL: Domingos 23:00 Andorra
+                try:
+                    _now_opt = ahora()
+                    if (_now_opt.weekday() == 6 and _now_opt.hour == 23
+                            and (time.time() - _ultima_optimizacion_semanal) > 82800):
+                        _auto_optimizar_semanal()
+                except Exception as e_opt:
+                    logger.warning(f"⚠️ Error auto-optimización: {e_opt}")
+
                 analizar_mercado()
                 ultimo_escaneo = time.time()
                 limpiar_caches_memoria()
@@ -14705,6 +14867,654 @@ _scalper_trades_hoy = 0
 _scalper_posiciones = {}  # {ticket: {symbol, tipo, entrada, sl, tp, tiempo}}
 _lock_scalper = threading.Lock()
 
+# ============================================================
+#  MEJORAS ESTRATÉGICAS v4 — 10 módulos de optimización
+# ============================================================
+
+# ── [3] TRACKING POR ESTRATEGIA CON AUTO-PAUSA ──
+_stats_por_estrategia: dict = {}  # {estrategia: {"wins": 0, "losses": 0, "pips": 0.0, "ultimo_trade": 0}}
+_estrategia_pausada_hasta: dict = {}  # {estrategia: timestamp_reactivación}
+
+# ── [5] CIRCUIT BREAKER GLOBAL ──
+_cb_pnl_diario: float = 0.0
+_cb_perdidas_consecutivas: int = 0
+_cb_activo: bool = False
+_cb_hasta: float = 0.0
+_cb_ultimo_dia: str = ""
+
+# ── [8] ANÁLISIS DE SPREAD EN TIEMPO REAL ──
+_spread_historico: dict = {}  # {mt5_symbol: {"promedio": float, "muestras": int, "ts": float}}
+
+# ── [10] AUTO-OPTIMIZACIÓN SEMANAL ──
+_ultima_optimizacion_semanal: float = 0.0
+_activos_desactivados_auto: set = set()  # Activos desactivados por auto-optimización
+_ajustes_rsi: dict = {}  # {ticker: {"rsi_os_adj": 0, "rsi_ob_adj": 0}}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [2] RIESGO DINÁMICO POR NOTICIAS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _ajustar_riesgo_por_noticias(ticker):
+    """
+    Retorna un multiplicador de riesgo (0.0–1.0) basado en proximidad a noticias.
+    - < 60 min antes de High impact → 0.0 (NO operar)
+    - < 180 min antes de High impact → 0.25
+    - Medium impact < 120 min → 0.5
+    - Sin noticias → 1.0
+    """
+    try:
+        noticias = cargar_calendario_economico()
+        if not noticias:
+            return 1.0
+
+        divisas = DIVISAS_POR_TICKER.get(ticker, [])
+        if not divisas:
+            return 1.0
+
+        ahora_utc = datetime.now(pytz.UTC)
+        tz_ny = pytz.timezone("America/New_York")
+
+        menor_diff_high = float('inf')
+        menor_diff_medium = float('inf')
+
+        for n in noticias:
+            impacto = n.get("impact", "").lower()
+            if impacto not in ("high", "medium"):
+                continue
+            if n.get("country", "") not in divisas:
+                continue
+            try:
+                fecha_str = n.get("date", "")
+                hora_str = n.get("time", "").strip().lower()
+                if not fecha_str or hora_str in ("", "all day", "tentative"):
+                    continue
+                dt = datetime.strptime(f"{fecha_str} {hora_str}", "%m-%d-%Y %I:%M%p")
+                dt_utc = tz_ny.localize(dt).astimezone(pytz.UTC)
+                diff_min = (dt_utc - ahora_utc).total_seconds() / 60.0
+                # Solo considerar noticias futuras o muy recientes (últimos 30 min)
+                if diff_min < -30:
+                    continue
+                if impacto == "high" and diff_min < menor_diff_high:
+                    menor_diff_high = diff_min
+                elif impacto == "medium" and diff_min < menor_diff_medium:
+                    menor_diff_medium = diff_min
+            except Exception:
+                continue
+
+        # Evaluar multiplicador basado en proximidad
+        if menor_diff_high <= 60:
+            logger.info(f"🚨 RIESGO NOTICIAS {ticker}: High impact en {menor_diff_high:.0f}min → mult=0.0 (NO OPERAR)")
+            return 0.0
+        elif menor_diff_high <= 180:
+            logger.info(f"⚠️ RIESGO NOTICIAS {ticker}: High impact en {menor_diff_high:.0f}min → mult=0.25")
+            return 0.25
+        elif menor_diff_medium <= 120:
+            logger.info(f"📰 RIESGO NOTICIAS {ticker}: Medium impact en {menor_diff_medium:.0f}min → mult=0.5")
+            return 0.5
+
+        return 1.0
+
+    except Exception as e:
+        logger.warning(f"⚠️ Error en _ajustar_riesgo_por_noticias({ticker}): {e}")
+        return 1.0
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [3] TRACKING POR ESTRATEGIA CON AUTO-PAUSA
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _registrar_resultado_estrategia(estrategia, resultado, pips):
+    """Registra resultado de una operación por estrategia (llamar al cerrar op)."""
+    global _stats_por_estrategia
+    if not estrategia:
+        return
+    if estrategia not in _stats_por_estrategia:
+        _stats_por_estrategia[estrategia] = {"wins": 0, "losses": 0, "pips": 0.0, "ultimo_trade": 0}
+    stats = _stats_por_estrategia[estrategia]
+    if resultado == "WIN":
+        stats["wins"] += 1
+    else:
+        stats["losses"] += 1
+    stats["pips"] += pips
+    stats["ultimo_trade"] = time.time()
+    total = stats["wins"] + stats["losses"]
+    wr = (stats["wins"] / total * 100) if total > 0 else 0
+    logger.info(f"📊 STATS ESTRATEGIA {estrategia}: {stats['wins']}W/{stats['losses']}L (WR={wr:.0f}%) | Pips={stats['pips']:+.1f}")
+
+
+def _estrategia_permitida(estrategia):
+    """Retorna False si la estrategia tiene WR < 35% tras 15+ operaciones. Re-habilita tras 24h."""
+    global _estrategia_pausada_hasta
+    if not estrategia:
+        return True
+
+    # Check si está en pausa temporal
+    if estrategia in _estrategia_pausada_hasta:
+        if time.time() < _estrategia_pausada_hasta[estrategia]:
+            logger.info(f"⏸️ ESTRATEGIA PAUSADA: {estrategia} — auto-re-habilita en {(_estrategia_pausada_hasta[estrategia] - time.time())/3600:.1f}h")
+            return False
+        else:
+            del _estrategia_pausada_hasta[estrategia]
+            logger.info(f"✅ ESTRATEGIA REHABILITADA: {estrategia} — 24h de pausa completadas")
+
+    stats = _stats_por_estrategia.get(estrategia)
+    if not stats:
+        return True
+    total = stats["wins"] + stats["losses"]
+    if total < 15:
+        return True
+    wr = (stats["wins"] / total * 100)
+    if wr < 35:
+        _estrategia_pausada_hasta[estrategia] = time.time() + 86400  # Pausa 24h
+        logger.warning(f"🚨 ESTRATEGIA AUTO-PAUSADA: {estrategia} — WR={wr:.0f}% < 35% tras {total} operaciones → pausa 24h")
+        return False
+    return True
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [4] CONFIRMACIÓN INTER-MERCADO
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Mapeo de correlaciones inter-mercado
+_INTER_MARKET_MAP = {
+    "NQ=F":     {"corr": "ES=F",     "relacion": "directa"},    # NQ y ES van juntos
+    "ES=F":     {"corr": "NQ=F",     "relacion": "directa"},    # ES y NQ van juntos
+    "EURUSD=X": {"corr": "DX-Y.NYB", "relacion": "inversa"},   # EUR vs DXY
+    "GC=F":     {"corr": "DX-Y.NYB", "relacion": "inversa"},   # Gold vs DXY
+}
+
+def _confirmar_inter_mercado(ticker, tipo):
+    """
+    Verifica confirmación inter-mercado.
+    Retorna True si el activo correlacionado confirma la dirección.
+    """
+    if ticker not in _INTER_MARKET_MAP:
+        return False
+
+    corr_info = _INTER_MARKET_MAP[ticker]
+    corr_ticker = corr_info["corr"]
+    relacion = corr_info["relacion"]
+
+    try:
+        # Intentar obtener precio del activo correlacionado
+        cot = obtener_cotizacion_tv(corr_ticker)
+        if not cot:
+            return False
+        precio_corr = cot.get('precio')
+        if not precio_corr:
+            return False
+
+        # Descargar datos para calcular EMA20 del correlacionado
+        df_corr = descargar_datos_seguro(corr_ticker)
+        if df_corr is None or len(df_corr) < 25:
+            return False
+
+        ema20_corr = df_corr['Close'].ewm(span=20, adjust=False).mean().iloc[-1]
+
+        # Determinar dirección del correlacionado
+        corr_alcista = precio_corr > ema20_corr
+        es_compra = tipo.upper() in ("COMPRA", "BUY", "LONG")
+
+        if relacion == "directa":
+            # Mismo activo confirma si va en la misma dirección
+            confirmado = (es_compra and corr_alcista) or (not es_compra and not corr_alcista)
+        else:  # inversa
+            # DXY inverso a EUR y Gold
+            confirmado = (es_compra and not corr_alcista) or (not es_compra and corr_alcista)
+
+        if confirmado:
+            _nombre_corr = {"ES=F": "S&P500", "NQ=F": "NASDAQ", "DX-Y.NYB": "DXY"}.get(corr_ticker, corr_ticker)
+            logger.info(f"🔗 INTER-MERCADO CONFIRMA: {ticker} {tipo} — {_nombre_corr} {'alcista' if corr_alcista else 'bajista'} ({relacion})")
+        return confirmado
+
+    except Exception as e:
+        logger.warning(f"⚠️ Error confirmación inter-mercado {ticker}: {e}")
+        return False
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [5] CIRCUIT BREAKER GLOBAL
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _circuit_breaker_check():
+    """
+    Verifica si el circuit breaker global está activo.
+    - Si P&L diario < -3% del capital → pausa hasta fin del día
+    - Si 5 pérdidas consecutivas → pausa 2 horas
+    Retorna True si el trading está bloqueado.
+    """
+    global _cb_pnl_diario, _cb_perdidas_consecutivas, _cb_activo, _cb_hasta, _cb_ultimo_dia
+
+    # Reset diario
+    hoy = ahora().strftime("%Y-%m-%d")
+    if _cb_ultimo_dia != hoy:
+        _cb_pnl_diario = 0.0
+        _cb_perdidas_consecutivas = 0
+        _cb_activo = False
+        _cb_hasta = 0.0
+        _cb_ultimo_dia = hoy
+
+    # Si ya está activo, verificar si expiró
+    if _cb_activo:
+        if time.time() >= _cb_hasta:
+            _cb_activo = False
+            _cb_hasta = 0.0
+            logger.info("✅ CIRCUIT BREAKER: Periodo de pausa terminado — trading reactivado")
+            return False
+        return True
+
+    # Check 1: P&L diario vs capital
+    capital = CAPITAL_USUARIO
+    if capital > 0 and _cb_pnl_diario <= -(capital * 0.03):
+        _cb_activo = True
+        # Hasta medianoche Andorra
+        _mañana = ahora().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        _cb_hasta = _mañana.timestamp()
+        msg_cb = f"🚨 *CIRCUIT BREAKER ACTIVADO*\n📉 P&L diario: ${_cb_pnl_diario:+.2f} (>{3}% de ${capital:.0f})\n⏰ Trading pausado hasta mañana"
+        logger.warning(msg_cb)
+        try:
+            enviar_telegram(msg_cb, destino=CHANNEL_ID)
+        except Exception:
+            pass
+        return True
+
+    # Check 2: Pérdidas consecutivas
+    if _cb_perdidas_consecutivas >= 5:
+        _cb_activo = True
+        _cb_hasta = time.time() + 7200  # 2 horas
+        msg_cb = f"🚨 *CIRCUIT BREAKER ACTIVADO*\n📉 {_cb_perdidas_consecutivas} pérdidas consecutivas\n⏰ Trading pausado 2 horas"
+        logger.warning(msg_cb)
+        try:
+            enviar_telegram(msg_cb, destino=CHANNEL_ID)
+        except Exception:
+            pass
+        return True
+
+    return False
+
+
+def _cb_registrar_resultado(pnl_usd, es_loss):
+    """Registra resultado en el circuit breaker global."""
+    global _cb_pnl_diario, _cb_perdidas_consecutivas
+    _cb_pnl_diario += pnl_usd
+    if es_loss:
+        _cb_perdidas_consecutivas += 1
+    else:
+        _cb_perdidas_consecutivas = 0
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [6] TRAILING STOP INTELIGENTE
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _trailing_stop_dinamico(posicion, precio_actual, indicadores):
+    """
+    Calcula el nuevo SL trailing basado en volatilidad (ADX + ATR).
+    - High volatility (ADX > 35): trail at 2x ATR
+    - Medium volatility (ADX 20-35): trail at 1.5x ATR
+    - Low volatility (ADX < 20): trail at 1x ATR
+    - Scalper: trail siguiendo EMA9 en M5
+    Retorna: nuevo_sl (float) o None si no hay que mover.
+    """
+    if not indicadores:
+        return None
+
+    adx = indicadores.get('adx', 25)
+    atr = indicadores.get('atr', 0)
+    if atr <= 0:
+        return None
+
+    tipo = posicion.get('tipo', '')
+    entrada = posicion.get('entrada', 0)
+    sl_actual = posicion.get('sl', 0)
+    es_scalper = posicion.get('estrategia', '') in ('scalper_bb_rsi', 'scalper_fibonacci')
+
+    es_compra = tipo.upper() in ("COMPRA", "BUY", "LONG")
+
+    if es_scalper:
+        # Scalper: trail con EMA9 (si disponible)
+        ema9 = indicadores.get('ema9', 0)
+        if ema9 > 0:
+            if es_compra:
+                nuevo_sl = ema9 - atr * 0.3  # EMA9 - 30% ATR buffer
+                if nuevo_sl > sl_actual and nuevo_sl < precio_actual:
+                    return nuevo_sl
+            else:
+                nuevo_sl = ema9 + atr * 0.3
+                if nuevo_sl < sl_actual and nuevo_sl > precio_actual:
+                    return nuevo_sl
+        return None
+
+    # Determinar multiplicador ATR por volatilidad
+    if adx > 35:
+        trail_mult = 2.0  # Alta volatilidad: más espacio
+    elif adx >= 20:
+        trail_mult = 1.5  # Media
+    else:
+        trail_mult = 1.0  # Baja volatilidad: ajustado
+
+    trail_dist = atr * trail_mult
+
+    if es_compra:
+        nuevo_sl = precio_actual - trail_dist
+        # Solo mover si mejora el SL (más alto que el actual) y no está por encima del precio
+        if nuevo_sl > sl_actual and nuevo_sl > entrada and nuevo_sl < precio_actual:
+            return nuevo_sl
+    else:
+        nuevo_sl = precio_actual + trail_dist
+        if nuevo_sl < sl_actual and nuevo_sl < entrada and nuevo_sl > precio_actual:
+            return nuevo_sl
+
+    return None
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [7] FILTRO DE SESIÓN MEJORADO
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _factor_sesion(ticker):
+    """
+    Retorna multiplicador de lote basado en sesión de mercado.
+    - London open 7:00-8:00 UTC → 0.5 (spreads altos)
+    - NY open 13:30-14:30 UTC → 0.7 (volátil)
+    - London-NY overlap 14:00-17:00 UTC → 1.0 (mejor liquidez)
+    - Late NY 20:00-22:00 UTC → 0.5 (baja liquidez)
+    - Otherwise → 0.8
+    """
+    try:
+        now_utc = datetime.now(pytz.UTC)
+        hora_utc = now_utc.hour + now_utc.minute / 60.0
+
+        # London open: spreads altos
+        if 7.0 <= hora_utc < 8.0:
+            return 0.5
+
+        # NY open: volatilidad de apertura
+        if 13.5 <= hora_utc < 14.5:
+            return 0.7
+
+        # London-NY overlap: MEJOR sesión (máxima liquidez)
+        if 14.0 <= hora_utc < 17.0:
+            return 1.0
+
+        # Late NY: baja liquidez
+        if 20.0 <= hora_utc < 22.0:
+            return 0.5
+
+        return 0.8
+
+    except Exception:
+        return 0.8
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [8] ANÁLISIS DE SPREAD EN TIEMPO REAL
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _spread_aceptable(ticker):
+    """
+    Verifica si el spread actual es aceptable comparado con el promedio histórico.
+    Retorna True si el spread es <= 2x el promedio, False si es excesivo.
+    También actualiza el promedio histórico (media móvil).
+    """
+    global _spread_historico
+
+    if not MT5_AVAILABLE:
+        return True
+
+    mt5_ticker = MT5_TICKER_MAP.get(ticker, ticker)
+    try:
+        with _lock_mt5:
+            symbol_info = mt5.symbol_info(mt5_ticker)
+        if symbol_info is None:
+            return True
+
+        spread_actual = symbol_info.spread
+
+        # Actualizar promedio histórico (TTL 4h, reset si datos muy viejos)
+        hist = _spread_historico.get(mt5_ticker)
+        if hist and (time.time() - hist['ts']) < 14400:
+            # Media móvil exponencial
+            alpha = 0.1
+            hist['promedio'] = hist['promedio'] * (1 - alpha) + spread_actual * alpha
+            hist['muestras'] += 1
+            hist['ts'] = time.time()
+        else:
+            # Inicializar o resetear
+            _spread_historico[mt5_ticker] = {
+                'promedio': float(spread_actual),
+                'muestras': 1,
+                'ts': time.time()
+            }
+            return True  # Primera muestra: no tenemos referencia aún
+
+        promedio = hist['promedio']
+        # Solo rechazar si tenemos suficientes muestras (> 10)
+        if hist['muestras'] > 10 and promedio > 0:
+            ratio = spread_actual / promedio
+            if ratio > 2.0:
+                logger.warning(f"🔴 SPREAD EXCESIVO {mt5_ticker}: actual={spread_actual} vs promedio={promedio:.0f} (ratio={ratio:.1f}x > 2x)")
+                return False
+
+        return True
+
+    except Exception as e:
+        logger.warning(f"⚠️ Error verificando spread {ticker}: {e}")
+        return True
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [9] SCORE DE CONFIANZA 0-100
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _calcular_confianza(ind, ticker, tipo):
+    """
+    Calcula score de confianza 0-100 combinando:
+    - Técnico (40%): EMA alignment, MACD, RSI position
+    - Volumen (20%): vol_ratio > 1.2 = full points
+    - Contexto mercado (20%): inter-mercado + sesión
+    - Timing (20%): sesión overlap = best, Asian = worst
+    """
+    if not ind:
+        return 0
+
+    score = 0.0
+    es_compra = tipo.upper() in ("COMPRA", "BUY", "LONG")
+
+    # ── TÉCNICO (40 puntos máx) ──
+    tecnico = 0.0
+
+    # EMA alignment (15 pts)
+    if es_compra:
+        if ind['ema20'] > ind['ema50']:
+            tecnico += 7.5
+        if ind['precio'] > ind['ema200']:
+            tecnico += 7.5
+    else:
+        if ind['ema20'] < ind['ema50']:
+            tecnico += 7.5
+        if ind['precio'] < ind['ema200']:
+            tecnico += 7.5
+
+    # MACD (10 pts)
+    if es_compra and ind['macd'] > ind['signal']:
+        tecnico += 10.0
+    elif not es_compra and ind['macd'] < ind['signal']:
+        tecnico += 10.0
+
+    # RSI position (15 pts)
+    rsi = ind.get('rsi', 50)
+    if es_compra:
+        if rsi < 30:
+            tecnico += 15.0  # Oversold = great for buy
+        elif rsi < 45:
+            tecnico += 10.0
+        elif rsi < 60:
+            tecnico += 5.0
+    else:
+        if rsi > 70:
+            tecnico += 15.0  # Overbought = great for sell
+        elif rsi > 55:
+            tecnico += 10.0
+        elif rsi > 40:
+            tecnico += 5.0
+
+    score += tecnico
+
+    # ── VOLUMEN (20 puntos máx) ──
+    vol_ratio = ind.get('vol_ratio', 1.0)
+    if vol_ratio >= 1.5:
+        score += 20.0
+    elif vol_ratio >= 1.2:
+        score += 15.0
+    elif vol_ratio >= 1.0:
+        score += 10.0
+    elif vol_ratio >= 0.8:
+        score += 5.0
+
+    # ── CONTEXTO MERCADO (20 puntos máx) ──
+    contexto = 0.0
+
+    # Inter-mercado (10 pts)
+    try:
+        if _confirmar_inter_mercado(ticker, tipo):
+            contexto += 10.0
+    except Exception:
+        pass
+
+    # Sesión quality (10 pts)
+    factor_ses = _factor_sesion(ticker)
+    contexto += factor_ses * 10.0
+
+    score += contexto
+
+    # ── TIMING (20 puntos máx) ──
+    try:
+        now_utc = datetime.now(pytz.UTC)
+        hora_utc = now_utc.hour
+
+        # London-NY overlap (14:00-17:00 UTC) = best
+        if 14 <= hora_utc < 17:
+            score += 20.0
+        # London session (8:00-14:00 UTC) = good
+        elif 8 <= hora_utc < 14:
+            score += 15.0
+        # NY afternoon (17:00-20:00 UTC) = decent
+        elif 17 <= hora_utc < 20:
+            score += 10.0
+        # Asian session (0:00-7:00 UTC) = worst
+        elif hora_utc < 7:
+            score += 5.0
+        else:
+            score += 8.0
+    except Exception:
+        score += 10.0
+
+    resultado = min(100, max(0, round(score)))
+    logger.info(f"📊 CONFIANZA {ticker} {tipo}: {resultado}/100 (técnico={tecnico:.0f}/40 vol={vol_ratio:.1f} sesión={factor_ses:.1f})")
+    return resultado
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  [10] AUTO-OPTIMIZACIÓN SEMANAL
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _auto_optimizar_semanal():
+    """
+    Análisis semanal: WR por activo, ajuste RSI, desactivar activos malos.
+    Se ejecuta domingos a las 23:00 (check en loop_escaneo).
+    """
+    global _ultima_optimizacion_semanal, _activos_desactivados_auto, _ajustes_rsi
+
+    _ultima_optimizacion_semanal = time.time()
+    logger.info("🔧 AUTO-OPTIMIZACIÓN SEMANAL: Iniciando análisis...")
+
+    resumen_lines = ["🔧 *AUTO-OPTIMIZACIÓN SEMANAL*\n"]
+    cambios = 0
+
+    try:
+        # Obtener operaciones de los últimos 7 días
+        ahora_ts = time.time()
+        una_semana = 7 * 86400
+
+        with _lock_ops:
+            ops_semana = [
+                h for h in historial_operaciones
+                if (ahora_ts - h.get('timestamp_cierre', h.get('timestamp_entrada', 0))) < una_semana
+            ]
+
+        if len(ops_semana) < 5:
+            resumen_lines.append("▪️ Menos de 5 operaciones esta semana — sin ajustes")
+            logger.info("🔧 Optimización: pocas operaciones (<5), sin ajustes")
+        else:
+            # Analizar por activo
+            por_activo = {}
+            for op in ops_semana:
+                tk = op.get('ticker', 'unknown')
+                if tk not in por_activo:
+                    por_activo[tk] = {"wins": 0, "losses": 0, "pips": 0.0}
+                if op.get('resultado') == 'WIN':
+                    por_activo[tk]["wins"] += 1
+                else:
+                    por_activo[tk]["losses"] += 1
+                por_activo[tk]["pips"] += op.get('pips', 0)
+
+            # Evaluar cada activo
+            activos_a_desactivar = set()
+            for tk, stats in por_activo.items():
+                total = stats["wins"] + stats["losses"]
+                if total < 3:
+                    continue
+                wr = stats["wins"] / total * 100
+                avg_pips = stats["pips"] / total
+                nombre_activo = {v: k for k, v in ACTIVOS.items()}.get(tk, tk)
+
+                resumen_lines.append(f"▪️ {nombre_activo}: {stats['wins']}W/{stats['losses']}L (WR={wr:.0f}%) | Avg={avg_pips:+.1f} pips")
+
+                # WR < 30% → desactivar temporalmente
+                if wr < 30 and total >= 5:
+                    activos_a_desactivar.add(tk)
+                    resumen_lines.append(f"  🔴 DESACTIVADO (WR < 30%)")
+                    cambios += 1
+
+                # Ajuste RSI: si muchas false signals de reversión, ajustar ±2
+                _rev_ops = [o for o in ops_semana if o.get('ticker') == tk and o.get('estrategia') in ('reversion',)]
+                if len(_rev_ops) >= 5:
+                    _rev_losses = sum(1 for o in _rev_ops if o.get('resultado') == 'LOSS')
+                    _rev_wr = (1 - _rev_losses / len(_rev_ops)) * 100
+                    if _rev_wr < 40:
+                        # Demasiadas falsas señales: hacer RSI más estricto (±2)
+                        if tk not in _ajustes_rsi:
+                            _ajustes_rsi[tk] = {"rsi_os_adj": 0, "rsi_ob_adj": 0}
+                        _ajustes_rsi[tk]["rsi_os_adj"] -= 2  # Más estricto (bajar umbral OS)
+                        _ajustes_rsi[tk]["rsi_ob_adj"] += 2  # Más estricto (subir umbral OB)
+                        resumen_lines.append(f"  📉 RSI ajustado: OS-2, OB+2 (rev WR={_rev_wr:.0f}%)")
+                        cambios += 1
+
+            # Aplicar desactivaciones
+            _activos_desactivados_auto = activos_a_desactivar
+
+        resumen_lines.append(f"\n📊 Total cambios: {cambios}")
+        resumen = "\n".join(resumen_lines)
+
+        # Guardar ajustes en estado.json
+        try:
+            guardar_estado()
+        except Exception:
+            pass
+
+        # Enviar resumen por Telegram
+        try:
+            enviar_telegram(resumen, destino=CHANNEL_ID)
+        except Exception:
+            pass
+
+        logger.info(f"🔧 AUTO-OPTIMIZACIÓN: Completada con {cambios} cambios")
+
+    except Exception as e:
+        logger.error(f"🔧 Error en auto-optimización semanal: {e}")
+
 
 def _scalper_descargar_m5(mt5_symbol):
     """Descarga 500 velas M5 desde MT5 para un símbolo."""
@@ -14789,6 +15599,13 @@ def _scalper_evaluar_senal(ind, config):
     """
     if not ind:
         return None, "Sin indicadores"
+
+    # [5] CIRCUIT BREAKER GLOBAL: bloquear scalper si está activo
+    try:
+        if _circuit_breaker_check():
+            return None, "Circuit Breaker activo"
+    except Exception:
+        pass
 
     adx = ind['adx']
     rsi = ind['rsi']
