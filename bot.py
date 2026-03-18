@@ -15022,19 +15022,29 @@ def loop_scalper():
                 if hora_local < h_inicio or hora_local >= h_fin:
                     continue
 
-                # No abrir si ya hay posición en este símbolo
+                # No abrir si ya hay posición del scalper en este símbolo
+                # Verificar tanto en dict interno como en MT5 directamente
                 with _lock_scalper:
-                    ya_abierto = any(p['symbol'] == mt5_sym for p in _scalper_posiciones.values())
-                if ya_abierto:
+                    ya_en_dict = any(p['symbol'] == mt5_sym for p in _scalper_posiciones.values())
+                ya_en_mt5 = False
+                try:
+                    if MT5_AVAILABLE:
+                        with _lock_mt5:
+                            positions = mt5.positions_get(symbol=mt5_sym)
+                        if positions:
+                            ya_en_mt5 = any(p.magic == SCALPER_MAGIC for p in positions)
+                except:
+                    pass
+                if ya_en_dict or ya_en_mt5:
                     continue
 
-                # Filtro correlación: no abrir EURUSD y GBPUSD en misma dirección
+                # Filtro correlación: no abrir EURUSD y GBPUSD simultáneamente
                 with _lock_scalper:
-                    _dirs = {p['symbol']: p['tipo'] for p in _scalper_posiciones.values()}
-                if mt5_sym == "EURUSD" and "GBPUSD" in _dirs:
-                    continue  # Ya hay GBP abierto, no duplicar
-                if mt5_sym == "GBPUSD" and "EURUSD" in _dirs:
-                    continue  # Ya hay EUR abierto, no duplicar
+                    _simbolos_abiertos = {p['symbol'] for p in _scalper_posiciones.values()}
+                if mt5_sym == "EURUSD" and "GBPUSD" in _simbolos_abiertos:
+                    continue
+                if mt5_sym == "GBPUSD" and "EURUSD" in _simbolos_abiertos:
+                    continue
 
                 # Descargar datos M5
                 df = _scalper_descargar_m5(mt5_sym)
