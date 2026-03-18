@@ -633,11 +633,17 @@ class ManagementConsole:
             self.root.after(1000, self._auto_start_bot)
 
         # Status bar
+        _status_frame = tk.Frame(self.root, bg="#0a0e14")
+        _status_frame.pack(side="bottom", fill="x")
         self._status_bar = tk.Label(
-            self.root, text="BuySell365 Pro v5.0 - Consola de Control",
+            _status_frame, text="BuySell365 Pro v5.0 | Bot: OFF",
             bg="#0a0e14", fg=TEXT_SEC, font=("Segoe UI", 9), anchor="w", padx=8
         )
-        self._status_bar.pack(side="bottom", fill="x")
+        self._status_bar.pack(side="left", fill="x", expand=True)
+        tk.Label(
+            _status_frame, text="Creado por Emmanuel Diaz",
+            bg="#0a0e14", fg="#4a90d9", font=("Segoe UI", 9, "italic"), anchor="e", padx=8
+        ).pack(side="right")
 
         # Start update loop
         self.root.after(1000, self._update_loop)
