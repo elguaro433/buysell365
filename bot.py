@@ -7093,8 +7093,8 @@ def cmd_admin_addvip(args: str):
     if len(partes) >= 2:
         try:
             dias = int(partes[1])
-            if dias < 1 or dias > 365:
-                return "❌ Los días deben estar entre 1 y 365."
+            if dias < 1 or dias > 9999:
+                return "❌ Los días deben estar entre 1 y 9999."
         except ValueError:
             return "❌ Los días deben ser un número.\nFormato: `/addvip <user_id> [dias]`"
 
