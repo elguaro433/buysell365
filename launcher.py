@@ -665,14 +665,14 @@ class ManagementConsole:
         self._tab_logs = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_web = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_scalper = tk.Frame(self.notebook, bg=BG_MAIN)
+        self._tab_noticias = tk.Frame(self.notebook, bg=BG_MAIN)
 
         self.notebook.add(self._tab_dashboard, text=" \U0001F4CA Dashboard ")
         self.notebook.add(self._tab_senales, text=" \U0001F4E1 Se\u00f1ales ")
         self.notebook.add(self._tab_scalper, text=" \U0001FA92 Scalper ")
+        self.notebook.add(self._tab_noticias, text=" \U0001F4F0 Noticias ")
         self.notebook.add(self._tab_analisis, text=" \U0001F50D Analisis ")
         self.notebook.add(self._tab_trading, text=" \u2699 Trading Config ")
-        # Conexiones tab removed (merged into Dashboard)
-        # self.notebook.add(self._tab_conexiones, text=" \U0001F517 Conexiones ")
         self.notebook.add(self._tab_vip, text=" \u2B50 VIP ")
         self.notebook.add(self._tab_logs, text=" \U0001F4DD Logs ")
         self.notebook.add(self._tab_web, text=" \U0001F310 Web ")
@@ -690,6 +690,7 @@ class ManagementConsole:
         self._build_logs()
         self._build_web()
         self._build_scalper()
+        self._build_noticias()
 
         # Mousewheel binding
         self.root.bind_all("<MouseWheel>", self._on_mousewheel)
@@ -1089,23 +1090,6 @@ class ManagementConsole:
                                          highlightthickness=0)
         self._equity_canvas.pack(fill="x", pady=(0, 5))
 
-        # === Noticias Economicas del Dia ===
-        news_frame = _make_section_frame(scroll_frame, "\U0001F4F0 Noticias Economicas Hoy")
-        news_frame.pack(fill="x", padx=10, pady=5)
-
-        news_cols = ("Hora", "Moneda", "Impacto", "Evento")
-        self._news_tree = ttk.Treeview(news_frame, columns=news_cols, show="headings", height=6)
-        for c in news_cols:
-            self._news_tree.heading(c, text=c)
-        self._news_tree.column("Hora", width=80, anchor="center")
-        self._news_tree.column("Moneda", width=80, anchor="center")
-        self._news_tree.column("Impacto", width=80, anchor="center")
-        self._news_tree.column("Evento", width=500, anchor="w")
-        self._news_tree.tag_configure("high", foreground="#ff6b6b")
-        self._news_tree.tag_configure("medium", foreground="#f5c842")
-        self._news_tree.tag_configure("low", foreground="#8b949e")
-        self._news_tree.pack(fill="x", pady=(0, 5))
-
         # Footer: Acerca de
         footer = tk.Frame(scroll_frame, bg=BG_MAIN)
         footer.pack(fill="x", padx=10, pady=(5, 15))
@@ -1115,8 +1099,7 @@ class ManagementConsole:
         # Start MT5 capital refresh timer (every 30s)
         self.root.after(5000, self._refresh_mt5_capital_loop)
 
-        # Initial news fetch
-        self._refresh_news()
+        # News fetched from Noticias tab
 
     def _show_about(self):
         messagebox.showinfo(
@@ -1233,8 +1216,112 @@ class ManagementConsole:
                 pass
         threading.Thread(target=_do_sound, daemon=True).start()
 
+    # ============================================================
+    #  TAB: NOTICIAS ECONOMICAS
+    # ============================================================
+    # Mapeo moneda → pares afectados
+    _CURRENCY_PAIRS = {
+        "USD": ["EUR/USD", "USD/JPY", "GBP/JPY", "ORO", "NASDAQ", "S&P 500"],
+        "EUR": ["EUR/USD"],
+        "GBP": ["GBP/JPY"],
+        "JPY": ["USD/JPY", "GBP/JPY"],
+        "CHF": ["EUR/USD"],
+        "AUD": ["ORO"],
+        "CAD": ["ORO"],
+        "NZD": [],
+        "CNY": ["ORO", "NASDAQ", "S&P 500"],
+    }
+
+    def _build_noticias(self):
+        canvas, scroll_frame = _make_scrollable(self._tab_noticias)
+        self._scroll_canvases[str(self._tab_noticias)] = canvas
+
+        # Header
+        header = tk.Frame(scroll_frame, bg=BG_MAIN)
+        header.pack(fill="x", padx=10, pady=(10, 5))
+
+        _make_button(header, "Actualizar", self._refresh_news,
+                     bg=BG_INPUT, fg=TEXT).pack(side="left", padx=(0, 10))
+        self._news_time_lbl = _make_label(header, "Ultima actualizacion: --",
+                                           fg=TEXT_SEC, font=("Segoe UI", 9))
+        self._news_time_lbl.config(bg=BG_MAIN)
+        self._news_time_lbl.pack(side="left")
+
+        # Filtros de impacto
+        filter_frame = tk.Frame(header, bg=BG_MAIN)
+        filter_frame.pack(side="right")
+        self._news_filter = tk.StringVar(value="all")
+        for val, txt, clr in [("all", "Todos", TEXT), ("High", "\U0001F534 Alto", ERR),
+                                ("Medium", "\U0001F7E1 Medio", WARN)]:
+            tk.Radiobutton(filter_frame, text=txt, variable=self._news_filter, value=val,
+                          command=self._apply_news_filter, bg=BG_MAIN, fg=clr,
+                          selectcolor=BG_INPUT, activebackground=BG_MAIN, activeforeground=clr,
+                          font=("Segoe UI", 9, "bold")).pack(side="left", padx=5)
+
+        # Resumen del dia
+        summary_frame = _make_section_frame(scroll_frame, "\U0001F4CA Resumen del Dia")
+        summary_frame.pack(fill="x", padx=10, pady=(5, 5))
+        self._news_summary_lbl = _make_label(summary_frame, "Cargando noticias...",
+                                              fg=TEXT, font=("Segoe UI", 10))
+        self._news_summary_lbl.pack(fill="x", padx=5, pady=5)
+
+        # Proximas noticias importantes
+        next_frame = _make_section_frame(scroll_frame, "\u23F0 Proximas Noticias de Alto Impacto")
+        next_frame.pack(fill="x", padx=10, pady=5)
+        self._news_next_lbl = _make_label(next_frame, "Cargando...",
+                                           fg=WARN, font=("Segoe UI", 11, "bold"))
+        self._news_next_lbl.pack(fill="x", padx=5, pady=5)
+
+        # Tabla principal
+        main_frame = _make_section_frame(scroll_frame, "\U0001F4F0 Calendario Economico — Hoy")
+        main_frame.pack(fill="x", padx=10, pady=5)
+
+        news_cols = ("Hora", "Moneda", "Impacto", "Pares Afectados", "Evento", "Previo", "Pronostico", "Actual")
+        self._news_tree = ttk.Treeview(main_frame, columns=news_cols, show="headings", height=15)
+        self._news_tree.heading("Hora", text="Hora")
+        self._news_tree.heading("Moneda", text="Moneda")
+        self._news_tree.heading("Impacto", text="Impacto")
+        self._news_tree.heading("Pares Afectados", text="Pares Afectados")
+        self._news_tree.heading("Evento", text="Evento")
+        self._news_tree.heading("Previo", text="Previo")
+        self._news_tree.heading("Pronostico", text="Pronostico")
+        self._news_tree.heading("Actual", text="Actual")
+        self._news_tree.column("Hora", width=60, anchor="center")
+        self._news_tree.column("Moneda", width=60, anchor="center")
+        self._news_tree.column("Impacto", width=90, anchor="center")
+        self._news_tree.column("Pares Afectados", width=180, anchor="w")
+        self._news_tree.column("Evento", width=300, anchor="w")
+        self._news_tree.column("Previo", width=80, anchor="center")
+        self._news_tree.column("Pronostico", width=80, anchor="center")
+        self._news_tree.column("Actual", width=80, anchor="center")
+        self._news_tree.tag_configure("high", foreground="#ef4444", font=("Segoe UI", 10, "bold"))
+        self._news_tree.tag_configure("medium", foreground="#f59e0b")
+        self._news_tree.tag_configure("low", foreground="#6b7a8d")
+        self._news_tree.tag_configure("past", foreground="#4a5568")
+        self._news_tree.tag_configure("upcoming_high", foreground="#ef4444", background="#1a0a0a",
+                                       font=("Segoe UI", 10, "bold"))
+        self._news_tree.pack(fill="x", pady=(0, 5))
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self._news_tree.yview)
+        self._news_tree.configure(yscrollcommand=scrollbar.set)
+
+        # Leyenda
+        legend_frame = tk.Frame(scroll_frame, bg=BG_MAIN)
+        legend_frame.pack(fill="x", padx=10, pady=(0, 10))
+        for clr, txt in [(ERR, "\U0001F534 Alto — Puede mover el mercado significativamente"),
+                          (WARN, "\U0001F7E1 Medio — Movimiento moderado esperado"),
+                          (TEXT_SEC, "\u26AA Bajo — Impacto menor en el mercado")]:
+            _make_label(legend_frame, txt, fg=clr, font=("Segoe UI", 9)).pack(anchor="w", padx=5)
+
+        # Cache de datos
+        self._news_data_cache = []
+
+        # Fetch inicial
+        self._refresh_news()
+
     def _refresh_news(self):
-        """Fetch economic calendar from ForexFactory and update the news treeview."""
+        """Fetch economic calendar from ForexFactory and update the Noticias tab."""
         def do_fetch():
             try:
                 url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
@@ -1250,25 +1337,103 @@ class ManagementConsole:
                     if ev_date == today:
                         today_events.append(ev)
 
+                self._news_data_cache = today_events
+
                 def update_ui():
-                    self._news_tree.delete(*self._news_tree.get_children())
-                    if not today_events:
-                        self._news_tree.insert("", "end", values=("--", "--", "--", "Sin noticias importantes hoy"))
-                        return
-                    for ev in sorted(today_events, key=lambda x: x.get("date", "")):
-                        hora = ev.get("date", "")[11:16] if len(ev.get("date", "")) > 11 else "--"
-                        moneda = ev.get("country", "")
-                        impacto = ev.get("impact", "Low")
-                        titulo = ev.get("title", "")
-                        tag = "high" if impacto == "High" else ("medium" if impacto == "Medium" else "low")
-                        imp_display = "\U0001F534 Alto" if impacto == "High" else ("\U0001F7E1 Medio" if impacto == "Medium" else "\u26AA Bajo")
-                        self._news_tree.insert("", "end", values=(hora, moneda, imp_display, titulo), tags=(tag,))
+                    self._render_news(today_events)
+                    self._news_time_lbl.config(
+                        text=f"Ultima actualizacion: {datetime.now().strftime('%H:%M:%S')} — {len(today_events)} eventos hoy")
 
                 self.root.after(0, update_ui)
             except Exception as e:
                 _log(f"Error fetching news: {e}")
 
         threading.Thread(target=do_fetch, daemon=True).start()
+
+    def _render_news(self, events):
+        """Render news events into the treeview with currency→pair mapping."""
+        self._news_tree.delete(*self._news_tree.get_children())
+
+        if not events:
+            self._news_tree.insert("", "end", values=("--", "--", "--", "--", "Sin noticias hoy", "", "", ""))
+            self._news_summary_lbl.config(text="No hay noticias economicas programadas para hoy.")
+            self._news_next_lbl.config(text="Sin noticias de alto impacto pendientes", fg=TEXT_SEC)
+            return
+
+        now_str = datetime.now().strftime("%H:%M")
+        high_count = sum(1 for e in events if e.get("impact") == "High")
+        med_count = sum(1 for e in events if e.get("impact") == "Medium")
+        low_count = len(events) - high_count - med_count
+
+        # Resumen
+        self._news_summary_lbl.config(
+            text=f"\U0001F534 {high_count} alto impacto  |  \U0001F7E1 {med_count} medio  |  \u26AA {low_count} bajo  |  Total: {len(events)} eventos")
+
+        # Proxima noticia de alto impacto
+        next_high = None
+        for ev in sorted(events, key=lambda x: x.get("date", "")):
+            hora = ev.get("date", "")[11:16] if len(ev.get("date", "")) > 11 else ""
+            if ev.get("impact") == "High" and hora >= now_str:
+                next_high = ev
+                break
+
+        if next_high:
+            _nh_hora = next_high.get("date", "")[11:16]
+            _nh_pais = next_high.get("country", "")
+            _nh_titulo = next_high.get("title", "")
+            _nh_pares = ", ".join(self._CURRENCY_PAIRS.get(_nh_pais, []))
+            self._news_next_lbl.config(
+                text=f"\u26A0 {_nh_hora}h — {_nh_pais} — {_nh_titulo}  \u2192  Afecta: {_nh_pares}",
+                fg=ERR)
+        else:
+            self._news_next_lbl.config(text="\u2705 No quedan noticias de alto impacto hoy", fg=WIN_COLOR)
+
+        # Filtro
+        filt = self._news_filter.get()
+        sorted_events = sorted(events, key=lambda x: x.get("date", ""))
+
+        for ev in sorted_events:
+            impacto = ev.get("impact", "Low")
+            if filt != "all" and impacto != filt:
+                continue
+
+            hora = ev.get("date", "")[11:16] if len(ev.get("date", "")) > 11 else "--"
+            moneda = ev.get("country", "")
+            titulo = ev.get("title", "")
+            previo = ev.get("previous", "") or ""
+            pronostico = ev.get("forecast", "") or ""
+            actual = ev.get("actual", "") or ""
+
+            # Pares afectados
+            pares = ", ".join(self._CURRENCY_PAIRS.get(moneda, [moneda]))
+
+            # Impacto display
+            if impacto == "High":
+                imp_display = "\U0001F534 ALTO"
+            elif impacto == "Medium":
+                imp_display = "\U0001F7E1 MEDIO"
+            else:
+                imp_display = "\u26AA Bajo"
+
+            # Tag: pasado vs futuro + impacto
+            is_past = hora < now_str
+            if is_past:
+                tag = "past"
+            elif impacto == "High":
+                tag = "upcoming_high"
+            elif impacto == "Medium":
+                tag = "medium"
+            else:
+                tag = "low"
+
+            self._news_tree.insert("", "end",
+                values=(hora, moneda, imp_display, pares, titulo, previo, pronostico, actual),
+                tags=(tag,))
+
+    def _apply_news_filter(self):
+        """Re-render news with current filter."""
+        if hasattr(self, '_news_data_cache') and self._news_data_cache:
+            self._render_news(self._news_data_cache)
 
     # --------------------------------------------------------
     #  MT5 CAPITAL REFRESH (every 30s)
