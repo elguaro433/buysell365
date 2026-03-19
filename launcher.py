@@ -1011,14 +1011,6 @@ class ManagementConsole:
                                      font=("Segoe UI", 11))
         self._conn_web.pack(side="left", padx=20)
 
-        # === P&L Chart (Today) ===
-        pnl_frame = _make_section_frame(scroll_frame, "P&L Hoy (Linea)")
-        pnl_frame.pack(fill="x", padx=10, pady=5)
-
-        self._pnl_canvas = tk.Canvas(pnl_frame, bg=BG_INPUT, height=120,
-                                      highlightthickness=0)
-        self._pnl_canvas.pack(fill="x", pady=(0, 5))
-
         # === Section 4: Rendimiento por Activo ===
         rend_frame = _make_section_frame(scroll_frame, "Rendimiento por Activo")
         rend_frame.pack(fill="x", padx=10, pady=5)
@@ -1081,14 +1073,6 @@ class ManagementConsole:
             val_lbl = _make_label(perf_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
             val_lbl.grid(row=i, column=3, sticky="w", pady=2)
             setattr(self, attr, val_lbl)
-
-        # Equity Curve
-        eq_frame = _make_section_frame(scroll_frame, "Curva de Capital")
-        eq_frame.pack(fill="x", padx=10, pady=5)
-
-        self._equity_canvas = tk.Canvas(eq_frame, bg=BG_INPUT, height=120,
-                                         highlightthickness=0)
-        self._equity_canvas.pack(fill="x", pady=(0, 5))
 
         # Footer: Acerca de
         footer = tk.Frame(scroll_frame, bg=BG_MAIN)
@@ -1482,6 +1466,8 @@ class ManagementConsole:
     def _draw_pnl_chart(self, pnl_points):
         """Draw a simple line chart on self._pnl_canvas.
         pnl_points: list of (label, value) where value is cumulative pips."""
+        if not hasattr(self, '_pnl_canvas'):
+            return
         c = self._pnl_canvas
         c.delete("all")
         w = c.winfo_width() or 600
@@ -1550,6 +1536,8 @@ class ManagementConsole:
     # --------------------------------------------------------
     def _draw_equity_curve(self):
         """Draw equity curve from self._equity_history on self._equity_canvas."""
+        if not hasattr(self, '_equity_canvas'):
+            return
         c = self._equity_canvas
         c.delete("all")
         w = c.winfo_width() or 600
