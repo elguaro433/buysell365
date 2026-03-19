@@ -15152,7 +15152,7 @@ SCALPER_RIESGO_POR_TRADE = 0.005   # 0.5% del capital por trade
 SCALPER_MAX_LOSS_DIARIO = 0.03     # 3% máximo pérdida diaria → para todo
 SCALPER_MAX_CONSECUTIVAS = 4       # 4 pérdidas seguidas → pausa 30 min
 SCALPER_MAX_POSICIONES = 5         # Máximo 5 posiciones abiertas simultáneas (7 activos)
-SCALPER_TIMEOUT_MINUTOS = 60       # Cerrar trade si no toca TP/SL en 60 min
+SCALPER_TIMEOUT_MINUTOS = 45       # FIX 2026-03-19: 60→45 min para scalping más rápido
 SCALPER_BREAKEVEN_PCT = 0.4        # Mover SL a breakeven al 40% del TP
 SCALPER_INTERVALO = 30             # Segundos entre escaneos (rápido para scalping)
 
@@ -15935,9 +15935,10 @@ def _scalper_evaluar_senal(ind, config):
         return None, "ATR=0"
 
     # 🔴 Filtro volumen: mercado muerto = no scalp
+    # FIX 2026-03-19: si vol=0 (sin datos de volumen, común en forex MT5), no bloquear
     _svol = ind.get('vol_ratio', 1.0)
-    if _svol < 0.5:
-        return None, f"Vol={_svol:.1f}x bajo (mín 0.5x)"
+    if _svol > 0 and _svol < 0.3:
+        return None, f"Vol={_svol:.1f}x bajo (mín 0.3x)"
 
     bb_lo = ind['bb_lo']
     bb_up = ind['bb_up']
@@ -15947,17 +15948,15 @@ def _scalper_evaluar_senal(ind, config):
     close = ind.get('close', precio)
 
     # ── Variante A: BB touch + RSI en zona extrema (principal) ──
-    # BUY
-    # FIX 2026-03-19: RSI 38→30 para entradas más extremas y confiables
-    if (low <= bb_lo and rsi < 30 and 10 <= adx <= 40):
+    # BUY — FIX 2026-03-19: RSI 30→35 (M5 raramente llega a 30)
+    if (low <= bb_lo and rsi < 35 and 10 <= adx <= 40):
         # Bloquear GOLD BUY (backtest: -83 pips, 36.4% WR)
-        if 'XAUUSD' in symbol or 'GC' in symbol:
+        if 'XAUUSD' in symbol or 'GC' in symbol or 'GOLD' in symbol:
             return None, "Gold BUY bloqueado (backtest negativo)"
         return "BUY", f"BB+RSI-A Buy | RSI={rsi:.0f} | ADX={adx:.0f}"
 
-    # SELL
-    # FIX 2026-03-19: RSI 62→70 para entradas más extremas y confiables
-    if (high >= bb_up and rsi > 70 and 10 <= adx <= 40):
+    # SELL — FIX 2026-03-19: RSI 70→65 (M5 raramente llega a 70)
+    if (high >= bb_up and rsi > 65 and 10 <= adx <= 40):
         # Bloquear NASDAQ SELL (backtest: -393 pips, 23.9% WR)
         if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
             return None, "NASDAQ SELL bloqueado (backtest negativo)"
@@ -16005,13 +16004,13 @@ def _scalper_evaluar_senal(ind, config):
         fib_236 = ind.get('fib_236', 0)
         fib_764 = ind.get('fib_764', 0)
 
-        # BUY: precio por debajo del 23.6% del rango + RSI < 40
-        if fib_pos < 0.236 and rsi < 40 and 10 <= adx <= 35:
-            return "BUY", f"FIB Buy | Pos={fib_pos:.1%} < 23.6% | RSI={rsi:.0f} | ADX={adx:.0f}"
+        # BUY: precio en zona baja del rango + RSI bajo — FIX 2026-03-19: 0.236→0.30 para más ops
+        if fib_pos < 0.30 and rsi < 42 and 10 <= adx <= 35:
+            return "BUY", f"FIB Buy | Pos={fib_pos:.1%} < 30% | RSI={rsi:.0f} | ADX={adx:.0f}"
 
-        # SELL: precio por encima del 76.4% del rango + RSI > 60
-        if fib_pos > 0.764 and rsi > 60 and 10 <= adx <= 35:
-            return "SELL", f"FIB Sell | Pos={fib_pos:.1%} > 76.4% | RSI={rsi:.0f} | ADX={adx:.0f}"
+        # SELL: precio en zona alta del rango + RSI alto — FIX 2026-03-19: 0.764→0.70
+        if fib_pos > 0.70 and rsi > 58 and 10 <= adx <= 35:
+            return "SELL", f"FIB Sell | Pos={fib_pos:.1%} > 70% | RSI={rsi:.0f} | ADX={adx:.0f}"
 
         return None, f"FIB neutral (pos={fib_pos:.1%})"
 
