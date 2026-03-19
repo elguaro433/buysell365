@@ -30,20 +30,20 @@ if sys.stdout and hasattr(sys.stdout, 'encoding') and sys.stdout.encoding != 'ut
 # ============================================================
 #  COLOR THEME
 # ============================================================
-BG_MAIN = "#0d1117"
-BG_PANEL = "#161b22"
-BG_INPUT = "#21262d"
-BG_ROW_ALT = "#1c2333"  # alternating row background
-TEXT = "#e6edf3"
-TEXT_PRI = "#e6edf3"
-TEXT_SEC = "#8b949e"
+BG_MAIN = "#0a0e14"
+BG_PANEL = "#12171f"
+BG_INPUT = "#1a2030"
+BG_ROW_ALT = "#151d2a"
+TEXT = "#e8ecf1"
+TEXT_PRI = "#f0f4f8"
+TEXT_SEC = "#6b7a8d"
 ACCENT = "#00d4aa"
 ACCENT_BRIGHT = "#00f5c4"
-WARN = "#f5c842"
-ERR = "#ff6b6b"
-WIN_COLOR = "#00d4aa"
-LOSS_COLOR = "#ff6b6b"
-PREMIUM_COLOR = "#FFD700"
+WARN = "#f59e0b"
+ERR = "#ef4444"
+WIN_COLOR = "#10b981"
+LOSS_COLOR = "#ef4444"
+PREMIUM_COLOR = "#f59e0b"
 
 # ============================================================
 #  PATHS
@@ -671,7 +671,8 @@ class ManagementConsole:
         self.notebook.add(self._tab_scalper, text=" \U0001FA92 Scalper ")
         self.notebook.add(self._tab_analisis, text=" \U0001F50D Analisis ")
         self.notebook.add(self._tab_trading, text=" \u2699 Trading Config ")
-        self.notebook.add(self._tab_conexiones, text=" \U0001F517 Conexiones ")
+        # Conexiones tab removed (merged into Dashboard)
+        # self.notebook.add(self._tab_conexiones, text=" \U0001F517 Conexiones ")
         self.notebook.add(self._tab_vip, text=" \u2B50 VIP ")
         self.notebook.add(self._tab_logs, text=" \U0001F4DD Logs ")
         self.notebook.add(self._tab_web, text=" \U0001F310 Web ")
@@ -731,14 +732,14 @@ class ManagementConsole:
 
         style.configure("TNotebook", background=BG_MAIN, borderwidth=0)
         style.configure("TNotebook.Tab", background=BG_INPUT, foreground=TEXT,
-                        font=("Segoe UI", 10, "bold"), padding=[14, 6])
+                        font=("Segoe UI", 10, "bold"), padding=[16, 8])
         style.map("TNotebook.Tab",
                   background=[("selected", BG_PANEL)],
                   foreground=[("selected", ACCENT)])
 
         style.configure("Treeview", background=BG_PANEL, foreground=TEXT,
                         fieldbackground=BG_PANEL, borderwidth=0,
-                        font=("Segoe UI", 10), rowheight=28)
+                        font=("Segoe UI", 10), rowheight=32)
         style.configure("Treeview.Heading", background=BG_INPUT, foreground=TEXT,
                         font=("Segoe UI", 10, "bold"), borderwidth=1,
                         relief="flat")
@@ -934,6 +935,10 @@ class ManagementConsole:
         _make_button(qctrl_row, "\U0001F50D Escanear Ahora", self._cmd_escanear_ahora,
                      bg="#1d4ed8", fg="#ffffff").pack(side="left", padx=5, pady=3)
 
+        self._btn_pause_all = _make_button(qctrl_row, "\u23F8 Pausar Todo", self._cmd_pause_all,
+                                           bg="#b91c1c", fg="#ffffff")
+        self._btn_pause_all.pack(side="left", padx=5, pady=3)
+
         # === Section 2: Estadisticas en Vivo ===
         stats_frame = _make_section_frame(scroll_frame, "Estadisticas en Vivo")
         stats_frame.pack(fill="x", padx=10, pady=5)
@@ -1084,6 +1089,23 @@ class ManagementConsole:
                                          highlightthickness=0)
         self._equity_canvas.pack(fill="x", pady=(0, 5))
 
+        # === Noticias Economicas del Dia ===
+        news_frame = _make_section_frame(scroll_frame, "\U0001F4F0 Noticias Economicas Hoy")
+        news_frame.pack(fill="x", padx=10, pady=5)
+
+        news_cols = ("Hora", "Moneda", "Impacto", "Evento")
+        self._news_tree = ttk.Treeview(news_frame, columns=news_cols, show="headings", height=6)
+        for c in news_cols:
+            self._news_tree.heading(c, text=c)
+        self._news_tree.column("Hora", width=80, anchor="center")
+        self._news_tree.column("Moneda", width=80, anchor="center")
+        self._news_tree.column("Impacto", width=80, anchor="center")
+        self._news_tree.column("Evento", width=500, anchor="w")
+        self._news_tree.tag_configure("high", foreground="#ff6b6b")
+        self._news_tree.tag_configure("medium", foreground="#f5c842")
+        self._news_tree.tag_configure("low", foreground="#8b949e")
+        self._news_tree.pack(fill="x", pady=(0, 5))
+
         # Footer: Acerca de
         footer = tk.Frame(scroll_frame, bg=BG_MAIN)
         footer.pack(fill="x", padx=10, pady=(5, 15))
@@ -1092,6 +1114,9 @@ class ManagementConsole:
 
         # Start MT5 capital refresh timer (every 30s)
         self.root.after(5000, self._refresh_mt5_capital_loop)
+
+        # Initial news fetch
+        self._refresh_news()
 
     def _show_about(self):
         messagebox.showinfo(
@@ -1179,6 +1204,71 @@ class ManagementConsole:
         _send_bot_cmd("force_scan")
         _log("Escaneo inmediato solicitado por usuario")
         messagebox.showinfo("Escanear", "Escaneo inmediato solicitado. Se ejecutara en el proximo ciclo.")
+
+    def _cmd_pause_all(self):
+        _send_bot_cmd("pause_all")
+        self._btn_pause_all.config(text="\u25B6 Reanudar Todo", bg="#238636",
+                                   command=self._cmd_resume_all)
+        _log("PAUSA TOTAL activada desde consola")
+
+    def _cmd_resume_all(self):
+        _send_bot_cmd("resume_all")
+        self._btn_pause_all.config(text="\u23F8 Pausar Todo", bg="#b91c1c",
+                                   command=self._cmd_pause_all)
+        _log("TODO REACTIVADO desde consola")
+
+    def _play_sound(self, sound_type="signal"):
+        """Play notification sounds for trading events."""
+        def _do_sound():
+            try:
+                if sound_type == "signal":
+                    winsound.Beep(800, 300)
+                elif sound_type == "win":
+                    winsound.Beep(1000, 200)
+                    time.sleep(0.1)
+                    winsound.Beep(1200, 200)
+                elif sound_type == "loss":
+                    winsound.Beep(400, 500)
+            except Exception:
+                pass
+        threading.Thread(target=_do_sound, daemon=True).start()
+
+    def _refresh_news(self):
+        """Fetch economic calendar from ForexFactory and update the news treeview."""
+        def do_fetch():
+            try:
+                url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = json.loads(resp.read().decode())
+
+                # Filter today's events
+                today = datetime.now().strftime("%Y-%m-%d")
+                today_events = []
+                for ev in data:
+                    ev_date = ev.get("date", "")[:10]
+                    if ev_date == today:
+                        today_events.append(ev)
+
+                def update_ui():
+                    self._news_tree.delete(*self._news_tree.get_children())
+                    if not today_events:
+                        self._news_tree.insert("", "end", values=("--", "--", "--", "Sin noticias importantes hoy"))
+                        return
+                    for ev in sorted(today_events, key=lambda x: x.get("date", "")):
+                        hora = ev.get("date", "")[11:16] if len(ev.get("date", "")) > 11 else "--"
+                        moneda = ev.get("country", "")
+                        impacto = ev.get("impact", "Low")
+                        titulo = ev.get("title", "")
+                        tag = "high" if impacto == "High" else ("medium" if impacto == "Medium" else "low")
+                        imp_display = "\U0001F534 Alto" if impacto == "High" else ("\U0001F7E1 Medio" if impacto == "Medium" else "\u26AA Bajo")
+                        self._news_tree.insert("", "end", values=(hora, moneda, imp_display, titulo), tags=(tag,))
+
+                self.root.after(0, update_ui)
+            except Exception as e:
+                _log(f"Error fetching news: {e}")
+
+        threading.Thread(target=do_fetch, daemon=True).start()
 
     # --------------------------------------------------------
     #  MT5 CAPITAL REFRESH (every 30s)
@@ -1459,13 +1549,15 @@ class ManagementConsole:
         # Auto-close after 5 seconds
         alert.after(5000, alert.destroy)
 
-        # Play beep for premium signals
+        # Play sound for new signals
         if premium_text:
             try:
                 winsound.Beep(1200, 300)
                 winsound.Beep(1500, 200)
             except Exception:
                 pass
+        else:
+            self._play_sound("signal")
 
     def _check_new_trades(self, estado):
         """Detect new trades and fire alerts."""
@@ -3218,8 +3310,11 @@ class ManagementConsole:
         threading.Thread(target=self.bot.stop, daemon=True).start()
 
     def _cmd_restart_bot(self):
+        self._btn_restart.config(text="Reiniciando...", state="disabled", bg=TEXT_SEC)
         def do_restart():
             self.bot.restart()
+            self.root.after(3000, lambda: self._btn_restart.config(
+                text="Reiniciar", state="normal", bg=WARN))
         threading.Thread(target=do_restart, daemon=True).start()
 
     def _toggle_autostart(self):
@@ -3263,6 +3358,13 @@ class ManagementConsole:
         if self._tick_count % 5 == 0:
             try:
                 self._refresh_scalper()
+            except Exception:
+                pass
+
+        # News (every 30 min = 900 ticks at 2s each)
+        if self._tick_count % 900 == 0 or self._tick_count == 1:
+            try:
+                self._refresh_news()
             except Exception:
                 pass
 
@@ -3310,6 +3412,9 @@ class ManagementConsole:
         total_all = len(historial)
         wins_all = sum(1 for op in historial if op.get("resultado") == "WIN")
         win_rate = (wins_all / total_all * 100) if total_all > 0 else 0
+
+        # Update window title with P&L info
+        self.root.title(f"BuySell365 Pro | ${capital:.0f} | {pips_today:+.1f} pips hoy | {wins_today}W/{losses_today}L")
 
         self._dash_winrate.config(text=f"{win_rate:.1f}%",
                                   fg=WIN_COLOR if win_rate >= 50 else ERR)
