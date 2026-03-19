@@ -221,6 +221,17 @@ def save_estado(data: dict):
         _log(f"Error guardando estado.json: {e}")
 
 
+def _send_bot_cmd(cmd: str):
+    """Envia un comando al bot via archivo .bot.cmd"""
+    cmd_file = os.path.join(BASE_DIR, ".bot.cmd")
+    try:
+        with open(cmd_file, "w", encoding="utf-8") as f:
+            f.write(cmd)
+        _log(f"Comando enviado al bot: {cmd}")
+    except Exception as e:
+        _log(f"Error enviando comando al bot: {e}")
+
+
 # ============================================================
 #  .ENV FILE MANAGEMENT
 # ============================================================
@@ -482,43 +493,89 @@ class BotManager:
     def stop(self):
         if not self.is_running:
             return
+        _target_pid = None
         try:
-            # Try graceful shutdown first (CTRL_BREAK → SIGBREAK on Windows)
+            # Determinar PID a matar (proceso propio o adoptado)
+            if self._proc and self._proc.poll() is None:
+                _target_pid = self._proc.pid
+            elif self.pid:
+                _target_pid = self.pid
+
+            if not _target_pid:
+                _log("Stop: no hay PID de bot conocido")
+                self._running = False
+                return
+
+            # Graceful shutdown: taskkill en Windows (CTRL_BREAK mata el grupo entero)
+            import subprocess as _sp
             try:
-                import signal as _sig
                 if os.name == 'nt':
-                    os.kill(self._proc.pid, _sig.CTRL_BREAK_EVENT)
+                    # Primero intentar taskkill sin /F (graceful)
+                    _sp.run(["taskkill", "/PID", str(_target_pid)],
+                            capture_output=True, timeout=10)
                 else:
-                    self._proc.send_signal(_sig.SIGTERM)
-                self._proc.wait(timeout=15)
-                _log("Bot detenido gracefully (estado guardado)")
-            except subprocess.TimeoutExpired:
-                _log("Bot no respondio al cierre graceful, forzando terminate...")
-                self._proc.terminate()
+                    import signal as _sig
+                    os.kill(_target_pid, _sig.SIGTERM)
+                # Esperar a que termine
+                for _ in range(30):
+                    time.sleep(0.5)
+                    if self._proc and self._proc.poll() is not None:
+                        break
+                    if not self._pid_alive(_target_pid):
+                        break
+                if not self._pid_alive(_target_pid):
+                    _log("Bot detenido gracefully (estado guardado)")
+                else:
+                    raise TimeoutError("Bot no respondio")
+            except (TimeoutError, _sp.TimeoutExpired, OSError):
+                _log("Bot no respondio al cierre graceful, forzando kill...")
                 try:
-                    self._proc.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self._proc.kill()
-                    self._proc.wait(timeout=5)
-            except Exception:
-                # Fallback: terminate directly
-                self._proc.terminate()
-                try:
-                    self._proc.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self._proc.kill()
-                    self._proc.wait(timeout=5)
+                    _sp.run(["taskkill", "/F", "/PID", str(_target_pid)],
+                            capture_output=True, timeout=10)
+                    time.sleep(1)
+                except Exception as e2:
+                    _log(f"Error en kill forzado: {e2}")
         except Exception as e:
             _log(f"Error deteniendo bot: {e}")
+        self._proc = None
+        self.pid = None
         self._running = False
         self._cleanup_pid_file()
         _log("Bot detenido")
 
+    @staticmethod
+    def _pid_alive(pid):
+        """Verifica si un PID sigue vivo en Windows."""
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+        except Exception:
+            pass
+        return False
+
     def restart(self):
+        _log("Reiniciando bot...")
         self.stop()
+        # Esperar a que el proceso realmente muera
+        for _ in range(15):
+            time.sleep(1)
+            if not self.is_running and (not self.pid or not self._pid_alive(self.pid)):
+                break
+        # Forzar estado limpio
+        self._proc = None
+        self.pid = None
+        self._running = False
         time.sleep(2)
         self.start()
         self.restart_count += 1
+        if self.is_running:
+            _log(f"Bot reiniciado OK — PID={self.pid}")
+        else:
+            _log("⚠️ Bot no arrancó después del reinicio")
 
     def uptime_str(self):
         if not self.start_time or not self.is_running:
@@ -1051,17 +1108,15 @@ class ManagementConsole:
     #  QUICK CONTROLS (improvement 5)
     # --------------------------------------------------------
     def _cmd_toggle_scalper(self):
-        """Toggle scalper pause state via estado.json."""
-        estado = load_estado()
-        currently_paused = estado.get("scalper_pausado", False)
-        estado["scalper_pausado"] = not currently_paused
-        save_estado(estado)
-        self._estado_mtime = 0
-        self._scalper_paused = not currently_paused
-        if self._scalper_paused:
+        """Toggle scalper pause state via .bot.cmd."""
+        if not self._scalper_paused:
+            _send_bot_cmd("scalper_pause")
+            self._scalper_paused = True
             self._btn_scalper_toggle.config(text="\u25B6 Play Scalper", bg="#238636")
             _log("Scalper PAUSADO por usuario")
         else:
+            _send_bot_cmd("scalper_resume")
+            self._scalper_paused = False
             self._btn_scalper_toggle.config(text="\u23F8 Pausar Scalper", bg="#6e40c9")
             _log("Scalper REANUDADO por usuario")
 
@@ -1120,14 +1175,10 @@ class ManagementConsole:
         threading.Thread(target=_close_all, daemon=True).start()
 
     def _cmd_escanear_ahora(self):
-        """Trigger immediate scan by setting scan_countdown to 0 in estado."""
-        estado = load_estado()
-        estado["_force_scan"] = True
-        save_estado(estado)
-        self._estado_mtime = 0
-        self._scan_countdown = 0
+        """Trigger immediate scan via .bot.cmd."""
+        _send_bot_cmd("force_scan")
         _log("Escaneo inmediato solicitado por usuario")
-        messagebox.showinfo("Escanear", "Se solicitara un escaneo inmediato en el proximo ciclo.")
+        messagebox.showinfo("Escanear", "Escaneo inmediato solicitado. Se ejecutara en el proximo ciclo.")
 
     # --------------------------------------------------------
     #  MT5 CAPITAL REFRESH (every 30s)
@@ -2892,9 +2943,10 @@ class ManagementConsole:
         self._sc_riesgo.config(text="0.5% por trade")
         self._sc_max_loss.config(text="3% diario")
 
-        # Check if scalper is paused
+        # Check if scalper is paused (bot saves 'scalper_activo' in estado.json)
         estado = self._get_estado()
-        if estado.get("scalper_pausado", False):
+        _scalper_on = estado.get("scalper_activo", True)
+        if not _scalper_on:
             self._scalper_paused = True
             self._btn_scalper_toggle.config(text="\u25B6 Play Scalper", bg="#238636")
         else:

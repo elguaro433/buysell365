@@ -50,7 +50,7 @@ _store = {
     "auto_trading": True,
     "ultimo_sync": 0,
     "assets_count": 6,
-    "capital_usuario": 640.0,
+    "capital_usuario": 550.0,
     "mt5_status": "DESCONECTADO",
     "active_ops_detail": [],  # Pre-computed by bot for /api/active_ops
 }
@@ -321,7 +321,7 @@ def _add_security_headers(response):
             response.headers['Cache-Control'] = 'no-store'
     return response
 
-_DATA_API_PATHS = {'/api/stats', '/api/winning_trades', '/api/active_ops'}
+_DATA_API_PATHS = {'/api/stats', '/api/winning_trades', '/api/all_trades', '/api/active_ops'}
 
 @app.before_request
 def _enforce_rate_limit():
@@ -542,11 +542,14 @@ def api_stats():
         logger.error(f"Stats error: {e}")
         return jsonify({"error": "server error"}), 500
 
-@app.route("/api/winning_trades")
-def api_winning_trades():
+# FIX 2026-03-19: Mostrar TODAS las operaciones (wins + losses) — transparencia total
+@app.route("/api/winning_trades")  # Mantener ruta vieja por compatibilidad
+@app.route("/api/all_trades")
+def api_all_trades():
     try:
         with _lock:
-            trades = _store.get("winning_trades", [])
+            # Priorizar historial completo; fallback a winning_trades para compatibilidad
+            trades = _store.get("historial_operaciones", []) or _store.get("winning_trades", [])
         return app.response_class(response=json.dumps(trades, ensure_ascii=False), status=200, mimetype="application/json")
     except Exception:
         return "[]", 200, {"Content-Type": "application/json"}
@@ -637,7 +640,8 @@ def index_web():
         hist = _store.get("historial_operaciones", [])
     wins = sum(1 for h in hist if h.get('pips', 0) > 0)
     total = len(hist)
-    wr = round(wins / total * 100, 1) if total > 0 else 78.5
+    # FIX 2026-03-19: WinRate real — no inventar 78.5% si no hay datos
+    wr = round(wins / total * 100, 1) if total > 0 else 0
     pips = round(sum(h.get('pips', 0) for h in hist), 1)
     n_ops = sum(1 for op in _store.get("operaciones_activas", {}).values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
     activos = _store.get("assets_count", 6)
@@ -1488,6 +1492,28 @@ def dashboard_visual():
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
     wr_color = '#00d4aa' if winrate >= 60 else ('#f0b90b' if winrate >= 45 else '#ff3b30')
 
+    # FIX 2026-03-19: Calcular drawdown máximo y racha de pérdidas
+    _cumul = 0.0
+    _peak = 0.0
+    _max_dd = 0.0
+    _loss_streak = 0
+    _max_loss_streak = 0
+    for h in hist:
+        _cumul += h.get('pips', 0)
+        if _cumul > _peak:
+            _peak = _cumul
+        dd = _peak - _cumul
+        if dd > _max_dd:
+            _max_dd = dd
+        if h.get('pips', 0) <= 0:
+            _loss_streak += 1
+            if _loss_streak > _max_loss_streak:
+                _max_loss_streak = _loss_streak
+        else:
+            _loss_streak = 0
+    max_drawdown = round(_max_dd, 1)
+    dd_color = '#00d4aa' if max_drawdown < 50 else ('#f0b90b' if max_drawdown < 150 else '#ff3b30')
+
     # --- Asset performance ---
     asset_perf = {}
     for h in hist:
@@ -1703,9 +1729,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     <!-- ACTIVE OPERATIONS -->
     <div id="active-alerts-container" style="margin-bottom:24px"></div>
 
-    <!-- WINNING TRADES HISTORY -->
+    <!-- ALL TRADES HISTORY — FIX 2026-03-19: Transparencia total -->
     <div class="card" style="margin-bottom:24px">
-        <div class="card-title"><i>&#127942;</i> <span>Historial de Operaciones Ganadas</span></div>
+        <div class="card-title"><i>&#128200;</i> <span>Historial Completo de Operaciones</span></div>
         <div id="streak-banner-container"></div>
         <div class="card-title" style="margin-top:8px"><i>&#128200;</i> <span data-i18n="dash.cumulative_chart">Rendimiento Acumulado</span></div>
         <div id="cumulative-chart-container" class="cumul-chart-wrap">
@@ -1755,6 +1781,29 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <div class="stat-label">&#9878; <span data-i18n="dash.rr">Risk : Reward</span></div>
             <div class="stat-value" style="color:var(--primary)">{rr}:1</div>
             <div class="stat-sub" data-i18n="dash.rr_sub">Relaci&oacute;n ganancia / p&eacute;rdida</div>
+        </div>
+    </div>
+    <!-- FIX 2026-03-19: Drawdown y racha de pérdidas — transparencia -->
+    <div class="stats-row" style="margin-top:0;margin-bottom:24px">
+        <div class="stat-card" style="border-left:3px solid {dd_color}">
+            <div class="stat-label">&#128200; Max Drawdown</div>
+            <div class="stat-value" style="color:{dd_color}">{max_drawdown} pips</div>
+            <div class="stat-sub">Ca&iacute;da m&aacute;xima desde el pico</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid #ff3b30">
+            <div class="stat-label">&#128308; Racha P&eacute;rdidas M&aacute;x</div>
+            <div class="stat-value" style="color:#ff3b30">{_max_loss_streak}</div>
+            <div class="stat-sub">P&eacute;rdidas consecutivas m&aacute;ximas</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--primary)">
+            <div class="stat-label">&#128178; Promedio P&eacute;rdida</div>
+            <div class="stat-value" style="color:#ff3b30">-{avg_loss}</div>
+            <div class="stat-sub">Pips promedio en p&eacute;rdidas</div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--primary)">
+            <div class="stat-label">&#128176; Profit Factor</div>
+            <div class="stat-value" style="color:var(--primary)">{round(sum(h.get('pips',0) for h in hist if h.get('pips',0)>0) / max(abs(sum(h.get('pips',0) for h in hist if h.get('pips',0)<=0)), 0.1), 2)}</div>
+            <div class="stat-sub">Ganancia total / P&eacute;rdida total</div>
         </div>
     </div>
 
@@ -1972,19 +2021,29 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     return 5;
   }}
 
+  // FIX 2026-03-19: Racha real — contar desde la última pérdida
   function renderStreak(trades){{
     const container = document.getElementById('streak-banner-container');
     if(!container) return;
     if(!trades || trades.length === 0){{ container.innerHTML = ''; return; }}
-    let streak = trades.length;
+    // Calcular racha actual desde el final
+    let streak = 0;
+    for(let i = trades.length - 1; i >= 0; i--){{
+      if((trades[i].pips || 0) > 0) streak++;
+      else break;
+    }}
+    if(streak < 2){{ container.innerHTML = ''; return; }}
+    const totalWins = trades.filter(function(t){{ return (t.pips||0) > 0; }}).length;
+    const totalAll = trades.length;
+    const realWR = totalAll > 0 ? Math.round(totalWins / totalAll * 100) : 0;
     let fireEmoji = '';
     if(streak >= 10) fireEmoji = '\U0001f525\U0001f525\U0001f525';
     else if(streak >= 5) fireEmoji = '\U0001f525\U0001f525';
     else if(streak >= 3) fireEmoji = '\U0001f525';
     let html = '<div class="streak-banner">';
     html += '<div class="streak-number">' + streak + '</div>';
-    html += '<div class="streak-info"><div class="streak-label">' + window._t('dash.consecutive_wins','Operaciones Ganadas Consecutivas') + '</div>';
-    html += '<div class="streak-sub">' + window._t('dash.winning_streak','Racha ganadora total') + '</div></div>';
+    html += '<div class="streak-info"><div class="streak-label">' + window._t('dash.consecutive_wins','Racha Ganadora Actual') + '</div>';
+    html += '<div class="streak-sub">' + totalWins + 'W / ' + (totalAll - totalWins) + 'L | WR: ' + realWR + '%</div></div>';
     if(fireEmoji) html += '<div class="streak-fire">' + fireEmoji + '</div>';
     html += '</div>';
     container.innerHTML = html;
@@ -2107,7 +2166,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     html += '<th style="padding:10px 6px">Hora</th><th style="padding:10px 8px">Pips/Pts</th><th style="padding:10px 8px">Score</th>';
     html += '</tr></thead><tbody>';
     pageData.forEach(function(t, i){{
-      const bg = i % 2 === 0 ? 'rgba(0,212,170,0.04)' : 'transparent';
+      // FIX 2026-03-19: Fondo rojo sutil para losses
+      const isLoss = (t.pips || 0) <= 0;
+      const bg = isLoss ? 'rgba(255,59,48,0.06)' : (i % 2 === 0 ? 'rgba(0,212,170,0.04)' : 'transparent');
       const tipoIcon = t.tipo === 'COMPRA' ? '\U0001f7e2' : '\U0001f534';
       const pips = (t.pips || 0);
       const tkr = (t.ticker || '').toUpperCase();
@@ -2121,14 +2182,22 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_entrada || '-') + '</td>';
       html += '<td style="padding:8px;font-family:monospace">' + (t.salida ? Number(t.salida).toFixed(dec) : '-') + '</td>';
       html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_salida || '-') + '</td>';
-      html += '<td style="padding:8px;color:#00e676;font-weight:700">+' + pips.toFixed(1) + ' ' + unit + '</td>';
-      html += '<td style="padding:8px;color:var(--primary)">' + (t.score != null ? Math.min(t.score * 2, 10) : '-') + '/10</td>';
+      // FIX 2026-03-19: Mostrar wins en verde y losses en rojo + score real /5
+      const pipsColor = pips >= 0 ? '#00e676' : '#ff3b30';
+      const pipsSign = pips >= 0 ? '+' : '';
+      html += '<td style="padding:8px;color:' + pipsColor + ';font-weight:700">' + pipsSign + pips.toFixed(1) + ' ' + unit + '</td>';
+      html += '<td style="padding:8px;color:var(--primary)">' + (t.score != null ? t.score : '-') + '/5</td>';
       html += '</tr>';
     }});
     html += '</tbody></table>';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 8px;margin-top:8px;border-top:2px solid var(--primary);font-weight:700">';
-    html += '<span style="color:var(--text)">\U0001f3c6 Total: ' + filtered.length + ' ' + window._t('dash.winning_ops','operaciones ganadas') + '</span>';
-    html += '<span style="color:#00e676;font-size:1.1rem">+' + totalPips.toFixed(1) + ' ' + window._t('dash.accumulated_pips','pips acumulados') + '</span>';
+    // FIX 2026-03-19: Resumen con wins/losses reales
+    const totalWins = filtered.filter(function(t){{ return (t.pips||0) > 0; }}).length;
+    const totalLosses = filtered.length - totalWins;
+    const pipsColorTotal = totalPips >= 0 ? '#00e676' : '#ff3b30';
+    const pipsSignTotal = totalPips >= 0 ? '+' : '';
+    html += '<span style="color:var(--text)">\U0001f4ca Total: ' + filtered.length + ' ops (' + totalWins + 'W / ' + totalLosses + 'L)</span>';
+    html += '<span style="color:' + pipsColorTotal + ';font-size:1.1rem">' + pipsSignTotal + totalPips.toFixed(1) + ' ' + window._t('dash.accumulated_pips','pips netos') + '</span>';
     html += '</div>';
     if(totalPages > 1){{
       html += '<div class="pagination">';

@@ -49,7 +49,8 @@ def _do_sync(get_state_fn, on_signals_fn):
                         on_signals_fn(signal)
                     except Exception as e:
                         logger.error(f"Error processing pending signal: {e}")
-            logger.debug(f"Web sync OK ({len(pending)} pending signals)")
+            if pending:
+                logger.info(f"Web sync OK — {len(pending)} señales enviadas")
             return True
         else:
             # Logged by the caller based on failure count

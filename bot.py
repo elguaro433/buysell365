@@ -107,6 +107,10 @@ class _CategoryFilter(logging.Filter):
         return True
 
 logger.addFilter(_CategoryFilter())
+
+# Silenciar loggers ruidosos de librerías externas
+for _noisy in ("urllib3", "requests", "urllib3.connectionpool"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 _file_handler.addFilter(_CategoryFilter())   # También en el handler → cubre urllib3, requests, etc.
 
 # 🔒 PRODUCCIÓN: Redirigir print() al logger para que NADA se pierda
@@ -195,7 +199,7 @@ INTERVALO_MONITOR = 15          # Monitorizar niveles cada 15 segundos (ALTA VEL
 MIN_SCORE = 3                   # Score mínimo para enviar señal (auto-calibración ajusta ±1 por activo)
 
 # ✅ PARÁMETROS INSTITUCIONALES
-CAPITAL_USUARIO   = 576.63      # Capital base (se actualiza automáticamente con equity real de MT5)
+CAPITAL_USUARIO   = 550.00      # Capital base actualizado 2026-03-19 (se actualiza con equity real de MT5)
 RIESGO_POR_TRADE  = 0.01        # 1% para TODOS los activos (~$5.4 por trade con $543)
 RIESGO_ORO        = 0.01        # 1% para ORO
 RIESGO_USDJPY     = 0.01        # 1% para USD/JPY
@@ -241,7 +245,7 @@ VIP_WALLET_USDT      = "TEw97pnhpbB9GtrzjnoX6WQy25ost1HUDA"  # Binance USDT TRC2
 VIP_RED              = "TRC20"     # Red de pago
 VIP_DURACION_DIAS    = 30          # Duración de la suscripción en días
 VIP_TRIAL_DIAS       = 7           # 7 días calendario = 5 días hábiles (L-V). NO cambiar.
-VIP_AVISO_DIAS       = 3           # Días antes de expirar para avisar
+VIP_AVISO_DIAS       = 7           # FIX 2026-03-19: Secuencia 7d→3d→1d (antes solo 3d)
 VIP_CHECK_INTERVALO  = 300         # Revisar depósitos cada 5 minutos (segundos)
 BINANCE_API_KEY      = os.getenv("BINANCE_API_KEY", "").strip()
 BINANCE_API_SECRET   = os.getenv("BINANCE_API_SECRET", "").strip()
@@ -344,6 +348,7 @@ ultimo_escaneo        = 0
 escaneo_pausado       = False
 mt5_pausado           = False   # Si True: escáner y Telegram siguen, pero MT5 NO ejecuta
 mt5_solo_premium      = False   # Si True: MT5 solo ejecuta señales PREMIUM (💎 score≥4 + conf≥40%)
+_CMD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".bot.cmd")
 _cache_ind: dict[str, dict]            = {}   # {ticker: ind} del último escaneo
 directorio_usuarios: dict[str, dict]   = {}   # {user_id: {"nombre": str, "username": str}}
 
@@ -680,6 +685,8 @@ def guardar_estado():
                 "_ultimo_reporte_diario": _ultimo_reporte_diario,
                 "mt5_pausado": mt5_pausado,
                 "mt5_solo_premium": mt5_solo_premium,
+                "escaneo_pausado": escaneo_pausado,
+                "scalper_activo": SCALPER_ACTIVO,
                 # H-07 FIX: Persistir cooldowns de cierres (keys son tuples → convertir a strings)
                 "_cooldown_cierres": {f"{k[0]}|{k[1]}": v for k, v in _cooldown_cierres.items()},
             })
@@ -821,10 +828,13 @@ def cargar_estado():
                     if isinstance(urd, str):
                         _ultimo_reporte_diario = urd
 
-                    # Cargar mt5_pausado y mt5_solo_premium
-                    global mt5_pausado, mt5_solo_premium
+                    # Cargar mt5_pausado, mt5_solo_premium, escaneo_pausado, SCALPER_ACTIVO
+                    global mt5_pausado, mt5_solo_premium, escaneo_pausado, SCALPER_ACTIVO
                     mt5_pausado = bool(data.get("mt5_pausado", False))
                     mt5_solo_premium = bool(data.get("mt5_solo_premium", False))
+                    escaneo_pausado = bool(data.get("escaneo_pausado", False))
+                    if "scalper_activo" in data:
+                        SCALPER_ACTIVO = bool(data["scalper_activo"])
 
                     # H-07 FIX: Cargar cooldowns de cierres (keys guardadas como "ticker|tipo")
                     _cd_data = data.get("_cooldown_cierres")
@@ -2870,7 +2880,8 @@ def evaluar_senal_profesional(ind, ticker=""):
 
     # Rev Score 4: filtros ORIGINALES para ORO/USD/JPY/GBP/JPY (rsi_os por activo, soporte opcional)
     # Rev Score 4 ESTRICTO: para otros activos (RSI < 30, soporte obligatorio)
-    _rev4_permitido = ticker in ("GC=F", "USDJPY=X", "GBPJPY=X")
+    # FIX 2026-03-19: USD/JPY reversión tiene 40.8% WR — desactivado (perdió -91 pips hoy)
+    _rev4_permitido = ticker in ("GC=F", "GBPJPY=X")  # USD/JPY removido
     if _rev4_permitido:
         # Filtros ORIGINALES — ORO: RSI<36, USD/JPY: RSI<33, GBP/JPY: RSI<30
         # Soporte es bonus, no obligatorio (el original no lo requería)
@@ -4361,18 +4372,26 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     tp2_dist = dist(precio, niveles['tp2'])
     tp3_dist = dist(precio, niveles['tp3'])
 
-    score_display = min(score * 2, 10)
+    # FIX 2026-03-19: Score REAL sin inflar (era score*2)
+    score_display = score
+
+    # R:R ratio (riesgo vs recompensa TP1)
+    rr_ratio = round(tp1_dist / sl_dist, 1) if sl_dist > 0 else 0
+
+    # Confianza real desde indicadores
+    _conf_display = ind.get('confianza_total', 0)
 
     return (
         f"{cabecera}\n"
         f"━━━━━━━━━━\n"
+        f"🕐 {hora} (Andorra)\n"
         f"Entrada: `{f_(precio)}`\n"
         f"SL: `{f_(niveles['sl'])}` (−{fmt_dist(sl_dist)})\n"
         f"TP1: `{f_(niveles['tp1'])}` (+{fmt_dist(tp1_dist)})\n"
         f"TP2: `{f_(niveles['tp2'])}` (+{fmt_dist(tp2_dist)})\n"
         f"TP3: `{f_(niveles['tp3'])}` (+{fmt_dist(tp3_dist)})\n"
         f"━━━━━━━━━━\n"
-        f"Score: {score_display}/10"
+        f"Score: {score_display}/5 | R:R 1:{rr_ratio} | Conf: {_conf_display}%"
     )
 
 
@@ -7031,6 +7050,11 @@ def _enviar_aviso_vip(user_id: str, dias_restantes: int):
     with _lock_ops:
         if user_id in suscripciones_vip:
             suscripciones_vip[user_id]["aviso_enviado"] = True
+            # FIX 2026-03-19: guardar lista de avisos para secuencia 7d→3d→1d
+            _prev = suscripciones_vip[user_id].get("avisos_enviados", [])
+            if dias_restantes not in _prev:
+                _prev.append(dias_restantes)
+            suscripciones_vip[user_id]["avisos_enviados"] = _prev
     guardar_estado()
 
 
@@ -7128,6 +7152,42 @@ def cmd_reanudar():
         "🟢 Operaciones se ejecutan en MT5\n"
         "📡 Escáner + Telegram + MT5 funcionando\n\n"
         "⏸️ Escribe `pausar` o `pause` para detener MT5"
+    )
+
+
+def cmd_pausar_todo():
+    """Pausa TODO: scanner premium, scalper y ejecución MT5."""
+    global mt5_pausado, escaneo_pausado, SCALPER_ACTIVO
+    mt5_pausado = True
+    escaneo_pausado = True
+    SCALPER_ACTIVO = False
+    guardar_estado()
+    log_sistema("🛑 PAUSA TOTAL activada por admin — scanner, scalper y MT5 detenidos")
+    return (
+        "🛑 *TODO PAUSADO*\n\n"
+        "⏸️ Scanner Premium — DETENIDO\n"
+        "⏸️ Scalper — DETENIDO\n"
+        "⏸️ MT5 — NO ejecuta ordenes\n\n"
+        "📌 Las posiciones abiertas se mantienen.\n"
+        "No se abren operaciones nuevas.\n\n"
+        "▶️ Escribe `reanudar todo` o `play todo` para reactivar"
+    )
+
+
+def cmd_reanudar_todo():
+    """Reanuda TODO: scanner premium, scalper y ejecución MT5."""
+    global mt5_pausado, escaneo_pausado, SCALPER_ACTIVO
+    mt5_pausado = False
+    escaneo_pausado = False
+    SCALPER_ACTIVO = True
+    guardar_estado()
+    log_sistema("▶️ PAUSA TOTAL desactivada por admin — todo reactivado")
+    return (
+        "▶️ *TODO ACTIVO*\n\n"
+        "🟢 Scanner Premium — ACTIVO\n"
+        "🟢 Scalper — ACTIVO\n"
+        "🟢 MT5 — Ejecutando ordenes\n\n"
+        "⏸️ Escribe `pausar todo` para detener todo"
     )
 
 # ━━━━━━━━━━
@@ -8391,6 +8451,7 @@ def respuesta_fallback_inteligente(texto: str, activo_detectado: str, intencion_
 
 def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     """Interpreta el mensaje con lenguaje natural y responde de forma conversacional."""
+    global SCALPER_ACTIVO, mt5_pausado, escaneo_pausado
     t = texto.strip().lower()
     
     # 👤 Obtener nombre del usuario para personalizar
@@ -8497,6 +8558,67 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     # /record y /racha eliminados — info ya incluida en /estado y /resumen
     if t in ("/estado bot", "/bot", "estado bot", "estado del bot", "/estado del bot"):
         return cmd_estado_bot()
+    # FIX 2026-03-19: Comando /admin con lista completa de comandos admin
+    if t in ("/admin", "admin", "/admin help", "admin help"):
+        if not es_admin: return "⛔ Solo administradores."
+        return (
+            "🔧 *COMANDOS DE ADMINISTRADOR*\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⏸️ *Control del bot:*\n"
+            "• `/pausar` — Pausa total (señales+scalper+MT5)\n"
+            "• `/reanudar` — Reactiva todo\n"
+            "• `/pausar scalper` — Solo pausar scalper\n"
+            "• `/play scalper` — Reactivar scalper\n"
+            "• `/reiniciar` — Reiniciar proceso\n"
+            "• `/apagar` — Apagar bot\n"
+            "• `/reset` — Reset stats diarias\n\n"
+            "👑 *VIP:*\n"
+            "• `/vip_lista` — Suscriptores activos\n"
+            "• `/vip_pendientes` — Pagos pendientes\n"
+            "• `/vip_dar [ID]` — Dar acceso VIP\n"
+            "• `/vip_quitar [ID]` — Quitar VIP\n"
+            "• `/addvip [args]` — Añadir VIP manual\n"
+            "• `/gencode` — Generar código invitación\n"
+            "• `/codes` — Ver códigos activos\n"
+            "• `/delcode [code]` — Eliminar código\n\n"
+            "📊 *Trading:*\n"
+            "• `/activar [activo]` — Activar escaneo\n"
+            "• `/desactivar [activo]` — Desactivar escaneo\n"
+            "• `/capital [monto]` — Cambiar capital base\n"
+            "• `/scalper` — Estado del scalper\n"
+            "• `/logs` — Últimas líneas del log\n"
+            "• `/briefing` — Enviar briefing al grupo"
+        )
+    # 🛑 /pausar — Pausa TOTAL: detiene señales, scalper y ejecuciones MT5
+    if t in ("/pausar", "/pause", "pausar", "pausar todo", "stop trading"):
+        if not es_admin: return "⛔ Solo administradores pueden pausar el bot."
+        global mt5_pausado, escaneo_pausado
+        mt5_pausado = True
+        escaneo_pausado = True
+        SCALPER_ACTIVO = False
+        guardar_estado()
+        log_sistema("🛑 PAUSA TOTAL activada desde Telegram")
+        return ("🛑 *PAUSA TOTAL ACTIVADA*\n\n"
+                "• Señales Premium: ⏸️ pausadas\n"
+                "• Scalper: ⏸️ pausado\n"
+                "• Ejecuciones MT5: ⏸️ pausadas\n\n"
+                "Las operaciones abiertas siguen activas.\n"
+                "Usa /reanudar para reactivar todo.")
+
+    # ▶️ /reanudar — Reactiva todo
+    if t in ("/reanudar", "/resume", "reanudar", "reanudar todo", "start trading"):
+        if not es_admin: return "⛔ Solo administradores pueden reanudar el bot."
+        mt5_pausado = False
+        escaneo_pausado = False
+        SCALPER_ACTIVO = True
+        guardar_estado()
+        log_sistema("▶️ TODO REACTIVADO desde Telegram")
+        return ("▶️ *TODO REACTIVADO*\n\n"
+                "• Señales Premium: ✅ activas\n"
+                "• Scalper: ✅ activo\n"
+                "• Ejecuciones MT5: ✅ activas\n\n"
+                "El bot vuelve a operar normalmente.")
+
     if t in ("/reiniciar", "reiniciar bot", "reiniciar proceso", "restart", "reboot"):
         if not es_admin: return "⛔ Solo administradores pueden reiniciar el proceso del bot."
         enviar_telegram("🔄 *Reiniciando proceso del bot...*", remitente)
@@ -8629,13 +8751,15 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     # /modo eliminado del chat público — se configura internamente
     # /capital eliminado del chat público — info privada del trader
 
-    if t in ("/pausar", "pausar", "/pause", "pause"):
+    # FIX 2026-03-19: /pausar y /reanudar duplicados eliminados — ya manejados arriba (línea 8549/8565)
+    # Solo dejamos los comandos granulares que NO están duplicados
+    if t in ("/pausar todo", "pausar todo", "/stop todo", "stop todo", "/pause all", "pause all"):
         if not es_admin: return "⛔ Solo administradores."
-        return cmd_pausar()
+        return cmd_pausar_todo()
 
-    if t in ("/reanudar", "reanudar", "/continuar", "continuar", "/play", "play"):
+    if t in ("/reanudar todo", "reanudar todo", "/play todo", "play todo", "/start todo", "start todo"):
         if not es_admin: return "⛔ Solo administradores."
-        return cmd_reanudar()
+        return cmd_reanudar_todo()
 
     # ── Scalper control ──
     if t in ("/pausar scalper", "pausar scalper", "/stop scalper", "stop scalper",
@@ -13101,6 +13225,12 @@ def analizar_activo(nombre, ticker):
             logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
             return
 
+        # 🔴 FILTRO DURO VOLUMEN: vol < 0.5x = mercado muerto, no operar
+        _vol_r = ind.get('vol_ratio', 1.0)
+        if _vol_r < 0.5:
+            logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.5x) — señal descartada")
+            return
+
         # [4] CONFIRMACIÓN INTER-MERCADO: +1 al score si el activo correlacionado confirma
         try:
             if _confirmar_inter_mercado(ticker, tipo):
@@ -13303,9 +13433,9 @@ def analizar_activo(nombre, ticker):
         peso_total = 0
         ml_prob = ind.get('ml_prob_alcista', 50.0)
         _ml_no_disponible = (ml_prob == 50.0)  # Sentinel: ML falló o no disponible
-        # ML: si no disponible, dar crédito completo (coherente con bypass en estrategias)
+        # ML: si no disponible, NO dar crédito (FIX 2026-03-19: inflaba confianza artificialmente)
         if _ml_no_disponible:
-            votos_favor += 25  # ML bypass = crédito completo
+            votos_favor += 0  # ML bypass = SIN crédito — señal debe valer por sí sola
         elif tipo == "COMPRA":
             if ml_prob > 52: votos_favor += 25
             elif ml_prob > 50: votos_favor += 12  # Crédito parcial
@@ -13338,8 +13468,8 @@ def analizar_activo(nombre, ticker):
         ind['cot_desc'] = cot_desc
         ind['sent_desc'] = sent_desc
         ind['confianza_multi_ia'] = confianza_total
-        # Umbral dinámico: Score 4-5 requiere 30%, Score 3 (Trend Following) requiere 10%
-        _min_conf = 10 if score <= 3 else 30
+        # Umbral dinámico: Score 4-5 requiere 50%, Score 3 (Trend Following) requiere 25%
+        _min_conf = 25 if score <= 3 else 50
         if confianza_total < _min_conf:
             print(f"MULTI-IA BLOQUEO: {nombre} {tipo} - confianza {confianza_total}% < {_min_conf}%")
             return
@@ -13368,7 +13498,8 @@ def analizar_activo(nombre, ticker):
             return
 
         # ⭐ SOLO SEÑALES PREMIUM — Breakout (score 4) + Reversión con divergencia (score 5)
-        _es_premium = (score >= 4 and confianza_total >= 30)
+        # FIX 2026-03-19: subido de 50% a 70% (con ML bypass en 0, solo pasan señales reales)
+        _es_premium = (score >= 4 and confianza_total >= 70)
         _nivel_senal = "PREMIUM"
 
         # 🔒 FILTRO PREMIUM: solo señales de alta calidad
@@ -13864,11 +13995,22 @@ def loop_vip_check():
                         _revocar_acceso_vip(uid)
                         continue
 
-                    # Aviso: 1 día para códigos, VIP_AVISO_DIAS (3) para trial/pagado
+                    # FIX 2026-03-19: Secuencia de avisos 7d→3d→1d (antes solo 1 aviso)
                     es_codigo = sub.get("tipo") == "codigo"
-                    dias_aviso = 1 if es_codigo else VIP_AVISO_DIAS
+                    _avisos_enviados = sub.get("avisos_enviados", [])  # Lista de días ya avisados
+                    # Migración: si tenía aviso_enviado=True antiguo, marcar como [3]
+                    if sub.get("aviso_enviado", False) and not _avisos_enviados:
+                        _avisos_enviados = [3]
 
-                    if dias_restantes <= dias_aviso and not sub.get("aviso_enviado", False):
+                    _secuencia_aviso = [1] if es_codigo else [7, 3, 1]
+                    _debe_avisar = False
+                    for _d in _secuencia_aviso:
+                        if dias_restantes <= _d and _d not in _avisos_enviados:
+                            _debe_avisar = True
+                            _avisos_enviados.append(_d)
+                            break
+
+                    if _debe_avisar:
                         logger.info(f"⚠️ Aviso VIP a {uid} ({dias_restantes}d) {'[CÓDIGO]' if es_codigo else ''}")
                         _enviar_aviso_vip(uid, dias_restantes)
 
@@ -13934,6 +14076,47 @@ def _actualizar_capital_desde_mt5():
         logger.warning(f"⚠️ Error actualizando capital: {e}")
 
 
+def _procesar_comandos_launcher():
+    """Lee y ejecuta comandos del launcher via .bot.cmd"""
+    global SCALPER_ACTIVO, escaneo_pausado, mt5_pausado
+    if not os.path.exists(_CMD_FILE):
+        return None
+    try:
+        with open(_CMD_FILE, "r", encoding="utf-8") as f:
+            cmd = f.read().strip()
+        os.remove(_CMD_FILE)
+        if not cmd:
+            return None
+        log_sistema(f"📩 Comando del launcher: {cmd}")
+        if cmd == "scalper_pause":
+            SCALPER_ACTIVO = False
+            guardar_estado()
+            print("🔪 Scalper PAUSADO por consola")
+        elif cmd == "scalper_resume":
+            SCALPER_ACTIVO = True
+            guardar_estado()
+            print("🔪 Scalper REANUDADO por consola")
+        elif cmd == "force_scan":
+            print("🔍 Escaneo inmediato solicitado por consola")
+            return "force_scan"
+        elif cmd == "pause_all":
+            mt5_pausado = True
+            escaneo_pausado = True
+            SCALPER_ACTIVO = False
+            guardar_estado()
+            print("🛑 PAUSA TOTAL por consola")
+        elif cmd == "resume_all":
+            mt5_pausado = False
+            escaneo_pausado = False
+            SCALPER_ACTIVO = True
+            guardar_estado()
+            print("▶️ TODO REACTIVADO por consola")
+        return cmd
+    except Exception as e:
+        logger.warning(f"Error procesando .bot.cmd: {e}")
+        return None
+
+
 def loop_escaneo():
     """Hilo dedicado al escaneo continuo de SEÑALES."""
     global ultimo_escaneo
@@ -13944,7 +14127,11 @@ def loop_escaneo():
     _errores_consecutivos = 0
 
     while True:
-        if not escaneo_pausado:
+        # 📩 Procesar comandos del launcher (scalper pause, force scan, etc.)
+        _launcher_cmd = _procesar_comandos_launcher()
+        _forzar_escaneo = (_launcher_cmd == "force_scan")
+
+        if not escaneo_pausado or _forzar_escaneo:
             try:
                 # 💰 ACTUALIZAR CAPITAL DESDE MT5 (cada ciclo = cada 3 min)
                 _actualizar_capital_desde_mt5()
@@ -14105,6 +14292,31 @@ def loop_polling():
     except Exception as e:
         print(f"⚠️ Error eliminando webhook: {e}")
 
+    # FIX 2026-03-19: Registrar comandos en BotFather para menú de usuario
+    try:
+        _cmds = [
+            {"command": "start", "description": "Iniciar el bot"},
+            {"command": "senales", "description": "Ver señales activas"},
+            {"command": "estado", "description": "Estado del bot y mercado"},
+            {"command": "resumen", "description": "Resumen del día"},
+            {"command": "noticias", "description": "Calendario económico"},
+            {"command": "tendencia", "description": "Tendencias del mercado"},
+            {"command": "precios", "description": "Precios en tiempo real"},
+            {"command": "analisis", "description": "Análisis técnico de un activo"},
+            {"command": "sentimiento", "description": "Fear & Greed index"},
+            {"command": "vip", "description": "Acceso VIP / Trial gratis"},
+            {"command": "web", "description": "Dashboard web"},
+            {"command": "ayuda", "description": "Lista de comandos"},
+        ]
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
+            json={"commands": _cmds},
+            timeout=10
+        )
+        print("✅ Comandos registrados en BotFather.")
+    except Exception as e:
+        print(f"⚠️ Error registrando comandos: {e}")
+
     while True:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
@@ -14126,9 +14338,24 @@ def loop_polling():
                         tipo_chat = chat.get("type", "private")
                         from_user = cb.get("from") or {}
                         user_id   = str(from_user.get("id", chat_id))
+                        # FIX 2026-03-19: Feedback contextual en vez de genérico "Procesando..."
+                        _cb_feedback = {
+                            "/activas": "📊 Cargando señales...",
+                            "/estado": "📈 Cargando estado...",
+                            "/resumen": "📋 Generando resumen...",
+                            "/precios": "💰 Consultando precios...",
+                            "/noticias": "📰 Cargando noticias...",
+                            "/semana": "📊 Calculando semana...",
+                            "/horarios": "🕐 Cargando horarios...",
+                            "/vip": "👑 Abriendo VIP...",
+                            "vip_trial_gratis": "🎁 Preparando trial...",
+                            "vip_pagar_usdt": "💰 Cargando pago...",
+                            "vip_trial_confirmar": "✅ Activando trial...",
+                            "vip_pagar_confirmar": "💳 Procesando pago...",
+                        }.get(texto, "⏳ Procesando...")
                         try:
                             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery",
-                                          json={"callback_query_id": cb_id, "text": "Procesando..."}, timeout=10)
+                                          json={"callback_query_id": cb_id, "text": _cb_feedback}, timeout=10)
                         except Exception: pass
                         log_usuario(f"🔘 CALLBACK [{tipo_chat}] user={user_id} chat={chat_id}: {texto}")
                         print(f"🔘 Callback [{tipo_chat}] user={user_id} chat={chat_id}: {texto}")
@@ -15113,10 +15340,12 @@ def _circuit_breaker_check():
         _cb_hasta = _mañana.timestamp()
         msg_cb = f"🚨 *CIRCUIT BREAKER ACTIVADO*\n📉 P&L diario: ${_cb_pnl_diario:+.2f} (>{3}% de ${capital:.0f})\n⏰ Trading pausado hasta mañana"
         logger.warning(msg_cb)
-        try:
-            enviar_telegram(msg_cb, destino=CHANNEL_ID)
-        except Exception:
-            pass
+        # FIX 2026-03-19: alertas solo al admin, NO al canal VIP
+        for _admin_id in ADMIN_IDS:
+            try:
+                enviar_telegram(msg_cb, destino=_admin_id)
+            except Exception:
+                pass
         return True
 
     # Check 2: Pérdidas consecutivas
@@ -15125,10 +15354,12 @@ def _circuit_breaker_check():
         _cb_hasta = time.time() + 7200  # 2 horas
         msg_cb = f"🚨 *CIRCUIT BREAKER ACTIVADO*\n📉 {_cb_perdidas_consecutivas} pérdidas consecutivas\n⏰ Trading pausado 2 horas"
         logger.warning(msg_cb)
-        try:
-            enviar_telegram(msg_cb, destino=CHANNEL_ID)
-        except Exception:
-            pass
+        # FIX 2026-03-19: alertas solo al admin, NO al canal VIP
+        for _admin_id in ADMIN_IDS:
+            try:
+                enviar_telegram(msg_cb, destino=_admin_id)
+            except Exception:
+                pass
         return True
 
     return False
@@ -15551,6 +15782,12 @@ def _scalper_calcular_indicadores(df):
         adx_df = ta.adx(high, low, close, length=10)
         atr = ta.atr(high, low, close, length=14)
 
+        # Volumen: ratio vs SMA(20)
+        vol = pd.Series(df['Volume'].values, dtype=float)
+        vol_sma = ta.sma(vol, length=20)
+        _last_vol_sma = float(vol_sma.iloc[-1]) if vol_sma is not None and len(vol_sma) > 0 and not pd.isna(vol_sma.iloc[-1]) else 0
+        vol_ratio = float(vol.iloc[-1]) / _last_vol_sma if _last_vol_sma > 0 else 1.0
+
         if rsi is None or bb is None or ema50 is None:
             return None
 
@@ -15581,6 +15818,7 @@ def _scalper_calcular_indicadores(df):
             "fib_764": fib_764,
             "fib_high": fib_high,
             "fib_low": fib_low,
+            "vol_ratio": vol_ratio,
         }
     except Exception as e:
         logger.warning(f"⚠️ Scalper: Error calculando indicadores: {e}")
@@ -15623,6 +15861,11 @@ def _scalper_evaluar_senal(ind, config):
     if ind['atr'] <= 0:
         return None, "ATR=0"
 
+    # 🔴 Filtro volumen: mercado muerto = no scalp
+    _svol = ind.get('vol_ratio', 1.0)
+    if _svol < 0.5:
+        return None, f"Vol={_svol:.1f}x bajo (mín 0.5x)"
+
     bb_lo = ind['bb_lo']
     bb_up = ind['bb_up']
     bb_mid = (bb_lo + bb_up) / 2
@@ -15632,14 +15875,16 @@ def _scalper_evaluar_senal(ind, config):
 
     # ── Variante A: BB touch + RSI en zona extrema (principal) ──
     # BUY
-    if (low <= bb_lo and rsi < 38 and 10 <= adx <= 40):
+    # FIX 2026-03-19: RSI 38→30 para entradas más extremas y confiables
+    if (low <= bb_lo and rsi < 30 and 10 <= adx <= 40):
         # Bloquear GOLD BUY (backtest: -83 pips, 36.4% WR)
         if 'XAUUSD' in symbol or 'GC' in symbol:
             return None, "Gold BUY bloqueado (backtest negativo)"
         return "BUY", f"BB+RSI-A Buy | RSI={rsi:.0f} | ADX={adx:.0f}"
 
     # SELL
-    if (high >= bb_up and rsi > 62 and 10 <= adx <= 40):
+    # FIX 2026-03-19: RSI 62→70 para entradas más extremas y confiables
+    if (high >= bb_up and rsi > 70 and 10 <= adx <= 40):
         # Bloquear NASDAQ SELL (backtest: -393 pips, 23.9% WR)
         if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
             return None, "NASDAQ SELL bloqueado (backtest negativo)"
@@ -15953,6 +16198,9 @@ def loop_scalper():
 
     while True:
         try:
+            # 📩 Procesar comandos del launcher (si el scanner no los atrapo primero)
+            _procesar_comandos_launcher()
+
             if not SCALPER_ACTIVO or not MT5_AVAILABLE or not AUTO_TRADING:
                 time.sleep(SCALPER_INTERVALO)
                 continue
