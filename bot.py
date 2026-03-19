@@ -2746,9 +2746,26 @@ def evaluar_senal_profesional(ind, ticker=""):
     if ind['atr'] < min_atr:
         return None, 0, [f"⚠️ Volatilidad insuficiente (ATR {ind['atr']:.5g} < {min_atr}). Mercado dormido."]
 
-    # FIX 2026-03-19: ORO COMPRA solo si RSI < 45 (backtest: +2831 pips vs +1088 original)
-    # Esto se aplica GLOBALMENTE a todas las estrategias COMPRA de ORO
-    _oro_bloquear_compra = (ticker == "GC=F" and ind['rsi'] >= 45)
+    # FIX 2026-03-19: Filtros RSI por activo basados en backtest 30 días
+    # Gate function — verifica si la señal pasa el filtro del activo
+    def _filtro_activo_ok(direccion):
+        """Retorna (ok, razon) — si ok=False, la señal se bloquea."""
+        rsi_v = ind['rsi']
+        adx_v = ind['adx']
+        if ticker == "GC=F":  # ORO: COMPRA solo si RSI < 45
+            if direccion == "COMPRA" and rsi_v >= 45:
+                return False, f"🟡 ORO COMPRA bloqueada: RSI {rsi_v:.0f} >= 45 (solo compra sobrevendido)"
+        elif ticker == "USDJPY=X":  # USD/JPY: RSI filtrado (+297 vs +104 pips)
+            if direccion == "COMPRA" and rsi_v >= 50:
+                return False, f"🟡 USD/JPY COMPRA bloqueada: RSI {rsi_v:.0f} >= 50"
+            if direccion == "VENTA" and rsi_v <= 50:
+                return False, f"🟡 USD/JPY VENTA bloqueada: RSI {rsi_v:.0f} <= 50"
+        elif ticker == "GBPJPY=X":  # GBP/JPY: RSI + ADX>25 (+162 vs -551 pips)
+            if direccion == "COMPRA" and (rsi_v >= 50 or adx_v < 25):
+                return False, f"🟡 GBP/JPY COMPRA bloqueada: RSI {rsi_v:.0f} ADX {adx_v:.0f} (necesita RSI<50 + ADX>25)"
+            if direccion == "VENTA" and (rsi_v <= 50 or adx_v < 25):
+                return False, f"🟡 GBP/JPY VENTA bloqueada: RSI {rsi_v:.0f} ADX {adx_v:.0f} (necesita RSI>50 + ADX>25)"
+        return True, ""
 
     # ── HELPER: verificar el cuerpo de la vela ──
     open_p = ind.get('open', ind['precio'])
@@ -2800,8 +2817,9 @@ def evaluar_senal_profesional(ind, ticker=""):
             ]
             if _eurusd_solo_score5:
                 return None, 0, ["📉 EUR/USD filtrado: Pullback es score 4, requiere score 5"]
-            if _oro_bloquear_compra:
-                return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45 (solo compra si sobrevendido)"]
+            _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
+            if not _filt_ok:
+                return None, 0, [_filt_msg]
             return "COMPRA", 4, razones
 
         # ── Pullback Bajista Premium ──
@@ -2825,6 +2843,9 @@ def evaluar_senal_profesional(ind, ticker=""):
             ]
             if _eurusd_solo_score5:
                 return None, 0, ["📉 EUR/USD filtrado: Pullback es score 4, requiere score 5"]
+            _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
+            if not _filt_ok:
+                return None, 0, [_filt_msg]
             return "VENTA", 4, razones
 
     # ━━━━━━━━━━
@@ -2856,8 +2877,9 @@ def evaluar_senal_profesional(ind, ticker=""):
                 _ml_tag
             ]
             # EUR/USD: Breakout PERMITIDO (buena estrategia para todos los activos)
-            if _oro_bloquear_compra:
-                return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
+            _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
+            if not _filt_ok:
+                return None, 0, [_filt_msg]
             return "COMPRA", 4, razones
 
         # Ruptura Bajista
@@ -2876,6 +2898,9 @@ def evaluar_senal_profesional(ind, ticker=""):
                 _ml_tag
             ]
             # EUR/USD: Breakout PERMITIDO (buena estrategia para todos los activos)
+            _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
+            if not _filt_ok:
+                return None, 0, [_filt_msg]
             return "VENTA", 4, razones
 
     # ━━━━━━━━━━
@@ -2922,8 +2947,9 @@ def evaluar_senal_profesional(ind, ticker=""):
             _ml_tag
         ]
         if cercania_soporte: razones.append("✓ Reacción en zona de Soporte clave")
-        if _oro_bloquear_compra:
-            return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
+        _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
+        if not _filt_ok:
+            return None, 0, [_filt_msg]
         return "COMPRA", 5, razones
     # Reversión Score 4 alcista — SOLO para ORO, USD/JPY, GBP/JPY
     # Backtest original: ORO 51.9% WR, USD/JPY 40.8% WR con reversiones
@@ -2937,8 +2963,9 @@ def evaluar_senal_profesional(ind, ticker=""):
             _ml_tag
         ]
         if cercania_soporte: razones.append("✓ Reacción en zona de Soporte clave")
-        if _oro_bloquear_compra:
-            return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
+        _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
+        if not _filt_ok:
+            return None, 0, [_filt_msg]
         return "COMPRA", 4, razones
 
     # Reversión Bajista (Score 5 si hay divergencia, Score 4 si RSI+R+ML)
@@ -2969,6 +2996,9 @@ def evaluar_senal_profesional(ind, ticker=""):
             _ml_tag
         ]
         if cercania_resistencia: razones.append("✓ Rechazo en zona de Resistencia clave")
+        _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
+        if not _filt_ok:
+            return None, 0, [_filt_msg]
         return "VENTA", 5, razones
     # Reversión Score 4 bajista — SOLO para ORO, USD/JPY, GBP/JPY
     if conf_bajista_extra and _rev4_permitido:
@@ -2980,6 +3010,9 @@ def evaluar_senal_profesional(ind, ticker=""):
             _ml_tag
         ]
         if cercania_resistencia: razones.append("✓ Rechazo en zona de Resistencia clave")
+        _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
+        if not _filt_ok:
+            return None, 0, [_filt_msg]
         return "VENTA", 4, razones
 
     # ━━━━━━━━━━
@@ -3019,8 +3052,9 @@ def evaluar_senal_profesional(ind, ticker=""):
                 f"✓ RSI en zona sana ({ind['rsi']:.1f})",
                 _ml_tag
             ]
-            if _oro_bloquear_compra:
-                return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
+            _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
+            if not _filt_ok:
+                return None, 0, [_filt_msg]
             return "COMPRA", 4, razones
 
         # Breakout Bajista: precio cierra DEBAJO del mínimo asiático
@@ -3040,6 +3074,9 @@ def evaluar_senal_profesional(ind, ticker=""):
                 f"✓ RSI en zona sana ({ind['rsi']:.1f})",
                 _ml_tag
             ]
+            _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
+            if not _filt_ok:
+                return None, 0, [_filt_msg]
             return "VENTA", 4, razones
 
     # Sin confirmaciones suficientes
@@ -3094,36 +3131,36 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
         tp2_mult = 1.1             # $22 TP2
         tp3_mult = 1.6             # $32 TP3
         ze_mult  = 0.2
-    elif ticker == "NQ=F":         # NASDAQ
-        sl_mult  = 1.2
-        tp1_mult = 2.0             # R:R 1.67
-        tp2_mult = 2.8             # (era 3.5)
-        tp3_mult = 3.8             # (era 5.5)
-        ze_mult  = 0.3
-    elif ticker == "ES=F":         # S&P500
-        sl_mult  = 1.5
-        tp1_mult = 2.2             # R:R 1.47:1
-        tp2_mult = 2.8
-        tp3_mult = 3.8
-        ze_mult  = 0.4
-    elif ticker == "USDJPY=X":     # USD/JPY — ATR ~19 pips
+    elif ticker == "NQ=F":         # NASDAQ — FIX 2026-03-19: SL ajustado, TP amplio (backtest +1526 pips)
+        sl_mult  = 0.7             # SL corto (era 1.2) — cortar perdidas rapido
+        tp1_mult = 2.2             # TP1 amplio (era 2.0) → R:R 3.1:1
+        tp2_mult = 3.0             # TP2
+        tp3_mult = 4.0             # TP3
+        ze_mult  = 0.2
+    elif ticker == "ES=F":         # S&P500 — FIX 2026-03-19: SL ajustado, TP amplio (backtest +1011 pips)
+        sl_mult  = 0.7             # SL corto (era 1.5) — cortar perdidas rapido
+        tp1_mult = 2.2             # TP1 amplio → R:R 3.1:1
+        tp2_mult = 3.0
+        tp3_mult = 4.0
+        ze_mult  = 0.2
+    elif ticker == "USDJPY=X":     # USD/JPY — ATR ~19 pips (SL/TP sin cambio, filtro RSI en señales)
         sl_mult  = 1.0             # SL ~19 pips
         tp1_mult = 1.4             # TP1 ~27 pips → R:R 1.40:1
         tp2_mult = 2.0             # TP2 ~38 pips
         tp3_mult = 2.8             # TP3 ~53 pips
         ze_mult  = 0.3
-    elif ticker == "GBPJPY=X":    # GBP/JPY — ATR ~22 pips
+    elif ticker == "GBPJPY=X":    # GBP/JPY — ATR ~22 pips (SL/TP sin cambio, filtro RSI+ADX en señales)
         sl_mult  = 1.0             # SL ~22 pips
         tp1_mult = 1.4             # TP1 ~31 pips → R:R 1.40:1
         tp2_mult = 2.0             # TP2 ~44 pips
         tp3_mult = 2.8             # TP3 ~62 pips
         ze_mult  = 0.3
-    elif cat == "forex":           # EUR/USD y otros
-        sl_mult  = 1.5
-        tp1_mult = 2.1             # R:R 1.40:1
-        tp2_mult = 2.5
-        tp3_mult = 3.2
-        ze_mult  = 0.3
+    elif cat == "forex":           # EUR/USD — FIX 2026-03-19: SL ajustado, TP amplio (backtest +292 pips)
+        sl_mult  = 0.8             # SL corto (era 1.5) — cortar perdidas rapido
+        tp1_mult = 2.5             # TP1 amplio (era 2.1) → R:R 3.1:1
+        tp2_mult = 3.2
+        tp3_mult = 4.0
+        ze_mult  = 0.2
     else:                          # Fallback
         sl_mult  = 1.8
         tp1_mult = 2.0
