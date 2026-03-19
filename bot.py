@@ -2586,9 +2586,10 @@ def calcular_indicadores_profesionales(df, precio, ticker=""):
             # 🛡️ DETECCIÓN DE RÉGIMEN DE MERCADO (Brain v2.5)
             # RANGO: ADX < 20
             # TENDENCIA: ADX > 25
-            # VOLATILIDAD: BB width > 2% o ADX explosivo
+            # VOLATILIDAD: BB width > umbral (ORO=5% porque es naturalmente volátil, resto=2.5%)
+            # FIX 2026-03-19: ORO siempre salía VOLATILIDAD con 2.5% — su rango normal es ~3-4%
             "regimen": (
-                "VOLATILIDAD" if (float(get_col(bb, 'BBU').iloc[-1] - get_col(bb, 'BBL').iloc[-1]) / precio * 100 > 2.5) else
+                "VOLATILIDAD" if (float(get_col(bb, 'BBU').iloc[-1] - get_col(bb, 'BBL').iloc[-1]) / precio * 100 > (5.0 if ticker in ("GC=F", "XAUUSD") else 2.5)) else
                 "TENDENCIA" if float(get_col(adx_df, 'ADX_').iloc[-1]) > 25 else
                 "RANGO" if float(get_col(adx_df, 'ADX_').iloc[-1]) < 20 else
                 "TRANSICIÓN"
@@ -2657,8 +2658,10 @@ def evaluar_senal_profesional(ind, ticker=""):
         return None, 0, [f"⚠️ Transición extrema (ADX {adx_val:.1f}<15)"]
 
     # Bloqueo de Volatilidad Extrema: Evita 'muertes por látigo'
-    if regimen == "VOLATILIDAD" and ind.get('vol_ratio', 1) < 1.0:
-        return None, 0, ["⚠️ Volatilidad extrema detectada sin volumen institucional de apoyo. Alto riesgo."]
+    # FIX 2026-03-19: ORO usa 0.5x (igual que filtro general), resto 1.0x
+    _vol_min_extrema = 0.5 if ticker in ("GC=F", "XAUUSD") else 1.0
+    if regimen == "VOLATILIDAD" and ind.get('vol_ratio', 1) < _vol_min_extrema:
+        return None, 0, [f"⚠️ Volatilidad extrema sin volumen institucional (vol={ind.get('vol_ratio',0):.1f}x < {_vol_min_extrema}x)"]
 
     # FIX 4: Filtro RANGO — solo bloquea en rango MUY débil (ADX < 12) sin RSI extremo
     if regimen == "RANGO":
