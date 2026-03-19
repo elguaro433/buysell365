@@ -3525,11 +3525,20 @@ class ManagementConsole:
 
     def _cmd_restart_bot(self):
         self._btn_restart.config(text="Reiniciando...", state="disabled", bg=TEXT_SEC)
+        self._restart_pending = True
         def do_restart():
             self.bot.restart()
-            self.root.after(3000, lambda: self._btn_restart.config(
-                text="Reiniciar", state="normal", bg=WARN))
+            self._restart_pending = False
         threading.Thread(target=do_restart, daemon=True).start()
+        self._check_restart_done()
+
+    def _check_restart_done(self):
+        """Poll desde el hilo principal hasta que restart termine."""
+        if getattr(self, '_restart_pending', False):
+            self.root.after(500, self._check_restart_done)
+        else:
+            self._btn_restart.config(text="Reiniciar", state="normal", bg=WARN)
+            _log("Bot reiniciado correctamente")
 
     def _toggle_autostart(self):
         self.config["autostart_bot"] = self._autostart_var.get()
