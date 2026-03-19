@@ -629,6 +629,8 @@ class ManagementConsole:
         self._equity_history = []  # list of (timestamp, capital) for equity curve
         self._scalper_paused = False
         self._tab_flash_state = {}  # tab_name -> bool for flashing
+        self._update_loop_active = True
+        self._closing = False
 
         # Build root window
         self.root = tk.Tk()
@@ -824,16 +826,41 @@ class ManagementConsole:
     #  CLOSE HANDLER
     # --------------------------------------------------------
     def _on_close(self):
-        if self.bot.is_running:
-            if messagebox.askyesno("Salir",
-                                   "El bot esta ejecutandose. Deseas detenerlo antes de salir?"):
-                self.bot.stop()
-        if self._tray_icon:
-            try:
+        # Evitar múltiples llamadas
+        if getattr(self, '_closing', False):
+            return
+        self._closing = True
+
+        # Detener el update loop inmediatamente
+        self._update_loop_active = False
+
+        try:
+            if self.bot.is_running:
+                resp = messagebox.askyesnocancel(
+                    "Salir",
+                    "El bot esta ejecutandose.\n\n"
+                    "SI = Detener bot y salir\n"
+                    "NO = Salir sin detener (bot sigue en background)\n"
+                    "CANCELAR = No salir")
+                if resp is None:  # Cancelar
+                    self._closing = False
+                    self._update_loop_active = True
+                    return
+                if resp:  # Si = detener bot
+                    self.bot.stop()
+        except Exception:
+            pass
+
+        try:
+            if self._tray_icon:
                 self._tray_icon.stop()
-            except Exception:
-                pass
-        self.root.destroy()
+        except Exception:
+            pass
+
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
 
     # --------------------------------------------------------
     #  ESTADO CACHE
@@ -3546,6 +3573,9 @@ class ManagementConsole:
     #  UPDATE LOOP
     # ============================================================
     def _update_loop(self):
+        # No seguir si se está cerrando
+        if not getattr(self, '_update_loop_active', True):
+            return
         try:
             self._tick_count = getattr(self, '_tick_count', 0) + 1
 
