@@ -2746,6 +2746,10 @@ def evaluar_senal_profesional(ind, ticker=""):
     if ind['atr'] < min_atr:
         return None, 0, [f"⚠️ Volatilidad insuficiente (ATR {ind['atr']:.5g} < {min_atr}). Mercado dormido."]
 
+    # FIX 2026-03-19: ORO COMPRA solo si RSI < 45 (backtest: +2831 pips vs +1088 original)
+    # Esto se aplica GLOBALMENTE a todas las estrategias COMPRA de ORO
+    _oro_bloquear_compra = (ticker == "GC=F" and ind['rsi'] >= 45)
+
     # ── HELPER: verificar el cuerpo de la vela ──
     open_p = ind.get('open', ind['precio'])
     cuerpo_pct = abs(open_p - ind['precio']) / max(ind['atr'], 1e-10)
@@ -2796,6 +2800,8 @@ def evaluar_senal_profesional(ind, ticker=""):
             ]
             if _eurusd_solo_score5:
                 return None, 0, ["📉 EUR/USD filtrado: Pullback es score 4, requiere score 5"]
+            if _oro_bloquear_compra:
+                return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45 (solo compra si sobrevendido)"]
             return "COMPRA", 4, razones
 
         # ── Pullback Bajista Premium ──
@@ -2850,6 +2856,8 @@ def evaluar_senal_profesional(ind, ticker=""):
                 _ml_tag
             ]
             # EUR/USD: Breakout PERMITIDO (buena estrategia para todos los activos)
+            if _oro_bloquear_compra:
+                return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
             return "COMPRA", 4, razones
 
         # Ruptura Bajista
@@ -2914,6 +2922,8 @@ def evaluar_senal_profesional(ind, ticker=""):
             _ml_tag
         ]
         if cercania_soporte: razones.append("✓ Reacción en zona de Soporte clave")
+        if _oro_bloquear_compra:
+            return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
         return "COMPRA", 5, razones
     # Reversión Score 4 alcista — SOLO para ORO, USD/JPY, GBP/JPY
     # Backtest original: ORO 51.9% WR, USD/JPY 40.8% WR con reversiones
@@ -2927,6 +2937,8 @@ def evaluar_senal_profesional(ind, ticker=""):
             _ml_tag
         ]
         if cercania_soporte: razones.append("✓ Reacción en zona de Soporte clave")
+        if _oro_bloquear_compra:
+            return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
         return "COMPRA", 4, razones
 
     # Reversión Bajista (Score 5 si hay divergencia, Score 4 si RSI+R+ML)
@@ -3007,6 +3019,8 @@ def evaluar_senal_profesional(ind, ticker=""):
                 f"✓ RSI en zona sana ({ind['rsi']:.1f})",
                 _ml_tag
             ]
+            if _oro_bloquear_compra:
+                return None, 0, [f"🟡 ORO COMPRA bloqueada: RSI {ind['rsi']:.0f} >= 45"]
             return "COMPRA", 4, razones
 
         # Breakout Bajista: precio cierra DEBAJO del mínimo asiático
