@@ -689,6 +689,8 @@ def guardar_estado():
                 "scalper_activo": SCALPER_ACTIVO,
                 # H-07 FIX: Persistir cooldowns de cierres (keys son tuples → convertir a strings)
                 "_cooldown_cierres": {f"{k[0]}|{k[1]}": v for k, v in _cooldown_cierres.items()},
+                # FIX 2026-03-19: Diagnóstico por activo para consola
+                "diagnostico_activos": dict(_diagnostico_activos),
             })
         
         # H-04 FIX: Crear backup del estado actual antes de sobreescribir
@@ -3035,6 +3037,20 @@ def evaluar_senal_profesional(ind, ticker=""):
     _diag.append(f"P{'>' if ind['precio']>ind['ema50'] else '<'}EMA50")
     _diag.append(f"Vol={ind.get('vol_ratio',0):.1f}x")
     logger.info(f"📋 DIAGNÓSTICO {ticker}: {' | '.join(_diag)}")
+
+    # FIX 2026-03-19: Guardar diagnóstico para la consola
+    _diagnostico_activos[ticker] = {
+        "adx": round(ind['adx'], 1),
+        "rsi": round(ind['rsi'], 1),
+        "vol": round(ind.get('vol_ratio', 0), 1),
+        "ema20": round(ind.get('ema20', 0), 5),
+        "ema50": round(ind.get('ema50', 0), 5),
+        "ema_bull": ind['ema20'] > ind['ema50'],
+        "macd_bull": ind['macd'] > ind['signal'],
+        "precio": round(ind.get('precio', 0), 5),
+        "spread": round(ind.get('spread_puntos', 0), 1),
+        "ts": time.time(),
+    }
 
     return None, 0, [f"📋 {' | '.join(_diag)}"]
 
@@ -15101,6 +15117,9 @@ _lock_scalper = threading.Lock()
 # ── [3] TRACKING POR ESTRATEGIA CON AUTO-PAUSA ──
 _stats_por_estrategia: dict = {}  # {estrategia: {"wins": 0, "losses": 0, "pips": 0.0, "ultimo_trade": 0}}
 _estrategia_pausada_hasta: dict = {}  # {estrategia: timestamp_reactivación}
+
+# ── DIAGNÓSTICO POR ACTIVO (para consola launcher) ──
+_diagnostico_activos: dict = {}  # ticker -> {adx, rsi, vol, ema_bull, macd_bull, precio, spread, ts}
 
 # ── [5] CIRCUIT BREAKER GLOBAL ──
 _cb_pnl_diario: float = 0.0

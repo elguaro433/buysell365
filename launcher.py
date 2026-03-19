@@ -1874,19 +1874,20 @@ class ManagementConsole:
         card = tk.Frame(parent, bg=BG_PANEL, padx=12, pady=10,
                         highlightthickness=1, highlightbackground="#30363d")
 
+        # Titulo con nombre del activo
         title = tk.Label(card, text=asset_name, bg=BG_PANEL, fg=ACCENT,
                          font=("Segoe UI", 13, "bold"), anchor="w")
         title.pack(fill="x")
 
-        price_lbl = tk.Label(card, text="Ultimo: --", bg=BG_PANEL, fg=TEXT,
+        # Precio
+        price_lbl = tk.Label(card, text="Precio: --", bg=BG_PANEL, fg=TEXT,
                              font=("Segoe UI", 10), anchor="w")
         price_lbl.pack(fill="x", pady=(2, 4))
 
         # Bullish/Bearish bar
-        bar_frame = tk.Frame(card, bg=BG_PANEL, height=18)
+        bar_frame = tk.Frame(card, bg=BG_PANEL, height=14)
         bar_frame.pack(fill="x", pady=2)
         bar_frame.pack_propagate(False)
-
         bull_bar = tk.Frame(bar_frame, bg=WIN_COLOR, width=1)
         bull_bar.place(relx=0, rely=0, relwidth=0.5, relheight=1.0)
         bear_bar = tk.Frame(bar_frame, bg=LOSS_COLOR, width=1)
@@ -1895,16 +1896,48 @@ class ManagementConsole:
         pct_frame = tk.Frame(card, bg=BG_PANEL)
         pct_frame.pack(fill="x")
         bull_pct = tk.Label(pct_frame, text="Alcista: --%", bg=BG_PANEL, fg=WIN_COLOR,
-                            font=("Segoe UI", 9), anchor="w")
+                            font=("Segoe UI", 8), anchor="w")
         bull_pct.pack(side="left")
         bear_pct = tk.Label(pct_frame, text="Bajista: --%", bg=BG_PANEL, fg=LOSS_COLOR,
-                            font=("Segoe UI", 9), anchor="e")
+                            font=("Segoe UI", 8), anchor="e")
         bear_pct.pack(side="right")
 
+        # Separador
+        tk.Frame(card, bg="#30363d", height=1).pack(fill="x", pady=4)
+
+        # Indicadores grid: RSI | ADX | Vol | Spread
+        ind_frame = tk.Frame(card, bg=BG_PANEL)
+        ind_frame.pack(fill="x")
+        ind_frame.columnconfigure(0, weight=1)
+        ind_frame.columnconfigure(1, weight=1)
+
+        rsi_lbl = tk.Label(ind_frame, text="RSI: --", bg=BG_PANEL, fg=TEXT_SEC,
+                           font=("Segoe UI", 9, "bold"), anchor="w")
+        rsi_lbl.grid(row=0, column=0, sticky="w", pady=1)
+
+        adx_lbl = tk.Label(ind_frame, text="ADX: --", bg=BG_PANEL, fg=TEXT_SEC,
+                           font=("Segoe UI", 9, "bold"), anchor="w")
+        adx_lbl.grid(row=0, column=1, sticky="w", pady=1)
+
+        vol_lbl = tk.Label(ind_frame, text="Vol: --", bg=BG_PANEL, fg=TEXT_SEC,
+                           font=("Segoe UI", 9, "bold"), anchor="w")
+        vol_lbl.grid(row=1, column=0, sticky="w", pady=1)
+
+        spread_lbl = tk.Label(ind_frame, text="Spread: --", bg=BG_PANEL, fg=TEXT_SEC,
+                              font=("Segoe UI", 9, "bold"), anchor="w")
+        spread_lbl.grid(row=1, column=1, sticky="w", pady=1)
+
+        # EMA y MACD
+        ema_lbl = tk.Label(card, text="EMA20/50: -- | MACD: --", bg=BG_PANEL, fg=TEXT_SEC,
+                           font=("Segoe UI", 8), anchor="w")
+        ema_lbl.pack(fill="x", pady=(2, 0))
+
+        # Tendencia
         trend_lbl = tk.Label(card, text="Tendencia: --", bg=BG_PANEL, fg=TEXT_SEC,
-                             font=("Segoe UI", 10), anchor="w")
+                             font=("Segoe UI", 10, "bold"), anchor="w")
         trend_lbl.pack(fill="x", pady=(4, 2))
 
+        # Señal activa
         signal_lbl = tk.Label(card, text="Sin senal activa", bg=BG_PANEL, fg=TEXT_SEC,
                               font=("Segoe UI", 9), anchor="w")
         signal_lbl.pack(fill="x")
@@ -1915,6 +1948,11 @@ class ManagementConsole:
             "bear_bar": bear_bar,
             "bull_pct": bull_pct,
             "bear_pct": bear_pct,
+            "rsi": rsi_lbl,
+            "adx": adx_lbl,
+            "vol": vol_lbl,
+            "spread": spread_lbl,
+            "ema": ema_lbl,
             "trend": trend_lbl,
             "signal": signal_lbl,
         }
@@ -3877,85 +3915,120 @@ class ManagementConsole:
         estado = self._get_estado()
         ops_activas = estado.get("operaciones_activas", {})
         historial = estado.get("historial_operaciones", [])
+        diagnosticos = estado.get("diagnostico_activos", {})
 
         self._last_analisis_time = datetime.now().strftime("%H:%M:%S")
         self._analisis_time_lbl.config(text=f"Ultima actualizacion: {self._last_analisis_time}")
 
-        # Build per-asset analysis from recent history
         for asset_name, widgets in self._analisis_cards.items():
-            # Gather ops for this asset
-            asset_ops = []
-            for op in historial:
-                if _normalize_asset(op.get("nombre", "")) == asset_name:
-                    asset_ops.append(op)
-                elif _normalize_asset(op.get("ticker", "")) == asset_name:
-                    asset_ops.append(op)
+            # Find ticker for this asset
+            ticker = _ASSET_TICKERS.get(asset_name, "")
+            diag = diagnosticos.get(ticker, {})
 
-            recent = asset_ops[-20:] if len(asset_ops) > 20 else asset_ops
+            # === INDICADORES EN TIEMPO REAL desde diagnóstico ===
+            if diag:
+                _rsi = diag.get("rsi", 0)
+                _adx = diag.get("adx", 0)
+                _vol = diag.get("vol", 0)
+                _spread = diag.get("spread", 0)
+                _ema_bull = diag.get("ema_bull", False)
+                _macd_bull = diag.get("macd_bull", False)
+                _precio = diag.get("precio", 0)
 
-            if not recent:
-                widgets["price"].config(text="Ultimo: --")
-                widgets["bull_pct"].config(text="Alcista: --%")
-                widgets["bear_pct"].config(text="Bajista: --%")
+                # Precio
+                if asset_name in ("EUR/USD", "GBP/JPY", "USD/JPY"):
+                    widgets["price"].config(text=f"Precio: {_precio:.5f}")
+                else:
+                    widgets["price"].config(text=f"Precio: {_precio:,.2f}")
+
+                # RSI con color
+                if _rsi > 70:
+                    rsi_clr = ERR  # Sobrecomprado
+                    rsi_tag = " \u2191OB"
+                elif _rsi < 30:
+                    rsi_clr = WIN_COLOR  # Sobrevendido
+                    rsi_tag = " \u2193OS"
+                elif _rsi > 50:
+                    rsi_clr = WIN_COLOR
+                    rsi_tag = ""
+                else:
+                    rsi_clr = ERR
+                    rsi_tag = ""
+                widgets["rsi"].config(text=f"RSI: {_rsi:.0f}{rsi_tag}", fg=rsi_clr)
+
+                # ADX con fuerza
+                if _adx >= 25:
+                    adx_clr = WIN_COLOR
+                    adx_tag = " \u2705"
+                elif _adx >= 20:
+                    adx_clr = WARN
+                    adx_tag = " ~"
+                else:
+                    adx_clr = ERR
+                    adx_tag = " \u274C"
+                widgets["adx"].config(text=f"ADX: {_adx:.0f}{adx_tag}", fg=adx_clr)
+
+                # Volumen
+                if _vol >= 0.5:
+                    vol_clr = WIN_COLOR
+                elif _vol >= 0.3:
+                    vol_clr = WARN
+                else:
+                    vol_clr = ERR
+                widgets["vol"].config(text=f"Vol: {_vol:.1f}x", fg=vol_clr)
+
+                # Spread
+                widgets["spread"].config(text=f"Spread: {_spread:.0f}",
+                                          fg=WIN_COLOR if _spread < 30 else (WARN if _spread < 50 else ERR))
+
+                # EMA y MACD
+                ema_txt = "\u2705 EMA20>50" if _ema_bull else "\u274C EMA20<50"
+                macd_txt = "\u2705 MACD>Sig" if _macd_bull else "\u274C MACD<Sig"
+                ema_clr = WIN_COLOR if (_ema_bull and _macd_bull) else (WARN if (_ema_bull or _macd_bull) else ERR)
+                widgets["ema"].config(text=f"{ema_txt} | {macd_txt}", fg=ema_clr)
+
+                # Tendencia basada en indicadores reales
+                _bull_count = sum([_ema_bull, _macd_bull, _rsi > 50, _adx >= 20])
+                if _bull_count >= 3:
+                    trend_text = "\u2B06 ALCISTA"
+                    trend_color = WIN_COLOR
+                elif _bull_count <= 1:
+                    trend_text = "\u2B07 BAJISTA"
+                    trend_color = ERR
+                else:
+                    trend_text = "\u2194 LATERAL"
+                    trend_color = WARN
+                widgets["trend"].config(text=f"Tendencia: {trend_text}", fg=trend_color)
+
+                # Barra alcista/bajista basada en indicadores
+                bull_pct = _bull_count / 4 * 100
+                bear_pct = 100 - bull_pct
+                bull_ratio = max(0.05, bull_pct / 100)
+                bear_ratio = max(0.05, 1 - bull_ratio)
+                widgets["bull_bar"].place(relx=0, rely=0, relwidth=bull_ratio, relheight=1.0)
+                widgets["bear_bar"].place(relx=bull_ratio, rely=0, relwidth=bear_ratio, relheight=1.0)
+                widgets["bull_pct"].config(text=f"Alcista: {bull_pct:.0f}%")
+                widgets["bear_pct"].config(text=f"Bajista: {bear_pct:.0f}%")
+            else:
+                # Sin datos de diagnóstico — usar historial como fallback
+                widgets["price"].config(text="Precio: esperando datos...")
+                widgets["rsi"].config(text="RSI: --", fg=TEXT_SEC)
+                widgets["adx"].config(text="ADX: --", fg=TEXT_SEC)
+                widgets["vol"].config(text="Vol: --", fg=TEXT_SEC)
+                widgets["spread"].config(text="Spread: --", fg=TEXT_SEC)
+                widgets["ema"].config(text="EMA20/50: -- | MACD: --", fg=TEXT_SEC)
+                widgets["trend"].config(text="Tendencia: esperando...", fg=TEXT_SEC)
                 widgets["bull_bar"].place(relx=0, rely=0, relwidth=0.5, relheight=1.0)
                 widgets["bear_bar"].place(relx=0.5, rely=0, relwidth=0.5, relheight=1.0)
-                widgets["trend"].config(text="Tendencia: --")
-                widgets["signal"].config(text="Sin senal activa", fg=TEXT_SEC)
-                continue
+                widgets["bull_pct"].config(text="Alcista: --%")
+                widgets["bear_pct"].config(text="Bajista: --%")
 
-            # Last price
-            last_op = recent[-1]
-            last_price = last_op.get("salida", last_op.get("entrada", "--"))
-            if isinstance(last_price, (int, float)):
-                if asset_name in ("EUR/USD", "GBP/JPY", "USD/JPY"):
-                    widgets["price"].config(text=f"Ultimo: {last_price:.5f}")
-                else:
-                    widgets["price"].config(text=f"Ultimo: {last_price:,.2f}")
-            else:
-                widgets["price"].config(text=f"Ultimo: {last_price}")
-
-            # Bullish/bearish from recent wins
-            buy_wins = sum(1 for op in recent if op.get("tipo") == "COMPRA" and op.get("resultado") == "WIN")
-            sell_wins = sum(1 for op in recent if op.get("tipo") == "VENTA" and op.get("resultado") == "WIN")
-            buy_total = sum(1 for op in recent if op.get("tipo") == "COMPRA")
-            sell_total = sum(1 for op in recent if op.get("tipo") == "VENTA")
-            total = buy_total + sell_total
-
-            if total > 0:
-                bull_pct = (buy_wins / total) * 100
-                bear_pct = (sell_wins / total) * 100
-                remainder = 100 - bull_pct - bear_pct
-                bull_pct += remainder / 2
-                bear_pct += remainder / 2
-            else:
-                bull_pct = 50
-                bear_pct = 50
-
-            bull_ratio = max(0.05, bull_pct / 100)
-            bear_ratio = max(0.05, 1 - bull_ratio)
-
-            widgets["bull_bar"].place(relx=0, rely=0, relwidth=bull_ratio, relheight=1.0)
-            widgets["bear_bar"].place(relx=bull_ratio, rely=0, relwidth=bear_ratio, relheight=1.0)
-            widgets["bull_pct"].config(text=f"Alcista: {bull_pct:.0f}%")
-            widgets["bear_pct"].config(text=f"Bajista: {bear_pct:.0f}%")
-
-            # Trend from recent pips
-            recent_pips = sum(op.get("pips", 0) for op in recent[-5:])
-            if recent_pips > 10:
-                trend_text = "ALCISTA"
-                trend_color = WIN_COLOR
-            elif recent_pips < -10:
-                trend_text = "BAJISTA"
-                trend_color = ERR
-            else:
-                trend_text = "LATERAL"
-                trend_color = WARN
-            widgets["trend"].config(text=f"Tendencia: {trend_text}", fg=trend_color)
-
-            # Check for active signal on this asset
+            # Señal activa
             signal_text = "Sin senal activa"
             signal_color = TEXT_SEC
             for key, op in ops_activas.items():
+                if not isinstance(op, dict):
+                    continue
                 op_asset = _normalize_asset(op.get("nombre", op.get("ticker", "")))
                 if op_asset == asset_name:
                     tipo = op.get("tipo", "?")
