@@ -3472,7 +3472,18 @@ class ManagementConsole:
         if not self.bot.is_running:
             messagebox.showinfo("Bot", "El bot ya esta detenido.")
             return
-        threading.Thread(target=self.bot.stop, daemon=True).start()
+        self._btn_stop.config(text="Deteniendo...", state="disabled", bg=TEXT_SEC)
+        def do_stop():
+            self.bot.stop()
+            # Forzar refresh del dashboard en el hilo principal
+            def _after_stop():
+                self._btn_stop.config(text="Detener Bot", state="normal", bg=ERR)
+                try:
+                    self._update_dashboard()
+                except Exception:
+                    pass
+            self.root.after(1000, _after_stop)
+        threading.Thread(target=do_stop, daemon=True).start()
 
     def _cmd_restart_bot(self):
         self._btn_restart.config(text="Reiniciando...", state="disabled", bg=TEXT_SEC)
@@ -3490,54 +3501,64 @@ class ManagementConsole:
     #  UPDATE LOOP
     # ============================================================
     def _update_loop(self):
-        self._tick_count = getattr(self, '_tick_count', 0) + 1
-
-        # Always update dashboard (every 2s)
         try:
-            self._update_dashboard()
+            self._tick_count = getattr(self, '_tick_count', 0) + 1
+
+            # Always update dashboard (every 2s)
+            try:
+                self._update_dashboard()
+            except Exception as e:
+                _log(f"Error actualizando dashboard: {e}")
+
+            # Solo actualizar tabs pesados si el bot está corriendo
+            _bot_on = self.bot.is_running
+
+            # Senales (every 4s)
+            if _bot_on and self._tick_count % 2 == 0:
+                try:
+                    self._refresh_senales()
+                except Exception:
+                    pass
+
+            # Logs (every 6s)
+            if self._tick_count % 3 == 0:
+                try:
+                    self._refresh_logs()
+                except Exception:
+                    pass
+
+            # Analisis (every 10s) — solo si bot activo
+            if _bot_on and self._tick_count % 5 == 0:
+                try:
+                    self._refresh_analisis()
+                except Exception:
+                    pass
+
+            # Scalper (every 10s) — solo si bot activo
+            if _bot_on and self._tick_count % 5 == 0:
+                try:
+                    self._refresh_scalper()
+                except Exception:
+                    pass
+
+            # News (every 30 min = 900 ticks at 2s each)
+            if self._tick_count % 900 == 0 or self._tick_count == 1:
+                try:
+                    self._refresh_news()
+                except Exception:
+                    pass
+
+            # Countdown
+            self._scan_countdown = max(0, self._scan_countdown - 2)
+            if self._scan_countdown <= 0:
+                try:
+                    tc = load_trading_config()
+                    self._scan_countdown = tc.get("intervalo_escaneo", 120)
+                except Exception:
+                    self._scan_countdown = 120
+
         except Exception as e:
-            _log(f"Error actualizando dashboard: {e}")
-
-        # Senales (every 4s)
-        if self._tick_count % 2 == 0:
-            try:
-                self._refresh_senales()
-            except Exception:
-                pass
-
-        # Logs (every 6s)
-        if self._tick_count % 3 == 0:
-            try:
-                self._refresh_logs()
-            except Exception:
-                pass
-
-        # Analisis (every 10s)
-        if self._tick_count % 5 == 0:
-            try:
-                self._refresh_analisis()
-            except Exception:
-                pass
-
-        # Scalper (every 10s)
-        if self._tick_count % 5 == 0:
-            try:
-                self._refresh_scalper()
-            except Exception:
-                pass
-
-        # News (every 30 min = 900 ticks at 2s each)
-        if self._tick_count % 900 == 0 or self._tick_count == 1:
-            try:
-                self._refresh_news()
-            except Exception:
-                pass
-
-        # Countdown
-        self._scan_countdown = max(0, self._scan_countdown - 2)
-        if self._scan_countdown <= 0:
-            tc = load_trading_config()
-            self._scan_countdown = tc.get("intervalo_escaneo", 120)
+            _log(f"Error critico en update_loop: {e}")
 
         self.root.after(2000, self._update_loop)
 
