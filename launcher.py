@@ -69,8 +69,11 @@ _ASSET_MAP = {
     "GBP/JPY": "GBP/JPY", "GBPJPY=X": "GBP/JPY", "GBPJPY": "GBP/JPY",
     "NASDAQ": "NASDAQ", "NQ=F": "NASDAQ", "US100": "NASDAQ", "US100Cash": "NASDAQ",
     "S&P 500": "S&P 500", "ES=F": "S&P 500", "US500": "S&P 500", "US500Cash": "S&P 500",
+    "AUD/CAD": "AUD/CAD", "AUDCAD": "AUD/CAD", "AUDCAD=X": "AUD/CAD",
+    "EUR/CHF": "EUR/CHF", "EURCHF": "EUR/CHF", "EURCHF=X": "EUR/CHF",
+    "USD/CAD": "USD/CAD", "USDCAD": "USD/CAD", "USDCAD=X": "USD/CAD",
 }
-_VALID_ASSETS = {"ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"}
+_VALID_ASSETS = {"ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"}
 
 # Reverse map: friendly name -> tickers used in estado.json
 _ASSET_TICKERS = {
@@ -140,19 +143,19 @@ def save_config(config: dict):
 
 def load_trading_config() -> dict:
     defaults = {
-        "capital": 500.0,
-        "riesgo_trade": 0.02,
-        "riesgo_premium": 0.04,
-        "riesgo_oro": 0.02,
+        "capital": 555.0,
+        "riesgo_trade": 0.01,
+        "riesgo_premium": 0.015,
+        "riesgo_oro": 0.01,
         "modo": "Normal",
         "min_score": 3,
-        "max_trades": 5,
-        "max_perdida_diaria": 0.10,
-        "hora_apertura": 6,
-        "hora_corte": 22,
-        "min_rr": 1.5,
+        "max_trades": 6,
+        "max_perdida_diaria": 0.05,
+        "hora_apertura": 8,
+        "hora_corte": 18,
+        "min_rr": 1.0,
         "auto_cierre_horas": 24,
-        "intervalo_escaneo": 120,
+        "intervalo_escaneo": 180,
         "auto_trading_mt5": True,
         "solo_premium_mt5": True,
         "spreads_max": {
@@ -162,14 +165,20 @@ def load_trading_config() -> dict:
             "GBP/JPY": 5,
             "NASDAQ": 30,
             "S&P 500": 20,
+            "AUD/CAD": 30,
+            "EUR/CHF": 25,
+            "USD/CAD": 25,
         },
         "activos_habilitados": {
             "ORO": True,
             "EUR/USD": True,
             "USD/JPY": True,
-            "GBP/JPY": True,
+            "GBP/JPY": False,
             "NASDAQ": True,
             "S&P 500": True,
+            "AUD/CAD": True,
+            "EUR/CHF": True,
+            "USD/CAD": True,
         },
     }
     if os.path.exists(TRADING_CONFIG_FILE):
@@ -634,7 +643,7 @@ class ManagementConsole:
 
         # Build root window
         self.root = tk.Tk()
-        self.root.title("BuySell365 Pro - Consola de Control | Creado por Emmanuel Diaz")
+        self.root.title("BuySell365 Pro - Consola de Control | Propiedad de Emmanuel Diaz")
         self.root.geometry("1400x850")
         self.root.minsize(1100, 700)
         self.root.configure(bg=BG_MAIN)
@@ -1011,7 +1020,7 @@ class ManagementConsole:
         tl_row = tk.Frame(traffic_frame, bg=BG_PANEL)
         tl_row.pack(fill="x", pady=3)
 
-        all_assets = ["ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"]
+        all_assets = ["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]
         for asset in all_assets:
             af = tk.Frame(tl_row, bg=BG_PANEL)
             af.pack(side="left", padx=8, pady=2)
@@ -1117,7 +1126,7 @@ class ManagementConsole:
             "Acerca de BuySell365 Pro",
             "BuySell365 Pro v5.0\n\n"
             "Bot de trading automatizado con IA\n"
-            "Senales para ORO, EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P 500\n\n"
+            "Senales para ORO, EUR/USD, USD/JPY, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD\n\n"
             "Creado por Emmanuel Diaz\n"
             "https://buysell365.pro\n\n"
             "(c) 2026 BuySell365. Todos los derechos reservados."
@@ -1193,6 +1202,43 @@ class ManagementConsole:
 
         threading.Thread(target=_close_all, daemon=True).start()
 
+    def _show_senal_context_menu(self, event):
+        """Show right-click context menu on active signals."""
+        item = self._senales_active_tree.identify_row(event.y)
+        if item:
+            self._senales_active_tree.selection_set(item)
+            self._senales_ctx_menu.post(event.x_root, event.y_root)
+
+    def _cmd_cerrar_senal(self):
+        """Close selected active signal (remove from bot tracking + close MT5 if open)."""
+        selection = self._senales_active_tree.selection()
+        if not selection:
+            messagebox.showwarning("Cerrar Senal", "Selecciona una senal activa primero.")
+            return
+
+        item_id = selection[0]
+        op_key = getattr(self, '_senales_op_keys', {}).get(item_id)
+        if not op_key:
+            messagebox.showerror("Error", "No se encontro la clave de operacion.")
+            return
+
+        values = self._senales_active_tree.item(item_id, "values")
+        nombre = values[1] if len(values) > 1 else "?"
+        tipo = values[2] if len(values) > 2 else "?"
+
+        if not messagebox.askyesno("Cerrar Senal",
+                                   f"Cerrar senal {nombre} {tipo}?\n\n"
+                                   "Esto la eliminara del tracking del bot.\n"
+                                   "Si tiene posicion en MT5, tambien se cerrara."):
+            return
+
+        # Send close command to bot
+        _send_bot_cmd(f"close_op:{op_key}")
+        _log(f"Cierre manual solicitado: {nombre} {tipo} (key={op_key})")
+        messagebox.showinfo("Cerrar Senal", f"Cierre de {nombre} {tipo} solicitado.\nSe ejecutara en el proximo ciclo.")
+        # Refresh immediately
+        self.root.after(500, self._refresh_senales)
+
     def _cmd_escanear_ahora(self):
         """Trigger immediate scan via .bot.cmd."""
         _send_bot_cmd("force_scan")
@@ -1232,13 +1278,13 @@ class ManagementConsole:
     # ============================================================
     # Mapeo moneda → pares afectados
     _CURRENCY_PAIRS = {
-        "USD": ["EUR/USD", "USD/JPY", "GBP/JPY", "ORO", "NASDAQ", "S&P 500"],
-        "EUR": ["EUR/USD"],
-        "GBP": ["GBP/JPY"],
-        "JPY": ["USD/JPY", "GBP/JPY"],
-        "CHF": ["EUR/USD"],
-        "AUD": ["ORO"],
-        "CAD": ["ORO"],
+        "USD": ["EUR/USD", "USD/JPY", "ORO", "NASDAQ", "S&P 500", "USD/CAD"],
+        "EUR": ["EUR/USD", "EUR/CHF"],
+        "GBP": [],
+        "JPY": ["USD/JPY"],
+        "CHF": ["EUR/CHF"],
+        "AUD": ["AUD/CAD", "ORO"],
+        "CAD": ["AUD/CAD", "USD/CAD", "ORO"],
         "NZD": [],
         "CNY": ["ORO", "NASDAQ", "S&P 500"],
     }
@@ -1471,9 +1517,10 @@ class ManagementConsole:
                 profit = result["profit"]
                 color = WIN_COLOR if profit >= 0 else LOSS_COLOR
                 self._dash_mt5_capital_lbl.config(
-                    text=f"MT5: ${eq:,.2f} (P&L: ${profit:+,.2f})", fg=color)
-                # Track equity history for curve
-                self._equity_history.append((time.time(), eq))
+                    text=f"MT5: ${bal:,.2f} (P&L: ${profit:+,.2f})", fg=color)
+                self._mt5_balance_real = bal  # Guardar para título
+                # Track balance history for curve
+                self._equity_history.append((time.time(), bal))
                 # Keep last 200 data points
                 if len(self._equity_history) > 200:
                     self._equity_history = self._equity_history[-200:]
@@ -1627,8 +1674,9 @@ class ManagementConsole:
 
         # Horarios por activo (Andorra time)
         horarios = {
-            "ORO": (8, 20), "EUR/USD": (8, 18), "USD/JPY": (8, 18),
-            "GBP/JPY": (9, 18), "NASDAQ": (15, 22), "S&P 500": (15, 22),
+            "ORO": (8, 20), "EUR/USD": (8, 18), "USD/JPY": (2, 18),
+            "NASDAQ": (15, 22), "S&P 500": (15, 22),
+            "AUD/CAD": (2, 16), "EUR/CHF": (9, 18), "USD/CAD": (15, 22),
         }
 
         # Assets with open positions
@@ -1825,6 +1873,19 @@ class ManagementConsole:
         self._senales_active_tree.tag_configure("PREMIUM", foreground=PREMIUM_COLOR)
         self._senales_active_tree.pack(fill="x", pady=(0, 5))
 
+        # Buttons below active signals
+        btn_row = tk.Frame(active_frame, bg=BG_PANEL)
+        btn_row.pack(fill="x", pady=(0, 5))
+        _make_button(btn_row, "Cerrar Senal Seleccionada", self._cmd_cerrar_senal,
+                     bg="#b91c1c", fg="white").pack(side="left", padx=5)
+
+        # Right-click context menu for active signals
+        self._senales_ctx_menu = tk.Menu(self._senales_active_tree, tearoff=0,
+                                         bg=BG_PANEL, fg=TEXT)
+        self._senales_ctx_menu.add_command(label="Cerrar esta senal",
+                                            command=self._cmd_cerrar_senal)
+        self._senales_active_tree.bind("<Button-3>", self._show_senal_context_menu)
+
         # Closed Signals Treeview
         closed_frame = _make_section_frame(scroll_frame, "Ultimas Senales Cerradas (Hoy)")
         closed_frame.pack(fill="x", padx=10, pady=5)
@@ -1844,6 +1905,7 @@ class ManagementConsole:
 
         self._senales_closed_tree.tag_configure("WIN", foreground=WIN_COLOR)
         self._senales_closed_tree.tag_configure("LOSS", foreground=LOSS_COLOR)
+        self._senales_closed_tree.tag_configure("MANUAL", foreground="#f0ad4e")
         self._senales_closed_tree.pack(fill="x", pady=(0, 5))
 
         # Summary bar
@@ -1878,7 +1940,7 @@ class ManagementConsole:
         grid_frame.columnconfigure(1, weight=1)
         grid_frame.columnconfigure(2, weight=1)
 
-        assets_ordered = ["ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"]
+        assets_ordered = ["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]
         for idx, asset_name in enumerate(assets_ordered):
             r = idx // 3
             c = idx % 3
@@ -2094,7 +2156,7 @@ class ManagementConsole:
 
         self._spread_entries = {}
         spreads = tc.get("spreads_max", {})
-        for idx, asset in enumerate(["ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"]):
+        for idx, asset in enumerate(["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]):
             r = idx // 3
             c = (idx % 3) * 2
             _make_label(spreads_grid, f"{asset}:", fg=TEXT_SEC).grid(
@@ -2113,7 +2175,7 @@ class ManagementConsole:
 
         self._activo_vars = {}
         habilitados = tc.get("activos_habilitados", {})
-        for idx, asset in enumerate(["ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"]):
+        for idx, asset in enumerate(["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]):
             r = idx // 3
             c = idx % 3
             var = tk.BooleanVar(value=habilitados.get(asset, True))
@@ -3185,15 +3247,14 @@ class ManagementConsole:
         self._sc_tree_activos.tag_configure("alt_activo", foreground=WIN_COLOR, background=BG_ROW_ALT)
         self._sc_tree_activos.tag_configure("alt_inactivo", foreground=TEXT_SEC, background=BG_ROW_ALT)
 
-        # All 7 scalper activos
+        # FIX 2026-03-21: 6 scalper activos optimizados con backtest 60d
         activos_data = [
-            ("EUR/USD", "EURUSD", "09:00 - 18:00", "20", ""),
-            ("GBP/USD", "GBPUSD", "09:00 - 18:00", "25", ""),
-            ("NASDAQ (US100)", "US100Cash", "15:30 - 22:00", "500", ""),
-            ("ORO (XAUUSD)", "GOLD", "09:00 - 19:00", "45", ""),
-            ("AUD/CAD", "AUDCAD", "09:00 - 18:00", "25", ""),
-            ("EUR/CHF", "EURCHF", "09:00 - 18:00", "20", ""),
-            ("USD/CAD", "USDCAD", "09:00 - 18:00", "22", ""),
+            ("EUR/USD", "EURUSD", "09:00 - 18:00", "20", "BB+RSI (BUY+SELL)"),
+            ("NASDAQ (US100)", "US100Cash", "15:30 - 22:00", "500", "BB+RSI (BUY only)"),
+            ("ORO (XAUUSD)", "GOLD", "09:00 - 19:00", "45", "BB+RSI (SELL only)"),
+            ("AUD/CAD", "AUDCAD", "09:00 - 18:00", "25", "Fibonacci (SELL only)"),
+            ("EUR/CHF", "EURCHF", "09:00 - 18:00", "20", "Fibonacci (SELL only)"),
+            ("USD/CAD", "USDCAD", "15:00 - 22:00", "22", "Fibonacci (SELL only)"),
         ]
         for idx, row in enumerate(activos_data):
             tag_prefix = "alt_" if idx % 2 == 1 else ""
@@ -3674,13 +3735,14 @@ class ManagementConsole:
         wins_all = sum(1 for op in historial if op.get("resultado") == "WIN")
         win_rate = (wins_all / total_all * 100) if total_all > 0 else 0
 
-        # Update window title with P&L info
-        self.root.title(f"BuySell365 Pro | ${capital:.0f} | {pips_today:+.1f} pips hoy | {wins_today}W/{losses_today}L")
+        # Update window title with P&L info (usar balance MT5 real si disponible)
+        _cap_titulo = getattr(self, '_mt5_balance_real', capital)
+        self.root.title(f"BuySell365 Pro | ${_cap_titulo:.0f} | {pips_today:+.1f} pips hoy | {wins_today}W/{losses_today}L | Propiedad de Emmanuel Diaz")
 
         self._dash_winrate.config(text=f"{win_rate:.1f}%",
                                   fg=WIN_COLOR if win_rate >= 50 else ERR)
         self._dash_senales_hoy.config(text=f"{total_today} ({wins_today}W / {losses_today}L)")
-        self._dash_capital.config(text=f"${capital:,.2f}")
+        self._dash_capital.config(text=f"${_cap_titulo:,.2f}")
         self._dash_modo.config(text=modo.capitalize())
 
         if pips_today >= 0:
@@ -3761,11 +3823,12 @@ class ManagementConsole:
         if hasattr(self, '_dash_last_update_lbl'):
             self._dash_last_update_lbl.config(text=f"Actualizado: {datetime.now().strftime('%H:%M:%S')}")
 
-        # Status bar
+        # Status bar (usar balance MT5 real si disponible)
         active_count = len(estado.get("operaciones_activas", {}))
+        _cap_status = getattr(self, '_mt5_balance_real', capital)
         self._status_bar.config(
             text=f"BuySell365 Pro v5.0 | Bot: {'ON' if self.bot.is_running else 'OFF'} | "
-                 f"Activas: {active_count} | Capital: ${capital:,.2f} | "
+                 f"Activas: {active_count} | Capital: ${_cap_status:,.2f} | "
                  f"{datetime.now().strftime('%H:%M:%S')}"
         )
 
@@ -3861,6 +3924,7 @@ class ManagementConsole:
 
         # Active signals
         self._senales_active_tree.delete(*self._senales_active_tree.get_children())
+        self._senales_op_keys = {}  # Map treeview item_id -> op key
         ops_activas = estado.get("operaciones_activas", {})
         active_count = 0
 
@@ -3895,10 +3959,11 @@ class ManagementConsole:
             if isinstance(score, (int, float)) and score >= 4:
                 tag = "PREMIUM"
 
-            self._senales_active_tree.insert("", "end",
+            item_id = self._senales_active_tree.insert("", "end",
                                              values=(hora, nombre, tipo, entrada, sl, tp1,
                                                      score, confianza, estado_op),
                                              tags=(tag,))
+            self._senales_op_keys[item_id] = key
             active_count += 1
 
         # Closed signals (today)
@@ -3924,7 +3989,7 @@ class ManagementConsole:
             if isinstance(duracion, (int, float)):
                 duracion = f"{duracion:.0f}m"
 
-            tag = "WIN" if resultado == "WIN" else "LOSS"
+            tag = "WIN" if resultado == "WIN" else ("MANUAL" if resultado == "MANUAL" else "LOSS")
             if resultado == "WIN":
                 wins_today += 1
             elif resultado == "LOSS":

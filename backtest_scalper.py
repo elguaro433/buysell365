@@ -32,30 +32,53 @@ warnings.filterwarnings("ignore")
 PERIODO_DATOS = "60d"
 INTERVALO = "5m"
 
+# Activos del scalper con PAR_PROFILES params
 ACTIVOS = {
-    "GOLD":    {"ticker": "GC=F",     "hora_ini": 7,  "hora_fin": 17, "pip_mult": 1,     "pip_name": "pts"},
-    "EUR/USD": {"ticker": "EURUSD=X", "hora_ini": 7,  "hora_fin": 16, "pip_mult": 10000, "pip_name": "pips"},
-    "GBP/USD": {"ticker": "GBPUSD=X", "hora_ini": 7,  "hora_fin": 16, "pip_mult": 10000, "pip_name": "pips"},
-    "NASDAQ":  {"ticker": "NQ=F",     "hora_ini": 13, "hora_fin": 20, "pip_mult": 1,     "pip_name": "pts"},
+    "GOLD":    {"ticker": "GC=F",     "hora_ini": 7,  "hora_fin": 17, "pip_mult": 1,     "pip_name": "pts",
+                "rsi_buy": 40, "rsi_sell": 60, "adx_min": 10, "adx_max": 50, "sl_atr": 1.2, "tp_atr": 2.0,
+                "block_buy": True, "block_sell": False, "estrategia": "bb_rsi",
+                "bb_period": 20, "bb_std": 2.0, "rsi_period": 7, "adx_period": 10},
+    "EUR/USD": {"ticker": "EURUSD=X", "hora_ini": 7,  "hora_fin": 17, "pip_mult": 10000, "pip_name": "pips",
+                "rsi_buy": 40, "rsi_sell": 60, "adx_min": 10, "adx_max": 50, "sl_atr": 1.2, "tp_atr": 2.0,
+                "block_buy": False, "block_sell": False, "estrategia": "bb_rsi",
+                "bb_period": 20, "bb_std": 2.0, "rsi_period": 7, "adx_period": 10},
+    "NASDAQ":  {"ticker": "NQ=F",     "hora_ini": 13, "hora_fin": 20, "pip_mult": 1,     "pip_name": "pts",
+                "rsi_buy": 40, "rsi_sell": 60, "adx_min": 10, "adx_max": 50, "sl_atr": 1.2, "tp_atr": 2.0,
+                "block_buy": False, "block_sell": True, "estrategia": "bb_rsi",
+                "bb_period": 20, "bb_std": 2.0, "rsi_period": 7, "adx_period": 10},
+    "AUD/CAD": {"ticker": "AUDCAD=X", "hora_ini": 0,  "hora_fin": 14, "pip_mult": 10000, "pip_name": "pips",
+                "rsi_buy": 45, "rsi_sell": 55, "adx_min": 10, "adx_max": 50, "sl_atr": 1.0, "tp_atr": 1.8,
+                "block_buy": False, "block_sell": False, "estrategia": "fibonacci",
+                "fib_buy": 0.35, "fib_sell": 0.65,
+                "bb_period": 20, "bb_std": 2.0, "rsi_period": 7, "adx_period": 10},
+    "EUR/CHF": {"ticker": "EURCHF=X", "hora_ini": 7,  "hora_fin": 16, "pip_mult": 10000, "pip_name": "pips",
+                "rsi_buy": 45, "rsi_sell": 55, "adx_min": 10, "adx_max": 50, "sl_atr": 1.0, "tp_atr": 1.8,
+                "block_buy": False, "block_sell": False, "estrategia": "fibonacci",
+                "fib_buy": 0.35, "fib_sell": 0.65,
+                "bb_period": 20, "bb_std": 2.0, "rsi_period": 7, "adx_period": 10},
+    "USD/CAD": {"ticker": "USDCAD=X", "hora_ini": 13, "hora_fin": 20, "pip_mult": 10000, "pip_name": "pips",
+                "rsi_buy": 45, "rsi_sell": 55, "adx_min": 10, "adx_max": 50, "sl_atr": 1.0, "tp_atr": 1.8,
+                "block_buy": False, "block_sell": False, "estrategia": "fibonacci",
+                "fib_buy": 0.35, "fib_sell": 0.65,
+                "bb_period": 20, "bb_std": 2.0, "rsi_period": 7, "adx_period": 10},
 }
 
-# Parametros de la estrategia
+# Defaults (used as fallback)
 BB_PERIOD = 20
 BB_STD = 2.0
 RSI_PERIOD = 7
 EMA_PERIOD = 50
 ADX_PERIOD = 10
 ADX_MIN = 10
-ADX_MAX = 40
+ADX_MAX = 50
 ATR_PERIOD = 14
-SL_ATR_MULT = 1.5
+SL_ATR_MULT = 1.2
 TP_ATR_MULT = 2.0
-TIMEOUT_CANDLES = 12  # 60 min / 5 min = 12 velas
-COOLDOWN_CANDLES = 3  # Minimo 3 velas (15 min) entre senales del mismo activo
+TIMEOUT_CANDLES = 9   # 45 min / 5 min = 9 velas (matching bot timeout)
+COOLDOWN_CANDLES = 6  # 30 min cooldown (matching bot)
 
-# RSI thresholds — nivel simple, sin requerir cruce
-RSI_BUY_ZONE = 38     # RSI < 38 = zona oversold para scalp
-RSI_SELL_ZONE = 62    # RSI > 62 = zona overbought para scalp
+RSI_BUY_ZONE = 40
+RSI_SELL_ZONE = 60
 
 
 def get_col(df, prefijo):
@@ -213,71 +236,69 @@ def run_backtest():
             if curr_atr <= 0:
                 continue
 
-            # -- Condiciones de entrada (3 variantes) --
+            # Per-pair thresholds from config
+            _rsi_buy = cfg.get("rsi_buy", RSI_BUY_ZONE)
+            _rsi_sell = cfg.get("rsi_sell", RSI_SELL_ZONE)
+            _adx_min = cfg.get("adx_min", ADX_MIN)
+            _adx_max = cfg.get("adx_max", ADX_MAX)
+            _estrategia = cfg.get("estrategia", "bb_rsi")
+
+            # -- Condiciones de entrada --
             tipo = None
             variante = ""
 
-            # Variante A: BB touch + RSI en zona oversold/overbought (principal)
-            # BUY: Low toca BB inferior + RSI < 38 + ADX ok
-            if (curr_low <= curr_bbl
-                    and curr_rsi < RSI_BUY_ZONE
-                    and ADX_MIN <= curr_adx <= ADX_MAX):
-                tipo = "BUY"
-                variante = "A"
+            if _estrategia == "fibonacci":
+                # Fibonacci Mean Reversion
+                fib_lookback = min(240, i)
+                _fh = df_calc['High'].iloc[max(0, i-fib_lookback):i+1].max()
+                _fl = df_calc['Low'].iloc[max(0, i-fib_lookback):i+1].min()
+                _fr = _fh - _fl
+                _fib_pos = (curr_close - _fl) / _fr if _fr > 0 else 0.5
+                _fib_buy_t = cfg.get("fib_buy", 0.35)
+                _fib_sell_t = cfg.get("fib_sell", 0.65)
 
-            # SELL: High toca BB superior + RSI > 62 + ADX ok
-            elif (curr_high >= curr_bbu
-                  and curr_rsi > RSI_SELL_ZONE
-                  and ADX_MIN <= curr_adx <= ADX_MAX):
-                tipo = "SELL"
-                variante = "A"
+                if _fib_pos < _fib_buy_t and curr_rsi < _rsi_buy and _adx_min <= curr_adx <= _adx_max:
+                    tipo = "BUY"
+                    variante = "FIB"
+                elif _fib_pos > _fib_sell_t and curr_rsi > _rsi_sell and _adx_min <= curr_adx <= _adx_max:
+                    tipo = "SELL"
+                    variante = "FIB"
+            else:
+                # BB+RSI Mean Reversion (3 variants)
+                # Variante A: BB touch + RSI extreme
+                if (curr_low <= curr_bbl and curr_rsi < _rsi_buy and _adx_min <= curr_adx <= _adx_max):
+                    tipo = "BUY"; variante = "A"
+                elif (curr_high >= curr_bbu and curr_rsi > _rsi_sell and _adx_min <= curr_adx <= _adx_max):
+                    tipo = "SELL"; variante = "A"
+                # Variante B: BB rejection (long wick)
+                elif (curr_low < curr_bbl and curr_close > curr_bbl
+                      and (curr_close - curr_low) > (curr_high - curr_close) * 1.5
+                      and curr_rsi < (_rsi_buy + 8) and _adx_min <= curr_adx <= _adx_max):
+                    tipo = "BUY"; variante = "B"
+                elif (curr_high > curr_bbu and curr_close < curr_bbu
+                      and (curr_high - curr_close) > (curr_close - curr_low) * 1.5
+                      and curr_rsi > (_rsi_sell - 8) and _adx_min <= curr_adx <= _adx_max):
+                    tipo = "SELL"; variante = "B"
+                # Variante C: RSI extremo
+                elif (curr_rsi < 30 and curr_close < (curr_bbl + (bbm - curr_bbl) * 0.3)
+                      and _adx_min <= curr_adx <= _adx_max):
+                    tipo = "BUY"; variante = "C"
+                elif (curr_rsi > 70 and curr_close > (curr_bbu - (curr_bbu - bbm) * 0.3)
+                      and _adx_min <= curr_adx <= _adx_max):
+                    tipo = "SELL"; variante = "C"
 
-            # Variante B: Rechazo fuerte de BB (vela cierra lejos del extremo)
-            # BUY: Low perforo BB inferior pero cerro por encima (mecha larga abajo)
-            elif (curr_low < curr_bbl
-                  and curr_close > curr_bbl
-                  and (curr_close - curr_low) > (curr_high - curr_close) * 1.5  # mecha inferior > 1.5x cuerpo superior
-                  and curr_rsi < 45
-                  and ADX_MIN <= curr_adx <= ADX_MAX):
-                tipo = "BUY"
-                variante = "B"
-
-            # SELL: High perforo BB superior pero cerro por debajo (mecha larga arriba)
-            elif (curr_high > curr_bbu
-                  and curr_close < curr_bbu
-                  and (curr_high - curr_close) > (curr_close - curr_low) * 1.5
-                  and curr_rsi > 55
-                  and ADX_MIN <= curr_adx <= ADX_MAX):
-                tipo = "SELL"
-                variante = "B"
-
-            # Variante C: RSI extremo + precio cerca de BB (sin necesidad de tocar)
-            # BUY: RSI < 25 + precio dentro de 20% del rango BB inferior
-            elif (curr_rsi < 25
-                  and curr_close < (curr_bbl + (bbm - curr_bbl) * 0.2)
-                  and ADX_MIN <= curr_adx <= ADX_MAX):
-                tipo = "BUY"
-                variante = "C"
-
-            # SELL: RSI > 75 + precio dentro de 20% del rango BB superior
-            elif (curr_rsi > 75
-                  and curr_close > (curr_bbu - (curr_bbu - bbm) * 0.2)
-                  and ADX_MIN <= curr_adx <= ADX_MAX):
-                tipo = "SELL"
-                variante = "C"
-
-            # Filtros por backtest: bloquear GOLD BUY y NASDAQ SELL (negativos)
-            if tipo == "BUY" and nombre == "GOLD":
+            # Block filters from PAR_PROFILES
+            if tipo == "BUY" and cfg.get("block_buy"):
                 tipo = None
-            if tipo == "SELL" and nombre == "NASDAQ":
+            if tipo == "SELL" and cfg.get("block_sell"):
                 tipo = None
 
             if tipo is None:
                 continue
 
-            # -- Calcular SL y TP --
-            sl_dist = curr_atr * SL_ATR_MULT
-            tp_dist = curr_atr * TP_ATR_MULT
+            # -- Calcular SL y TP (per-pair from profile) --
+            sl_dist = curr_atr * cfg.get("sl_atr", SL_ATR_MULT)
+            tp_dist = curr_atr * cfg.get("tp_atr", TP_ATR_MULT)
 
             if tipo == "BUY":
                 sl_price = curr_close - sl_dist

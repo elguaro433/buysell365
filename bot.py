@@ -192,15 +192,15 @@ USERS_AUTORIZADOS = _valid_uids
 # 👑 IDs de Administradores (Tienen control total + VIP permanente)
 ADMIN_IDS = list(_valid_uids)  # Ambos propietarios son admin
 
-# ✅ CONFIGURACIÓN PROFESIONAL
+# ✅ CONFIGURACIÓN PROFESIONAL (defaults — se sobreescriben con launcher_trading_config.json)
 TIEMPO_AUTOCIERRE = 86400       # Auto-cierre a las 24 horas
 INTERVALO_ESCANEO = 180         # Escanear señales cada 3 minutos
 INTERVALO_MONITOR = 15          # Monitorizar niveles cada 15 segundos (ALTA VELOCIDAD)
 MIN_SCORE = 3                   # Score mínimo para enviar señal (auto-calibración ajusta ±1 por activo)
 
 # ✅ PARÁMETROS INSTITUCIONALES
-CAPITAL_USUARIO   = 550.00      # Capital base actualizado 2026-03-19 (se actualiza con equity real de MT5)
-RIESGO_POR_TRADE  = 0.01        # 1% para TODOS los activos (~$5.4 por trade con $543)
+CAPITAL_USUARIO   = 555.00      # Capital base (se actualiza con balance real de MT5)
+RIESGO_POR_TRADE  = 0.01        # 1% para TODOS los activos (~$5.5 por trade)
 RIESGO_ORO        = 0.01        # 1% para ORO
 RIESGO_USDJPY     = 0.01        # 1% para USD/JPY
 RIESGO_GBPJPY     = 0.01        # 1% para GBP/JPY
@@ -208,9 +208,30 @@ RIESGO_PREMIUM    = 0.015       # 1.5% para señales premium (~$8 por trade — 
 BOT_TZ = pytz.timezone('Europe/Andorra')  # Zona horaria del usuario (CET/CEST)
 HORA_APERTURA_LOCAL = 8         # 08:00 hora Andorra: inicio de ejecución MT5
 HORA_CORTE_LOCAL = 18           # 18:00 hora Andorra: fin de ejecución MT5 (L-V uniforme)
-MAX_PERDIDA_DIARIA = 0.05       # 5% máximo diario (~$27 con $543) — estándar prop firms
+MAX_PERDIDA_DIARIA = 0.05       # 5% máximo diario (~$27) — estándar prop firms
 MAX_TRADES_SIMULTANEOS = 6      # Máx 1 por activo × 6 activos = 6 simultáneas
 MIN_RR_RATIO = 1.0              # Mínimo Risk:Reward — no abrir si TP1/SL < 1.0
+
+# 📂 Cargar config desde consola (launcher_trading_config.json) si existe
+_TRADING_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "launcher_trading_config.json")
+try:
+    if os.path.exists(_TRADING_CONFIG_FILE):
+        with open(_TRADING_CONFIG_FILE, "r", encoding="utf-8") as _tcf:
+            _tc = json.load(_tcf)
+        RIESGO_POR_TRADE = _tc.get("riesgo_trade", RIESGO_POR_TRADE)
+        RIESGO_PREMIUM = _tc.get("riesgo_premium", RIESGO_PREMIUM)
+        RIESGO_ORO = _tc.get("riesgo_oro", RIESGO_ORO)
+        MIN_SCORE = _tc.get("min_score", MIN_SCORE)
+        MAX_TRADES_SIMULTANEOS = _tc.get("max_trades", MAX_TRADES_SIMULTANEOS)
+        MAX_PERDIDA_DIARIA = _tc.get("max_perdida_diaria", MAX_PERDIDA_DIARIA)
+        HORA_APERTURA_LOCAL = _tc.get("hora_apertura", HORA_APERTURA_LOCAL)
+        HORA_CORTE_LOCAL = _tc.get("hora_corte", HORA_CORTE_LOCAL)
+        MIN_RR_RATIO = _tc.get("min_rr", MIN_RR_RATIO)
+        TIEMPO_AUTOCIERRE = _tc.get("auto_cierre_horas", 24) * 3600
+        INTERVALO_ESCANEO = _tc.get("intervalo_escaneo", INTERVALO_ESCANEO)
+        print(f"📂 Config cargada desde consola: Riesgo={RIESGO_POR_TRADE*100:.1f}% Premium={RIESGO_PREMIUM*100:.1f}% Horario={HORA_APERTURA_LOCAL}-{HORA_CORTE_LOCAL}h")
+except Exception as _e_tc:
+    print(f"⚠️ No se pudo cargar trading config: {_e_tc}")
 
 # Cooldown persistente: sobrevive al cierre de posiciones (anti re-entry)
 _cooldown_cierres = {}  # {(ticker_normalizado, tipo): timestamp_cierre}
@@ -1689,11 +1710,12 @@ def enviar_canal(mensaje: str, **kwargs):
     """📢 SEÑALES Y SALIDAS: Envía solo señales, TP y SL al canal principal."""
     return enviar_telegram(mensaje, destino=CHANNEL_ID, **kwargs)
 
-def enviar_grupo(mensaje: str, incluir_promo: bool = True, **kwargs):
+def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 300, **kwargs):
     """👥 ALERTAS TÉCNICAS: Envía logs, ejecuciones y alertas de sistema al grupo.
-       Añade automáticamente un tag de publicidad VIP para incentivar ventas."""
+       Añade automáticamente un tag de publicidad VIP para incentivar ventas.
+       auto_delete: segundos para auto-borrar (default 300=5min, 0=no borrar)."""
     target = GROUP_ID if GROUP_ID else CHANNEL_ID
-    
+
     # 📢 Marca de agua publicitaria para el grupo
     if incluir_promo and ADMIN_USER:
         promos = [
@@ -1706,10 +1728,13 @@ def enviar_grupo(mensaje: str, incluir_promo: bool = True, **kwargs):
         ]
         mensaje += random.choice(promos)
         
-    return enviar_telegram(mensaje, destino=target, **kwargs)
+    msg_id = enviar_telegram(mensaje, destino=target, **kwargs)
+    if msg_id and auto_delete > 0:
+        _programar_borrado_mensaje(target, msg_id, auto_delete)
+    return msg_id
 
 def notificar_fomo_grupo(nombre: str, tipo: str):
-    """Notificación FOMO al grupo público — corta y con CopyTrading."""
+    """Notificación FOMO al grupo público — corta y con CopyTrading. Se auto-borra en 10 min."""
     if not ADMIN_USER or not GROUP_ID: return
 
     fomos = [
@@ -1724,7 +1749,28 @@ def notificar_fomo_grupo(nombre: str, tipo: str):
          f"\u26a1 [Activa Copy Trading — sin experiencia](https://social.tp-redirect.com/s/WRE0V7jm)"),
     ]
     msg = random.choice(fomos)
-    return enviar_telegram(msg, destino=GROUP_ID)
+    return enviar_telegram_temporal(msg, destino=GROUP_ID, delay_borrado=600)
+
+def _programar_borrado_mensaje(chat_id, message_id, delay_seg=300):
+    """Borra un mensaje de Telegram después de N segundos (default 5 min)."""
+    def _borrar():
+        time.sleep(delay_seg)
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
+            requests.post(url, json={"chat_id": chat_id, "message_id": message_id}, timeout=10)
+        except Exception:
+            pass
+    threading.Thread(target=_borrar, daemon=True).start()
+
+
+def enviar_telegram_temporal(mensaje: str, destino: str = None, delay_borrado: int = 300, **kwargs):
+    """Envía un mensaje a Telegram que se auto-borra después de delay_borrado segundos."""
+    chat_id = destino or CHANNEL_ID
+    msg_id = enviar_telegram(mensaje, destino=chat_id, **kwargs)
+    if msg_id:
+        _programar_borrado_mensaje(chat_id, msg_id, delay_borrado)
+    return msg_id
+
 
 def enviar_foto_telegram(mensaje: str, ruta_foto: str, destino: str = None):
     """Envía una foto con un caption (mensaje) a Telegram. Retorna message_id."""
@@ -2652,14 +2698,16 @@ def evaluar_senal_profesional(ind, ticker=""):
     # ━━━━━━━━━━
     regimen = ind.get('regimen', 'TRANSICIÓN')
     adx_val = ind.get('adx', 0)
-    
-    # Bloqueo preventivo: Evitar operar en indecisión total - Relajado
-    if regimen == "TRANSICIÓN" and adx_val < 15:
-        return None, 0, [f"⚠️ Transición extrema (ADX {adx_val:.1f}<15)"]
 
-    # Bloqueo de Volatilidad Extrema: Evita 'muertes por látigo'
-    # FIX 2026-03-19: ORO usa 0.5x (igual que filtro general), resto 1.0x
-    _vol_min_extrema = 0.5 if ticker in ("GC=F", "XAUUSD") else 1.0
+    # PAR_PROFILES lookup — must be before any _prof usage
+    _prof = get_par_profile(ticker=ticker)
+
+    # Bloqueo preventivo: Evitar operar en indecisión total
+    if regimen == "TRANSICIÓN" and adx_val < 12:
+        return None, 0, [f"⚠️ Transición extrema (ADX {adx_val:.1f}<12)"]
+
+    # Bloqueo de Volatilidad Extrema
+    _vol_min_extrema = (_prof["premium"].get("vol_min_extrema", 0.3) if (_prof and _prof.get("premium", {}).get("enabled")) else (0.3 if ticker in ("GC=F", "XAUUSD") else 0.3))
     if regimen == "VOLATILIDAD" and ind.get('vol_ratio', 1) < _vol_min_extrema:
         return None, 0, [f"⚠️ Volatilidad extrema sin volumen institucional (vol={ind.get('vol_ratio',0):.1f}x < {_vol_min_extrema}x)"]
 
@@ -2682,89 +2730,49 @@ def evaluar_senal_profesional(ind, ticker=""):
 
     cat = get_categoria(ticker)
 
-    # 🔧 Calibración por personalidad de mercado (v3 — Umbrales ML reducidos para más señales)
-    adx_min    = 15   # Reducido de 18
-    bb_squeeze = 0.015
-    rsi_os, rsi_ob = 35, 65
-    ml_umbral_fuerte = 55.0  # Mínimo 55% para TODAS las estrategias (subido de 52%)
+    # ── PAR_PROFILES config — _prof already set above ──
+    if _prof and _prof.get("premium", {}).get("enabled"):
+        _prem = _prof["premium"]
+        adx_min        = _prem.get("adx_min", 13)
+        bb_squeeze     = _prem.get("bb_squeeze", 0.008)
+        rsi_os         = _prem.get("rsi_os", 35)
+        rsi_ob         = _prem.get("rsi_ob", 65)
+        ml_umbral_fuerte = _prem.get("ml_umbral", 55.0)
+        min_atr        = _prem.get("min_atr", 0.0)
+    else:
+        adx_min = 13; bb_squeeze = 0.008; rsi_os, rsi_ob = 35, 65
+        ml_umbral_fuerte = 55.0; min_atr = 0.0
 
-    if ticker == "GC=F":            # 🟡 ORO — Errático, gaps frecuentes, caza de stops
-        adx_min = 15                # Exigir tendencia real
-        bb_squeeze = 0.012
-        rsi_os, rsi_ob = 36, 64     # Más selectivo
-        ml_umbral_fuerte = 56.0     # ORO necesita ML más alto (errático)
-    elif ticker == "NQ=F":          # 📊 NASDAQ — R:R 0.41 histórico, ser MUY selectivo
-        adx_min = 20                # Solo tendencias fuertes
-        bb_squeeze = 0.010
-        rsi_os, rsi_ob = 35, 65     # Extremos
-        ml_umbral_fuerte = 60.0     # Muy exigente con ML
-    elif ticker == "ES=F":          # 📈 S&P500 — Más estable que NQ, tendencia constante
-        adx_min = 16
-        bb_squeeze = 0.010
-        rsi_os, rsi_ob = 44, 56
-        ml_umbral_fuerte = 57.0     # S&P requiere convicción alta (subido de 55)
-    elif ticker == "USDJPY=X":      # 💴 USD/JPY — Influenciado por BOJ, rangos amplios
-        adx_min = 16
-        bb_squeeze = 0.010
-        rsi_os, rsi_ob = 33, 67
-        ml_umbral_fuerte = 55.0     # Mínimo 55% (subido de 52)
-    elif ticker == "GBPJPY=X":      # 🐉 GBP/JPY — "The Beast", muy volátil
-        adx_min = 18
-        bb_squeeze = 0.012
-        rsi_os, rsi_ob = 30, 70
-        ml_umbral_fuerte = 55.0     # Mínimo 55% (subido de 54)
-    elif ticker == "EURUSD=X":      # 💶 EUR/USD — Par más líquido, movimientos limpios
-        adx_min = 15
-        bb_squeeze = 0.008
-        rsi_os, rsi_ob = 35, 65
-        ml_umbral_fuerte = 55.0     # Mínimo 55% (subido de 52)
-    else:                           # Fallback genérico
-        adx_min = 15
-        bb_squeeze = 0.008
-        rsi_os, rsi_ob = 35, 65
-        ml_umbral_fuerte = 55.0
-
-    # En régimen RANGO con ADX > 12, no sobre-exigir ML (ya filtrado por estrategias)
-    # Antes forzaba 60%, ahora solo +2% extra como precaución
     if regimen == "RANGO" and adx_val >= 12:
-        ml_umbral_fuerte = ml_umbral_fuerte + 1.0  # Solo +1% extra, no forzar 60%
+        ml_umbral_fuerte = ml_umbral_fuerte + 1.0
 
-    # Tolerancia cercanía (0.8% — preciso)
     cercania_soporte      = ind['dist_soporte'] < 0.8
     cercania_resistencia  = ind['dist_resistencia'] < 0.8
-
-    # ── ATR MÍNIMO POR ACTIVO (Calidad de movimiento mínima exigida) ──
-    # Ajustado históricamente (Nasdaq es veloz, Oro es errático)
-    min_atr = 0.0
-    if   ticker == "GC=F":   min_atr = 0.2       # Oro: Reducido para más señales
-    elif ticker == "NQ=F":   min_atr = 2.0       # NQ: Reducido
-    elif ticker == "ES=F":   min_atr = 0.8       # ES: Reducido
-    elif cat == "forex":
-        if "JPY" in ticker: min_atr = 0.004       # JPY pares (USD/JPY, GBP/JPY)
-        else:               min_atr = 0.0003      # Forex pares (~3 pips mínimo)
 
     if ind['atr'] < min_atr:
         return None, 0, [f"⚠️ Volatilidad insuficiente (ATR {ind['atr']:.5g} < {min_atr}). Mercado dormido."]
 
-    # FIX 2026-03-19: Filtros RSI por activo basados en backtest 30 días
-    # Gate function — verifica si la señal pasa el filtro del activo
-    def _filtro_activo_ok(direccion):
+    # Gate function — per-pair RSI/ADX filters from PAR_PROFILES
+    # Note: _prof passed as default arg to avoid closure scoping issues with exec()
+    def _filtro_activo_ok(direccion, _p=_prof):
         """Retorna (ok, razon) — si ok=False, la señal se bloquea."""
+        if not _p or not _p.get("premium", {}).get("enabled"):
+            return True, ""
+        _pm = _p["premium"]
         rsi_v = ind['rsi']
         adx_v = ind['adx']
-        if ticker == "GC=F":  # ORO: COMPRA solo si RSI < 45
-            if direccion == "COMPRA" and rsi_v >= 45:
-                return False, f"🟡 ORO COMPRA bloqueada: RSI {rsi_v:.0f} >= 45 (solo compra sobrevendido)"
-        elif ticker == "USDJPY=X":  # USD/JPY: RSI filtrado (+297 vs +104 pips)
-            if direccion == "COMPRA" and rsi_v >= 50:
-                return False, f"🟡 USD/JPY COMPRA bloqueada: RSI {rsi_v:.0f} >= 50"
-            if direccion == "VENTA" and rsi_v <= 50:
-                return False, f"🟡 USD/JPY VENTA bloqueada: RSI {rsi_v:.0f} <= 50"
-        elif ticker == "GBPJPY=X":  # GBP/JPY: RSI + ADX>25 (+162 vs -551 pips)
-            if direccion == "COMPRA" and (rsi_v >= 50 or adx_v < 25):
-                return False, f"🟡 GBP/JPY COMPRA bloqueada: RSI {rsi_v:.0f} ADX {adx_v:.0f} (necesita RSI<50 + ADX>25)"
-            if direccion == "VENTA" and (rsi_v <= 50 or adx_v < 25):
-                return False, f"🟡 GBP/JPY VENTA bloqueada: RSI {rsi_v:.0f} ADX {adx_v:.0f} (necesita RSI>50 + ADX>25)"
+        _disp = _p["identity"]["display"]
+        if direccion == "COMPRA":
+            gate = _pm.get("rsi_gate_buy")
+            if gate is not None and rsi_v >= gate:
+                return False, f"🟡 {_disp} COMPRA bloqueada: RSI {rsi_v:.0f} >= {gate}"
+        elif direccion == "VENTA":
+            gate = _pm.get("rsi_gate_sell")
+            if gate is not None and rsi_v <= gate:
+                return False, f"🟡 {_disp} VENTA bloqueada: RSI {rsi_v:.0f} <= {gate}"
+        adx_gate = _pm.get("adx_gate")
+        if adx_gate is not None and adx_v < adx_gate:
+            return False, f"🟡 {_disp} bloqueada: ADX {adx_v:.0f} < {adx_gate}"
         return True, ""
 
     # ── HELPER: verificar el cuerpo de la vela ──
@@ -2859,7 +2867,7 @@ def evaluar_senal_profesional(ind, ticker=""):
         # Futuros (GC=F, NQ=F, ES=F) usan proxy ATR como volumen — umbral más bajo
         _es_futuro = ticker.endswith("=F")
         _es_forex = ticker.endswith("=X")
-        vol_breakout = 1.0 if _es_futuro else (1.3 if _es_forex else 1.5)  # Futuros: 1.0x, Forex: 1.3x, Otros: 1.5x
+        vol_breakout = (_prof["premium"].get("vol_breakout", 1.3) if (_prof and _prof.get("premium", {}).get("enabled")) else (1.0 if _es_futuro else (1.3 if _es_forex else 1.5)))
 
         # Ruptura Alcista
         if (ind['precio'] > ind['bb_up']
@@ -2919,7 +2927,7 @@ def evaluar_senal_profesional(ind, ticker=""):
     # Rev Score 4: filtros ORIGINALES para ORO/USD/JPY/GBP/JPY (rsi_os por activo, soporte opcional)
     # Rev Score 4 ESTRICTO: para otros activos (RSI < 30, soporte obligatorio)
     # FIX 2026-03-19: USD/JPY reversión tiene 40.8% WR — desactivado (perdió -91 pips hoy)
-    _rev4_permitido = ticker in ("GC=F", "GBPJPY=X")  # USD/JPY removido
+    _rev4_permitido = (_prof["premium"].get("rev4_allowed", False) if (_prof and _prof.get("premium", {}).get("enabled")) else ticker in ("GC=F", "GBPJPY=X"))
     if _rev4_permitido:
         # Filtros ORIGINALES — ORO: RSI<36, USD/JPY: RSI<33, GBP/JPY: RSI<30
         # Soporte es bonus, no obligatorio (el original no lo requería)
@@ -3121,52 +3129,17 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
     cat = get_categoria(ticker)
     ze_mult = 0.4 # Buffer neutro por defecto
 
-    # 💎 SISTEMA TP/SL — Cierre RÁPIDO en TP1 (R:R ~1:1, cierres más frecuentes)
-    # SL y TP más ajustados → operaciones cierran en horas, no en días
-    # TP2/TP3 OPTIMIZADOS (backtest: 0 TP3, 2 TP2 en 395 señales → targets demasiado lejos)
-    # TP2 reducido ~30%, TP3 reducido ~40% para capturar más beneficio parcial
-    if ticker == "GC=F":           # ORO — SL ~$12, TP1 ~$15
-        sl_mult  = 0.6             # $12 SL (ATR $20 × 0.6)
-        tp1_mult = 0.75            # $15 TP1 → R:R 1.25:1
-        tp2_mult = 1.1             # $22 TP2
-        tp3_mult = 1.6             # $32 TP3
-        ze_mult  = 0.2
-    elif ticker == "NQ=F":         # NASDAQ — FIX 2026-03-19: SL ajustado, TP amplio (backtest +1526 pips)
-        sl_mult  = 0.7             # SL corto (era 1.2) — cortar perdidas rapido
-        tp1_mult = 2.2             # TP1 amplio (era 2.0) → R:R 3.1:1
-        tp2_mult = 3.0             # TP2
-        tp3_mult = 4.0             # TP3
-        ze_mult  = 0.2
-    elif ticker == "ES=F":         # S&P500 — FIX 2026-03-19: SL ajustado, TP amplio (backtest +1011 pips)
-        sl_mult  = 0.7             # SL corto (era 1.5) — cortar perdidas rapido
-        tp1_mult = 2.2             # TP1 amplio → R:R 3.1:1
-        tp2_mult = 3.0
-        tp3_mult = 4.0
-        ze_mult  = 0.2
-    elif ticker == "USDJPY=X":     # USD/JPY — ATR ~19 pips (SL/TP sin cambio, filtro RSI en señales)
-        sl_mult  = 1.0             # SL ~19 pips
-        tp1_mult = 1.4             # TP1 ~27 pips → R:R 1.40:1
-        tp2_mult = 2.0             # TP2 ~38 pips
-        tp3_mult = 2.8             # TP3 ~53 pips
-        ze_mult  = 0.3
-    elif ticker == "GBPJPY=X":    # GBP/JPY — ATR ~22 pips (SL/TP sin cambio, filtro RSI+ADX en señales)
-        sl_mult  = 1.0             # SL ~22 pips
-        tp1_mult = 1.4             # TP1 ~31 pips → R:R 1.40:1
-        tp2_mult = 2.0             # TP2 ~44 pips
-        tp3_mult = 2.8             # TP3 ~62 pips
-        ze_mult  = 0.3
-    elif cat == "forex":           # EUR/USD — FIX 2026-03-19: SL ajustado, TP amplio (backtest +292 pips)
-        sl_mult  = 0.8             # SL corto (era 1.5) — cortar perdidas rapido
-        tp1_mult = 2.5             # TP1 amplio (era 2.1) → R:R 3.1:1
-        tp2_mult = 3.2
-        tp3_mult = 4.0
-        ze_mult  = 0.2
-    else:                          # Fallback
-        sl_mult  = 1.8
-        tp1_mult = 2.0
-        tp2_mult = 2.5             # (era 3.0)
-        tp3_mult = 3.2             # (era 4.5)
-        ze_mult  = 0.3
+    # 💎 SISTEMA TP/SL — desde PAR_PROFILES (single source of truth)
+    _prof_tp = get_par_profile(ticker=ticker)
+    if _prof_tp and _prof_tp.get("sl_tp"):
+        _st = _prof_tp["sl_tp"]
+        sl_mult  = _st.get("sl_mult", 1.8)
+        tp1_mult = _st.get("tp1_mult", 2.0)
+        tp2_mult = _st.get("tp2_mult", 2.5)
+        tp3_mult = _st.get("tp3_mult", 3.2)
+        ze_mult  = _st.get("ze_mult", 0.3)
+    else:
+        sl_mult = 1.8; tp1_mult = 2.0; tp2_mult = 2.5; tp3_mult = 3.2; ze_mult = 0.3
 
     # Ajuste según modo de riesgo
     if MODO_RIESGO == "conservador":
@@ -3219,17 +3192,10 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
         except Exception as e:
             logger.warning(f"⚠️ Error SL asiático adaptativo {ticker}: {e}")
 
-    # FIX 2: MIN_SL floor por activo — evita SL ridículos cuando ATR es bajo
-    MIN_SL = {
-        "EURUSD=X": 0.00150,   # 15 pips mínimo (1 pip = 0.0001)
-        "USDJPY=X": 0.150,     # 15 pips mínimo (1 pip JPY = 0.01, 0.15 = 15 pips)
-        "GBPJPY=X": 0.200,     # 20 pips mínimo (1 pip JPY = 0.01, 0.20 = 20 pips)
-        "GC=F":     5.0,       # $5.0 mínimo en Oro
-        "NQ=F":     25.0,      # 25 puntos mínimo en NASDAQ
-        "ES=F":     8.0,       # 8 puntos mínimo en S&P500
-    }
-    if ticker in MIN_SL and sl < MIN_SL[ticker]:
-        sl = MIN_SL[ticker]
+    # MIN_SL floor from PAR_PROFILES
+    _min_sl_val = _prof_tp["sl_tp"].get("min_sl", 0) if (_prof_tp and _prof_tp.get("sl_tp")) else 0
+    if _min_sl_val > 0 and sl < _min_sl_val:
+        sl = _min_sl_val
 
     tp1 = atr * tp1_mult
     tp2 = atr * tp2_mult
@@ -3389,25 +3355,21 @@ def calcular_lote_sugerido(capital, riesgo_pct, entrada, sl, ticker):
 #  FILTROS DE CALIDAD — EVITAR FALSAS SEÑALES
 # ============================================================
 
-# Horarios de máxima liquidez por activo (hora UTC)
-HORARIOS_MERCADO = {
-    "EURUSD=X": (7,  21),   # 08:00 - 22:00 (Cubre Londres y NY completo)
-    "USDJPY=X": (1,  21),   # FIX 3: era hora 0 → hora 1 UTC (evita spread amplio de apertura asiática)
-    "GBPJPY=X": (1,  21),   # GBP/JPY: sesión asiática + Londres + NY (mismo que USD/JPY)
-    "GC=F":     (7,  21),   # 08:00 - 22:00 (Cubre Pre-Londres y NY) - ADELANTADO 1H
-    "NQ=F":     (8,  21),   # 09:00 - 22:00 (Cubre Apertura Europea y NY) - ADELANTADO 1H
-    "ES=F":     (8,  21),   # 09:00 - 22:00 (Cubre Apertura Europea y NY) - ADELANTADO 1H
-}
+# Horarios de máxima liquidez por activo (hora UTC) — se llena después de PAR_PROFILES
+HORARIOS_MERCADO = {}
+DIVISAS_POR_TICKER = {}
 
-# Divisas que afecta cada activo (para filtrar noticias)
-DIVISAS_POR_TICKER = {
-    "EURUSD=X": ["EUR", "USD"],
-    "USDJPY=X": ["USD", "JPY"],
-    "GBPJPY=X": ["GBP", "JPY"],
-    "GC=F":     ["USD"],
-    "NQ=F":     ["USD"],
-    "ES=F":     ["USD"],
-}
+def _init_horarios_from_profiles():
+    global HORARIOS_MERCADO, DIVISAS_POR_TICKER
+    for _pp_v in PAR_PROFILES.values():
+        _yf_tk = _pp_v["identity"].get("yf")
+        if _yf_tk and _pp_v.get("premium", {}).get("enabled"):
+            _tf = _pp_v["time_filter"]
+            _bh = _tf.get("best_hours_utc", [(7, 21)])
+            _h_min = min(h[0] for h in _bh)
+            _h_max = max(h[1] for h in _bh)
+            HORARIOS_MERCADO[_yf_tk] = (_h_min, max(_h_max, 21))
+            DIVISAS_POR_TICKER[_yf_tk] = _pp_v["news"]["currencies"]
 
 _cache_noticias   = {"datos": None, "ts": 0}
 _cache_fear_greed = {"valor": 50, "class": "Neutral", "ts": 0}
@@ -3505,8 +3467,8 @@ def parsear_senal_externa(texto: str):
 
 def _obtener_capital_real_mt5():
     """
-    Obtiene el equity REAL desde MT5 para calcular lotaje dinámico.
-    Retorna el equity actual (capital + ganancias/pérdidas flotantes).
+    Obtiene el BALANCE REAL desde MT5 para calcular lotaje dinámico.
+    Retorna el balance (dinero real, sin créditos/bonos del broker).
     Si no se puede obtener, retorna CAPITAL_USUARIO como fallback.
     """
     if not MT5_AVAILABLE:
@@ -3514,14 +3476,14 @@ def _obtener_capital_real_mt5():
     try:
         with _lock_mt5:
             acc = mt5.account_info()
-        if acc and acc.equity > 0:
-            _equity = round(acc.equity, 2)
+        if acc and acc.balance > 0:
+            _balance = round(acc.balance, 2)
             # Log solo si hay diferencia significativa con CAPITAL_USUARIO
-            if abs(_equity - CAPITAL_USUARIO) > 10:
-                logger.info(f"💰 Capital dinámico MT5: equity=${_equity:.2f} (CAPITAL_USUARIO=${CAPITAL_USUARIO:.0f})")
-            return _equity
+            if abs(_balance - CAPITAL_USUARIO) > 10:
+                logger.info(f"💰 Capital dinámico MT5: balance=${_balance:.2f} (CAPITAL_USUARIO=${CAPITAL_USUARIO:.0f})")
+            return _balance
     except Exception as e:
-        logger.warning(f"⚠️ No se pudo obtener equity MT5: {e}")
+        logger.warning(f"⚠️ No se pudo obtener balance MT5: {e}")
     return CAPITAL_USUARIO
 
 
@@ -12622,8 +12584,8 @@ def enviar_resumen_diario():
 
     msg_completo = f"{cabecera}\n{lista_estetica}"
 
-    # Siempre enviar al CANAL PRIVADO (VIP)
-    enviar_canal(msg_completo)
+    # Siempre enviar al CANAL PRIVADO (VIP) — se borra en 15 min
+    enviar_telegram_temporal(msg_completo, destino=CHANNEL_ID, delay_borrado=900)
 
     # Solo enviar al GRUPO PÚBLICO si el resultado es POSITIVO
     if GROUP_ID and GROUP_ID != CHANNEL_ID:
@@ -12706,7 +12668,7 @@ def enviar_briefing_matutino():
     lineas.append(
         f"⚙️ Modo: *{MODO_RIESGO.upper()}* | Score min: {get_min_score_efectivo()}/5"
     )
-    enviar_telegram("\n".join(lineas))
+    enviar_telegram_temporal("\n".join(lineas), destino=CHANNEL_ID, delay_borrado=600)
 
 def enviar_notificacion_sesion(sesion):
     """Envía notificación de apertura de sesión (Londres o Nueva York)."""
@@ -12735,7 +12697,7 @@ def enviar_notificacion_sesion(sesion):
             [{"text": f"🔍 Analizar {a}", "callback_data": f"/analisis {a}"} for a in activos_clave]
         ]
     }
-    enviar_telegram("\n".join(lineas), teclado=teclado)
+    enviar_telegram_temporal("\n".join(lineas), destino=CHANNEL_ID, delay_borrado=600, teclado=teclado)
 
 def crear_teclado_principal():
     """Crea un Menú Persistente (ReplyKeyboardMarkup) en la parte inferior para máxima automatización."""
@@ -12965,8 +12927,8 @@ def revisar_niveles_operaciones():
             # Gráfico desactivado — hace el mensaje muy largo
             # ruta_img = generar_grafico_operacion(df, ticker, tipo, op['entrada'], precio_salida, tag, niveles=op) if df is not None else None
 
-            # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP)
-            enviar_telegram(msg, destino=CHANNEL_ID)
+            # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP) — se borra en 15 min
+            enviar_telegram_temporal(msg, destino=CHANNEL_ID, delay_borrado=900)
 
             # 2. 🚫 Resultados de trades MT5 NO se envían al grupo público
             #    (solo van al canal VIP privado — línea 12026 arriba)
@@ -13269,16 +13231,18 @@ def analizar_activo(nombre, ticker):
 
         precio = precio_mon
 
-        # ── 🛑 CIRCUIT BREAKER: pausa 1h tras 2 pérdidas consecutivas ──
+        # ── 🛑 CIRCUIT BREAKER: pausa 1h tras 4 pérdidas consecutivas ──
+        # FIX 2026-03-20: 2→4 pérdidas (2 era demasiado agresivo, bloqueaba todo el día)
         _racha = _calcular_racha_perdidas_actual()
-        if _racha >= 2:
+        if _racha >= 4:
             _last_loss_time = _get_last_loss_time()
             if _last_loss_time and (time.time() - _last_loss_time) < 3600:
                 logger.info(f"🛑 CIRCUIT BREAKER: {nombre} — {_racha} pérdidas seguidas, pausa 1h")
                 return
 
         # ── 🚨 FILTRO DE NOTICIAS (ANTES de generar señales) ────────────
-        if hay_noticia_alto_impacto(ticker, horas_antes=2, horas_despues=1):
+        # FIX 2026-03-20: 2h→1h antes (2h bloqueaba demasiado tiempo)
+        if hay_noticia_alto_impacto(ticker, horas_antes=1, horas_despues=0.5):
             logger.info(f"🚨 {nombre}: BLOQUEADO por noticia 🔴 ROJA de alto impacto")
             return
 
@@ -13377,10 +13341,9 @@ def analizar_activo(nombre, ticker):
             elif "Reversi" in _r or "Divergencia" in _r: _estrategia_tipo = "reversion"; break
 
         # 📉 FILTRO EUR/USD: backtest mostró 24.7% win rate
-        # Permitir: Breakout (score 4) + Reversión con divergencia (score 5)
-        # Bloquear: Pullback (score 4) + Reversión sin divergencia (score 4)
-        if ticker == "EURUSD=X" and score < 5 and _estrategia_tipo != "breakout":
-            print(f"📉 EUR/USD FILTRADO: {_estrategia_tipo} score {score}/5 — solo Breakout o divergencia permitidos")
+        # FIX 2026-03-20: score<5→score<4 (permitir score 4 también, solo bloquear score 3)
+        if ticker == "EURUSD=X" and score < 4 and _estrategia_tipo != "breakout":
+            print(f"📉 EUR/USD FILTRADO: {_estrategia_tipo} score {score}/5 — mínimo score 4 o Breakout")
             return
 
         # 🚫 FILTRO ANTI-CONTRADICCIÓN: No abrir SELL si hay BUY abierto (y viceversa)
@@ -14140,10 +14103,86 @@ def _actualizar_capital_desde_mt5():
             # Log solo cada 10 min o si cambio > $5
             _now = time.time()
             if abs(equity - _old) > 5 or (_now - _ultimo_log_capital) > 600:
-                print(f"💰 CAPITAL ACTUALIZADO: ${_old:.0f} → ${equity:.0f} (equity MT5)")
+                print(f"💰 CAPITAL ACTUALIZADO: ${_old:.0f} → ${equity:.0f} (balance MT5)")
                 _ultimo_log_capital = _now
     except Exception as e:
         logger.warning(f"⚠️ Error actualizando capital: {e}")
+
+
+def _cerrar_operacion_manual(op_key):
+    """Cierra una operacion manualmente desde la consola.
+    Cierra posicion MT5 si existe, elimina del tracking, registra en historial."""
+    global operaciones_activas
+    with _lock_ops:
+        op = operaciones_activas.get(op_key)
+        if not op:
+            print(f"⚠️ CIERRE MANUAL: Operacion {op_key} no encontrada")
+            return
+
+        nombre = op.get('nombre', '?')
+        tipo = op.get('tipo', '?')
+        ticker = op.get('ticker', '')
+        entrada = op.get('entrada', 0)
+        ticket_mt5 = op.get('ticket_mt5')
+        print(f"🔧 CIERRE MANUAL: {nombre} {tipo} (key={op_key})")
+
+        # Cerrar posicion MT5 si existe
+        if ticket_mt5 and MT5_AVAILABLE:
+            try:
+                import MetaTrader5 as _mt5_mod
+                pos = _mt5_mod.positions_get(ticket=ticket_mt5)
+                if pos and len(pos) > 0:
+                    p = pos[0]
+                    close_type = _mt5_mod.ORDER_TYPE_SELL if p.type == 0 else _mt5_mod.ORDER_TYPE_BUY
+                    sym_info = _mt5_mod.symbol_info(p.symbol)
+                    if sym_info:
+                        price = sym_info.bid if p.type == 0 else sym_info.ask
+                        request = {
+                            "action": _mt5_mod.TRADE_ACTION_DEAL,
+                            "symbol": p.symbol,
+                            "volume": p.volume,
+                            "type": close_type,
+                            "position": p.ticket,
+                            "price": price,
+                            "deviation": 20,
+                            "magic": p.magic,
+                            "comment": "BuySell365 manual close",
+                            "type_time": _mt5_mod.ORDER_TIME_GTC,
+                            "type_filling": _mt5_mod.ORDER_FILLING_IOC,
+                        }
+                        result = _mt5_mod.order_send(request)
+                        if result and result.retcode == _mt5_mod.TRADE_RETCODE_DONE:
+                            print(f"✅ MT5 posicion {ticket_mt5} cerrada OK")
+                        else:
+                            _rc = result.retcode if result else "None"
+                            print(f"⚠️ MT5 cierre ticket {ticket_mt5}: retcode={_rc}")
+                else:
+                    print(f"ℹ️ MT5 ticket {ticket_mt5} ya no existe (posicion cerrada)")
+            except Exception as e_mt5:
+                print(f"⚠️ Error cerrando MT5 ticket {ticket_mt5}: {e_mt5}")
+
+        # Registrar en historial
+        _hora_salida = ahora().strftime("%H:%M")
+        _dur_seg = time.time() - op.get('timestamp', time.time())
+        _dur_min = round(_dur_seg / 60, 1)
+        _hist = {
+            "nombre": nombre, "tipo": tipo, "ticker": ticker,
+            "entrada": entrada, "salida": entrada,
+            "pips": 0, "resultado": "MANUAL",
+            "hora": _hora_salida, "fecha": ahora().strftime("%d/%m/%Y"),
+            "hora_entrada": op.get('hora', ''), "hora_salida": _hora_salida,
+            "tag": "MANUAL", "duracion_min": _dur_min,
+            "score": op.get('score', 0),
+            "confianza": op.get('confianza_multi_ia', 0),
+            "estrategia": op.get('estrategia', ''),
+            "fuente": "manual_close",
+        }
+        historial_operaciones.append(_hist)
+
+        # Eliminar del tracking
+        del operaciones_activas[op_key]
+        guardar_estado()
+        log_op(f"🔧 CIERRE MANUAL: {nombre} {tipo} eliminado del tracking (dur: {_dur_min}min)")
 
 
 def _procesar_comandos_launcher():
@@ -14181,6 +14220,9 @@ def _procesar_comandos_launcher():
             SCALPER_ACTIVO = True
             guardar_estado()
             print("▶️ TODO REACTIVADO por consola")
+        elif cmd.startswith("close_op:"):
+            _op_key = cmd.split(":", 1)[1]
+            _cerrar_operacion_manual(_op_key)
         return cmd
     except Exception as e:
         logger.warning(f"Error procesando .bot.cmd: {e}")
@@ -15130,22 +15172,148 @@ def _cmd_scalper_estado():
 #  Activos: XAUUSD (Gold), EURUSD, GBPUSD, US100 (NASDAQ)
 #  Horarios individuales por activo (hora Andorra CET/CEST)
 # ============================================================
+#  PAR_PROFILES — Per-Pair Independent Strategy Configuration
+#  Single source of truth for Scalper + Premium engines
+#  Basado en investigación de estrategias institucionales 2026
+# ============================================================
+
+PAR_PROFILES = {
+    # ━━━━ EURUSD — Multi-TF mean reversion scalp + premium breakout ━━━━
+    "EURUSD": {
+        "identity": {"mt5": "EURUSD", "yf": "EURUSD=X", "display": "EUR/USD", "category": "forex", "currencies": ["EUR", "USD"], "pip_size": 0.0001},
+        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 20},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 15, "bb_squeeze": 0.008, "min_atr": 0.0003, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 50},
+        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
+        "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (9, 18)},
+        "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ GOLD — Momentum breakout, SELL only scalper, London open ━━━━
+    "GOLD": {
+        "identity": {"mt5": "GOLD", "yf": "GC=F", "display": "ORO", "category": "commodity", "currencies": ["USD"], "pip_size": 0.01},
+        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 80},
+        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 200},
+        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
+        "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 19)},
+        "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
+    "US100Cash": {
+        "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
+        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 500},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 20, "bb_squeeze": 0.010, "min_atr": 2.0, "vol_breakout": 1.0, "ml_umbral": 60.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
+        "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
+        "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
+        "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ US500 (S&P 500) — Mean reversion + momentum, solo premium ━━━━
+    "US500Cash": {
+        "identity": {"mt5": "US500Cash", "yf": "ES=F", "display": "S&P 500", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
+        "scalper": {"enabled": False, "strategies": []},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 44, "rsi_ob": 56, "adx_min": 16, "bb_squeeze": 0.010, "min_atr": 0.8, "vol_breakout": 1.0, "ml_umbral": 57.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 300},
+        "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 8.0},
+        "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
+        "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ USDJPY — Carry trade + trend following, Tokyo + NY ━━━━
+    "USDJPY": {
+        "identity": {"mt5": "USDJPY", "yf": "USDJPY=X", "display": "USD/JPY", "category": "forex", "currencies": ["USD", "JPY"], "pip_size": 0.01},
+        "scalper": {"enabled": False, "strategies": []},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 33, "rsi_ob": 67, "adx_min": 16, "bb_squeeze": 0.010, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": None, "rev4_allowed": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 80},
+        "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
+        "time_filter": {"best_hours_utc": [(0, 7), (12, 16)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (1, 21)},
+        "news": {"currencies": ["USD", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ GBPJPY — "The Beast", London breakout, alta volatilidad ━━━━
+    "GBPJPY": {
+        "identity": {"mt5": "GBPJPY", "yf": "GBPJPY=X", "display": "GBP/JPY", "category": "forex", "currencies": ["GBP", "JPY"], "pip_size": 0.01},
+        "scalper": {"enabled": False, "strategies": []},
+        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 70, "adx_min": 18, "bb_squeeze": 0.012, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": 20, "rev4_allowed": True},
+        "risk": {"risk_pct": 0.004, "max_sl_pips": 150},
+        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.8, "tp2_mult": 2.5, "tp3_mult": 3.5, "ze_mult": 0.3, "min_sl": 0.200},
+        "time_filter": {"best_hours_utc": [(7, 10), (12, 16)], "peak_hours_utc": [(7, 10)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (1, 21)},
+        "news": {"currencies": ["GBP", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ AUDCAD — Fibonacci range trading, Asian + London ━━━━
+    "AUDCAD": {
+        "identity": {"mt5": "AUDCAD", "yf": None, "display": "AUD/CAD", "category": "forex", "currencies": ["AUD", "CAD"], "pip_size": 0.0001},
+        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 1.8, "sl_atr": 1.5, "max_spread": 60},
+        "premium": {"enabled": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
+        "sl_tp": {},
+        "time_filter": {"best_hours_utc": [(0, 7), (7, 14)], "peak_hours_utc": [(7, 10)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 18)},
+        "news": {"currencies": ["AUD", "CAD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ EURCHF — Mean reversion SNB, baja volatilidad, London ━━━━
+    "EURCHF": {
+        "identity": {"mt5": "EURCHF", "yf": None, "display": "EUR/CHF", "category": "forex", "currencies": ["EUR", "CHF"], "pip_size": 0.0001},
+        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 1.8, "sl_atr": 1.5, "max_spread": 45},
+        "premium": {"enabled": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 30},
+        "sl_tp": {},
+        "time_filter": {"best_hours_utc": [(7, 16)], "peak_hours_utc": [(8, 12)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 18)},
+        "news": {"currencies": ["EUR", "CHF"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+    # ━━━━ USDCAD — Oil correlation + Fibonacci, NY session ━━━━
+    "USDCAD": {
+        "identity": {"mt5": "USDCAD", "yf": None, "display": "USD/CAD", "category": "forex", "currencies": ["USD", "CAD"], "pip_size": 0.0001},
+        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 1.8, "sl_atr": 1.5, "max_spread": 40},
+        "premium": {"enabled": False},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
+        "sl_tp": {},
+        "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(14, 17)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 18)},
+        "news": {"currencies": ["USD", "CAD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+    },
+}
+
+# ── Init deferred data from PAR_PROFILES ──
+_init_horarios_from_profiles()
+
+# ── Lookup helpers ──
+_PROFILE_BY_YF = {p["identity"]["yf"]: p for k, p in PAR_PROFILES.items() if p["identity"].get("yf")}
+_PROFILE_BY_MT5 = {p["identity"]["mt5"]: p for k, p in PAR_PROFILES.items()}
+
+def get_par_profile(ticker=None, mt5_symbol=None):
+    """Get profile by yfinance ticker or MT5 symbol."""
+    if ticker:
+        return _PROFILE_BY_YF.get(ticker)
+    if mt5_symbol:
+        return _PROFILE_BY_MT5.get(mt5_symbol)
+    return None
+
+# ── Auto-generate SCALPER_ACTIVOS from PAR_PROFILES (backward compat) ──
+SCALPER_ACTIVOS = {}
+for _pp_key, _pp_val in PAR_PROFILES.items():
+    if _pp_val.get("scalper", {}).get("enabled"):
+        _sc_cfg = _pp_val["scalper"]
+        SCALPER_ACTIVOS[_pp_key] = {
+            "mt5": _pp_val["identity"]["mt5"],
+            "tipo": _pp_val["identity"]["category"],
+            "horario": _pp_val["time_filter"]["scalper_horario"],
+            "max_spread": _sc_cfg["max_spread"],
+            "tp_atr": _sc_cfg["tp_atr"],
+            "sl_atr": _sc_cfg["sl_atr"],
+            "estrategia": _sc_cfg["strategies"][0] if _sc_cfg.get("strategies") else "bb_rsi",
+            "solo_sell": _pp_val["behavior"].get("solo_sell", False),
+            "_profile": _pp_val,
+        }
 
 # Configuración del Scalper
 SCALPER_ACTIVO = True  # Master switch para activar/desactivar scalper
 SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
-
-SCALPER_ACTIVOS = {
-    # BB+RSI Mean Reversion M5
-    "EURUSD":    {"mt5": "EURUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 20,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
-    "GBPUSD":    {"mt5": "GBPUSD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
-    "US100Cash": {"mt5": "US100Cash",  "tipo": "indice",    "horario": (15, 22), "max_spread": 500, "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi"},
-    "GOLD":      {"mt5": "GOLD",       "tipo": "commodity", "horario": (9, 19),  "max_spread": 40,  "tp_atr": 2.0, "sl_atr": 1.5, "estrategia": "bb_rsi", "solo_sell": True},
-    # Fibonacci Mean Reversion — pares de rango (backtest 70-82% WR)
-    "AUDCAD":    {"mt5": "AUDCAD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 30,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
-    "EURCHF":    {"mt5": "EURCHF",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
-    "USDCAD":    {"mt5": "USDCAD",     "tipo": "forex",     "horario": (9, 18),  "max_spread": 25,  "tp_atr": 1.5, "sl_atr": 1.0, "estrategia": "fibonacci"},
-}
 
 # Risk Management del Scalper
 SCALPER_RIESGO_POR_TRADE = 0.005   # 0.5% del capital por trade
@@ -15163,6 +15331,11 @@ _scalper_pausa_hasta = None
 _scalper_trades_hoy = 0
 _scalper_posiciones = {}  # {ticket: {symbol, tipo, entrada, sl, tp, tiempo}}
 _lock_scalper = threading.Lock()
+
+# FIX 2026-03-20: Cooldown por dirección después de pérdida
+# {symbol_tipo: timestamp_hasta} — ej: {"EURUSD_BUY": 1711000000}
+_scalper_cooldown_direccion: dict = {}
+SCALPER_COOLDOWN_MINUTOS = 30  # No repetir misma dirección en 30 min tras pérdida
 
 # ============================================================
 #  MEJORAS ESTRATÉGICAS v4 — 10 módulos de optimización
@@ -15799,6 +15972,14 @@ def _auto_optimizar_semanal():
             # Aplicar desactivaciones
             _activos_desactivados_auto = activos_a_desactivar
 
+            # Write RSI adjustments back to PAR_PROFILES (per-pair optimization)
+            for _adj_tk, _adj_vals in _ajustes_rsi.items():
+                _adj_prof = get_par_profile(ticker=_adj_tk)
+                if _adj_prof and _adj_prof.get("premium", {}).get("enabled"):
+                    _adj_prof["premium"]["rsi_os"] += _adj_vals.get("rsi_os_adj", 0)
+                    _adj_prof["premium"]["rsi_ob"] += _adj_vals.get("rsi_ob_adj", 0)
+                    resumen_lines.append(f"  🔧 {_adj_tk}: PAR_PROFILES RSI actualizado OS={_adj_prof['premium']['rsi_os']} OB={_adj_prof['premium']['rsi_ob']}")
+
         resumen_lines.append(f"\n📊 Total cambios: {cambios}")
         resumen = "\n".join(resumen_lines)
 
@@ -15810,7 +15991,7 @@ def _auto_optimizar_semanal():
 
         # Enviar resumen por Telegram
         try:
-            enviar_telegram(resumen, destino=CHANNEL_ID)
+            enviar_telegram_temporal(resumen, destino=CHANNEL_ID, delay_borrado=900)
         except Exception:
             pass
 
@@ -15839,9 +16020,15 @@ def _scalper_descargar_m5(mt5_symbol):
     return None
 
 
-def _scalper_calcular_indicadores(df):
-    """Calcula BB(20,2), RSI(7), EMA(50), ADX(10), ATR(14) para scalping M5."""
+def _scalper_calcular_indicadores(df, profile=None):
+    """Calcula indicadores para scalping M5 con parámetros del perfil."""
     try:
+        _sc = profile["scalper"] if profile else {}
+        _rsi_p = _sc.get("rsi_period", 7)
+        _bb_p = _sc.get("bb_period", 20)
+        _bb_s = _sc.get("bb_std", 2.0)
+        _adx_p = _sc.get("adx_period", 10)
+
         close = pd.Series(df['Close'].values, dtype=float)
         high = pd.Series(df['High'].values, dtype=float)
         low = pd.Series(df['Low'].values, dtype=float)
@@ -15849,10 +16036,11 @@ def _scalper_calcular_indicadores(df):
         if len(close) < 100:
             return None
 
-        rsi = ta.rsi(close, length=7)
-        bb = ta.bbands(close, length=20, std=2)
+        rsi = ta.rsi(close, length=_rsi_p)
+        bb = ta.bbands(close, length=_bb_p, std=_bb_s)
+        ema20 = ta.ema(close, length=20)
         ema50 = ta.ema(close, length=50)
-        adx_df = ta.adx(high, low, close, length=10)
+        adx_df = ta.adx(high, low, close, length=_adx_p)
         atr = ta.atr(high, low, close, length=14)
 
         # Volumen: ratio vs SMA(20)
@@ -15861,7 +16049,7 @@ def _scalper_calcular_indicadores(df):
         _last_vol_sma = float(vol_sma.iloc[-1]) if vol_sma is not None and len(vol_sma) > 0 and not pd.isna(vol_sma.iloc[-1]) else 0
         vol_ratio = float(vol.iloc[-1]) / _last_vol_sma if _last_vol_sma > 0 else 1.0
 
-        if rsi is None or bb is None or ema50 is None:
+        if rsi is None or bb is None or ema50 is None or ema20 is None:
             return None
 
         # Fibonacci: rango de últimas 20 velas H1 (240 M5 = 20 H1)
@@ -15883,7 +16071,9 @@ def _scalper_calcular_indicadores(df):
             "bb_up": float(get_col(bb, 'BBU').iloc[-1]),
             "bb_mid": float(get_col(bb, 'BBM').iloc[-1]),
             "bb_lo": float(get_col(bb, 'BBL').iloc[-1]),
+            "ema20": float(ema20.iloc[-1]),
             "ema50": float(ema50.iloc[-1]),
+            "tendencia": "ALCISTA" if float(ema20.iloc[-1]) > float(ema50.iloc[-1]) else "BAJISTA",
             "adx": float(get_col(adx_df, 'ADX_').iloc[-1]),
             "atr": float(atr.iloc[-1]),
             "fib_pos": fib_pos,
@@ -15924,11 +16114,20 @@ def _scalper_evaluar_senal(ind, config):
     precio = ind['precio']
     symbol = config.get('mt5', '')
 
-    # Filtro ADX: entre 10 y 40
-    if adx < 10:
-        return None, f"ADX={adx:.0f} muy bajo"
-    if adx > 40:
-        return None, f"ADX={adx:.0f} muy alto"
+    # PAR_PROFILES lookup for per-pair thresholds
+    _pp = config.get('_profile')
+    _sc = _pp["scalper"] if _pp else {}
+    _beh = _pp["behavior"] if _pp else {}
+    _adx_min = _sc.get("adx_min", 10)
+    _adx_max = _sc.get("adx_max", 50)
+    _rsi_buy = _sc.get("rsi_buy", 40)
+    _rsi_sell = _sc.get("rsi_sell", 60)
+    _vol_min = _sc.get("vol_min", 0.3)
+
+    if adx < _adx_min:
+        return None, f"ADX={adx:.0f} muy bajo (min {_adx_min})"
+    if adx > _adx_max:
+        return None, f"ADX={adx:.0f} muy alto (max {_adx_max})"
 
     # Filtro ATR mínimo
     if ind['atr'] <= 0:
@@ -15937,8 +16136,8 @@ def _scalper_evaluar_senal(ind, config):
     # 🔴 Filtro volumen: mercado muerto = no scalp
     # FIX 2026-03-19: si vol=0 (sin datos de volumen, común en forex MT5), no bloquear
     _svol = ind.get('vol_ratio', 1.0)
-    if _svol > 0 and _svol < 0.3:
-        return None, f"Vol={_svol:.1f}x bajo (mín 0.3x)"
+    if _svol > 0 and _svol < _vol_min:
+        return None, f"Vol={_svol:.1f}x bajo (mín {_vol_min}x)"
 
     bb_lo = ind['bb_lo']
     bb_up = ind['bb_up']
@@ -15946,71 +16145,107 @@ def _scalper_evaluar_senal(ind, config):
     low = ind['low']
     high = ind['high']
     close = ind.get('close', precio)
+    tendencia = ind.get('tendencia', 'NEUTRAL')
+
+    # FIX 2026-03-20: FILTRO DE TENDENCIA EMA20 vs EMA50
+    # Solo bloquea contra-tendencia cuando ADX>35 (tendencia MUY fuerte)
+    # Mean reversion NECESITA operar contra tendencia moderada — solo bloquear extremos
+    def _filtro_tendencia(tipo_op):
+        """Mean reversion = operar CONTRA tendencia. No filtrar por tendencia.
+        FIX 2026-03-20: Eliminado filtro tendencia para scalper mean reversion.
+        La protección ya existe: R:R 1.67:1, cooldown 30min, trailing stop."""
+        return True
+
+    # FIX 2026-03-20: COOLDOWN POR DIRECCIÓN (30 min tras pérdida)
+    _now_ts = time.time()
+    def _en_cooldown(tipo_op):
+        """Retorna True si hay cooldown activo para esta dirección."""
+        key = f"{symbol}_{tipo_op}"
+        hasta = _scalper_cooldown_direccion.get(key, 0)
+        return _now_ts < hasta
+
+    # Helper: check BUY/SELL blocks from profile
+    def _block_check(tipo_op):
+        if tipo_op == "BUY" and _beh.get("block_buy"):
+            return True, f"{symbol} BUY bloqueado (perfil)"
+        if tipo_op == "SELL" and _beh.get("block_sell"):
+            return True, f"{symbol} SELL bloqueado (perfil)"
+        return False, ""
 
     # ── Variante A: BB touch + RSI en zona extrema (principal) ──
-    # BUY — FIX 2026-03-19: RSI 30→35 (M5 raramente llega a 30)
-    if (low <= bb_lo and rsi < 35 and 10 <= adx <= 40):
-        # Bloquear GOLD BUY (backtest: -83 pips, 36.4% WR)
-        if 'XAUUSD' in symbol or 'GC' in symbol or 'GOLD' in symbol:
-            return None, "Gold BUY bloqueado (backtest negativo)"
-        return "BUY", f"BB+RSI-A Buy | RSI={rsi:.0f} | ADX={adx:.0f}"
+    if (low <= bb_lo and rsi < _rsi_buy and _adx_min <= adx <= _adx_max):
+        blocked, msg = _block_check("BUY")
+        if blocked: return None, msg
+        if not _filtro_tendencia("BUY"): return None, f"BUY bloqueado (tendencia {tendencia})"
+        if _en_cooldown("BUY"): return None, f"BUY en cooldown 30min"
+        return "BUY", f"BB+RSI-A Buy | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
-    # SELL — FIX 2026-03-19: RSI 70→65 (M5 raramente llega a 70)
-    if (high >= bb_up and rsi > 65 and 10 <= adx <= 40):
-        # Bloquear NASDAQ SELL (backtest: -393 pips, 23.9% WR)
-        if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
-            return None, "NASDAQ SELL bloqueado (backtest negativo)"
-        return "SELL", f"BB+RSI-A Sell | RSI={rsi:.0f} | ADX={adx:.0f}"
+    if (high >= bb_up and rsi > _rsi_sell and _adx_min <= adx <= _adx_max):
+        blocked, msg = _block_check("SELL")
+        if blocked: return None, msg
+        if not _filtro_tendencia("SELL"): return None, f"SELL bloqueado (tendencia {tendencia})"
+        if _en_cooldown("SELL"): return None, f"SELL en cooldown 30min"
+        return "SELL", f"BB+RSI-A Sell | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
     # ── Variante B: Rechazo fuerte de BB (mecha larga) ──
-    wick_upper = high - close   # mecha superior
-    wick_lower = close - low    # mecha inferior
+    wick_upper = high - close
+    wick_lower = close - low
 
-    # BUY: mecha inferior larga (rechazo)
-    if (low < bb_lo and close > bb_lo
-            and wick_lower > wick_upper * 1.5
-            and rsi < 45 and 10 <= adx <= 40):
-        if 'XAUUSD' in symbol or 'GC' in symbol:
-            return None, "Gold BUY-B bloqueado"
-        return "BUY", f"BB+RSI-B Buy (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+    if (low < bb_lo and close > bb_lo and wick_lower > wick_upper * 1.5
+            and rsi < (_rsi_buy + 8) and _adx_min <= adx <= _adx_max):
+        blocked, msg = _block_check("BUY")
+        if blocked: return None, msg
+        if not _filtro_tendencia("BUY"): return None, f"BUY-B bloqueado (tendencia {tendencia})"
+        if _en_cooldown("BUY"): return None, f"BUY-B en cooldown 30min"
+        return "BUY", f"BB+RSI-B Buy (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
-    # SELL: mecha superior larga (rechazo)
-    if (high > bb_up and close < bb_up
-            and wick_upper > wick_lower * 1.5
-            and rsi > 55 and 10 <= adx <= 40):
-        if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
-            return None, "NASDAQ SELL-B bloqueado"
-        return "SELL", f"BB+RSI-B Sell (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+    if (high > bb_up and close < bb_up and wick_upper > wick_lower * 1.5
+            and rsi > (_rsi_sell - 8) and _adx_min <= adx <= _adx_max):
+        blocked, msg = _block_check("SELL")
+        if blocked: return None, msg
+        if not _filtro_tendencia("SELL"): return None, f"SELL-B bloqueado (tendencia {tendencia})"
+        if _en_cooldown("SELL"): return None, f"SELL-B en cooldown 30min"
+        return "SELL", f"BB+RSI-B Sell (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
     # ── Variante C: RSI extremo + precio cerca de BB ──
-    # BUY: RSI < 25 + precio en zona baja
-    if (rsi < 25 and close < (bb_lo + (bb_mid - bb_lo) * 0.2)
-            and 10 <= adx <= 40):
-        if 'XAUUSD' in symbol or 'GC' in symbol:
-            return None, "Gold BUY-C bloqueado"
-        return "BUY", f"BB+RSI-C Buy (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+    if (rsi < 30 and close < (bb_lo + (bb_mid - bb_lo) * 0.3)
+            and _adx_min <= adx <= _adx_max):
+        blocked, msg = _block_check("BUY")
+        if blocked: return None, msg
+        if not _filtro_tendencia("BUY"): return None, f"BUY-C bloqueado (tendencia {tendencia})"
+        if _en_cooldown("BUY"): return None, f"BUY-C en cooldown 30min"
+        return "BUY", f"BB+RSI-C Buy (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
-    # SELL: RSI > 75 + precio en zona alta
-    if (rsi > 75 and close > (bb_up - (bb_up - bb_mid) * 0.2)
-            and 10 <= adx <= 40):
-        if 'NQ' in symbol or 'US100' in symbol or 'USTEC' in symbol:
-            return None, "NASDAQ SELL-C bloqueado"
-        return "SELL", f"BB+RSI-C Sell (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f}"
+    if (rsi > 70 and close > (bb_up - (bb_up - bb_mid) * 0.3)
+            and _adx_min <= adx <= _adx_max):
+        blocked, msg = _block_check("SELL")
+        if blocked: return None, msg
+        if not _filtro_tendencia("SELL"): return None, f"SELL-C bloqueado (tendencia {tendencia})"
+        if _en_cooldown("SELL"): return None, f"SELL-C en cooldown 30min"
+        return "SELL", f"BB+RSI-C Sell (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
-    # ── Variante D: FIBONACCI Mean Reversion (nuevos pares de rango) ──
+    # ── Variante D: FIBONACCI Mean Reversion ──
     estrategia = config.get('estrategia', 'bb_rsi')
     if estrategia == 'fibonacci':
         fib_pos = ind.get('fib_pos', 0.5)
-        fib_236 = ind.get('fib_236', 0)
-        fib_764 = ind.get('fib_764', 0)
+        _fib_buy = _sc.get("fib_buy", 0.35)
+        _fib_sell = _sc.get("fib_sell", 0.65)
+        _fib_rsi_buy = _sc.get("rsi_buy", 45)
+        _fib_rsi_sell = _sc.get("rsi_sell", 55)
 
-        # BUY: precio en zona baja del rango + RSI bajo — FIX 2026-03-19: 0.236→0.30 para más ops
-        if fib_pos < 0.30 and rsi < 42 and 10 <= adx <= 35:
-            return "BUY", f"FIB Buy | Pos={fib_pos:.1%} < 30% | RSI={rsi:.0f} | ADX={adx:.0f}"
+        if fib_pos < _fib_buy and rsi < _fib_rsi_buy and _adx_min <= adx <= _adx_max:
+            blocked, msg = _block_check("BUY")
+            if blocked: return None, msg
+            if not _filtro_tendencia("BUY"): return None, f"FIB BUY bloqueado (tendencia {tendencia})"
+            if _en_cooldown("BUY"): return None, f"FIB BUY en cooldown 30min"
+            return "BUY", f"FIB Buy | Pos={fib_pos:.1%} < {_fib_buy:.0%} | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
-        # SELL: precio en zona alta del rango + RSI alto — FIX 2026-03-19: 0.764→0.70
-        if fib_pos > 0.70 and rsi > 58 and 10 <= adx <= 35:
-            return "SELL", f"FIB Sell | Pos={fib_pos:.1%} > 70% | RSI={rsi:.0f} | ADX={adx:.0f}"
+        if fib_pos > _fib_sell and rsi > _fib_rsi_sell and _adx_min <= adx <= _adx_max:
+            blocked, msg = _block_check("SELL")
+            if blocked: return None, msg
+            if not _filtro_tendencia("SELL"): return None, f"FIB SELL bloqueado (tendencia {tendencia})"
+            if _en_cooldown("SELL"): return None, f"FIB SELL en cooldown 30min"
+            return "SELL", f"FIB Sell | Pos={fib_pos:.1%} > {_fib_sell:.0%} | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
 
         return None, f"FIB neutral (pos={fib_pos:.1%})"
 
@@ -16022,17 +16257,19 @@ def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
     global _scalper_trades_hoy, _scalper_posiciones
 
     if not MT5_AVAILABLE or not AUTO_TRADING:
+        logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: MT5={MT5_AVAILABLE} AutoTrading={AUTO_TRADING}")
         return False
 
     try:
         with _lock_mt5:
             symbol_info = mt5.symbol_info(mt5_symbol)
         if symbol_info is None:
+            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: symbol_info=None (símbolo no encontrado en MT5)")
             return False
 
         # Verificar spread
         if symbol_info.spread > config['max_spread']:
-            print(f"🔪 Scalper: {mt5_symbol} spread={symbol_info.spread} > max={config['max_spread']} — skip")
+            logger.info(f"🔪 Scalper: {mt5_symbol} spread={symbol_info.spread} > max={config['max_spread']} — skip")
             return False
 
         # Calcular lote basado en riesgo 0.5%
@@ -16041,17 +16278,20 @@ def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
         with _lock_mt5:
             tick = mt5.symbol_info_tick(mt5_symbol)
         if not tick:
+            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: tick=None (sin precio)")
             return False
 
         precio_entrada = tick.ask if tipo == "BUY" else tick.bid
         sl_distance = abs(precio_entrada - sl_price)
         if sl_distance <= 0:
+            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: sl_distance=0 (SL igual a precio)")
             return False
 
         # Calcular valor del pip
         tick_size = symbol_info.trade_tick_size
         tick_value = symbol_info.trade_tick_value
         if tick_size <= 0 or tick_value <= 0:
+            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: tick_size={tick_size} tick_value={tick_value}")
             return False
 
         lote_calculado = riesgo_dinero / (sl_distance / tick_size * tick_value)
@@ -16094,11 +16334,12 @@ def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
                     "lote": lote,
                     "tiempo": datetime.now(),
                 }
-            print(f"🔪 SCALPER {tipo}: {mt5_symbol} @ {precio_entrada:.5g} | SL={sl_price:.5g} | TP={tp_price:.5g} | Lote={lote} | Trade #{_scalper_trades_hoy}")
+            logger.info(f"🔪 SCALPER EJECUTADO {tipo}: {mt5_symbol} @ {precio_entrada:.5g} | SL={sl_price:.5g} | TP={tp_price:.5g} | Lote={lote} | Trade #{_scalper_trades_hoy}")
             return True
         else:
             rc = result.retcode if result else "None"
-            print(f"🔪 Scalper: Orden rechazada {mt5_symbol} — retcode={rc}")
+            comment = getattr(result, 'comment', '') if result else ''
+            logger.info(f"🔪 Scalper: Orden RECHAZADA {mt5_symbol} — retcode={rc} comment={comment}")
             return False
 
     except Exception as e:
@@ -16146,9 +16387,25 @@ def _scalper_gestionar_posiciones():
                                     _scalper_pnl_diario += profit
                                     if profit < 0:
                                         _scalper_perdidas_consecutivas += 1
+                                        # FIX 2026-03-20: Cooldown 30min para misma dirección tras pérdida
+                                        _cd_key = f"{pos_info['symbol']}_{pos_info['tipo']}"
+                                        _scalper_cooldown_direccion[_cd_key] = time.time() + SCALPER_COOLDOWN_MINUTOS * 60
+                                        print(f"🔪 Cooldown 30min activado: {_cd_key}")
                                     else:
                                         _scalper_perdidas_consecutivas = 0
                                     print(f"🔪 Scalper CERRADO: {pos_info['symbol']} {pos_info['tipo']} | P&L=${profit:.2f} | Día=${_scalper_pnl_diario:.2f} | Racha={_scalper_perdidas_consecutivas}")
+                                    # Notificar al admin directamente (chat privado)
+                                    try:
+                                        _sc_emoji = "✅" if profit >= 0 else "🛑"
+                                        _sc_msg = (
+                                            f"{_sc_emoji} *Scalper* — {pos_info.get('symbol', '?')}\n"
+                                            f"{pos_info.get('tipo', '?')}  {'$+' if profit >= 0 else '$'}{profit:.2f}\n"
+                                            f"P&L día: ${_scalper_pnl_diario:+.2f}"
+                                        )
+                                        if USERS_AUTORIZADOS:
+                                            enviar_telegram_temporal(_sc_msg, destino=USERS_AUTORIZADOS[0], delay_borrado=600)
+                                    except Exception:
+                                        pass
                                     break
                     except Exception:
                         pass
@@ -16168,27 +16425,42 @@ def _scalper_gestionar_posiciones():
                 _scalper_cerrar_posicion(pos)
                 continue
 
-            # Breakeven: mover SL a entrada si precio avanzó 40% hacia TP
+            # Trailing Stop Progresivo: proteger ganancias conforme avanza el precio
             tp_dist = abs(info['tp'] - info['entrada'])
             if tp_dist > 0:
+                with _lock_mt5:
+                    _tick_be = mt5.symbol_info_tick(pos.symbol)
+                _spread_be = (_tick_be.ask - _tick_be.bid) if _tick_be else 0
+
                 if info['tipo'] == "BUY":
                     avance = pos.price_current - info['entrada']
                 else:
                     avance = info['entrada'] - pos.price_current
 
                 if avance > tp_dist * SCALPER_BREAKEVEN_PCT:
-                    # Mover SL a breakeven (+ spread buffer)
-                    with _lock_mt5:
-                        _tick_be = mt5.symbol_info_tick(pos.symbol)
-                    _spread_be = (_tick_be.ask - _tick_be.bid) if _tick_be else 0
+                    # Trailing progresivo: SL sigue al precio asegurando ganancia
+                    # Nivel 1 (40% TP): SL a breakeven (entrada + spread)
+                    # Nivel 2 (60% TP): SL a 30% del avance
+                    # Nivel 3 (80% TP): SL a 60% del avance
+                    if avance > tp_dist * 0.80:
+                        trail_pct = 0.60  # Asegurar 60% de la ganancia
+                    elif avance > tp_dist * 0.60:
+                        trail_pct = 0.30  # Asegurar 30% de la ganancia
+                    else:
+                        trail_pct = 0.0   # Breakeven
+
                     if info['tipo'] == "BUY":
-                        nuevo_sl = info['entrada'] + _spread_be
+                        nuevo_sl = info['entrada'] + _spread_be + (avance * trail_pct)
                         if pos.sl < nuevo_sl:
                             _scalper_modificar_sl(pos, nuevo_sl)
+                            if trail_pct > 0:
+                                print(f"📈 Scalper TRAIL: {pos.symbol} BUY SL→{nuevo_sl:.5g} (aseg. {trail_pct*100:.0f}%)")
                     elif info['tipo'] == "SELL":
-                        nuevo_sl = info['entrada'] - _spread_be
+                        nuevo_sl = info['entrada'] - _spread_be - (avance * trail_pct)
                         if pos.sl > nuevo_sl:
                             _scalper_modificar_sl(pos, nuevo_sl)
+                            if trail_pct > 0:
+                                print(f"📈 Scalper TRAIL: {pos.symbol} SELL SL→{nuevo_sl:.5g} (aseg. {trail_pct*100:.0f}%)")
 
     except Exception as e:
         logger.error(f"🔪 Scalper: Error gestionando posiciones: {e}")
@@ -16333,6 +16605,13 @@ def loop_scalper():
                 if hora_local < h_inicio or hora_local >= h_fin:
                     continue
 
+                # Filtro best_days from PAR_PROFILES
+                _pp_loop = config.get('_profile')
+                if _pp_loop:
+                    _best_days = _pp_loop.get("time_filter", {}).get("best_days")
+                    if _best_days is not None and now.weekday() not in _best_days:
+                        continue  # Skip non-peak days for this pair
+
                 # No abrir si ya hay posición del scalper en este símbolo
                 # Verificar tanto en dict interno como en MT5 directamente
                 with _lock_scalper:
@@ -16349,13 +16628,7 @@ def loop_scalper():
                 if ya_en_dict or ya_en_mt5:
                     continue
 
-                # Filtro correlación: no abrir EURUSD y GBPUSD simultáneamente
-                with _lock_scalper:
-                    _simbolos_abiertos = {p['symbol'] for p in _scalper_posiciones.values()}
-                if mt5_sym == "EURUSD" and "GBPUSD" in _simbolos_abiertos:
-                    continue
-                if mt5_sym == "GBPUSD" and "EURUSD" in _simbolos_abiertos:
-                    continue
+                # FIX 2026-03-20: GBPUSD eliminado, ya no necesita filtro correlación
 
                 # Descargar datos M5
                 df = _scalper_descargar_m5(mt5_sym)
@@ -16363,12 +16636,18 @@ def loop_scalper():
                     continue
 
                 # Calcular indicadores
-                ind = _scalper_calcular_indicadores(df)
+                ind = _scalper_calcular_indicadores(df, profile=config.get('_profile'))
                 if not ind:
                     continue
 
                 # Evaluar señal
                 tipo, razon = _scalper_evaluar_senal(ind, config)
+                # FIX 2026-03-20: Log de cada evaluación para diagnóstico
+                _sc_rsi = ind.get('rsi', 0)
+                _sc_adx = ind.get('adx', 0)
+                _sc_tend = ind.get('tendencia', '?')
+                _sc_fib = ind.get('fib_pos', 0.5)
+                logger.info(f"🔪 Scalper {mt5_sym}: RSI={_sc_rsi:.1f} ADX={_sc_adx:.1f} {_sc_tend} Fib={_sc_fib:.0%} => {tipo or 'NADA'} ({razon})")
                 if tipo is None:
                     continue
 
@@ -16388,8 +16667,9 @@ def loop_scalper():
                     tp_price = ind['precio'] - tp_dist
 
                 # EJECUTAR
-                print(f"🔪 Scalper SEÑAL: {mt5_sym} {tipo} — {razon}")
-                _scalper_ejecutar_orden(mt5_sym, tipo, sl_price, tp_price, config)
+                logger.info(f"🔪 Scalper SEÑAL EJECUTANDO: {mt5_sym} {tipo} — {razon} | SL={sl_price:.5g} TP={tp_price:.5g}")
+                ok = _scalper_ejecutar_orden(mt5_sym, tipo, sl_price, tp_price, config)
+                logger.info(f"🔪 Scalper RESULTADO: {mt5_sym} {tipo} — {'EJECUTADO' if ok else 'FALLIDO'}")
 
         except Exception as e:
             logger.error(f"🔪 Scalper: Error en loop principal: {e}")
@@ -16560,17 +16840,17 @@ def _arrancar_interno():
 
     cargar_estado()
 
-    # 💰 INICIALIZAR CAPITAL DESDE MT5 (equity real al arrancar)
+    # 💰 INICIALIZAR CAPITAL DESDE MT5 (balance real al arrancar)
     if MT5_AVAILABLE:
         try:
             _acc_info = mt5.account_info()
-            if _acc_info and _acc_info.equity > 0:
-                CAPITAL_USUARIO = round(_acc_info.equity, 2)
-                print(f"💰 Capital inicializado desde MT5: ${CAPITAL_USUARIO:.2f} (equity real)")
+            if _acc_info and _acc_info.balance > 0:
+                CAPITAL_USUARIO = round(_acc_info.balance, 2)
+                print(f"💰 Capital inicializado desde MT5: ${CAPITAL_USUARIO:.2f} (balance real)")
             else:
-                print(f"⚠️ No se pudo leer equity MT5, usando capital guardado: ${CAPITAL_USUARIO:.0f}")
+                print(f"⚠️ No se pudo leer balance MT5, usando capital guardado: ${CAPITAL_USUARIO:.0f}")
         except Exception as e:
-            print(f"⚠️ Error leyendo equity MT5: {e}, usando: ${CAPITAL_USUARIO:.0f}")
+            print(f"⚠️ Error leyendo balance MT5: {e}, usando: ${CAPITAL_USUARIO:.0f}")
 
     log_sistema(f"📂 Estado cargado: {len(operaciones_activas)} ops, {len(suscripciones_vip)} VIPs, {len(historial_operaciones)} historial")
     if MT5_AVAILABLE:

@@ -181,14 +181,54 @@ def run_backtest():
             "MIN_SCORE = 3",
         ]
 
-        full_code = '\n'.join(stubs) + '\n\n' + '\n\n'.join(extracted)
+        # Extract PAR_PROFILES: find balanced braces
+        par_profiles_code = ""
+        lookup_code = ""
+        for li, ln in enumerate(lines):
+            if "PAR_PROFILES = {" in ln:
+                brace_count = 0
+                pp_lines = []
+                for j in range(li, min(li + 500, len(lines))):
+                    pp_lines.append(lines[j])
+                    brace_count += lines[j].count('{') - lines[j].count('}')
+                    if brace_count == 0 and j > li:
+                        break
+                par_profiles_code = '\n'.join(pp_lines)
+                break
+        # Extract lookup helpers (dict comprehensions after PAR_PROFILES)
+        for li, ln in enumerate(lines):
+            if "_PROFILE_BY_YF" in ln and "=" in ln and "def " not in ln and ln.strip().startswith("_"):
+                lookup_code += ln + "\n"
+            if "_PROFILE_BY_MT5" in ln and "=" in ln and "def " not in ln and ln.strip().startswith("_"):
+                lookup_code += ln + "\n"
+        get_par_func = extract_function(lines, "def get_par_profile(")
 
-        # Execute in isolated namespace
-        exec(full_code, ns)
+        full_code = '\n'.join(stubs) + '\n\n'
+        if par_profiles_code:
+            full_code += par_profiles_code + '\n\n'
+        if lookup_code:
+            full_code += lookup_code + '\n'
+        if get_par_func:
+            full_code += get_par_func + '\n\n'
+        full_code += '\n\n'.join(extracted)
+
+        # Execute in isolated namespace — pass ns as both globals and locals
+        # so nested functions can access module-level vars like _PROFILE_BY_YF
+        exec(compile(full_code, '<backtest_bot>', 'exec'), ns, ns)
 
         calcular_indicadores = ns.get("calcular_indicadores_profesionales")
         evaluar_senal = ns.get("evaluar_senal_profesional")
         calcular_niveles = ns.get("calcular_niveles_3tp")
+
+        # Verify PAR_PROFILES loaded
+        _pp_check = ns.get("PAR_PROFILES")
+        _gpf_check = ns.get("get_par_profile")
+        if _pp_check:
+            print(f"   ✅ PAR_PROFILES: {len(_pp_check)} pares cargados")
+        else:
+            print("   ⚠️ PAR_PROFILES no encontrado — señales premium pueden fallar")
+        if _gpf_check:
+            print(f"   ✅ get_par_profile disponible")
 
         if calcular_indicadores and evaluar_senal and calcular_niveles:
             print("   ✅ Funciones extraídas correctamente (modo aislado)")
@@ -266,7 +306,9 @@ def run_backtest():
 
             try:
                 ind = calcular_indicadores(df_slice, precio, ticker)
-            except Exception:
+            except Exception as _ci_err:
+                if n_senales == 0 and f"{nombre}_calc_err" not in stats_por_activo:
+                    stats_por_activo[f"{nombre}_calc_err"] = {"reasons": [str(_ci_err)[:120]]}
                 continue
 
             if not ind:
@@ -274,8 +316,19 @@ def run_backtest():
 
             try:
                 tipo, score, razones = evaluar_senal(ind, ticker)
-            except Exception:
+            except Exception as _ev_err:
+                if n_senales == 0 and f"{nombre}_eval_err" not in stats_por_activo:
+                    stats_por_activo[f"{nombre}_eval_err"] = {"reasons": [str(_ev_err)[:120]]}
                 continue
+
+            # Debug: log first few rejections per asset
+            if tipo is None and n_senales == 0:
+                _dbg_key = f"{nombre}_dbg"
+                if _dbg_key not in stats_por_activo:
+                    stats_por_activo[_dbg_key] = {"reasons": []}
+                if len(stats_por_activo[_dbg_key]["reasons"]) < 3:
+                    _reason_str = razones[0] if razones else "unknown"
+                    stats_por_activo[_dbg_key]["reasons"].append(f"score={score} razones={_reason_str[:80]}")
 
             if tipo is None or score < 4:
                 continue
@@ -464,6 +517,11 @@ def run_backtest():
     total_senales = len(todas_senales)
     if total_senales == 0:
         print("❌ No se generaron señales en el período.")
+        # Show debug info
+        print("\n📋 Diagnóstico (primeras razones de rechazo por activo):")
+        for k, v in stats_por_activo.items():
+            if ("_dbg" in k or "_err" in k) and v.get("reasons"):
+                print(f"   {k}: {v['reasons']}")
         return
 
     total_wins = sum(1 for s in todas_senales if s["resultado"] in ("TP1", "TP2", "TP3"))
@@ -595,7 +653,9 @@ def _generate_html_report(senales, stats_activo, stats_estrat,
     # Tabla por activo
     activo_rows = ""
     for nombre, s in stats_activo.items():
-        if s["total"] == 0:
+        if "_dbg" in nombre or "_err" in nombre:
+            continue
+        if s.get("total", 0) == 0:
             continue
         w = s["tp1"] + s["tp2"] + s["tp3"]
         wr = w / s["total"] * 100
@@ -672,4 +732,7 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
 
-    input("\nPresiona Enter para salir...")
+    try:
+        input("\nPresiona Enter para salir...")
+    except EOFError:
+        pass

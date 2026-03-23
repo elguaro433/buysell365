@@ -657,7 +657,7 @@ def index_web():
 <meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en 6 activos con IA avanzada y datos institucionales.">
 <meta name="keywords" content="trading signals, se\u00f1ales trading, inteligencia artificial trading, forex signals, oro trading, NASDAQ signals, copy trading, bot trading, XAU USD, BuySell365">
 <meta property="og:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. Oro, EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P 500.">
+<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. Oro, EUR/USD, USD/JPY, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -1062,8 +1062,16 @@ if('serviceWorker' in navigator){{
       <div class="asset-name">USD/JPY</div><div class="asset-tag" data-i18n="assets.forex_major">Forex Principal</div>
     </div>
     <div class="asset-card">
-      <div class="asset-icon gbpjpy"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#012169"/><text x="14" y="25" text-anchor="middle" font-size="14" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text><circle cx="28" cy="20" r="12" fill="#bc002d"/><text x="28" y="25" text-anchor="middle" font-size="15" font-weight="900" fill="#fff" font-family="Arial">\u00a5</text><path d="M20 10v20" stroke="#0d1117" stroke-width="2" stroke-dasharray="2 2" opacity=".3"/></svg></div>
-      <div class="asset-name">GBP/JPY</div><div class="asset-tag">La Bestia \u2022 Forex</div>
+      <div class="asset-icon audcad"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#00008B"/><text x="14" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">A$</text><circle cx="28" cy="20" r="12" fill="#FF0000"/><text x="28" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">C$</text></svg></div>
+      <div class="asset-name">AUD/CAD</div><div class="asset-tag">Fibonacci Scalper</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon eurchf"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#003399"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#FFD700" font-family="Arial">&euro;</text><circle cx="28" cy="20" r="12" fill="#FF0000"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">Fr</text></svg></div>
+      <div class="asset-name">EUR/CHF</div><div class="asset-tag">Fibonacci Scalper</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon usdcad"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#002868"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">$</text><circle cx="28" cy="20" r="12" fill="#FF0000"/><text x="28" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">C$</text></svg></div>
+      <div class="asset-name">USD/CAD</div><div class="asset-tag">Fibonacci Scalper</div>
     </div>
     <div class="asset-card">
       <div class="asset-icon nasdaq"><svg viewBox="0 0 40 40" fill="none"><line x1="8" y1="22" x2="8" y2="32" stroke="#ef4444" stroke-width="1.2"/><rect x="6" y="24" width="4" height="6" rx=".5" fill="#ef4444"/><line x1="15" y1="12" x2="15" y2="28" stroke="#00d4aa" stroke-width="1.2"/><rect x="13" y="14" width="4" height="10" rx=".5" fill="#00d4aa"/><line x1="22" y1="16" x2="22" y2="30" stroke="#ef4444" stroke-width="1.2"/><rect x="20" y="18" width="4" height="8" rx=".5" fill="#ef4444"/><line x1="29" y1="6" x2="29" y2="24" stroke="#00d4aa" stroke-width="1.2"/><rect x="27" y="8" width="4" height="12" rx=".5" fill="#00d4aa"/><line x1="35" y1="4" x2="35" y2="20" stroke="#00d4aa" stroke-width="1.2"/><rect x="33" y="6" width="4" height="10" rx=".5" fill="#00d4aa"/><path d="M5 35l7-8 7 4 7-12 7-8 4-3" stroke="#00d4aa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/></svg></div>
@@ -1119,12 +1127,12 @@ if('serviceWorker' in navigator){{
       </ul>
       <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Empezar Prueba Gratis</a>
     </div>
-    <div class="price-card" style="position:relative">
-      <div class="price-badge" style="background:linear-gradient(135deg,#00e676,#00c853);animation:pulse 2s infinite;box-shadow:0 0 16px rgba(0,230,118,.4)">\U0001f525 <span data-i18n="pricing.copy_badge">DISPONIBLE AHORA</span></div>
+    <div class="price-card" style="position:relative;opacity:0.7">
+      <div class="price-badge" style="background:linear-gradient(135deg,#ff9800,#f57c00);box-shadow:0 0 16px rgba(255,152,0,.4)">&#9200; <span data-i18n="pricing.copy_badge">PROXIMAMENTE</span></div>
       <div class="price-name" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.1rem;color:var(--accent)" data-i18n="pricing.copy_price">Peque\u00f1a comisi\u00f3n por apertura</div>
+      <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Pr\u00f3ximamente disponible</div>
       <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5 a trav\u00e9s de XM</p>
-      <ul class="price-list">
+      <ul class="price-list" style="opacity:0.5">
         <li data-i18n="pricing.cp1">Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
         <li data-i18n="pricing.cp2">Copia autom\u00e1tica en tiempo real</li>
         <li data-i18n="pricing.cp3">SL y TP colocados autom\u00e1ticamente</li>
@@ -1132,7 +1140,7 @@ if('serviceWorker' in navigator){{
         <li data-i18n="pricing.cp5">Broker regulado XM (MT5)</li>
         <li data-i18n="pricing.cp6">Sin intervenci\u00f3n manual requerida</li>
       </ul>
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;background:linear-gradient(135deg,#a855f7,#6366f1);border:none" data-i18n="pricing.copy_btn">\U0001f680 Empezar Copy Trading</a>
+      <div style="width:100%;text-align:center;margin-top:16px;padding:12px 24px;background:linear-gradient(135deg,#666,#444);border-radius:8px;color:#fff;font-weight:600;cursor:not-allowed">&#128276; Proximamente</div>
     </div>
   </div>
 </section>
@@ -1529,11 +1537,13 @@ def dashboard_visual():
 
     _all_assets = [
         ('ORO', '#f0b90b', ['ORO', 'GOLD', 'XAUUSD', 'XAU']),
-        ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100']),
-        ('S&amp;P 500', '#3b82f6', ['S&P', 'SP500', 'US500', 'ES']),
+        ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100', 'US100Cash']),
+        ('S&amp;P 500', '#3b82f6', ['S&P', 'SP500', 'US500', 'ES', 'US500Cash']),
         ('EUR/USD', '#a855f7', ['EUR/USD', 'EURUSD', 'EUR']),
         ('USD/JPY', '#ef4444', ['USD/JPY', 'USDJPY', 'JPY']),
-        ('GBP/JPY', '#10b981', ['GBP/JPY', 'GBPJPY', 'GJ']),
+        ('AUD/CAD', '#22c55e', ['AUD/CAD', 'AUDCAD']),
+        ('EUR/CHF', '#06b6d4', ['EUR/CHF', 'EURCHF']),
+        ('USD/CAD', '#f97316', ['USD/CAD', 'USDCAD']),
     ]
     activos_en_curso = [str(op.get('nombre', op.get('ticker', ''))) for op in ops.values() if isinstance(op, dict)]
     asset_cards_html = ""
@@ -1832,9 +1842,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
                 <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM GRATIS</a>
-                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="cta-btn" style="background:linear-gradient(135deg,#a855f7,#6366f1);border:none;padding:12px 24px">&#128640; COPY TRADING</a>
+                <span class="cta-btn" style="background:linear-gradient(135deg,#666,#444);border:none;padding:12px 24px;cursor:not-allowed;opacity:0.6">&#9200; COPY TRADING - PROXIMAMENTE</span>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px">Peque&ntilde;a comisi&oacute;n por apertura &mdash; Solo pagas si ganas</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
         </div>
     </div>
 
@@ -1964,7 +1974,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
           const isMt5 = op.fuente === 'mt5';
           const plColor = (op.beneficio !== undefined) ? (op.beneficio >= 0 ? '#00c853' : '#ff5252') : '#8b949e';
           html += '<div class="alert-op">';
-          const _dispName = (function(raw){{ if(!raw) return '?'; const m={{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY'}}; if(m[raw]) return m[raw]; var n=raw; for(var k in m){{ if(raw.indexOf(k)>=0) return m[k]; }}; n=n.replace(/[^A-Za-z0-9\\/&. _-]/g,'').trim(); if(m[n]) return m[n]; return n||raw; }})(op.nombre || op.ticker);
+          const _dispName = (function(raw){{ if(!raw) return '?'; const m={{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY','AUDCAD':'AUD/CAD','EURCHF':'EUR/CHF','USDCAD':'USD/CAD'}}; if(m[raw]) return m[raw]; var n=raw; for(var k in m){{ if(raw.indexOf(k)>=0) return m[k]; }}; n=n.replace(/[^A-Za-z0-9\\/&. _-]/g,'').trim(); if(m[n]) return m[n]; return n||raw; }})(op.nombre || op.ticker);
           html += '<div class="alert-name">' + _dispName;
           if(isMt5 && op.volumen) html += ' <span style="font-size:11px;color:#8b949e">(' + op.volumen + ' lots)</span>';
           html += '</div>';
@@ -2093,7 +2103,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
   function normName(raw){{
     if(!raw) return '?';
-    const map = {{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY','BTC-USD':'BITCOIN','ETH-USD':'ETHEREUM','XAUUSD':'ORO','BTCUSD':'BITCOIN','ETHUSD':'ETHEREUM','US100Cash':'NASDAQ','US500Cash':'S&P 500'}};
+    const map = {{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY','AUDCAD':'AUD/CAD','EURCHF':'EUR/CHF','USDCAD':'USD/CAD','BTC-USD':'BITCOIN','ETH-USD':'ETHEREUM','XAUUSD':'ORO','BTCUSD':'BITCOIN','ETHUSD':'ETHEREUM','US100Cash':'NASDAQ','US500Cash':'S&P 500'}};
     if(map[raw]) return map[raw];
     let n = raw.replace(/[^A-Za-z0-9\\/&. _-]/g, '').trim();
     if(map[n]) return map[n];
