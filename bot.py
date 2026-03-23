@@ -1722,9 +1722,10 @@ def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 30
             f"\n\n💎 *¿QUIERES ESTAS SEÑALES EN VIVO?*\nRecibe entradas con alta precision.\n🎁 *Escribe /vip — 5 dias habiles GRATIS + 50% en tu primer mes* 🔥",
             f"\n\n🚀 *SEÑALES DE TRADING EN TIEMPO REAL*\nAnalisis tecnico automatizado con IA.\n🎁 *Escribe /vip — Prueba 5 dias habiles GRATIS + 50% OFF* 🔥",
             f"\n\n🔥 *UNETE AL CANAL VIP*\nSenales diarias de Oro, Forex e Indices.\n🎁 *Escribe /vip — 5 dias habiles GRATIS + 50% en tu primer mes* 🔥",
-            "\n\n🚀 *COPY TRADING DISPONIBLE*\nCopia nuestras operaciones automaticamente en tu cuenta MT5.\n👉 [Empezar Copy Trading](https://social.tp-redirect.com/s/WRE0V7jm) 🔥",
-            "\n\n📈 *COPIA NUESTRAS OPERACIONES 24/7*\nSin experiencia necesaria. Broker regulado XM.\n👉 [Activar Copy Trading](https://social.tp-redirect.com/s/WRE0V7jm) 🚀",
-            "\n\n💰 *COPY TRADING AUTOMATICO*\nTodas nuestras senales ejecutadas en tu cuenta.\n👉 [Comenzar ahora](https://social.tp-redirect.com/s/WRE0V7jm) — Solo pagas si ganas 🔥"
+            # Copy Trading desactivado hasta nuevo aviso
+            # "\n\n🚀 *COPY TRADING DISPONIBLE*\n...",
+            # "\n\n📈 *COPIA NUESTRAS OPERACIONES 24/7*\n...",
+            # "\n\n💰 *COPY TRADING AUTOMATICO*\n..."
         ]
         mensaje += random.choice(promos)
         
@@ -1740,13 +1741,13 @@ def notificar_fomo_grupo(nombre: str, tipo: str):
     fomos = [
         (f"*{nombre}* — Se\u00f1al activa\n"
          f"[Ver resultado en vivo]({DASHBOARD_URL})\n"
-         f"\U0001f680 [Copy Trading — copia autom\u00e1tica](https://social.tp-redirect.com/s/WRE0V7jm)"),
+         f"\U0001f4e2 Escribe /vip para recibir todas las se\u00f1ales"),
         (f"*{nombre}* — Operaci\u00f3n en curso\n"
          f"[Dashboard en vivo]({DASHBOARD_URL})\n"
-         f"\U0001f4b0 [Copia nuestras operaciones en tu cuenta](https://social.tp-redirect.com/s/WRE0V7jm)"),
+         f"\U0001f525 Escribe /vip — 5 d\u00edas GRATIS"),
         (f"*{nombre}* — Se\u00f1al detectada\n"
          f"[Rendimiento en vivo]({DASHBOARD_URL})\n"
-         f"\u26a1 [Activa Copy Trading — sin experiencia](https://social.tp-redirect.com/s/WRE0V7jm)"),
+         f"\U0001f4b0 Escribe /vip — Se\u00f1ales Premium con IA"),
     ]
     msg = random.choice(fomos)
     return enviar_telegram_temporal(msg, destino=GROUP_ID, delay_borrado=600)
@@ -4515,9 +4516,9 @@ def cmd_ayuda():
         "📊 *Herramientas*\n"
         "   `/web` — Trading en Vivo\n"
         "   `/estado` — Estado del sistema\n\n"
-        "👑 *VIP y Copy Trading*\n"
+        "👑 *VIP*\n"
         f"   `/vip` — Canal VIP (5 dias habiles gratis)\n"
-        "   `/copy` — Copy Trading automatico\n\n"
+        "   `/copy` — Copy Trading (proximamente)\n\n"
         "💡 _Preguntame: \"Analiza el oro\" o \"Precio del nasdaq\"_"
     )
 
@@ -6434,7 +6435,7 @@ def cmd_vip(user_id: str = None):
         "━━━━━━━━━━\n\n"
         "✅ Senales IA: Oro, Forex, NASDAQ, S&P 500\n"
         "✅ Alta precision | Entrada, SL, TP exactos\n"
-        "✅ Copy Trading automatico en tu cuenta MT5\n"
+        "✅ Notificaciones en tiempo real a Telegram\n"
         "✅ Gestion de riesgo | Trading en Vivo\n\n"
     )
 
@@ -6475,7 +6476,7 @@ def cmd_vip(user_id: str = None):
     botones = []
     if puede_trial:
         botones.append([{"text": f"🎁 5 DIAS HABILES GRATIS — PROBAR AHORA", "callback_data": "vip_trial_gratis"}])
-    botones.append([{"text": "🚀 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}])
+    botones.append([{"text": "📊 VER DASHBOARD", "url": "https://buysell365.pro"}])
     botones.append([{"text": btn_pago, "callback_data": "vip_pagar_usdt"}])
     if _tiene_pago_pendiente:
         monto_pend = pagos_pendientes_vip[user_id].get("monto_unico", 0)
@@ -8714,21 +8715,15 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                              "copiar trades", "como copio", "quiero copiar",
                              "copiar automatico", "copia automatica")):
         return (
-            "🚀 *COPY TRADING — BuySell365.pro*\n"
+            "⏳ *COPY TRADING — Proximamente*\n"
             "━━━━━━━━━━\n\n"
-            "Copia nuestras operaciones automaticamente en tu cuenta.\n\n"
-            "✅ Sin experiencia necesaria\n"
-            "✅ Operaciones en tiempo real\n"
-            "✅ Oro, Forex, NASDAQ, S&P 500\n"
-            "✅ Broker regulado XM\n\n"
-            "📌 *Como funciona:*\n"
-            "1. Abre tu cuenta en XM (link abajo)\n"
-            "2. Activa Copy Trading\n"
-            "3. Nuestras operaciones se copian automaticamente\n\n"
-            "💡 _Tu controlas el riesgo y puedes pausar cuando quieras._",
+            "Estamos optimizando nuestro sistema de Copy Trading para ofrecerte la mejor experiencia.\n\n"
+            "📢 Te notificaremos cuando este disponible.\n\n"
+            "Mientras tanto, recibe nuestras señales Premium en tiempo real:\n"
+            "👉 Escribe /vip para mas informacion",
             {"inline_keyboard": [
-                [{"text": "🚀 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
-                [{"text": "👑 CANAL VIP", "callback_data": "vip_pagar_usdt"}, {"text": "❓ AYUDA", "callback_data": "/ayuda"}]
+                [{"text": "👑 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "📊 DASHBOARD", "url": "https://buysell365.pro"}]
             ]}
         )
 
@@ -9682,20 +9677,20 @@ section{{padding:50px 20px}}
       </ul>
       <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Empezar Prueba Gratis</a>
     </div>
-    <div class="price-card" style="position:relative">
-      <div class="price-badge" style="background:linear-gradient(135deg,#00e676,#00c853);animation:pulse 2s infinite;box-shadow:0 0 16px rgba(0,230,118,.4)">🔥 <span data-i18n="pricing.copy_badge">DISPONIBLE AHORA</span></div>
+    <div class="price-card" style="position:relative;opacity:0.7">
+      <div class="price-badge" style="background:linear-gradient(135deg,#ff9800,#f57c00);box-shadow:0 0 16px rgba(255,152,0,.4)">⏳ <span data-i18n="pricing.copy_badge">PROXIMAMENTE</span></div>
       <div class="price-name" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.1rem;color:var(--accent)" data-i18n="pricing.copy_price">Pequeña comisión por apertura</div>
-      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia automática todas nuestras operaciones en tu cuenta MT5 a través de XM</p>
-      <ul class="price-list">
+      <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Proximamente disponible</div>
+      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia automatica todas nuestras operaciones en tu cuenta MT5</p>
+      <ul class="price-list" style="opacity:0.5">
         <li data-i18n="pricing.cp1">Operativa automatizada — Oro, Forex e \u00cdndices</li>
-        <li data-i18n="pricing.cp2">Copia automática en tiempo real</li>
-        <li data-i18n="pricing.cp3">SL y TP colocados automáticamente</li>
+        <li data-i18n="pricing.cp2">Copia automatica en tiempo real</li>
+        <li data-i18n="pricing.cp3">SL y TP colocados automaticamente</li>
         <li data-i18n="pricing.cp4">Sin cuota mensual — solo pagas si ganas</li>
         <li data-i18n="pricing.cp5">Broker regulado XM (MT5)</li>
-        <li data-i18n="pricing.cp6">Sin intervención manual requerida</li>
+        <li data-i18n="pricing.cp6">Sin intervencion manual requerida</li>
       </ul>
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px;background:linear-gradient(135deg,#a855f7,#6366f1);border:none" data-i18n="pricing.copy_btn">🚀 Empezar Copy Trading</a>
+      <div style="width:100%;text-align:center;margin-top:16px;padding:12px 24px;background:linear-gradient(135deg,#666,#444);border-radius:8px;color:#fff;font-weight:600;cursor:not-allowed">🔔 Proximamente</div>
     </div>
   </div>
 </section>
@@ -10967,15 +10962,15 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <p style="font-size:14px;max-width:520px;margin:8px auto 20px" data-i18n="dash.promo_unified_sub">Se&ntilde;ales de IA + Copy Trading autom&aacute;tico en tu cuenta MT5 con broker regulado XM</p>
             <div class="promo-features" style="margin-bottom:20px">
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Se&ntilde;ales con TP y SL exactos</div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Copy Trading 24/7</div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Broker regulado XM</div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Notificaciones en tiempo real</div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Oro, Forex, NASDAQ, S&amp;P 500</div>
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> SL y TP autom&aacute;ticos</div>
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
                 <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM GRATIS</a>
-                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="cta-btn" style="background:linear-gradient(135deg,#a855f7,#6366f1);border:none;padding:12px 24px">&#128640; COPY TRADING</a>
+                <span class="cta-btn" style="background:linear-gradient(135deg,#666,#444);border:none;padding:12px 24px;cursor:not-allowed;opacity:0.6">&#9200; COPY TRADING - PROXIMAMENTE</span>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px">Peque&ntilde;a comisi&oacute;n por apertura &mdash; Solo pagas si ganas</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
         </div>
     </div>
 
@@ -14318,8 +14313,8 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         bienvenida += (
             "Canal VIP con senales de alta precision:\n"
             "✅ Oro, Forex, NASDAQ, S&P 500\n"
-            "✅ Entry, SL, TP exactos\n\n"
-            "🚀 *Copy Trading* — copia nuestras operaciones automaticamente\n\n"
+            "✅ Entry, SL, TP exactos\n"
+            "✅ Notificaciones en tiempo real\n\n"
             f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
         )
 
@@ -14327,17 +14322,15 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         markup = {
             "inline_keyboard": [
                 [{"text": f"🎁 5 DIAS HABILES GRATIS", "callback_data": "vip_trial_gratis"}],
-                [{"text": "🚀 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                 [{"text": f"💰 PAGAR {p}{VIP_MONEDA}{desc_label}", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Estadisticas", "callback_data": "/semana"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+                [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
             ]
         }
     else:
         markup = {
             "inline_keyboard": [
-                [{"text": "🚀 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                 [{"text": f"💰 SUSCRIBIRSE AL VIP ({p}{VIP_MONEDA}{desc_label})", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Estadisticas", "callback_data": "/semana"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+                [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
             ]
         }
 
@@ -15063,15 +15056,15 @@ def loop_polling():
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
-                                            f"🚀 *COPY TRADING DISPONIBLE*\n"
-                                            f"Copia nuestras operaciones en tu cuenta MT5.\n"
-                                            f"👉 [Activar Copy Trading](https://social.tp-redirect.com/s/WRE0V7jm)"
+                                            f"📊 *SENALES PREMIUM CON IA*\n"
+                                            f"Recibe todas las senales en tiempo real.\n"
+                                            f"👉 Escribe /vip — 5 dias GRATIS"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
-                                            f"📈 *COPIA NUESTRAS OPERACIONES 24/7*\n"
-                                            f"Sin experiencia necesaria. Broker regulado XM.\n"
-                                            f"👉 [Empezar Copy Trading](https://social.tp-redirect.com/s/WRE0V7jm)"
+                                            f"🔥 *UNETE AL CANAL VIP*\n"
+                                            f"Oro, Forex, NASDAQ, S&P 500.\n"
+                                            f"👉 Escribe /vip"
                                         ),
                                     ]
                                     respuesta += random.choice(promos_grupo)
