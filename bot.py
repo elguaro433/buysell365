@@ -13254,9 +13254,9 @@ def analizar_activo(nombre, ticker):
             logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
             return
 
-        # 🔴 FILTRO DURO VOLUMEN: vol < 0.5x = mercado muerto, no operar
+        # 🔴 FILTRO DURO VOLUMEN: vol < 0.2x = mercado muerto, no operar
         _vol_r = ind.get('vol_ratio', 1.0)
-        if _vol_r < 0.5:
+        if _vol_r < 0.2:
             logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.5x) — señal descartada")
             return
 
@@ -15175,8 +15175,8 @@ PAR_PROFILES = {
     "EURUSD": {
         "identity": {"mt5": "EURUSD", "yf": "EURUSD=X", "display": "EUR/USD", "category": "forex", "currencies": ["EUR", "USD"], "pip_size": 0.0001},
         "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 20},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 15, "bb_squeeze": 0.008, "min_atr": 0.0003, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": False},
-        "risk": {"risk_pct": 0.005, "max_sl_pips": 50},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "risk": {"risk_pct": 0.01, "max_sl_pips": 50},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
         "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (9, 18)},
         "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
@@ -15197,8 +15197,8 @@ PAR_PROFILES = {
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
         "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 500},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 20, "bb_squeeze": 0.010, "min_atr": 2.0, "vol_breakout": 1.0, "ml_umbral": 60.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": False},
-        "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "risk": {"risk_pct": 0.01, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
         "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
@@ -15208,8 +15208,8 @@ PAR_PROFILES = {
     "US500Cash": {
         "identity": {"mt5": "US500Cash", "yf": "ES=F", "display": "S&P 500", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
         "scalper": {"enabled": False, "strategies": []},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 44, "rsi_ob": 56, "adx_min": 16, "bb_squeeze": 0.010, "min_atr": 0.8, "vol_breakout": 1.0, "ml_umbral": 57.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": False},
-        "risk": {"risk_pct": 0.005, "max_sl_pips": 300},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 40, "rsi_ob": 60, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.5, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "risk": {"risk_pct": 0.01, "max_sl_pips": 300},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 8.0},
         "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
@@ -15219,8 +15219,8 @@ PAR_PROFILES = {
     "USDJPY": {
         "identity": {"mt5": "USDJPY", "yf": "USDJPY=X", "display": "USD/JPY", "category": "forex", "currencies": ["USD", "JPY"], "pip_size": 0.01},
         "scalper": {"enabled": False, "strategies": []},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_5"], "rsi_period": 14, "rsi_os": 33, "rsi_ob": 67, "adx_min": 16, "bb_squeeze": 0.010, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": None, "rev4_allowed": False},
-        "risk": {"risk_pct": 0.005, "max_sl_pips": 80},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.003, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": 60, "rsi_gate_sell": 40, "adx_gate": None, "rev4_allowed": True},
+        "risk": {"risk_pct": 0.01, "max_sl_pips": 80},
         "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
         "time_filter": {"best_hours_utc": [(0, 7), (12, 16)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (1, 21)},
         "news": {"currencies": ["USD", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
@@ -15309,7 +15309,7 @@ SCALPER_ACTIVO = True  # Master switch para activar/desactivar scalper
 SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
 
 # Risk Management del Scalper
-SCALPER_RIESGO_POR_TRADE = 0.005   # 0.5% del capital por trade
+SCALPER_RIESGO_POR_TRADE = 0.015   # 1.5% del capital por trade (demo — más agresivo)
 SCALPER_MAX_LOSS_DIARIO = 0.03     # 3% máximo pérdida diaria → para todo
 SCALPER_MAX_CONSECUTIVAS = 4       # 4 pérdidas seguidas → pausa 30 min
 SCALPER_MAX_POSICIONES = 5         # Máximo 5 posiciones abiertas simultáneas (7 activos)
