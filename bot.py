@@ -15338,6 +15338,31 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
     """Procesa mensaje con IA si es admin en chat privado. Retorna True si respondió."""
     if user_id not in ADMIN_IDS:
         return False
+
+    texto_lower = texto.lower().strip()
+
+    # Comando directo: "cierra todo" o "cerrar todo"
+    if any(cmd in texto_lower for cmd in ["cierra todo", "cerrar todo", "close all"]):
+        n_cerradas = _cerrar_todas_posiciones_mt5()
+        enviar_telegram(f"✅ {n_cerradas} posiciones cerradas en MT5", chat_id)
+        return True
+
+    # Comando: "cierra oro" o "cierra gold" o "cierra eurusd"
+    _pares_cierre = {
+        "oro": "GOLD", "gold": "GOLD", "xauusd": "GOLD",
+        "eurusd": "EURUSD", "gbpusd": "GBPUSD", "usdjpy": "USDJPY",
+        "nasdaq": "US100Cash", "us100": "US100Cash", "nas100": "US100Cash",
+        "sp500": "US500Cash", "us500": "US500Cash",
+        "audcad": "AUDCAD", "eurchf": "EURCHF", "usdcad": "USDCAD",
+        "gbpjpy": "GBPJPY", "gbpnzd": "GBPNZD",
+    }
+    for palabra, mt5_sym in _pares_cierre.items():
+        if any(cmd in texto_lower for cmd in [f"cierra {palabra}", f"cerrar {palabra}", f"close {palabra}"]):
+            n = _cerrar_posiciones_por_simbolo(mt5_sym)
+            enviar_telegram(f"✅ {n} posiciones de {mt5_sym} cerradas", chat_id)
+            return True
+
+    # IA respuesta general
     if not _GEMINI_KEY:
         return False
 
@@ -15346,6 +15371,80 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
         enviar_telegram(respuesta, chat_id)
         return True
     return False
+
+
+def _cerrar_todas_posiciones_mt5():
+    """Cierra TODAS las posiciones abiertas en MT5."""
+    if not MT5_AVAILABLE:
+        return 0
+    count = 0
+    try:
+        with _lock_mt5:
+            positions = mt5.positions_get()
+        if not positions:
+            return 0
+        for pos in positions:
+            close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            with _lock_mt5:
+                tick = mt5.symbol_info_tick(pos.symbol)
+            if not tick:
+                continue
+            price = tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": pos.symbol,
+                "volume": pos.volume,
+                "type": close_type,
+                "price": price,
+                "position": pos.ticket,
+                "deviation": 30,
+                "comment": "BuySell365 Pro",
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            with _lock_mt5:
+                result = mt5.order_send(request)
+            if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                count += 1
+    except Exception as e:
+        logger.error(f"Error cerrando posiciones: {e}")
+    return count
+
+
+def _cerrar_posiciones_por_simbolo(mt5_symbol):
+    """Cierra todas las posiciones de un símbolo específico en MT5."""
+    if not MT5_AVAILABLE:
+        return 0
+    count = 0
+    try:
+        with _lock_mt5:
+            positions = mt5.positions_get(symbol=mt5_symbol)
+        if not positions:
+            return 0
+        for pos in positions:
+            close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            with _lock_mt5:
+                tick = mt5.symbol_info_tick(pos.symbol)
+            if not tick:
+                continue
+            price = tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": pos.symbol,
+                "volume": pos.volume,
+                "type": close_type,
+                "price": price,
+                "position": pos.ticket,
+                "deviation": 30,
+                "comment": "BuySell365 Pro",
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+            with _lock_mt5:
+                result = mt5.order_send(request)
+            if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                count += 1
+    except Exception as e:
+        logger.error(f"Error cerrando {mt5_symbol}: {e}")
+    return count
 
 # Inicializar Gemini al arrancar
 if _GEMINI_KEY:
