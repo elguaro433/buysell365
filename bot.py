@@ -8711,7 +8711,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 "Usa /reanudar para reactivar todo.")
 
     # ▶️ /reanudar — Reactiva todo
-    if t in ("/reanudar", "/resume", "reanudar", "reanudar todo", "start trading"):
+    if t in ("/reanudar", "/resume", "/play", "reanudar", "reanudar todo", "start trading", "play", "continuar", "/continuar"):
         if not es_admin: return "⛔ Solo administradores pueden reanudar el bot."
         mt5_pausado = False
         escaneo_pausado = False
