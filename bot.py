@@ -17412,7 +17412,84 @@ def _arrancar_interno():
         _iniciar_hilo("signal_copier", _loop_signal_copier)
         log_sistema("📡 Signal Copier activado — escuchando canales VIP")
 
-    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier")
+    # 📊 MONITOR CUENTA REAL — lee MSC Gold Stable Pro y envía a Telegram
+    # Cada 60s: lock MT5 → login real → leer posiciones → login demo → unlock
+    _monitor_real_posiciones: dict = {}
+
+    def _loop_monitor_real():
+        """Monitorea cuenta real periódicamente cambiando de cuenta."""
+        nonlocal _monitor_real_posiciones
+        _REAL_LOGIN = 88849791
+        _REAL_PASS = "Andorra433+"
+        _REAL_SERVER = "XMGlobal-MT5 4"
+        _DEMO_LOGIN = 336093063
+        _DEMO_PASS = "Emmanuel433+"
+        _DEMO_SERVER = "XMGlobal-MT5 9"
+
+        time.sleep(120)  # Esperar arranque completo
+        logger.info("📊 Monitor REAL: iniciando monitoreo cada 60s")
+
+        while True:
+            try:
+                time.sleep(60)
+                with _lock_mt5:
+                    # Cambiar a real
+                    mt5.login(_REAL_LOGIN, password=_REAL_PASS, server=_REAL_SERVER)
+                    time.sleep(1)
+                    positions = mt5.positions_get()
+                    # Volver a demo inmediatamente
+                    mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
+
+                if positions:
+                    current_tickets = {p.ticket for p in positions}
+                    for pos in positions:
+                        if pos.ticket not in _monitor_real_posiciones:
+                            _dir = "COMPRA" if pos.type == 0 else "VENTA"
+                            emoji = "🟢" if pos.type == 0 else "🔴"
+                            msg = (
+                                f"{emoji} *{_dir} {pos.symbol}*\n"
+                                f"Entrada: {pos.price_open}\n"
+                                f"SL: {pos.sl}\n"
+                                f"TP: {pos.tp}"
+                            )
+                            enviar_canal(msg)
+                            logger.info(f"📊 REAL: Nueva posición {_dir} {pos.symbol} @ {pos.price_open}")
+                            _monitor_real_posiciones[pos.ticket] = {
+                                "symbol": pos.symbol, "type": pos.type,
+                                "price_open": pos.price_open,
+                            }
+
+                    # Detectar cerradas
+                    cerradas = set(_monitor_real_posiciones.keys()) - current_tickets
+                    for ticket in cerradas:
+                        info = _monitor_real_posiciones[ticket]
+                        msg = f"🔄 *{info['symbol']}* — CIERRE"
+                        enviar_canal(msg)
+                        logger.info(f"📊 REAL: Posición cerrada {info['symbol']}")
+                        del _monitor_real_posiciones[ticket]
+                else:
+                    # Sin posiciones — limpiar
+                    if _monitor_real_posiciones:
+                        for ticket, info in list(_monitor_real_posiciones.items()):
+                            msg = f"🔄 *{info['symbol']}* — CIERRE"
+                            enviar_canal(msg)
+                        _monitor_real_posiciones.clear()
+
+            except Exception as e:
+                logger.error(f"📊 Monitor REAL error: {e}")
+                # Asegurar que volvemos a demo
+                try:
+                    with _lock_mt5:
+                        mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
+                except Exception:
+                    pass
+
+    _MT5_LOGIN_ACTUAL = os.getenv("MT5_LOGIN", "")
+    if str(_MT5_LOGIN_ACTUAL) == "336093063" and MT5_AVAILABLE:
+        _iniciar_hilo("monitor_real", _loop_monitor_real)
+        log_sistema("📊 Monitor cuenta REAL activado — leyendo MSC Gold Stable Pro cada 60s")
+
+    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier, monitor_real")
 
     # 🐕 WATCHDOG — vigila y reinicia hilos muertos cada 60s
     _iniciar_hilo("watchdog", _watchdog)
