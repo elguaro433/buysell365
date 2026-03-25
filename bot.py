@@ -14956,6 +14956,9 @@ def loop_polling():
                                 manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
                                 continue
                             else:
+                                # 🤖 IA: si es admin en privado, responder con Gemini
+                                if user_id in ADMIN_IDS and _procesar_ia_telegram(texto, chat_id, user_id, nombre_u):
+                                    continue
                                 # 💬 Privado: enviar bienvenida VIP al chat directo
                                 manejar_usuario_nuevo(msg, from_user, texto)
                                 continue
@@ -15227,8 +15230,106 @@ def _cmd_scalper_estado():
     )
 
 # ============================================================
+#  🤖 IA ASISTENTE — Gemini AI para respuestas inteligentes
+#  Responde preguntas sobre trading, estado del bot, señales
+#  Solo para ADMIN (Emmanuel) en chat privado
+# ============================================================
+
+_GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
+_gemini_model = None
+
+def _inicializar_gemini():
+    global _gemini_model
+    if not _GEMINI_KEY:
+        return False
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=_GEMINI_KEY)
+        _gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+        logger.info("🤖 Gemini AI inicializado correctamente")
+        return True
+    except Exception as e:
+        logger.warning(f"🤖 Gemini AI no disponible: {e}")
+        return False
+
+def _ia_responder(pregunta, user_name="Trader"):
+    """Genera respuesta IA con contexto del bot."""
+    global _gemini_model
+    if not _gemini_model:
+        if not _inicializar_gemini():
+            return None
+
+    # Construir contexto del bot
+    _ctx_ops = []
+    try:
+        if MT5_AVAILABLE:
+            import MetaTrader5 as _mt5_ia
+            with _lock_mt5:
+                _pos = _mt5_ia.positions_get()
+            if _pos:
+                for p in _pos:
+                    _profit = p.profit
+                    _tipo = "BUY" if p.type == 0 else "SELL"
+                    _ctx_ops.append(f"{_tipo} {p.symbol} @ {p.price_open:.5g} P&L: ${_profit:.2f}")
+    except Exception:
+        pass
+
+    _ops_texto = "\n".join(_ctx_ops) if _ctx_ops else "Sin operaciones abiertas"
+
+    # Stats del bot
+    _wr = f"{len([h for h in historial_operaciones if h.get('resultado') == 'WIN'])/max(1,len(historial_operaciones))*100:.1f}%" if historial_operaciones else "N/A"
+    _capital = f"${CAPITAL_USUARIO:.2f}"
+    _n_ops = len(operaciones_activas)
+
+    prompt = f"""Eres BuySell365 Pro, un asistente de trading con IA. Responde en español, breve y profesional.
+
+CONTEXTO ACTUAL:
+- Capital: {_capital}
+- Win Rate historico: {_wr}
+- Operaciones activas: {_n_ops}
+- Posiciones MT5:
+{_ops_texto}
+- Pares que operamos: ORO, EUR/USD, GBP/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, AUD/CAD, EUR/CHF, NASDAQ, S&P 500, US30, GER40, GBP/JPY, y mas
+- Modos: Scalper M5, Premium M15, Signal Copier (tiempo real)
+- El usuario se llama {user_name}
+
+REGLAS:
+- Responde breve (max 300 caracteres)
+- Si preguntan por operaciones abiertas, muestra las posiciones MT5
+- Si preguntan por estado del bot, da resumen rapido
+- Si piden cerrar operacion, di que debe usar /cerrar o hacerlo en MT5
+- Si preguntan por señales, explica los 3 modos
+- No inventes datos que no tienes
+- Usa emojis moderadamente
+
+PREGUNTA: {pregunta}"""
+
+    try:
+        response = _gemini_model.generate_content(prompt)
+        return response.text[:1000] if response.text else None
+    except Exception as e:
+        logger.warning(f"🤖 Gemini error: {e}")
+        return None
+
+def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
+    """Procesa mensaje con IA si es admin en chat privado. Retorna True si respondió."""
+    if user_id not in ADMIN_IDS:
+        return False
+    if not _GEMINI_KEY:
+        return False
+
+    respuesta = _ia_responder(texto, nombre)
+    if respuesta:
+        enviar_telegram(respuesta, chat_id)
+        return True
+    return False
+
+# Inicializar Gemini al arrancar
+if _GEMINI_KEY:
+    _inicializar_gemini()
+
+# ============================================================
 #  📡 SIGNAL COPIER — Lee señales externas y ejecuta en MT5
-#  Fuentes: SureShotFX (FX VIP, GOLD VIP, INDICES VIP)
 #  + Reenvía señales al canal BuySell365 Telegram
 # ============================================================
 
