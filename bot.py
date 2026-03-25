@@ -15245,7 +15245,8 @@ _COPIER_SYMBOL_MAP = {
     "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "EURCHF": "EURCHF",
     "AUDNZD": "AUDNZD", "EURGBP": "EURGBP", "EURAUD": "EURAUD",
     "GBPAUD": "GBPAUD", "NZDJPY": "NZDJPY", "CADJPY": "CADJPY",
-    "CHFJPY": "CHFJPY",
+    "CHFJPY": "CHFJPY", "GBPNZD": "GBPNZD",
+    "GER40": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
 }
 
 def _parsear_senal_externa(texto):

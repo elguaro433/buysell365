@@ -36,7 +36,8 @@ SYMBOL_MAP = {
     "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "EURCHF": "EURCHF",
     "EURGBP": "EURGBP", "EURAUD": "EURAUD", "GBPAUD": "GBPAUD",
     "NZDJPY": "NZDJPY", "CADJPY": "CADJPY", "CHFJPY": "CHFJPY",
-    "AUDNZD": "AUDNZD",
+    "AUDNZD": "AUDNZD", "GBPNZD": "GBPNZD",
+    "GER40": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
 }
 
 MAGIC_COPIER = 20260325
@@ -49,13 +50,31 @@ def parse_signal(text):
 
     upper = text.upper().replace("\n", " ").replace("  ", " ").strip()
 
-    # Skip update/close messages
-    if any(w in upper for w in ["CLOSE HALF", "CLOSE PARTIAL", "FULL CLOSE", "MOVE SL", "RUNNING", "PIPS PROFIT", "STOP LOSS HIT", "TP HIT"]):
-        # This is an update, not a new signal — handle separately
+    # Skip update/close messages (English + Spanish)
+    # Skip noise messages (info, ads, errors)
+    _ignore_keywords = [
+        "SSF COPIER", "SSF TRADE COPIER", "AUTOMATIZACION", "CUPON", "SURESHOTFX.COM",
+        "INVALID PARAMETERS", "INVALID ORDER", "MARKET IS TOO VOLATILE", "RISK SMALL",
+        "GOLD ANALYSIS", "LET'S WAIT", "HOLA MIEMBROS", "HELLO VIP",
+        "SL UPDATED", "HIT OUR RISK",
+    ]
+    if any(w in upper for w in _ignore_keywords):
+        return None
+
+    # Update/close messages (English + Spanish)
+    _update_keywords = [
+        "CLOSE HALF", "CLOSE PARTIAL", "FULL CLOSE", "MOVE SL", "RUNNING", "PIPS PROFIT",
+        "STOP LOSS HIT", "TP HIT", "HIT OUR RISK",
+        "CIERRA LA MITAD", "CIERRE DE LA MITAD", "CIERRE MEDIO", "CIERRE PARCIAL",
+        "MOVER SL", "MOVER EL SL", "MOVIMOS EL SL",
+        "CERRAR COMPLETAMENTE", "EN CURSO CON", "GANANCIA DE",
+    ]
+    if any(w in upper for w in _update_keywords):
         return _parse_update(text, upper)
 
-    # Detect direction
+    # Detect direction (including LIMIT orders — treated as market orders)
     direction = None
+    is_limit = "LIMIT" in upper
     if any(w in upper for w in ["BUY", "COMPRA", "LONG"]):
         direction = "BUY"
     elif any(w in upper for w in ["SELL", "VENTA", "SHORT"]):
@@ -83,13 +102,14 @@ def parse_signal(text):
     if not entry_match:
         entry_match = re.search(rf'{alias}\s+(?:BUY|SELL|COMPRA|VENTA)\s+(\d+\.?\d*)', upper)
 
-    if not entry_match or not sl_match or not tp_match:
+    if not sl_match or not tp_match:
         return None
 
     try:
-        entry = float(entry_match.group(1))
         sl = float(sl_match.group(1))
         tp = float(tp_match.group(1))
+        # Entry price: use from text if available, otherwise 0 (will use market price)
+        entry = float(entry_match.group(1)) if entry_match else 0.0
     except (ValueError, IndexError):
         return None
 
@@ -127,22 +147,39 @@ def parse_signal(text):
 
 
 def _parse_update(text, upper):
-    """Parse signal updates (close half, move SL, etc.)."""
+    """Parse signal updates (close half, move SL, etc.) — English + Spanish."""
     action = None
-    if "CLOSE HALF" in upper:
+
+    # Close half (EN + ES)
+    if any(w in upper for w in ["CLOSE HALF", "CIERRA LA MITAD", "CIERRE DE LA MITAD", "CIERRE MEDIO"]):
         action = "close_half"
-    elif "CLOSE PARTIAL" in upper:
+    # Close partial (EN + ES)
+    elif any(w in upper for w in ["CLOSE PARTIAL", "CIERRE PARCIAL"]):
         action = "close_partial"
-    elif "FULL CLOSE" in upper:
+    # Full close (EN + ES)
+    elif any(w in upper for w in ["FULL CLOSE", "CERRAR COMPLETAMENTE"]):
         action = "full_close"
-    elif "MOVE SL" in upper and "ENTRY" in upper:
+    # Move SL to entry (EN + ES)
+    elif any(w in upper for w in ["MOVE SL TO ENTRY", "MOVER SL A LA ENTRADA", "MOVER EL SL A LA ENTRADA", "MOVIMOS EL SL A LA ENTRADA"]):
         action = "move_sl_to_entry"
+    # SL/TP hit
     elif "STOP LOSS HIT" in upper:
         action = "sl_hit"
     elif "TP HIT" in upper or "TAKE PROFIT HIT" in upper:
         action = "tp_hit"
+    # "EN CURSO CON GANANCIA" = info only, suggest full close
+    elif "EN CURSO CON" in upper or "RUNNING" in upper:
+        action = "info_running"
     else:
         return None
+
+    # info_running = just notify, don't execute
+    if action == "info_running":
+        return None
+
+    # "FULL TP HIT" = TP alcanzado
+    if "FULL TP HIT" in upper:
+        action = "tp_hit"
 
     # Find pair in update
     pair_found = None
@@ -188,6 +225,9 @@ def execute_in_mt5(signal):
     price = tick.ask if signal["direction"] == "BUY" else tick.bid
     sl = signal["sl"]
     tp = signal["tp"]
+    # If entry was 0 (not in message), use current market price
+    if signal["entry"] == 0 or signal["entry"] == 0.0:
+        signal["entry"] = price
 
     # R:R check
     risk = abs(price - sl)
