@@ -412,25 +412,23 @@ async def main():
     }
     SIGNAL_KEYWORDS = ["sureshot"]  # Solo para el log de monitoreo
 
-    @client.on(events.NewMessage)
+    @client.on(events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
     async def handler(event):
-        """Process every new message from all chats."""
+        """Process every new message from allowed signal channels."""
         try:
-            # Only process channel/group messages
-            if not event.is_channel and not event.is_group:
-                return
-
             text = event.raw_text
             if not text or len(text) < 10:
                 return
 
             # Get chat info
             chat = await event.get_chat()
-            chat_title = getattr(chat, 'title', 'Unknown').lower()
-
-            # Filter: only process from allowed channels (by ID)
+            chat_title = getattr(chat, 'title', 'Unknown')
             chat_id = event.chat_id
-            if chat_id not in ALLOWED_CHANNEL_IDS:
+
+            log.info(f"📡 Mensaje recibido de [{chat_title}]: {text[:80]}")
+
+            # Double check channel ID (positive or negative)
+            if chat_id not in ALLOWED_CHANNEL_IDS and -chat_id not in ALLOWED_CHANNEL_IDS:
                 return
 
             # Parse the signal
