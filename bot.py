@@ -15427,10 +15427,12 @@ def _ejecutar_senal_externa(senal):
 
 def _reenviar_senal_canal(senal, ejecutado, detalle):
     """Reenvía la señal al canal BuySell365 — solo datos esenciales."""
+    _dir = "COMPRA" if senal["direccion"] == "BUY" else "VENTA"
     tipo_emoji = "🟢" if senal["direccion"] == "BUY" else "🔴"
 
     msg = (
-        f"{tipo_emoji} *{senal['direccion']} {senal['par']}* — {senal['entrada']}\n"
+        f"{tipo_emoji} *{_dir} {senal['par']}*\n"
+        f"Entrada: {senal['entrada']}\n"
         f"SL: {senal['sl']}\n"
         f"TP: {senal['tp']}"
     )

@@ -329,11 +329,22 @@ def send_to_channel(signal, executed, detail):
     import requests
 
     if signal["type"] == "update":
-        msg = f"🔄 *{signal['pair']}* — {signal['action'].upper()}"
+        _acciones = {
+            "close_half": "CERRAR MITAD",
+            "close_partial": "CIERRE PARCIAL",
+            "full_close": "CIERRE TOTAL",
+            "move_sl_to_entry": "SL A ENTRADA",
+            "sl_hit": "SL TOCADO",
+            "tp_hit": "TP ALCANZADO",
+        }
+        _accion = _acciones.get(signal["action"], signal["action"].upper())
+        msg = f"🔄 *{signal['pair']}* — {_accion}"
     else:
+        _dir = "COMPRA" if signal["direction"] == "BUY" else "VENTA"
         tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
         msg = (
-            f"{tipo_emoji} *{signal['direction']} {signal['pair']}* — {signal['entry']}\n"
+            f"{tipo_emoji} *{_dir} {signal['pair']}*\n"
+            f"Entrada: {signal['entry']}\n"
             f"SL: {signal['sl']}\n"
             f"TP: {signal['tp']}"
         )
