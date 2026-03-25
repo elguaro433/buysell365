@@ -1081,6 +1081,54 @@ if('serviceWorker' in navigator){{
       <div class="asset-icon sp500"><svg viewBox="0 0 40 40" fill="none"><defs><linearGradient id="spg" x1="20" y1="8" x2="20" y2="36" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#3b82f6" stop-opacity=".5"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs><path d="M4 30L10 24 16 27 22 18 28 14 34 8 38 6v30H4z" fill="url(#spg)"/><path d="M4 30L10 24 16 27 22 18 28 14 34 8 38 6" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="8" r="3" fill="#3b82f6"/><circle cx="34" cy="8" r="5" fill="#3b82f6" opacity=".2"/><text x="34" y="10" text-anchor="middle" font-size="4" fill="#fff" font-weight="700" font-family="Arial">\u2191</text></svg></div>
       <div class="asset-name">S&P 500</div><div class="asset-tag">ES \u2022 <span data-i18n="assets.us_market">Mercado EE.UU.</span></div>
     </div>
+    <div class="asset-card">
+      <div class="asset-icon gbpusd"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#012169"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text><circle cx="28" cy="20" r="12" fill="#1a6b3c"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">$</text></svg></div>
+      <div class="asset-name">GBP/USD</div><div class="asset-tag">Forex Principal</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon usdchf"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#002868"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">$</text><circle cx="28" cy="20" r="12" fill="#FF0000"/><text x="28" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">Fr</text></svg></div>
+      <div class="asset-name">USD/CHF</div><div class="asset-tag">Forex Principal</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon audusd"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#00008B"/><text x="14" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">A$</text><circle cx="28" cy="20" r="12" fill="#1a6b3c"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">$</text></svg></div>
+      <div class="asset-name">AUD/USD</div><div class="asset-tag">Forex Principal</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon nzdusd"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#00247D"/><text x="14" y="25" text-anchor="middle" font-size="9" font-weight="900" fill="#fff" font-family="Arial">NZ</text><circle cx="28" cy="20" r="12" fill="#1a6b3c"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">$</text></svg></div>
+      <div class="asset-name">NZD/USD</div><div class="asset-tag">Forex</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon gbpjpy"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#012169"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text><circle cx="28" cy="20" r="12" fill="#bc002d"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a5</text></svg></div>
+      <div class="asset-name">GBP/JPY</div><div class="asset-tag">Cross Volatil</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon eurjpy"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#003399"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#FFD700" font-family="Arial">\u20ac</text><circle cx="28" cy="20" r="12" fill="#bc002d"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a5</text></svg></div>
+      <div class="asset-name">EUR/JPY</div><div class="asset-tag">Cross</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon us30"><svg viewBox="0 0 40 40" fill="none"><rect x="4" y="4" width="32" height="32" rx="6" fill="#1a365d"/><text x="20" y="23" text-anchor="middle" font-size="8" font-weight="900" fill="#60a5fa" font-family="Arial">US30</text><path d="M8 28l6-4 6 2 6-8 6-6" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" opacity=".6"/></svg></div>
+      <div class="asset-name">US30</div><div class="asset-tag">Dow Jones</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon ger40"><svg viewBox="0 0 40 40" fill="none"><rect x="4" y="4" width="32" height="32" rx="6" fill="#1a1a2e"/><rect x="12" y="8" width="16" height="5" fill="#000"/><rect x="12" y="13" width="16" height="5" fill="#DD0000"/><rect x="12" y="18" width="16" height="5" fill="#FFCC00"/><text x="20" y="32" text-anchor="middle" font-size="7" font-weight="900" fill="#FFCC00" font-family="Arial">DAX</text></svg></div>
+      <div class="asset-name">GER40</div><div class="asset-tag">DAX \u2022 Alemania</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon gbpnzd"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#012169"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text><circle cx="28" cy="20" r="12" fill="#00247D"/><text x="28" y="25" text-anchor="middle" font-size="9" font-weight="900" fill="#fff" font-family="Arial">NZ</text></svg></div>
+      <div class="asset-name">GBP/NZD</div><div class="asset-tag">Cross</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon gbpaud"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#012169"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text><circle cx="28" cy="20" r="12" fill="#00008B"/><text x="28" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">A$</text></svg></div>
+      <div class="asset-name">GBP/AUD</div><div class="asset-tag">Cross</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon eurgbp"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#003399"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#FFD700" font-family="Arial">\u20ac</text><circle cx="28" cy="20" r="12" fill="#012169"/><text x="28" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text></svg></div>
+      <div class="asset-name">EUR/GBP</div><div class="asset-tag">Cross Europa</div>
+    </div>
+    <div class="asset-card">
+      <div class="asset-icon euraud"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#003399"/><text x="14" y="25" text-anchor="middle" font-size="12" font-weight="900" fill="#FFD700" font-family="Arial">\u20ac</text><circle cx="28" cy="20" r="12" fill="#00008B"/><text x="28" y="25" text-anchor="middle" font-size="10" font-weight="900" fill="#fff" font-family="Arial">A$</text></svg></div>
+      <div class="asset-name">EUR/AUD</div><div class="asset-tag">Cross</div>
+    </div>
   </div>
 </section>
 
