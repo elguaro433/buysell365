@@ -15400,7 +15400,7 @@ def _ejecutar_senal_externa(senal):
         "tp": round(tp_price, symbol_info.digits),
         "deviation": 30,
         "magic": _SIGNAL_COPIER_MAGIC,
-        "comment": f"BuySell365 Copier {senal['fuente']}",
+        "comment": "BuySell365 Pro",
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": mt5.ORDER_FILLING_IOC,
     }

@@ -49,7 +49,7 @@ _store = {
     "bot_active": False,
     "auto_trading": True,
     "ultimo_sync": 0,
-    "assets_count": 6,
+    "assets_count": 20,
     "capital_usuario": 550.0,
     "mt5_status": "DESCONECTADO",
     "active_ops_detail": [],  # Pre-computed by bot for /api/active_ops
@@ -654,7 +654,7 @@ def index_web():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con Inteligencia Artificial</title>
-<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en 6 activos con IA avanzada y datos institucionales.">
+<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en +20 activos con IA avanzada y datos institucionales.">
 <meta name="keywords" content="trading signals, se\u00f1ales trading, inteligencia artificial trading, forex signals, oro trading, NASDAQ signals, copy trading, bot trading, XAU USD, BuySell365">
 <meta property="og:title" content="BuySell365 Pro \u2014 Trading con IA">
 <meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. Oro, EUR/USD, USD/JPY, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD.">
@@ -680,7 +680,7 @@ def index_web():
   "name": "BuySell365 Pro",
   "applicationCategory": "FinanceApplication",
   "operatingSystem": "Web, Telegram",
-  "description": "Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en 6 activos con IA avanzada y datos institucionales.",
+  "description": "Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en +20 activos con IA avanzada y datos institucionales.",
   "url": "https://buysell365.pro",
   "offers": {{
     "@type": "Offer",
@@ -1000,7 +1000,7 @@ if('serviceWorker' in navigator){{
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon gold">\U0001f4ca</div>
       <h3 data-i18n="features.ta.title">An\u00e1lisis T\u00e9cnico Avanzado</h3>
-      <p data-i18n="features.ta.desc">8 indicadores t\u00e9cnicos (RSI, MACD, Bollinger, ADX, Ichimoku, ATR, EMA, volumen) con umbrales calibrados individualmente para cada uno de los 6 activos.</p>
+      <p data-i18n="features.ta.desc">8 indicadores t\u00e9cnicos (RSI, MACD, Bollinger, ADX, Ichimoku, ATR, EMA, volumen) con umbrales calibrados individualmente para cada uno de los +20 activos.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\u26a1</div>
@@ -1178,7 +1178,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q6">\u00bfCu\u00e1ntas se\u00f1ales recibo al d\u00eda?</div>
-      <div class="faq-a" data-i18n="faq.a6">En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los 6 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad.</div>
+      <div class="faq-a" data-i18n="faq.a6">En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los +20 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad.</div>
     </div>
   </div>
 </section>

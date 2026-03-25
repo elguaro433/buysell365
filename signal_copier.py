@@ -264,7 +264,7 @@ def execute_in_mt5(signal):
         "tp": round(tp, info.digits),
         "deviation": 30,
         "magic": MAGIC_COPIER,
-        "comment": f"Copier {signal['source']}",
+        "comment": "BuySell365 Pro",
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": mt5.ORDER_FILLING_IOC,
     }
@@ -319,7 +319,7 @@ def handle_update_mt5(update):
                 "position": pos.ticket,
                 "deviation": 30,
                 "magic": MAGIC_COPIER,
-                "comment": "Copier close half",
+                "comment": "BuySell365 Pro",
                 "type_filling": mt5.ORDER_FILLING_IOC,
             }
             result = mt5.order_send(request)
@@ -352,7 +352,7 @@ def handle_update_mt5(update):
                 "position": pos.ticket,
                 "deviation": 30,
                 "magic": MAGIC_COPIER,
-                "comment": f"Copier {action}",
+                "comment": "BuySell365 Pro",
                 "type_filling": mt5.ORDER_FILLING_IOC,
             }
             result = mt5.order_send(request)
@@ -382,9 +382,10 @@ def send_to_channel(signal, executed, detail):
     else:
         _dir = "COMPRA" if signal["direction"] == "BUY" else "VENTA"
         tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
+        _entry_display = signal['entry'] if signal['entry'] > 0 else "Mercado"
         msg = (
             f"{tipo_emoji} *{_dir} {signal['pair']}*\n"
-            f"Entrada: {signal['entry']}\n"
+            f"Entrada: {_entry_display}\n"
             f"SL: {signal['sl']}\n"
             f"TP: {signal['tp']}"
         )
