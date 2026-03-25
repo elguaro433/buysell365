@@ -206,8 +206,8 @@ RIESGO_USDJPY     = 0.01        # 1% para USD/JPY
 RIESGO_GBPJPY     = 0.01        # 1% para GBP/JPY
 RIESGO_PREMIUM    = 0.015       # 1.5% para señales premium (~$8 por trade — solo score≥4)
 BOT_TZ = pytz.timezone('Europe/Andorra')  # Zona horaria del usuario (CET/CEST)
-HORA_APERTURA_LOCAL = 8         # 08:00 hora Andorra: inicio de ejecución MT5
-HORA_CORTE_LOCAL = 18           # 18:00 hora Andorra: fin de ejecución MT5 (L-V uniforme)
+HORA_APERTURA_LOCAL = 0         # 00:00 hora Andorra: sin restricción horaria (demo)
+HORA_CORTE_LOCAL = 23           # 23:00 hora Andorra: casi 24h (demo)
 MAX_PERDIDA_DIARIA = 0.05       # 5% máximo diario (~$27) — estándar prop firms
 MAX_TRADES_SIMULTANEOS = 6      # Máx 1 por activo × 6 activos = 6 simultáneas
 MIN_RR_RATIO = 1.0              # Mínimo Risk:Reward — no abrir si TP1/SL < 1.0
@@ -3087,6 +3087,59 @@ def evaluar_senal_profesional(ind, ticker=""):
             if not _filt_ok:
                 return None, 0, [_filt_msg]
             return "VENTA", 4, razones
+
+    # ━━━━━━━━━━
+    # ESTRATEGIA 5 — MOMENTUM TREND FOLLOWING  (Score 3)
+    # Detecta INICIO de tendencia usando EMA crossover + MACD + ADX creciente.
+    # Genera señales cuando el mercado empieza a moverse, no cuando ya está en extremo.
+    # Más señales que Breakout/Reversal pero con score 3 (menor confianza).
+    # ━━━━━━━━━━
+    _ema20 = ind.get('ema20', 0)
+    _ema50 = ind.get('ema50', 0)
+    _ema200 = ind.get('ema200', 0)
+    _macd = ind.get('macd', 0)
+    _signal_line = ind.get('signal', 0)
+    _adx = ind.get('adx', 0)
+    _rsi = ind.get('rsi', 50)
+    _vol = ind.get('vol_ratio', 0)
+
+    # Momentum BUY: EMA20 > EMA50, MACD > Signal, ADX > 20 (tendencia activa), RSI 40-65
+    if (_ema20 > _ema50
+        and _macd > _signal_line
+        and _adx >= 20
+        and 40 < _rsi < 65
+        and _vol >= 0.3
+        and ind['precio'] > _ema50
+        and vela_con_cuerpo):
+        _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
+        if _filt_ok:
+            razones = [
+                "📈 Estrategia: *Momentum Trend Following — Alcista*",
+                f"✓ EMA20 ({_ema20:.5g}) > EMA50 ({_ema50:.5g}) — tendencia alcista",
+                f"✓ MACD alcista ({_macd:.5g} > Signal {_signal_line:.5g})",
+                f"✓ ADX={_adx:.1f} (tendencia activa) · RSI={_rsi:.1f} (zona sana)",
+                f"✓ Volumen {_vol:.1f}x · Precio sobre EMA50",
+            ]
+            return "COMPRA", 3, razones
+
+    # Momentum SELL: EMA20 < EMA50, MACD < Signal, ADX > 20, RSI 35-60
+    if (_ema20 < _ema50
+        and _macd < _signal_line
+        and _adx >= 20
+        and 35 < _rsi < 60
+        and _vol >= 0.3
+        and ind['precio'] < _ema50
+        and vela_con_cuerpo):
+        _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
+        if _filt_ok:
+            razones = [
+                "📉 Estrategia: *Momentum Trend Following — Bajista*",
+                f"✓ EMA20 ({_ema20:.5g}) < EMA50 ({_ema50:.5g}) — tendencia bajista",
+                f"✓ MACD bajista ({_macd:.5g} < Signal {_signal_line:.5g})",
+                f"✓ ADX={_adx:.1f} (tendencia activa) · RSI={_rsi:.1f} (zona sana)",
+                f"✓ Volumen {_vol:.1f}x · Precio bajo EMA50",
+            ]
+            return "VENTA", 3, razones
 
     # Sin confirmaciones suficientes
     # ── DIAGNÓSTICO: ¿Por qué no disparó ninguna estrategia? ──
@@ -14252,11 +14305,12 @@ def loop_escaneo():
                 except Exception as e_opt:
                     logger.warning(f"⚠️ Error auto-optimización: {e_opt}")
 
+                logger.info(f"🔍 Iniciando ciclo de escaneo Premium...")
                 analizar_mercado()
                 ultimo_escaneo = time.time()
                 limpiar_caches_memoria()
                 _errores_consecutivos = 0
-                print(f"✅ Ciclo completado. Siguiente en {INTERVALO_ESCANEO}s...")
+                logger.info(f"✅ Ciclo completado. Siguiente en {INTERVALO_ESCANEO}s...")
             except Exception as e:
                 _errores_consecutivos += 1
                 logger.error(f"⚠️ Error en loop de escaneo (#{_errores_consecutivos}): {e}")
@@ -14271,7 +14325,7 @@ def loop_escaneo():
                         incluir_promo=False
                     )
         else:
-            print("⏸️ Escaneo pausado, esperando...")
+            logger.info("⏸️ Escaneo pausado, esperando...")
 
         time.sleep(INTERVALO_ESCANEO)
 
@@ -14778,6 +14832,23 @@ def loop_polling():
                             continue
 
                         texto = msg.get("text", "").strip()
+
+                        # 📡 SIGNAL COPIER: intentar parsear señales externas
+                        # Si el mensaje contiene BUY/SELL + par + SL + TP, lo copia
+                        _fwd_from = msg.get("forward_from_chat", {})
+                        _fwd_id = str(_fwd_from.get("id", ""))
+                        _fwd_title = _fwd_from.get("title", "")
+                        _is_forwarded = bool(_fwd_from)
+                        _is_from_signal_channel = _is_forwarded or msg.get("sender_chat", {}).get("type") == "channel"
+                        if texto and _is_from_signal_channel:
+                            try:
+                                if _procesar_mensaje_signal_copier(texto, str(msg.get("chat", {}).get("id", ""))):
+                                    if _fwd_id:
+                                        _SIGNAL_SOURCE_IDS.add(_fwd_id)
+                                    logger.info(f"📡 Copier procesó señal de: {_fwd_title or 'canal desconocido'}")
+                                    continue
+                            except Exception as _e_copier:
+                                logger.warning(f"📡 Copier error: {_e_copier}")
                         # Limpiar sufijo @botname de comandos en grupos
                         # Telegram envía "/vip@Andoperandobot" cuando el usuario escribe /vip
                         if "@" in texto and texto.startswith("/"):
@@ -15160,6 +15231,245 @@ def _cmd_scalper_estado():
     )
 
 # ============================================================
+#  📡 SIGNAL COPIER — Lee señales externas y ejecuta en MT5
+#  Fuentes: SureShotFX (FX VIP, GOLD VIP, INDICES VIP)
+#  + Reenvía señales al canal BuySell365 Telegram
+# ============================================================
+
+_SIGNAL_COPIER_MAGIC = 20260325
+_copier_posiciones_activas: dict = {}  # {symbol: {ticket, tipo, entrada, sl, tp, fuente}}
+_COPIER_SYMBOL_MAP = {
+    "XAUUSD": "GOLD", "GOLD": "GOLD", "ORO": "GOLD",
+    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+    "US30": "US30Cash", "DOW": "US30Cash",
+    "SPX500": "US500Cash", "SP500": "US500Cash", "US500": "US500Cash",
+    "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "AUDUSD": "AUDUSD",
+    "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
+    "USDJPY": "USDJPY", "EURJPY": "EURJPY", "GBPJPY": "GBPJPY",
+    "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "EURCHF": "EURCHF",
+    "AUDNZD": "AUDNZD", "EURGBP": "EURGBP", "EURAUD": "EURAUD",
+    "GBPAUD": "GBPAUD", "NZDJPY": "NZDJPY", "CADJPY": "CADJPY",
+    "CHFJPY": "CHFJPY",
+}
+
+def _parsear_senal_externa(texto):
+    """Parsea señales de SureShotFX, Learn2Trade y formatos similares.
+    Retorna dict {par, mt5_symbol, direccion, entrada, sl, tp, fuente, trader} o None."""
+    import re
+    if not texto or len(texto) < 15:
+        return None
+    texto_upper = texto.upper().replace("\n", " ").replace("  ", " ")
+
+    # Detectar dirección
+    direccion = None
+    if any(w in texto_upper for w in ["BUY", "COMPRA", "LONG"]):
+        direccion = "BUY"
+    elif any(w in texto_upper for w in ["SELL", "VENTA", "SHORT"]):
+        direccion = "SELL"
+    if not direccion:
+        return None
+
+    # Detectar par
+    par_encontrado = None
+    for alias, mt5_sym in _COPIER_SYMBOL_MAP.items():
+        # Buscar el alias como palabra completa o pegado a BUY/SELL
+        if re.search(rf'\b{alias}\b', texto_upper):
+            par_encontrado = (alias, mt5_sym)
+            break
+    if not par_encontrado:
+        return None
+    alias_par, mt5_symbol = par_encontrado
+
+    # Extraer números (entrada, SL, TP)
+    numeros = re.findall(r'(\d+\.?\d*)', texto.replace(",", ""))
+    if len(numeros) < 2:
+        return None
+
+    # Buscar SL y TP explícitamente
+    sl_match = re.search(r'(?:SL|STOP\s*LOSS)[:\s]*(\d+\.?\d*)', texto_upper)
+    tp_match = re.search(r'(?:TP|TAKE\s*PROFIT)[:\s]*(\d+\.?\d*)', texto_upper)
+
+    # Buscar entrada (primer número después del par o después de BUY/SELL)
+    entrada_match = re.search(rf'(?:BUY|SELL|COMPRA|VENTA)\s+(?:DE\s+)?(?:{alias_par}\s+)?(\d+\.?\d*)', texto_upper)
+    if not entrada_match:
+        entrada_match = re.search(rf'{alias_par}\s+(?:BUY|SELL|COMPRA|VENTA)\s+(\d+\.?\d*)', texto_upper)
+
+    if not entrada_match or not sl_match or not tp_match:
+        return None
+
+    try:
+        entrada = float(entrada_match.group(1))
+        sl = float(sl_match.group(1))
+        tp = float(tp_match.group(1))
+    except (ValueError, IndexError):
+        return None
+
+    if entrada <= 0 or sl <= 0 or tp <= 0:
+        return None
+
+    # Detectar trader/fuente
+    trader = "Desconocido"
+    trader_match = re.search(r'(?:Trade by|Operaci[oó]n de)\s+(\w+)', texto, re.IGNORECASE)
+    if trader_match:
+        trader = trader_match.group(1)
+
+    fuente = "Externa"
+    if "sureshot" in texto.lower() or "ssf" in texto.lower():
+        fuente = "SureShotFX"
+    elif "learn2trade" in texto.lower() or "l2t" in texto.lower():
+        fuente = "Learn2Trade"
+
+    return {
+        "par": alias_par,
+        "mt5_symbol": mt5_symbol,
+        "direccion": direccion,
+        "entrada": entrada,
+        "sl": sl,
+        "tp": tp,
+        "fuente": fuente,
+        "trader": trader,
+    }
+
+
+def _ejecutar_senal_externa(senal):
+    """Ejecuta señal externa en MT5. Retorna (exito, mensaje)."""
+    if not MT5_AVAILABLE or not AUTO_TRADING:
+        return False, "MT5 no disponible o Auto-Trading desactivado"
+
+    mt5_symbol = senal["mt5_symbol"]
+    tipo = senal["direccion"]
+
+    with _lock_mt5:
+        symbol_info = mt5.symbol_info(mt5_symbol)
+    if not symbol_info:
+        logger.info(f"📡 Copier BLOQUEADO {mt5_symbol}: symbol_info=None")
+        return False, f"Símbolo {mt5_symbol} no encontrado en MT5"
+    if not symbol_info.visible:
+        with _lock_mt5:
+            mt5.symbol_select(mt5_symbol, True)
+
+    with _lock_mt5:
+        tick = mt5.symbol_info_tick(mt5_symbol)
+    if not tick:
+        return False, f"Sin precio para {mt5_symbol}"
+
+    precio_entrada = tick.ask if tipo == "BUY" else tick.bid
+    sl_price = senal["sl"]
+    tp_price = senal["tp"]
+
+    # Verificar R:R mínimo 1:1
+    riesgo = abs(precio_entrada - sl_price)
+    beneficio = abs(tp_price - precio_entrada)
+    if riesgo <= 0:
+        return False, "SL inválido (distancia 0)"
+    rr = beneficio / riesgo
+    if rr < 0.8:
+        return False, f"R:R {rr:.2f} < 0.8 — señal rechazada"
+
+    # Calcular lote basado en riesgo (1% del capital)
+    capital_real = CAPITAL_USUARIO
+    try:
+        with _lock_mt5:
+            account_info = mt5.account_info()
+        if account_info:
+            capital_real = account_info.balance
+    except Exception:
+        pass
+
+    riesgo_dinero = capital_real * 0.01  # 1% riesgo
+    tick_size = symbol_info.trade_tick_size
+    tick_value = symbol_info.trade_tick_value
+    if tick_size <= 0 or tick_value <= 0:
+        lote = 0.01
+    else:
+        sl_ticks = abs(precio_entrada - sl_price) / tick_size
+        if sl_ticks <= 0:
+            lote = 0.01
+        else:
+            lote = riesgo_dinero / (sl_ticks * tick_value)
+
+    lote = max(symbol_info.volume_min, min(symbol_info.volume_max, round(lote, 2)))
+    if lote < symbol_info.volume_min:
+        lote = symbol_info.volume_min
+
+    order_type = mt5.ORDER_TYPE_BUY if tipo == "BUY" else mt5.ORDER_TYPE_SELL
+    request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": mt5_symbol,
+        "volume": lote,
+        "type": order_type,
+        "price": precio_entrada,
+        "sl": round(sl_price, symbol_info.digits),
+        "tp": round(tp_price, symbol_info.digits),
+        "deviation": 30,
+        "magic": _SIGNAL_COPIER_MAGIC,
+        "comment": f"BuySell365 Copier {senal['fuente']}",
+        "type_time": mt5.ORDER_TIME_GTC,
+        "type_filling": mt5.ORDER_FILLING_IOC,
+    }
+
+    with _lock_mt5:
+        result = mt5.order_send(request)
+
+    if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+        _copier_posiciones_activas[mt5_symbol] = {
+            "ticket": result.order,
+            "tipo": tipo,
+            "entrada": precio_entrada,
+            "sl": sl_price,
+            "tp": tp_price,
+            "fuente": senal["fuente"],
+            "lote": lote,
+        }
+        logger.info(f"📡 COPIER EJECUTADO {tipo} {mt5_symbol} @ {precio_entrada} | SL={sl_price} TP={tp_price} | Lote={lote} | {senal['fuente']}")
+        return True, f"Ejecutado {tipo} {mt5_symbol} @ {precio_entrada} Lote={lote}"
+    else:
+        error = result.comment if result else "Sin respuesta"
+        logger.info(f"📡 COPIER FALLO {tipo} {mt5_symbol}: {error}")
+        return False, f"Error MT5: {error}"
+
+
+def _reenviar_senal_canal(senal, ejecutado, detalle):
+    """Reenvía la señal al canal BuySell365 con formato profesional."""
+    tipo_emoji = "🟢" if senal["direccion"] == "BUY" else "🔴"
+    estado = "✅ Ejecutada en MT5" if ejecutado else "📋 Solo señal"
+
+    msg = (
+        f"📡 *SEÑAL {senal['fuente'].upper()}*\n\n"
+        f"{tipo_emoji} *{senal['direccion']} {senal['par']}* — {senal['entrada']}\n\n"
+        f"🔴 SL: `{senal['sl']}`\n"
+        f"🟢 TP: `{senal['tp']}`\n\n"
+        f"👤 Trader: {senal['trader']}\n"
+        f"📊 {estado}\n"
+        f"{'💰 ' + detalle if ejecutado else '⚠️ ' + detalle}"
+    )
+    try:
+        enviar_canal(msg)
+    except Exception as e:
+        logger.warning(f"📡 Copier: error enviando a canal: {e}")
+
+
+def _procesar_mensaje_signal_copier(texto, chat_id_str):
+    """Procesa un mensaje para ver si es una señal copiable. Llamado desde loop_polling."""
+    senal = _parsear_senal_externa(texto)
+    if not senal:
+        return False
+
+    logger.info(f"📡 Copier SEÑAL DETECTADA: {senal['direccion']} {senal['par']} @ {senal['entrada']} SL={senal['sl']} TP={senal['tp']} [{senal['fuente']}]")
+
+    # Ejecutar en MT5
+    ejecutado, detalle = _ejecutar_senal_externa(senal)
+
+    # Reenviar al canal BuySell365
+    _reenviar_senal_canal(senal, ejecutado, detalle)
+
+    return True
+
+
+# IDs de canales/chats de señales externas (se llenan automáticamente al detectar señales)
+_SIGNAL_SOURCE_IDS: set = set()
+
+# ============================================================
 #  🔪 SCALPER SILENCIOSO — MT5 Only (Sin Telegram, Sin Stats)
 #  Estrategia: BB(20,2) + RSI(7) Mean Reversion en M5
 #  Activos: XAUUSD (Gold), EURUSD, GBPUSD, US100 (NASDAQ)
@@ -15175,7 +15485,7 @@ PAR_PROFILES = {
     "EURUSD": {
         "identity": {"mt5": "EURUSD", "yf": "EURUSD=X", "display": "EUR/USD", "category": "forex", "currencies": ["EUR", "USD"], "pip_size": 0.0001},
         "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 20},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 50},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
         "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (9, 18)},
@@ -15186,7 +15496,7 @@ PAR_PROFILES = {
     "GOLD": {
         "identity": {"mt5": "GOLD", "yf": "GC=F", "display": "ORO", "category": "commodity", "currencies": ["USD"], "pip_size": 0.01},
         "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 80},
-        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
+        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 200},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
         "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 19)},
@@ -15197,7 +15507,7 @@ PAR_PROFILES = {
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
         "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 500},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
         "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
@@ -15208,7 +15518,7 @@ PAR_PROFILES = {
     "US500Cash": {
         "identity": {"mt5": "US500Cash", "yf": "ES=F", "display": "S&P 500", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
         "scalper": {"enabled": False, "strategies": []},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 40, "rsi_ob": 60, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.5, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 40, "rsi_ob": 60, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.5, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 300},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 8.0},
         "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
@@ -15219,7 +15529,7 @@ PAR_PROFILES = {
     "USDJPY": {
         "identity": {"mt5": "USDJPY", "yf": "USDJPY=X", "display": "USD/JPY", "category": "forex", "currencies": ["USD", "JPY"], "pip_size": 0.01},
         "scalper": {"enabled": False, "strategies": []},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.003, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": 60, "rsi_gate_sell": 40, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.003, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": 60, "rsi_gate_sell": 40, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 80},
         "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
         "time_filter": {"best_hours_utc": [(0, 7), (12, 16)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (1, 21)},
@@ -15230,7 +15540,7 @@ PAR_PROFILES = {
     "GBPJPY": {
         "identity": {"mt5": "GBPJPY", "yf": "GBPJPY=X", "display": "GBP/JPY", "category": "forex", "currencies": ["GBP", "JPY"], "pip_size": 0.01},
         "scalper": {"enabled": False, "strategies": []},
-        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 70, "adx_min": 18, "bb_squeeze": 0.012, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": 20, "rev4_allowed": True},
+        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 70, "adx_min": 18, "bb_squeeze": 0.012, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": 20, "rev4_allowed": True},
         "risk": {"risk_pct": 0.004, "max_sl_pips": 150},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.8, "tp2_mult": 2.5, "tp3_mult": 3.5, "ze_mult": 0.3, "min_sl": 0.200},
         "time_filter": {"best_hours_utc": [(7, 10), (12, 16)], "peak_hours_utc": [(7, 10)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (1, 21)},
@@ -16865,7 +17175,27 @@ def _arrancar_interno():
         _sc_names = ", ".join(SCALPER_ACTIVOS.keys())
         log_sistema(f"🔪 Scalper Silencioso activado — {len(SCALPER_ACTIVOS)} activos | {_sc_names}")
 
-    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog")
+    # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
+    def _loop_signal_copier():
+        """Hilo que ejecuta el Signal Copier (Telethon userbot)."""
+        try:
+            import asyncio
+            from signal_copier import main as copier_main
+            logger.info("📡 Signal Copier iniciando dentro del bot...")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(copier_main())
+        except ImportError:
+            logger.warning("📡 Signal Copier no disponible (telethon no instalado)")
+        except Exception as e:
+            logger.error(f"📡 Signal Copier error: {e}")
+
+    _TG_API_ID = os.getenv("TG_API_ID", "")
+    if _TG_API_ID and _TG_API_ID != "0":
+        _iniciar_hilo("signal_copier", _loop_signal_copier)
+        log_sistema("📡 Signal Copier activado — escuchando canales VIP")
+
+    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier")
 
     # 🐕 WATCHDOG — vigila y reinicia hilos muertos cada 60s
     _iniciar_hilo("watchdog", _watchdog)
