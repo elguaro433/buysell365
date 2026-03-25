@@ -206,8 +206,8 @@ RIESGO_USDJPY     = 0.01        # 1% para USD/JPY
 RIESGO_GBPJPY     = 0.01        # 1% para GBP/JPY
 RIESGO_PREMIUM    = 0.015       # 1.5% para señales premium (~$8 por trade — solo score≥4)
 BOT_TZ = pytz.timezone('Europe/Andorra')  # Zona horaria del usuario (CET/CEST)
-HORA_APERTURA_LOCAL = 0         # 00:00 hora Andorra: sin restricción horaria (demo)
-HORA_CORTE_LOCAL = 23           # 23:00 hora Andorra: casi 24h (demo)
+HORA_APERTURA_LOCAL = 0         # 00:00 — sin restricción horaria, opera 24/5
+HORA_CORTE_LOCAL = 24           # 24:00 — sin restricción horaria, opera 24/5
 MAX_PERDIDA_DIARIA = 0.05       # 5% máximo diario (~$27) — estándar prop firms
 MAX_TRADES_SIMULTANEOS = 6      # Máx 1 por activo × 6 activos = 6 simultáneas
 MIN_RR_RATIO = 1.0              # Mínimo Risk:Reward — no abrir si TP1/SL < 1.0
@@ -15488,7 +15488,7 @@ PAR_PROFILES = {
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 50},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
-        "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (9, 18)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15499,7 +15499,7 @@ PAR_PROFILES = {
         "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 200},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
-        "time_filter": {"best_hours_utc": [(7, 17)], "peak_hours_utc": [(12, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 19)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15510,7 +15510,7 @@ PAR_PROFILES = {
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
-        "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15521,7 +15521,7 @@ PAR_PROFILES = {
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 40, "rsi_ob": 60, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.5, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 300},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 8.0},
-        "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(13, 16)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (15, 22)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15532,7 +15532,7 @@ PAR_PROFILES = {
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.003, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": 60, "rsi_gate_sell": 40, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 80},
         "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
-        "time_filter": {"best_hours_utc": [(0, 7), (12, 16)], "peak_hours_utc": [(12, 16)], "best_days": [1, 2, 3], "scalper_horario": (1, 21)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["USD", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15543,7 +15543,7 @@ PAR_PROFILES = {
         "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 70, "adx_min": 18, "bb_squeeze": 0.012, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": 20, "rev4_allowed": True},
         "risk": {"risk_pct": 0.004, "max_sl_pips": 150},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.8, "tp2_mult": 2.5, "tp3_mult": 3.5, "ze_mult": 0.3, "min_sl": 0.200},
-        "time_filter": {"best_hours_utc": [(7, 10), (12, 16)], "peak_hours_utc": [(7, 10)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (1, 21)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["GBP", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15554,7 +15554,7 @@ PAR_PROFILES = {
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
         "sl_tp": {},
-        "time_filter": {"best_hours_utc": [(0, 7), (7, 14)], "peak_hours_utc": [(7, 10)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 18)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["AUD", "CAD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15565,7 +15565,7 @@ PAR_PROFILES = {
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 30},
         "sl_tp": {},
-        "time_filter": {"best_hours_utc": [(7, 16)], "peak_hours_utc": [(8, 12)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 18)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["EUR", "CHF"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -15576,7 +15576,7 @@ PAR_PROFILES = {
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
         "sl_tp": {},
-        "time_filter": {"best_hours_utc": [(13, 20)], "peak_hours_utc": [(14, 17)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (9, 18)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["USD", "CAD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
