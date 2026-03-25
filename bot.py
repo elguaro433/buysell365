@@ -7353,7 +7353,17 @@ def _generar_reporte_diario():
             f"  🔹 Hora: {ahora_dt.strftime('%H:%M:%S')}\n"
         )
 
-        # Enviar con botones
+        # IA: análisis del mercado para el canal
+        _ia_market = ""
+        try:
+            _ia_market = _ia_responder(
+                f"Dame un resumen de 2 líneas del mercado para hoy. Pares: ORO, EURUSD, NASDAQ. Incluye qué esperar.",
+                "Canal VIP"
+            ) or ""
+        except Exception:
+            pass
+
+        # Enviar reporte al admin
         enviar_telegram(
             reporte,
             admin_id,
@@ -7363,6 +7373,19 @@ def _generar_reporte_diario():
                 [{"text": "👑 VIP LISTA", "callback_data": "/vip_lista_cb"}],
             ]}
         )
+
+        # Enviar resumen al canal VIP
+        _canal_msg = (
+            f"📊 *RESUMEN DEL DÍA — {hoy_str}*\n"
+            f"Señales: {total_senales} | WR: {wr:.0f}% | Pips: {pips_net:+.1f}\n"
+            f"Capital: ${CAPITAL_USUARIO:.0f}"
+        )
+        if _ia_market:
+            _canal_msg += f"\n\n💡 {_ia_market[:200]}"
+        try:
+            enviar_canal(_canal_msg)
+        except Exception:
+            pass
 
         log_sistema(f"📊 Reporte diario enviado al admin {admin_id}")
         guardar_estado()

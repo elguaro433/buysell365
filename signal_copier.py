@@ -363,6 +363,52 @@ def handle_update_mt5(update):
         return False, str(e)
 
 
+# === IA FILTER + COMMENTARY ===
+_GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
+
+def _ia_evaluar_senal(signal):
+    """IA evalúa si la señal es buena antes de ejecutar. Retorna (aprobar, comentario)."""
+    if not _GEMINI_KEY:
+        return True, ""
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=_GEMINI_KEY)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+
+        _dir = signal.get("direction", signal.get("action", "?"))
+        _pair = signal["pair"]
+        _entry = signal.get("entry", 0)
+        _sl = signal.get("sl", 0)
+        _tp = signal.get("tp", 0)
+
+        # R:R calculation
+        if _entry > 0 and _sl > 0 and _tp > 0:
+            risk = abs(_entry - _sl)
+            reward = abs(_tp - _entry)
+            rr = f"{reward/risk:.1f}:1" if risk > 0 else "N/A"
+        else:
+            rr = "N/A"
+
+        prompt = f"""Eres un analista de trading profesional. Evalúa esta señal en 1 línea (max 80 caracteres).
+
+Señal: {_dir} {_pair} @ {_entry}
+SL: {_sl} | TP: {_tp} | R:R: {rr}
+
+Responde SOLO con una línea corta de análisis. Ejemplo:
+- "Tendencia alcista fuerte, buen momento"
+- "RSI sobrecomprado, riesgo alto"
+- "Zona de soporte, buena entrada"
+
+NO digas si aprobar o rechazar. Solo el análisis."""
+
+        response = model.generate_content(prompt)
+        comentario = response.text.strip()[:100] if response.text else ""
+        return True, comentario
+    except Exception as e:
+        log.warning(f"IA eval error: {e}")
+        return True, ""
+
+
 # === TELEGRAM BOT SEND ===
 def send_to_channel(signal, executed, detail):
     """Send signal to BuySell365 channel via bot API."""
@@ -383,11 +429,15 @@ def send_to_channel(signal, executed, detail):
         _dir = "COMPRA" if signal["direction"] == "BUY" else "VENTA"
         tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
         _entry_display = signal['entry'] if signal['entry'] > 0 else "Mercado"
+        # IA commentary
+        _ia_comment = signal.get("ia_comment", "")
+        _ia_line = f"\n💡 {_ia_comment}" if _ia_comment else ""
         msg = (
             f"{tipo_emoji} *{_dir} {signal['pair']}*\n"
             f"Entrada: {_entry_display}\n"
             f"SL: {signal['sl']}\n"
             f"TP: {signal['tp']}"
+            f"{_ia_line}"
         )
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -439,6 +489,12 @@ async def main():
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
             if signal["type"] == "new_signal":
+                # IA filter + commentary
+                aprobar, ia_comment = _ia_evaluar_senal(signal)
+                signal["ia_comment"] = ia_comment
+                if ia_comment:
+                    log.info(f"🤖 IA: {ia_comment}")
+
                 # Execute in MT5
                 executed, detail = execute_in_mt5(signal)
                 log.info(f"📡 MT5: {'✅' if executed else '❌'} {detail}")
