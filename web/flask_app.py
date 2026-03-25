@@ -1035,7 +1035,7 @@ if('serviceWorker' in navigator){{
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_transparent">Transparente</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">6</div>
+      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">+20</div>
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_assets">Activos</div>
     </div>
   </div>
@@ -1045,7 +1045,7 @@ if('serviceWorker' in navigator){{
 <!-- ASSETS -->
 <section id="assets" class="fade-in">
   <div class="section-title">
-    <h2>\U0001f30d <span data-i18n="assets.title">6 Activos de Clase Mundial</span></h2>
+    <h2>\U0001f30d <span data-i18n="assets.title">+20 Activos de Clase Mundial</span></h2>
     <p data-i18n="assets.subtitle">Cada activo tiene par\u00e1metros de detecci\u00f3n calibrados individualmente para m\u00e1xima precisi\u00f3n.</p>
   </div>
   <div class="assets-grid">

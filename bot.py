@@ -17419,12 +17419,12 @@ def _arrancar_interno():
     def _loop_monitor_real():
         """Monitorea cuenta real periódicamente cambiando de cuenta."""
         nonlocal _monitor_real_posiciones
-        _REAL_LOGIN = 88849791
-        _REAL_PASS = "Andorra433+"
-        _REAL_SERVER = "XMGlobal-MT5 4"
-        _DEMO_LOGIN = 336093063
-        _DEMO_PASS = "Emmanuel433+"
-        _DEMO_SERVER = "XMGlobal-MT5 9"
+        _REAL_LOGIN = int(os.getenv("MT5_REAL_LOGIN", "88849791"))
+        _REAL_PASS = os.getenv("MT5_REAL_PASS", "")
+        _REAL_SERVER = os.getenv("MT5_REAL_SERVER", "XMGlobal-MT5 4")
+        _DEMO_LOGIN = int(os.getenv("MT5_LOGIN", "336093063"))
+        _DEMO_PASS = os.getenv("MT5_PASSWORD", "")
+        _DEMO_SERVER = os.getenv("MT5_SERVER", "XMGlobal-MT5 9")
 
         time.sleep(120)  # Esperar arranque completo
         logger.info("📊 Monitor REAL: iniciando monitoreo cada 60s")
@@ -17432,13 +17432,23 @@ def _arrancar_interno():
         while True:
             try:
                 time.sleep(60)
+                positions = None
                 with _lock_mt5:
                     # Cambiar a real
-                    mt5.login(_REAL_LOGIN, password=_REAL_PASS, server=_REAL_SERVER)
-                    time.sleep(1)
-                    positions = mt5.positions_get()
-                    # Volver a demo inmediatamente
-                    mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
+                    if not _REAL_PASS:
+                        continue  # No hay credenciales reales configuradas
+                    ok_real = mt5.login(_REAL_LOGIN, password=_REAL_PASS, server=_REAL_SERVER)
+                    if ok_real:
+                        time.sleep(1)
+                        positions = mt5.positions_get()
+                    else:
+                        logger.warning(f"📊 Monitor REAL: login real fallido")
+                    # Volver a demo SIEMPRE
+                    ok_demo = mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
+                    if not ok_demo:
+                        logger.error(f"📊 CRÍTICO: no se pudo volver a demo — reintentando")
+                        time.sleep(2)
+                        mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
 
                 if positions:
                     current_tickets = {p.ticket for p in positions}
@@ -17480,9 +17490,10 @@ def _arrancar_interno():
                 # Asegurar que volvemos a demo
                 try:
                     with _lock_mt5:
-                        mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
-                except Exception:
-                    pass
+                        if not mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER):
+                            logger.error("📊 CRÍTICO: no se pudo volver a demo después de error")
+                except Exception as e2:
+                    logger.error(f"📊 CRÍTICO: error volviendo a demo: {e2}")
 
     _MT5_LOGIN_ACTUAL = os.getenv("MT5_LOGIN", "")
     if str(_MT5_LOGIN_ACTUAL) == "336093063" and MT5_AVAILABLE:
