@@ -4469,15 +4469,11 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 
     return (
         f"{cabecera}\n"
-        f"━━━━━━━━━━\n"
-        f"🕐 {hora} (Andorra)\n"
         f"Entrada: `{f_(precio)}`\n"
-        f"SL: `{f_(niveles['sl'])}` (−{fmt_dist(sl_dist)})\n"
-        f"TP1: `{f_(niveles['tp1'])}` (+{fmt_dist(tp1_dist)})\n"
-        f"TP2: `{f_(niveles['tp2'])}` (+{fmt_dist(tp2_dist)})\n"
-        f"TP3: `{f_(niveles['tp3'])}` (+{fmt_dist(tp3_dist)})\n"
-        f"━━━━━━━━━━\n"
-        f"Score: {score_display}/5 | R:R 1:{rr_ratio} | Conf: {_conf_display}%"
+        f"SL: `{f_(niveles['sl'])}`\n"
+        f"TP1: `{f_(niveles['tp1'])}`\n"
+        f"TP2: `{f_(niveles['tp2'])}`\n"
+        f"TP3: `{f_(niveles['tp3'])}`"
     )
 
 
@@ -15430,18 +15426,13 @@ def _ejecutar_senal_externa(senal):
 
 
 def _reenviar_senal_canal(senal, ejecutado, detalle):
-    """Reenvía la señal al canal BuySell365 con formato profesional."""
+    """Reenvía la señal al canal BuySell365 — solo datos esenciales."""
     tipo_emoji = "🟢" if senal["direccion"] == "BUY" else "🔴"
-    estado = "✅ Ejecutada en MT5" if ejecutado else "📋 Solo señal"
 
     msg = (
-        f"📡 *SEÑAL {senal['fuente'].upper()}*\n\n"
-        f"{tipo_emoji} *{senal['direccion']} {senal['par']}* — {senal['entrada']}\n\n"
-        f"🔴 SL: `{senal['sl']}`\n"
-        f"🟢 TP: `{senal['tp']}`\n\n"
-        f"👤 Trader: {senal['trader']}\n"
-        f"📊 {estado}\n"
-        f"{'💰 ' + detalle if ejecutado else '⚠️ ' + detalle}"
+        f"{tipo_emoji} *{senal['direccion']} {senal['par']}* — {senal['entrada']}\n"
+        f"SL: {senal['sl']}\n"
+        f"TP: {senal['tp']}"
     )
     try:
         enviar_canal(msg)

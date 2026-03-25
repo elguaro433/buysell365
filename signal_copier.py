@@ -329,19 +329,13 @@ def send_to_channel(signal, executed, detail):
     import requests
 
     if signal["type"] == "update":
-        emoji = "🔄" if signal["action"] == "move_sl_to_entry" else "📊"
-        msg = f"{emoji} *ACTUALIZACIÓN {signal['pair']}*\n\n{signal['action'].upper()}\n{'✅ ' + detail if executed else '⚠️ ' + detail}"
+        msg = f"🔄 *{signal['pair']}* — {signal['action'].upper()}"
     else:
         tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
-        estado = "✅ Ejecutada en MT5" if executed else "📋 Solo señal"
         msg = (
-            f"📡 *SEÑAL {signal['source'].upper()}*\n\n"
-            f"{tipo_emoji} *{signal['direction']} {signal['pair']}* — {signal['entry']}\n\n"
-            f"🔴 SL: `{signal['sl']}`\n"
-            f"🟢 TP: `{signal['tp']}`\n\n"
-            f"👤 Trader: {signal['trader']}\n"
-            f"📊 {estado}\n"
-            f"{'💰 ' + detail if executed else '⚠️ ' + detail}"
+            f"{tipo_emoji} *{signal['direction']} {signal['pair']}* — {signal['entry']}\n"
+            f"SL: {signal['sl']}\n"
+            f"TP: {signal['tp']}"
         )
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
