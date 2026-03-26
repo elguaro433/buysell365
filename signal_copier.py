@@ -519,4 +519,27 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Lock file para evitar múltiples instancias
+    _lock_file = Path(__file__).parent / ".copier.lock"
+    try:
+        if _lock_file.exists():
+            # Check if the PID in the lock file is still running
+            try:
+                old_pid = int(_lock_file.read_text().strip())
+                import psutil
+                if psutil.pid_exists(old_pid):
+                    log.warning(f"📡 Otra instancia del copier corriendo (PID={old_pid}). Saliendo.")
+                    sys.exit(0)
+            except (ImportError, ValueError):
+                pass  # psutil not installed or invalid PID — continue
+        _lock_file.write_text(str(os.getpid()))
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("📡 Signal Copier detenido por usuario")
+    except Exception as e:
+        log.error(f"📡 Signal Copier error fatal: {e}")
+    finally:
+        try:
+            _lock_file.unlink(missing_ok=True)
+        except Exception:
+            pass

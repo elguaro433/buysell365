@@ -17426,10 +17426,10 @@ def _arrancar_interno():
                     # Proceso murió — reiniciar
                     logger.warning(f"📡 Signal Copier murió (code={_copier_process.returncode}) — reiniciando...")
                     _launch_signal_copier()
-                time.sleep(30)
+                time.sleep(120)
             except Exception as e:
                 logger.error(f"📡 Copier watchdog error: {e}")
-                time.sleep(60)
+                time.sleep(120)
 
     _TG_API_ID = os.getenv("TG_API_ID", "")
     if _TG_API_ID and _TG_API_ID != "0":
