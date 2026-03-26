@@ -3489,7 +3489,11 @@ def parsear_senal_externa(texto: str):
 
     # 3. Extraer Números (Entrada, SL, TPs)
     numeros = re.findall(r"\d+\.\d+|\d+", t)
-    if len(numeros) < 3:
+    # "Now" / "Ahora" = precio de mercado, solo necesita SL + TP (2 números)
+    _es_mercado = any(x in t for x in ["NOW", "AHORA", "MERCADO", "MARKET"])
+    if len(numeros) < 2:
+        return None
+    if len(numeros) < 3 and not _es_mercado:
         return None
 
     entrada, sl = None, None
@@ -3519,7 +3523,11 @@ def parsear_senal_externa(texto: str):
                 if n > entrada and (not sl or n > sl): sl = n
                 elif n < entrada: tps.append(n)
 
-    if not entrada or not sl or not tps:
+    # Si "Now" y no hay entrada, usar 0 (precio de mercado)
+    if not entrada and _es_mercado:
+        entrada = 0
+
+    if entrada is None or not sl or not tps:
         return None
 
     return {
@@ -8592,11 +8600,23 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         sl = senal['sl']
         tp = senal['tp1']
 
+        # Si entrada=0, obtener precio de mercado
+        if entrada == 0 and MT5_AVAILABLE:
+            with _lock_mt5:
+                tick = mt5.symbol_info_tick(ticker)
+            if tick:
+                entrada = tick.ask if tipo == "COMPRA" else tick.bid
+
         # Ejecutar trade si el auto-trading está activo
         if MT5_AVAILABLE and AUTO_TRADING:
             exito = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, RIESGO_POR_TRADE, entrada, sl, tp)
             if exito:
-                return f"✅ *SEÑAL EXTERNA EJECUTADA EN XM*\n🚀 {tipo} {ticker} @ {entrada}\n🛑 SL: {sl}\n🎯 TP: {tp}"
+                # Enviar al canal VIP
+                _dir_txt = "COMPRA" if tipo == "COMPRA" else "VENTA"
+                _emoji = "🟢" if tipo == "COMPRA" else "🔴"
+                _msg_canal = f"{_emoji} {_dir_txt} {senal['nombre']}\nEntrada: {entrada}\nSL: {sl}\nTP: {tp}"
+                enviar_canal(_msg_canal)
+                return f"✅ *SEÑAL EJECUTADA*\n{_emoji} {_dir_txt} {senal['nombre']} @ {entrada}\nSL: {sl}\nTP: {tp}"
             else:
                 # Error de ejecución: solo notificar al admin, NO mostrar públicamente
                 admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
