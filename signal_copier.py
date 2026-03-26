@@ -449,7 +449,11 @@ def send_to_channel(signal, executed, detail):
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg}, timeout=10)
+        resp = requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg}, timeout=10)
+        if resp.status_code == 200:
+            log.info(f"📡 ENVIADO AL CANAL: {msg[:80]}")
+        else:
+            log.warning(f"📡 Error enviando al canal: {resp.status_code} {resp.text[:100]}")
     except Exception as e:
         log.warning(f"Error sending to channel: {e}")
 
