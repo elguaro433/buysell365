@@ -17393,24 +17393,49 @@ def _arrancar_interno():
         log_sistema(f"🔪 Scalper Silencioso activado — {len(SCALPER_ACTIVOS)} activos | {_sc_names}")
 
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
-    def _loop_signal_copier():
-        """Hilo que ejecuta el Signal Copier (Telethon userbot)."""
+    # Signal Copier como subprocess independiente (Telethon necesita su propio event loop limpio)
+    _copier_process = None
+
+    def _launch_signal_copier():
+        """Lanza signal_copier.py como proceso independiente."""
+        nonlocal _copier_process
+        import subprocess
+        copier_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signal_copier.py")
+        if not os.path.exists(copier_script):
+            logger.warning("📡 Signal Copier no disponible (signal_copier.py no existe)")
+            return
         try:
-            import asyncio
-            from signal_copier import main as copier_main
-            logger.info("📡 Signal Copier iniciando dentro del bot...")
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(copier_main())
-        except ImportError:
-            logger.warning("📡 Signal Copier no disponible (telethon no instalado)")
+            _copier_process = subprocess.Popen(
+                [sys.executable, copier_script],
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+            )
+            logger.info(f"📡 Signal Copier lanzado como proceso PID={_copier_process.pid}")
         except Exception as e:
-            logger.error(f"📡 Signal Copier error: {e}")
+            logger.error(f"📡 Signal Copier error al lanzar: {e}")
+
+    def _loop_copier_watchdog():
+        """Vigila que el proceso del Signal Copier siga vivo. Si muere, lo reinicia."""
+        nonlocal _copier_process
+        time.sleep(10)  # Esperar a que arranque
+        while True:
+            try:
+                if _copier_process and _copier_process.poll() is not None:
+                    # Proceso murió — reiniciar
+                    logger.warning(f"📡 Signal Copier murió (code={_copier_process.returncode}) — reiniciando...")
+                    _launch_signal_copier()
+                time.sleep(30)
+            except Exception as e:
+                logger.error(f"📡 Copier watchdog error: {e}")
+                time.sleep(60)
 
     _TG_API_ID = os.getenv("TG_API_ID", "")
     if _TG_API_ID and _TG_API_ID != "0":
-        _iniciar_hilo("signal_copier", _loop_signal_copier)
-        log_sistema("📡 Signal Copier activado — escuchando canales VIP")
+        _launch_signal_copier()
+        _iniciar_hilo("copier_watchdog", _loop_copier_watchdog)
+        log_sistema("📡 Signal Copier activado como proceso independiente")
 
     # 📊 MONITOR CUENTA REAL — lee MSC Gold Stable Pro y envía a Telegram
     # Cada 60s: lock MT5 → login real → leer posiciones → login demo → unlock
@@ -17678,6 +17703,13 @@ if __name__ == "__main__":
             try:
                 if os.path.exists(_pid_file):
                     os.remove(_pid_file)
+            except Exception:
+                pass
+            # Matar Signal Copier subprocess
+            try:
+                if _copier_process and _copier_process.poll() is None:
+                    _copier_process.terminate()
+                    print("✅ Signal Copier cerrado correctamente.")
             except Exception:
                 pass
 
