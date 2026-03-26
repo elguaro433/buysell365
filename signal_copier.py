@@ -18,6 +18,24 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 
 SESSION_FILE = str(Path(__file__).parent / "signal_copier_session")
 
+# Fix sqlite locked: set WAL mode and timeout
+import sqlite3
+_session_db = SESSION_FILE + ".session"
+if os.path.exists(_session_db):
+    try:
+        _conn = sqlite3.connect(_session_db, timeout=5)
+        _conn.execute("PRAGMA journal_mode=WAL")
+        _conn.close()
+    except Exception:
+        # If locked, delete and let Telethon recreate
+        try:
+            os.remove(_session_db)
+            _journal = _session_db + "-journal"
+            if os.path.exists(_journal):
+                os.remove(_journal)
+        except Exception:
+            pass
+
 # === LOGGING ===
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [COPIER] %(message)s",
                     handlers=[logging.FileHandler(Path(__file__).parent / "logs" / "copier.log", encoding="utf-8"),
