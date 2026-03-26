@@ -113,8 +113,9 @@ def parse_signal(text):
     except (ValueError, IndexError):
         return None
 
-    if entry <= 0 or sl <= 0 or tp <= 0:
+    if sl <= 0 or tp <= 0:
         return None
+    # entry=0 es OK — se usará precio de mercado en execute_in_mt5()
 
     # Detect trader
     trader = "Desconocido"
