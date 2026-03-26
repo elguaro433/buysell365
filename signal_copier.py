@@ -412,38 +412,26 @@ NO digas si aprobar o rechazar. Solo el análisis."""
 
 # === TELEGRAM BOT SEND ===
 def send_to_channel(signal, executed, detail):
-    """Send signal to BuySell365 channel via bot API."""
+    """Send ONLY new signals to BuySell365 channel. No updates, no closes."""
     import requests
 
+    # Solo enviar señales de apertura — nada de cierres ni updates
     if signal["type"] == "update":
-        _acciones = {
-            "close_half": "CERRAR MITAD",
-            "close_partial": "CIERRE PARCIAL",
-            "full_close": "CIERRE TOTAL",
-            "move_sl_to_entry": "SL A ENTRADA",
-            "sl_hit": "SL TOCADO",
-            "tp_hit": "TP ALCANZADO",
-        }
-        _accion = _acciones.get(signal["action"], signal["action"].upper())
-        msg = f"🔄 *{signal['pair']}* — {_accion}"
-    else:
-        _dir = "COMPRA" if signal["direction"] == "BUY" else "VENTA"
-        tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
-        _entry_display = signal['entry'] if signal['entry'] > 0 else "Mercado"
-        # IA commentary
-        _ia_comment = signal.get("ia_comment", "")
-        _ia_line = f"\n💡 {_ia_comment}" if _ia_comment else ""
-        msg = (
-            f"{tipo_emoji} *{_dir} {signal['pair']}*\n"
-            f"Entrada: {_entry_display}\n"
-            f"SL: {signal['sl']}\n"
-            f"TP: {signal['tp']}"
-            f"{_ia_line}"
-        )
+        return  # No enviar al canal
+
+    _dir = "COMPRA" if signal["direction"] == "BUY" else "VENTA"
+    tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
+    _entry_display = signal['entry'] if signal['entry'] > 0 else "Mercado"
+    msg = (
+        f"{tipo_emoji} {_dir} {signal['pair']}\n"
+        f"Entrada: {_entry_display}\n"
+        f"SL: {signal['sl']}\n"
+        f"TP: {signal['tp']}"
+    )
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+        requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg}, timeout=10)
     except Exception as e:
         log.warning(f"Error sending to channel: {e}")
 
