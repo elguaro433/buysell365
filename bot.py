@@ -15778,7 +15778,7 @@ PAR_PROFILES = {
     # ━━━━ EURCHF — Mean reversion SNB, baja volatilidad, London ━━━━
     "EURCHF": {
         "identity": {"mt5": "EURCHF", "yf": None, "display": "EUR/CHF", "category": "forex", "currencies": ["EUR", "CHF"], "pip_size": 0.0001},
-        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 1.8, "sl_atr": 1.5, "max_spread": 45},
+        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 3.0, "sl_atr": 2.5, "max_spread": 45},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 30},
         "sl_tp": {},
@@ -17431,11 +17431,14 @@ def _arrancar_interno():
                 logger.error(f"📡 Copier watchdog error: {e}")
                 time.sleep(120)
 
-    _TG_API_ID = os.getenv("TG_API_ID", "")
-    if _TG_API_ID and _TG_API_ID != "0":
-        _launch_signal_copier()
-        _iniciar_hilo("copier_watchdog", _loop_copier_watchdog)
-        log_sistema("📡 Signal Copier activado como proceso independiente")
+    # Signal Copier se ejecuta desde terminal negra manualmente (python signal_copier.py)
+    # No lanzar subprocess desde aquí para evitar conflicto de sesión sqlite
+    # _TG_API_ID = os.getenv("TG_API_ID", "")
+    # if _TG_API_ID and _TG_API_ID != "0":
+    #     _launch_signal_copier()
+    #     _iniciar_hilo("copier_watchdog", _loop_copier_watchdog)
+    #     log_sistema("📡 Signal Copier activado como proceso independiente")
+    log_sistema("📡 Signal Copier: ejecutar manualmente 'python signal_copier.py'")
 
     # 📊 MONITOR CUENTA REAL — lee MSC Gold Stable Pro y envía a Telegram
     # Cada 60s: lock MT5 → login real → leer posiciones → login demo → unlock
