@@ -15723,9 +15723,9 @@ PAR_PROFILES = {
     # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 500},
+        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.5, "sl_atr": 1.5, "max_spread": 500},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
-        "risk": {"risk_pct": 0.01, "max_sl_pips": 500},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
         "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
@@ -16679,10 +16679,16 @@ def _scalper_evaluar_senal(ind, config):
     # FIX 2026-03-20: COOLDOWN POR DIRECCIÓN (30 min tras pérdida)
     _now_ts = time.time()
     def _en_cooldown(tipo_op):
-        """Retorna True si hay cooldown activo para esta dirección."""
+        """Retorna True si hay cooldown activo para esta dirección O cooldown general del par."""
+        # Cooldown por dirección
         key = f"{symbol}_{tipo_op}"
         hasta = _scalper_cooldown_direccion.get(key, 0)
-        return _now_ts < hasta
+        if _now_ts < hasta:
+            return True
+        # Cooldown GENERAL por par (15 min entre cualquier trade del mismo par)
+        key_general = f"{symbol}_ANY"
+        hasta_general = _scalper_cooldown_direccion.get(key_general, 0)
+        return _now_ts < hasta_general
 
     # Helper: check BUY/SELL blocks from profile
     def _block_check(tipo_op):
@@ -16845,6 +16851,8 @@ def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
         if result and result.retcode == mt5.TRADE_RETCODE_DONE:
             with _lock_scalper:
                 _scalper_trades_hoy += 1
+                # Cooldown general 15 min para este par (evitar sobre-operar)
+                _scalper_cooldown_direccion[f"{mt5_symbol}_ANY"] = time.time() + 15 * 60
                 _scalper_posiciones[result.order] = {
                     "symbol": mt5_symbol,
                     "tipo": tipo,
