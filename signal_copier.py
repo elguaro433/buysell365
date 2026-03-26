@@ -66,7 +66,7 @@ def parse_signal(text):
     if not text or len(text) < 10:
         return None
 
-    upper = text.upper().replace("\n", " ").replace("  ", " ").strip()
+    upper = text.upper().replace("\n", " ").replace("  ", " ").replace("/", "").strip()
 
     # Skip update/close messages (English + Spanish)
     # Skip noise messages (info, ads, errors)
@@ -111,12 +111,14 @@ def parse_signal(text):
 
     alias, mt5_symbol = pair_found
 
-    # Extract SL and TP
+    # Extract SL and TP (multiple formats)
     sl_match = re.search(r'(?:SL|STOP\s*LOSS)[:\s]*(\d+\.?\d*)', upper)
-    tp_match = re.search(r'(?:TP|TAKE\s*PROFIT)[:\s]*(\d+\.?\d*)', upper)
+    tp_match = re.search(r'(?:TP|TAKE\s*PROFIT|TARGET)[:\s]*(\d+\.?\d*)', upper)
 
-    # Extract entry price
-    entry_match = re.search(rf'(?:BUY|SELL|COMPRA|VENTA)\s+(?:DE\s+)?(?:{alias}\s+)?(\d+\.?\d*)', upper)
+    # Extract entry price (multiple formats)
+    entry_match = re.search(r'(?:ENTRY\s*PRICE|ENTRADA)[:\s]*(\d+\.?\d*)', upper)
+    if not entry_match:
+        entry_match = re.search(rf'(?:BUY|SELL|COMPRA|VENTA)\s+(?:DE\s+)?(?:{alias}\s+)?(\d+\.?\d*)', upper)
     if not entry_match:
         entry_match = re.search(rf'{alias}\s+(?:BUY|SELL|COMPRA|VENTA)\s+(\d+\.?\d*)', upper)
 
@@ -471,7 +473,9 @@ async def main():
         -1001661400724,   # SureShot GOLD (VIP)
         -1001700795303,   # Sureshot INDICES (VIP)
     }
-    SIGNAL_KEYWORDS = ["sureshot"]  # Solo para el log de monitoreo
+    # Auto-discover: buscar canales Learn2Trade VIP y agregarlos
+    L2T_KEYWORDS = ["learn 2 trade", "learn2trade", "l2t"]
+    SIGNAL_KEYWORDS = ["sureshot", "learn"]  # Para el log de monitoreo
 
     @client.on(events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
     async def handler(event):
@@ -531,10 +535,20 @@ async def main():
     me = await client.get_me()
     log.info(f"📡 Conectado como: {me.first_name} (@{me.username})")
 
-    # List channels we're monitoring
+    # Auto-discover Learn2Trade VIP channels + list monitored channels
     async for dialog in client.iter_dialogs():
+        title_lower = (dialog.title or "").lower()
+        # Auto-add Learn2Trade VIP channels
+        if any(kw in title_lower for kw in L2T_KEYWORDS) and "vip" in title_lower:
+            if dialog.id not in ALLOWED_CHANNEL_IDS:
+                ALLOWED_CHANNEL_IDS.add(dialog.id)
+                log.info(f"📡 AUTO-AGREGADO: {dialog.title} (ID: {dialog.id})")
         if dialog.id in ALLOWED_CHANNEL_IDS:
             log.info(f"📡 Monitoreando: {dialog.title} (ID: {dialog.id})")
+
+    # Update event handler with new channels
+    client.remove_event_handler(handler)
+    client.add_event_handler(handler, events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
 
     log.info("📡 Signal Copier ACTIVO — escuchando todos los canales VIP...")
     await client.run_until_disconnected()
