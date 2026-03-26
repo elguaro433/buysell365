@@ -17527,7 +17527,7 @@ def _arrancar_interno():
     #     _iniciar_hilo("monitor_real", _loop_monitor_real)
     #     log_sistema("📊 Monitor cuenta REAL activado — leyendo MSC Gold Stable Pro cada 60s")
 
-    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier, monitor_real")
+    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier")
 
     # 🐕 WATCHDOG — vigila y reinicia hilos muertos cada 60s
     _iniciar_hilo("watchdog", _watchdog)
