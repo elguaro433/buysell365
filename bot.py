@@ -17520,10 +17520,12 @@ def _arrancar_interno():
                 except Exception as e2:
                     logger.error(f"📊 CRÍTICO: error volviendo a demo: {e2}")
 
-    _MT5_LOGIN_ACTUAL = os.getenv("MT5_LOGIN", "")
-    if str(_MT5_LOGIN_ACTUAL) == "336093063" and MT5_AVAILABLE:
-        _iniciar_hilo("monitor_real", _loop_monitor_real)
-        log_sistema("📊 Monitor cuenta REAL activado — leyendo MSC Gold Stable Pro cada 60s")
+    # Monitor REAL desactivado — cambiar login rompe AutoTrading en MT5
+    # Las señales de MSC Gold se monitorean manualmente o desde mql5.com
+    # _MT5_LOGIN_ACTUAL = os.getenv("MT5_LOGIN", "")
+    # if str(_MT5_LOGIN_ACTUAL) == "336093063" and MT5_AVAILABLE:
+    #     _iniciar_hilo("monitor_real", _loop_monitor_real)
+    #     log_sistema("📊 Monitor cuenta REAL activado — leyendo MSC Gold Stable Pro cada 60s")
 
     log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier, monitor_real")
 
