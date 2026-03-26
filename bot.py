@@ -944,7 +944,7 @@ ACTIVOS = {
 # Mapa de palabras clave simplificado
 KEYWORDS_ACTIVOS = {
     # ORO
-    "oro": "ORO", "gold": "ORO", "gc": "ORO",
+    "oro": "ORO", "gold": "ORO", "gc": "ORO", "xauusd": "ORO", "xau/usd": "ORO", "xau": "ORO",
 
     # ❌ BITCOIN y ETHEREUM eliminados
 
@@ -967,6 +967,26 @@ KEYWORDS_ACTIVOS = {
     # GBP/JPY
     "gbpjpy": "GBP/JPY", "gbp/jpy": "GBP/JPY", "librayen": "GBP/JPY",
     "beast": "GBP/JPY", "dragon": "GBP/JPY", "gj": "GBP/JPY",
+
+    # Pares adicionales (señales externas)
+    "gbpusd": "GBP/USD", "gbp/usd": "GBP/USD", "cable": "GBP/USD",
+    "audusd": "AUD/USD", "aud/usd": "AUD/USD",
+    "nzdusd": "NZD/USD", "nzd/usd": "NZD/USD",
+    "usdchf": "USD/CHF", "usd/chf": "USD/CHF",
+    "usdcad": "USD/CAD", "usd/cad": "USD/CAD",
+    "audcad": "AUD/CAD", "aud/cad": "AUD/CAD",
+    "eurchf": "EUR/CHF", "eur/chf": "EUR/CHF",
+    "gbpaud": "GBP/AUD", "gbp/aud": "GBP/AUD",
+    "gbpnzd": "GBP/NZD", "gbp/nzd": "GBP/NZD",
+    "audnzd": "AUD/NZD", "aud/nzd": "AUD/NZD",
+    "eurjpy": "EUR/JPY", "eur/jpy": "EUR/JPY",
+    "audjpy": "AUD/JPY", "aud/jpy": "AUD/JPY",
+    "nzdjpy": "NZD/JPY", "nzd/jpy": "NZD/JPY",
+    "cadjpy": "CAD/JPY", "cad/jpy": "CAD/JPY",
+    "chfjpy": "CHF/JPY", "chf/jpy": "CHF/JPY",
+    "eurgbp": "EUR/GBP", "eur/gbp": "EUR/GBP",
+    "euraud": "EUR/AUD", "eur/aud": "EUR/AUD",
+    "nas100": "NASDAQ", "us100": "NASDAQ", "us30": "US30",
 }
 
 # ============================================================
