@@ -4391,7 +4391,7 @@ def _obtener_tendencia_tf(ticker, interval, cache_dict, ttl=900):
     except Exception:
         return None
 
-def confirmar_tendencia_1h(ticker, tipo):
+def confirmar_tendencia_1h(ticker, tipo, **kwargs):
     """
     Verifica que la tendencia en 1H y 4H coincidan con la dirección de la señal.
     Sistema de doble filtro: ambas temporalidades deben alinearse (o ser neutras).
@@ -4399,6 +4399,12 @@ def confirmar_tendencia_1h(ticker, tipo):
     global _cache_mtf_1h, _cache_mtf_4h
 
     try:
+        # RSI extremo bypass — en sobreventa/sobrecompra extrema, ignorar MTF
+        _rsi_val = kwargs.get("rsi", 50) if kwargs else 50
+        if _rsi_val < 25 or _rsi_val > 75:
+            logger.info(f"✅ MTF bypass: RSI={_rsi_val:.0f} extremo — señal {tipo} {ticker} permitida sin filtro MTF")
+            return True
+
         # ── TEMPORALIDAD 1H ─────────────────────────────────────
         alcista_1h = _obtener_tendencia_tf(ticker, "1h", _cache_mtf_1h, ttl=900)
 
@@ -13516,9 +13522,12 @@ def analizar_activo(nombre, ticker):
         # 🔻 FILTRO MULTI-TIMEFRAME 4H — Soft: penaliza en confianza pero NO bloquea
         # Reversiones de alta calidad (score 5) pueden ir contra 4H
         _mtf_4h_ok = filtro_multi_timeframe(ticker, tipo)
-        if not _mtf_4h_ok and not _es_reversion:
+        _rsi_extremo = ind.get('rsi', 50) < 25 or ind.get('rsi', 50) > 75
+        if not _mtf_4h_ok and not _es_reversion and not _rsi_extremo:
             log_op(f"⛔ MTF 4H BLOQUEADO: {nombre} {tipo} va contra tendencia 4H — señal descartada")
             return
+        if not _mtf_4h_ok and _rsi_extremo:
+            print(f"✅ MTF 4H contra señal pero RSI EXTREMO ({ind.get('rsi', 50):.0f}) PERMITIDO: {nombre} {tipo}")
         if not _mtf_4h_ok and _es_reversion:
             print(f"⚠️ MTF 4H contra señal pero REVERSIÓN PERMITIDA: {nombre} {tipo}")
 
@@ -13598,7 +13607,7 @@ def analizar_activo(nombre, ticker):
         votos_favor += int(sent_peso * 15)
         peso_total += 15
         try:
-            mtf_ok = confirmar_tendencia_1h(ticker, tipo)
+            mtf_ok = confirmar_tendencia_1h(ticker, tipo, rsi=ind.get('rsi', 50))
             if mtf_ok:
                 votos_favor += 15
         except Exception:
@@ -15880,7 +15889,7 @@ SCALPER_ACTIVO = True  # Master switch para activar/desactivar scalper
 SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
 
 # Risk Management del Scalper
-SCALPER_RIESGO_POR_TRADE = 0.015   # 1.5% del capital por trade (demo — más agresivo)
+SCALPER_RIESGO_POR_TRADE = 0.008   # 0.8% del capital por trade (demo — equilibrado)
 SCALPER_MAX_LOSS_DIARIO = 0.03     # 3% máximo pérdida diaria → para todo
 SCALPER_MAX_CONSECUTIVAS = 4       # 4 pérdidas seguidas → pausa 30 min
 SCALPER_MAX_POSICIONES = 5         # Máximo 5 posiciones abiertas simultáneas (7 activos)
