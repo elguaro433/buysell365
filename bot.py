@@ -12634,12 +12634,13 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
             _wh_skip_mt5_razon = "Fuera de horario MT5"
             logger.info(f"🕐 HORARIO: {ticker_yf} — fuera de horario MT5 — señal solo Telegram")
 
-        # 💎 Lotaje por activo + premium webhook
+        # 💎 Clasificación webhook: Premium (score≥4) vs Standard (score≥3)
         _es_premium = (score_bot is not None and score_bot >= 4)
+        _es_standard = (score_bot is not None and score_bot >= 3)
 
-        # 🔒 FILTRO PREMIUM GLOBAL: solo webhooks premium pasan (score >= 4)
-        if not _es_premium:
-            logger.info(f"🔒 FILTRO PREMIUM WH: {nombre_activo} {direccion} — Score:{score_bot} — NO es premium → descartada")
+        # 🔒 FILTRO: mínimo score 3 para webhooks
+        if not _es_standard:
+            logger.info(f"🔒 FILTRO WH: {nombre_activo} {direccion} — Score:{score_bot} — no cumple mínimo → descartada")
             with _lock_ops:
                 operaciones_activas.pop(op_id, None)
                 estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 0) - 1)
@@ -13885,8 +13886,9 @@ def analizar_activo(nombre, ticker):
         ind['cot_desc'] = cot_desc
         ind['sent_desc'] = sent_desc
         ind['confianza_multi_ia'] = confianza_total
-        # Umbral dinámico: Score 4-5 requiere 50%, Score 3 (Trend Following) requiere 25%
-        _min_conf = 25 if score <= 3 else 50
+        # Umbral dinámico: Score 4-5 requiere 40%, Score 3 (Trend Following) requiere 25%
+        # FIX 2026-03-27: bajado de 50%→40% para score 4-5 (sin ML, 50% era casi imposible)
+        _min_conf = 25 if score <= 3 else 40
         if confianza_total < _min_conf:
             print(f"MULTI-IA BLOQUEO: {nombre} {tipo} - confianza {confianza_total}% < {_min_conf}%")
             return
@@ -13914,14 +13916,18 @@ def analizar_activo(nombre, ticker):
             print(f"🕐 HORARIO: {nombre} — fuera de horario — descartado")
             return
 
-        # ⭐ SOLO SEÑALES PREMIUM — Breakout (score 4) + Reversión con divergencia (score 5)
-        # FIX 2026-03-19: subido de 50% a 70% (con ML bypass en 0, solo pasan señales reales)
-        _es_premium = (score >= 4 and confianza_total >= 70)
-        _nivel_senal = "PREMIUM"
+        # ⭐ CLASIFICACIÓN DE SEÑALES — Premium vs Standard
+        # FIX 2026-03-27: 70%→50% confianza premium, permitir STANDARD (score≥3, conf≥40%)
+        # Con ML bypass=0, 70% era casi imposible de alcanzar → 0 señales en 2 días
+        _es_premium = (score >= 4 and confianza_total >= 50)
+        _es_standard = (score >= 3 and confianza_total >= 40)
 
-        # 🔒 FILTRO PREMIUM: solo señales de alta calidad
-        if not _es_premium:
-            print(f"🔒 FILTRO PREMIUM: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
+        if _es_premium:
+            _nivel_senal = "PREMIUM"
+        elif _es_standard:
+            _nivel_senal = "STANDARD"
+        else:
+            print(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
             return
 
         # ═══ C-03 FIX: RESERVA ATÓMICA — Todos los checks + reserva en UN lock ═══
