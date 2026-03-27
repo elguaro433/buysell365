@@ -706,46 +706,48 @@ def index_web():
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 *{{margin:0;padding:0;box-sizing:border-box}}
 :root{{
-  --bg:#0a0e17;--bg2:#111827;--bg3:#1a2332;
-  --green:#00d4aa;--green2:#00f5c4;--blue:#3b82f6;--purple:#8b5cf6;
-  --gold:#f59e0b;--red:#ef4444;--text:#e2e8f0;--text2:#94a3b8;
-  --glass:rgba(255,255,255,0.03);--border:rgba(255,255,255,0.06);
+  --bg:#060a12;--bg2:#0d1420;--bg3:#141e2e;
+  --green:#00ffcc;--green2:#00f5c4;--blue:#4d9fff;--purple:#a78bfa;
+  --gold:#fbbf24;--red:#f87171;--text:#f1f5f9;--text2:#a0aec0;
+  --glass:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.08);
+  --glow-green:rgba(0,255,204,0.15);--glow-gold:rgba(251,191,36,0.15);
 }}
 html{{scroll-behavior:smooth}}
 body{{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}}
 
 /* ═══ HERO ═══ */
-.hero{{min-height:80vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:20px}}
+.hero{{min-height:60vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:100px 20px 40px}}
 .hero::before{{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
-  background:radial-gradient(circle at 30% 40%,rgba(0,212,170,0.08) 0%,transparent 50%),
-             radial-gradient(circle at 70% 60%,rgba(59,130,246,0.06) 0%,transparent 50%),
-             radial-gradient(circle at 50% 50%,rgba(139,92,246,0.04) 0%,transparent 50%);
-  animation:heroGlow 20s ease infinite alternate}}
-@keyframes heroGlow{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(15deg)}}}}
+  background:radial-gradient(circle at 30% 40%,rgba(0,255,204,0.12) 0%,transparent 45%),
+             radial-gradient(circle at 70% 60%,rgba(77,159,255,0.10) 0%,transparent 45%),
+             radial-gradient(circle at 50% 30%,rgba(167,139,250,0.08) 0%,transparent 45%);
+  animation:heroGlow 15s ease infinite alternate}}
+@keyframes heroGlow{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(12deg)}}}}
 .hero-content{{text-align:center;max-width:900px;z-index:2;position:relative}}
 .hero-badge{{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.2);
   border-radius:50px;padding:6px 18px;font-size:13px;color:var(--green);margin-bottom:24px;font-weight:500}}
 .hero-badge .dot{{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}}
 @keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:0.3}}}}
-.hero h1{{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:900;line-height:1.1;margin-bottom:20px;
-  background:linear-gradient(135deg,#fff 0%,var(--green) 50%,var(--blue) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
-.hero p{{font-size:clamp(1rem,2vw,1.25rem);color:var(--text2);max-width:650px;margin:0 auto 40px;line-height:1.7}}
+.hero h1{{font-size:clamp(2.5rem,6vw,4rem);font-weight:900;line-height:1.1;margin-bottom:16px;
+  background:linear-gradient(135deg,#fff 0%,#00ffcc 40%,#4d9fff 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  text-shadow:none;filter:drop-shadow(0 0 30px rgba(0,255,204,0.2))}}
+.hero p{{font-size:clamp(1rem,2vw,1.15rem);color:var(--text2);max-width:600px;margin:0 auto 30px;line-height:1.6}}
 .hero-buttons{{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}}
 .btn{{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:600;
   text-decoration:none;transition:all 0.3s ease;cursor:pointer;border:none}}
-.btn-primary{{background:linear-gradient(135deg,var(--green),#00b894);color:#0a0e17;box-shadow:0 4px 20px rgba(0,212,170,0.3)}}
-.btn-primary:hover{{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,212,170,0.4)}}
-.btn-secondary{{background:var(--glass);color:var(--text);border:1px solid var(--border)}}
-.btn-secondary:hover{{background:rgba(255,255,255,0.08);transform:translateY(-2px)}}
+.btn-primary{{background:linear-gradient(135deg,#00ffcc,#00d4aa,#00b894);color:#060a12;box-shadow:0 4px 25px rgba(0,255,204,0.4);font-weight:800}}
+.btn-primary:hover{{transform:translateY(-3px);box-shadow:0 8px 40px rgba(0,255,204,0.6)}}
+.btn-secondary{{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.15)}}
+.btn-secondary:hover{{background:rgba(255,255,255,0.12);transform:translateY(-3px);border-color:rgba(0,255,204,0.3)}}
 
 /* ═══ STATS BAR ═══ */
-.stats-bar{{display:flex;justify-content:center;gap:40px;margin-top:60px;flex-wrap:wrap}}
+.stats-bar{{display:flex;justify-content:center;gap:40px;margin-top:40px;flex-wrap:wrap;padding:20px;background:rgba(0,255,204,0.03);border:1px solid rgba(0,255,204,0.1);border-radius:20px;max-width:700px;margin-left:auto;margin-right:auto}}
 .stat-item{{text-align:center}}
-.stat-value{{font-size:2rem;font-weight:800;color:var(--green)}}
-.stat-value.blue{{color:var(--blue)}}
-.stat-value.gold{{color:var(--gold)}}
-.stat-value.purple{{color:var(--purple)}}
+.stat-value{{font-size:2rem;font-weight:900;color:#00ffcc;text-shadow:0 0 20px rgba(0,255,204,0.4)}}
+.stat-value.blue{{color:#4d9fff;text-shadow:0 0 20px rgba(77,159,255,0.4)}}
+.stat-value.gold{{color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,0.4)}}
+.stat-value.purple{{color:#a78bfa;text-shadow:0 0 20px rgba(167,139,250,0.4)}}
 .stat-label{{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px}}
 
 /* ═══ SECTIONS ═══ */
@@ -757,8 +759,8 @@ section{{padding:60px 20px}}
 /* ═══ FEATURES ═══ */
 .features{{background:var(--bg2)}}
 .features-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto}}
-.feature-card{{background:linear-gradient(145deg,var(--bg3),rgba(26,35,50,0.6));border:1px solid var(--border);border-radius:16px;padding:24px;transition:all 0.4s ease}}
-.feature-card:hover{{transform:translateY(-6px);border-color:rgba(0,212,170,0.3);box-shadow:0 8px 30px rgba(0,212,170,0.1)}}
+.feature-card{{background:linear-gradient(145deg,rgba(20,30,46,0.8),rgba(13,20,32,0.6));border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:28px;transition:all 0.4s ease}}
+.feature-card:hover{{transform:translateY(-6px);border-color:rgba(0,255,204,0.4);box-shadow:0 8px 40px rgba(0,255,204,0.1)}}
 .feature-icon{{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px}}
 .feature-icon.green{{background:rgba(0,212,170,0.1)}}
 .feature-icon.blue{{background:rgba(59,130,246,0.1)}}
@@ -785,24 +787,24 @@ section{{padding:60px 20px}}
 .asset-tag{{font-size:0.75rem;color:var(--text2);margin-top:4px}}
 
 /* ═══ PRICING ═══ */
-.pricing{{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 30%,var(--bg) 100%);padding:80px 20px!important;position:relative}}
-.pricing::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:80%;height:1px;background:linear-gradient(90deg,transparent,var(--green),var(--gold),var(--green),transparent)}}
-.pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1200px;margin:0 auto}}
+.pricing{{background:linear-gradient(180deg,rgba(0,255,204,0.03) 0%,var(--bg2) 40%,rgba(251,191,36,0.03) 100%);padding:80px 20px!important;position:relative}}
+.pricing::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:2px;background:linear-gradient(90deg,transparent,#00ffcc,#fbbf24,#00ffcc,transparent);border-radius:2px}}
+.pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;max-width:1200px;margin:0 auto}}
 @media(max-width:900px){{.pricing-cards{{grid-template-columns:1fr!important}}}}
-.price-card{{background:linear-gradient(145deg,var(--bg3),rgba(26,35,50,0.8));border:1px solid var(--border);border-radius:24px;padding:44px 32px;text-align:center;position:relative;transition:all .4s ease}}
-.price-card:hover{{transform:translateY(-8px);box-shadow:0 20px 60px rgba(0,0,0,.4)}}
-.price-card.featured{{border-color:var(--green);box-shadow:0 0 40px rgba(0,212,170,0.1)}}
-.price-badge{{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),#00b894);
-  color:#0a0e17;padding:6px 24px;border-radius:20px;font-size:13px;font-weight:800;white-space:nowrap}}
-.price-name{{font-size:1.3rem;font-weight:800;margin-bottom:8px}}
-.price-amount{{font-size:3.2rem;font-weight:900;margin:16px 0}}
+.price-card{{background:linear-gradient(160deg,rgba(20,30,46,0.95),rgba(13,20,32,0.95));border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:48px 32px;text-align:center;position:relative;transition:all .4s ease;backdrop-filter:blur(10px)}}
+.price-card:hover{{transform:translateY(-10px) scale(1.02);box-shadow:0 24px 60px rgba(0,0,0,.5)}}
+.price-card.featured{{border-color:var(--gold);box-shadow:0 0 50px rgba(251,191,36,0.15),0 0 100px rgba(251,191,36,0.05)}}
+.price-badge{{position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),#00b894);
+  color:#060a12;padding:8px 28px;border-radius:24px;font-size:14px;font-weight:900;white-space:nowrap;letter-spacing:0.5px;box-shadow:0 4px 20px rgba(0,255,204,0.3)}}
+.price-name{{font-size:1.4rem;font-weight:900;margin-bottom:10px;letter-spacing:-0.5px}}
+.price-amount{{font-size:3.5rem;font-weight:900;margin:16px 0}}
 .price-amount span{{font-size:1rem;color:var(--text2);font-weight:400}}
 .price-amount .old{{text-decoration:line-through;color:var(--text2);font-size:1.5rem;display:block;font-weight:400}}
 .price-list{{list-style:none;text-align:left;margin:24px 0}}
-.price-list li{{padding:10px 0;color:var(--text2);font-size:0.95rem;display:flex;align-items:center;gap:10px}}
+.price-list li{{padding:10px 0;color:var(--text);font-size:0.95rem;display:flex;align-items:center;gap:10px;font-weight:500}}
 .price-list li::before{{content:'\u2714\ufe0f';font-size:14px}}
 @keyframes shimmer{{0%{{background-position:-200% 0}}100%{{background-position:200% 0}}}}
-.price-card .btn-price{{display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;border-radius:14px;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}}
+@keyframes glowPulse{{0%,100%{{box-shadow:0 0 20px rgba(0,255,204,0.3)}}50%{{box-shadow:0 0 40px rgba(0,255,204,0.6)}}}}
 
 /* ═══ CTA ═══ */
 .cta{{text-align:center;padding:50px 20px}}
@@ -820,7 +822,7 @@ section{{padding:60px 20px}}
 .nav{{position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;
   background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;border-bottom:none;
   transition:background .3s,backdrop-filter .3s,border-bottom .3s,padding .3s}}
-.nav.scrolled{{background:rgba(10,14,23,0.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.04);padding:8px 28px}}
+.nav.scrolled{{background:rgba(6,10,18,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,255,204,0.1);padding:8px 28px;box-shadow:0 4px 30px rgba(0,0,0,0.3)}}
 .nav-logo{{display:flex;align-items:center;gap:14px;font-weight:800;font-size:24px;color:#fff;text-decoration:none;flex-shrink:0;z-index:101;letter-spacing:-.5px}}
 .nav-logo img{{width:72px;height:72px;min-width:72px;min-height:72px;border-radius:14px;object-fit:contain;flex-shrink:0;display:block;border:1px solid rgba(0,212,170,.2);box-shadow:0 4px 16px rgba(0,212,170,.15)}}
 .nav-links{{display:flex;gap:24px;align-items:center}}
@@ -929,7 +931,7 @@ if('serviceWorker' in navigator){{
 <body>
 
 <!-- MATRIX RAIN BACKGROUND -->
-<canvas id="matrixCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.07"></canvas>
+<canvas id="matrixCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.10"></canvas>
 
 <!-- NAV -->
 <nav class="nav">
@@ -994,14 +996,14 @@ if('serviceWorker' in navigator){{
 
 <!-- PRICING — Visible inmediatamente después del Hero -->
 <section class="pricing fade-in" id="pricing">
-  <div class="section-title" style="margin-bottom:40px">
-    <h2 style="background:linear-gradient(135deg,#fff,#ffd740,#00e676);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f4b0 <span data-i18n="pricing.title" style="-webkit-text-fill-color:inherit">Servicios y Planes</span></h2>
-    <p data-i18n="pricing.subtitle" style="font-size:1.1rem">Elige el plan que mejor se adapte a tu estilo de trading.</p>
+  <div class="section-title" style="margin-bottom:48px">
+    <h2 style="font-size:clamp(2rem,5vw,3rem);background:linear-gradient(135deg,#fff 20%,#fbbf24 50%,#00ffcc 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(251,191,36,0.2))">\U0001f4b0 <span data-i18n="pricing.title" style="-webkit-text-fill-color:inherit">Servicios y Planes</span></h2>
+    <p data-i18n="pricing.subtitle" style="font-size:1.15rem;color:#a0aec0">Elige el plan que mejor se adapte a tu estilo de trading.</p>
   </div>
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
-    <div class="price-card" style="border:1px solid rgba(96,165,250,0.3);box-shadow:0 0 20px rgba(96,165,250,0.1)">
-      <div class="price-name" style="color:#60a5fa;font-size:1.3rem" data-i18n="pricing.community">Comunidad</div>
-      <div class="price-amount" style="color:#60a5fa;text-shadow:0 0 20px rgba(96,165,250,0.5)" data-i18n="pricing.free">GRATIS</div>
+    <div class="price-card" style="border:1px solid rgba(77,159,255,0.3);box-shadow:0 0 30px rgba(77,159,255,0.1)">
+      <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">Comunidad</div>
+      <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:3rem" data-i18n="pricing.free">GRATIS</div>
       <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
         <li style="color:#90caf9">&#128227; Resumen diario de mercado</li>
@@ -1009,12 +1011,12 @@ if('serviceWorker' in navigator){{
         <li style="color:#90caf9">&#129309; Soporte de la comunidad</li>
         <li style="color:#90caf9">&#128202; Dashboard p\u00fablico limitado</li>
       </ul>
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5);border-radius:14px;color:#fff;font-weight:800;font-size:1.05rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 20px rgba(66,165,245,0.4);transition:all .3s">&#128172; Unirse Gratis</a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5,#64b5f6);border-radius:14px;color:#fff;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 25px rgba(66,165,245,0.5);transition:all .3s">&#128172; Unirse Gratis</a>
     </div>
-    <div class="price-card featured" style="border:2px solid #ffd740;box-shadow:0 0 40px rgba(255,215,64,0.3),0 0 80px rgba(255,215,64,0.1);transform:scale(1.03)">
-      <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#ffd740);box-shadow:0 0 25px rgba(255,215,64,.7);animation:pulse 2s infinite;font-size:14px;padding:8px 28px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
-      <div class="price-name" style="color:#ffd740;font-size:1.4rem" data-i18n="pricing.vip">VIP Pro</div>
-      <div class="price-amount" style="font-size:3.5rem">
+    <div class="price-card featured" style="border:2px solid #fbbf24;box-shadow:0 0 50px rgba(251,191,36,0.3),0 0 100px rgba(251,191,36,0.1);transform:scale(1.04)">
+      <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
+      <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">VIP Pro</div>
+      <div class="price-amount" style="font-size:3.8rem;text-shadow:0 0 30px rgba(255,255,255,0.1)">
         <span class="old">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
       </div>
@@ -1034,10 +1036,10 @@ if('serviceWorker' in navigator){{
       </ul>
       <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s">\U0001f451 Suscribirme al VIP</a>
     </div>
-    <div class="price-card" style="position:relative;border:2px solid #00e676;box-shadow:0 0 40px rgba(0,230,118,0.3),0 0 80px rgba(0,230,118,0.1)">
-      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 25px rgba(0,200,83,.7);animation:pulse 2s infinite;font-size:14px;padding:8px 28px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
-      <div class="price-name" style="color:#00e676;font-size:1.4rem" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.8rem;color:#00e676;font-weight:900;text-shadow:0 0 25px rgba(0,230,118,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
+    <div class="price-card" style="position:relative;border:2px solid #00ffcc;box-shadow:0 0 50px rgba(0,255,204,0.25),0 0 100px rgba(0,255,204,0.08)">
+      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00ffcc);box-shadow:0 0 30px rgba(0,255,204,.7);animation:glowPulse 3s infinite;font-size:15px;padding:10px 32px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
+      <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">Copy Trading</div>
+      <div class="price-amount" style="font-size:2rem;color:#00ffcc;font-weight:900;text-shadow:0 0 30px rgba(0,255,204,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
       <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5</p>
       <ul class="price-list" style="color:#e0e0e0">
         <li style="color:#00e676" data-i18n="pricing.cp1">&#9889; Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
