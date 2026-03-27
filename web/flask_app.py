@@ -1176,11 +1176,11 @@ if('serviceWorker' in navigator){{
       <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Empezar Prueba Gratis</a>
     </div>
     <div class="price-card" style="position:relative;opacity:0.7">
-      <div class="price-badge" style="background:linear-gradient(135deg,#ff9800,#f57c00);box-shadow:0 0 16px rgba(255,152,0,.4)">&#9200; <span data-i18n="pricing.copy_badge">PROXIMAMENTE</span></div>
+      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 16px rgba(0,200,83,.4)">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
       <div class="price-name" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Pr\u00f3ximamente disponible</div>
+      <div class="price-amount" style="font-size:1.4rem;color:var(--green);font-weight:900" data-i18n="pricing.copy_price">GRATIS</div>
       <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5 a trav\u00e9s de XM</p>
-      <ul class="price-list" style="opacity:0.5">
+      <ul class="price-list">
         <li data-i18n="pricing.cp1">Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
         <li data-i18n="pricing.cp2">Copia autom\u00e1tica en tiempo real</li>
         <li data-i18n="pricing.cp3">SL y TP colocados autom\u00e1ticamente</li>
@@ -1188,7 +1188,7 @@ if('serviceWorker' in navigator){{
         <li data-i18n="pricing.cp5">Broker regulado XM (MT5)</li>
         <li data-i18n="pricing.cp6">Sin intervenci\u00f3n manual requerida</li>
       </ul>
-      <div style="width:100%;text-align:center;margin-top:16px;padding:12px 24px;background:linear-gradient(135deg,#666,#444);border-radius:8px;color:#fff;font-weight:600;cursor:not-allowed">&#128276; Proximamente</div>
+      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:12px 24px;background:linear-gradient(135deg,#00c853,#00e676);border-radius:8px;color:#fff;font-weight:600;text-decoration:none;cursor:pointer">&#128640; Empezar Copy Trading</a>
     </div>
   </div>
 </section>
@@ -1890,7 +1890,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
                 <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM GRATIS</a>
-                <span class="cta-btn" style="background:linear-gradient(135deg,#666,#444);border:none;padding:12px 24px;cursor:not-allowed;opacity:0.6">&#9200; COPY TRADING - PROXIMAMENTE</span>
+                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="background:linear-gradient(135deg,#00c853,#00e676);border:none;padding:12px 24px">&#128640; COPY TRADING GRATIS</a>
             </div>
             <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
         </div>
