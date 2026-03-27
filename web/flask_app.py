@@ -715,7 +715,7 @@ html{{scroll-behavior:smooth}}
 body{{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}}
 
 /* ═══ HERO ═══ */
-.hero{{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:20px}}
+.hero{{min-height:80vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:20px}}
 .hero::before{{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
   background:radial-gradient(circle at 30% 40%,rgba(0,212,170,0.08) 0%,transparent 50%),
              radial-gradient(circle at 70% 60%,rgba(59,130,246,0.06) 0%,transparent 50%),
@@ -749,16 +749,16 @@ body{{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);over
 .stat-label{{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px}}
 
 /* ═══ SECTIONS ═══ */
-section{{padding:50px 20px}}
-.section-title{{text-align:center;margin-bottom:30px}}
-.section-title h2{{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:800;margin-bottom:12px}}
-.section-title p{{color:var(--text2);font-size:1.05rem;max-width:600px;margin:0 auto}}
+section{{padding:60px 20px}}
+.section-title{{text-align:center;margin-bottom:36px}}
+.section-title h2{{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;margin-bottom:14px}}
+.section-title p{{color:var(--text2);font-size:1.1rem;max-width:650px;margin:0 auto;line-height:1.6}}
 
 /* ═══ FEATURES ═══ */
 .features{{background:var(--bg2)}}
-.features-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1000px;margin:0 auto}}
-.feature-card{{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:20px;transition:all 0.3s ease}}
-.feature-card:hover{{transform:translateY(-2px);border-color:rgba(0,212,170,0.2);box-shadow:0 4px 16px rgba(0,0,0,0.2)}}
+.features-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto}}
+.feature-card{{background:linear-gradient(145deg,var(--bg3),rgba(26,35,50,0.6));border:1px solid var(--border);border-radius:16px;padding:24px;transition:all 0.4s ease}}
+.feature-card:hover{{transform:translateY(-6px);border-color:rgba(0,212,170,0.3);box-shadow:0 8px 30px rgba(0,212,170,0.1)}}
 .feature-icon{{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px}}
 .feature-icon.green{{background:rgba(0,212,170,0.1)}}
 .feature-icon.blue{{background:rgba(59,130,246,0.1)}}
@@ -785,20 +785,24 @@ section{{padding:50px 20px}}
 .asset-tag{{font-size:0.75rem;color:var(--text2);margin-top:4px}}
 
 /* ═══ PRICING ═══ */
-.pricing{{background:var(--bg2)}}
-.pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto}}
+.pricing{{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 30%,var(--bg) 100%);padding:80px 20px!important;position:relative}}
+.pricing::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:80%;height:1px;background:linear-gradient(90deg,transparent,var(--green),var(--gold),var(--green),transparent)}}
+.pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1200px;margin:0 auto}}
 @media(max-width:900px){{.pricing-cards{{grid-template-columns:1fr!important}}}}
-.price-card{{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:40px 32px;text-align:center;position:relative}}
+.price-card{{background:linear-gradient(145deg,var(--bg3),rgba(26,35,50,0.8));border:1px solid var(--border);border-radius:24px;padding:44px 32px;text-align:center;position:relative;transition:all .4s ease}}
+.price-card:hover{{transform:translateY(-8px);box-shadow:0 20px 60px rgba(0,0,0,.4)}}
 .price-card.featured{{border-color:var(--green);box-shadow:0 0 40px rgba(0,212,170,0.1)}}
-.price-badge{{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),#00b894);
-  color:#0a0e17;padding:4px 20px;border-radius:20px;font-size:12px;font-weight:700}}
-.price-name{{font-size:1.2rem;font-weight:700;margin-bottom:8px}}
-.price-amount{{font-size:3rem;font-weight:900;margin:16px 0}}
+.price-badge{{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),#00b894);
+  color:#0a0e17;padding:6px 24px;border-radius:20px;font-size:13px;font-weight:800;white-space:nowrap}}
+.price-name{{font-size:1.3rem;font-weight:800;margin-bottom:8px}}
+.price-amount{{font-size:3.2rem;font-weight:900;margin:16px 0}}
 .price-amount span{{font-size:1rem;color:var(--text2);font-weight:400}}
 .price-amount .old{{text-decoration:line-through;color:var(--text2);font-size:1.5rem;display:block;font-weight:400}}
 .price-list{{list-style:none;text-align:left;margin:24px 0}}
-.price-list li{{padding:8px 0;color:var(--text2);font-size:0.9rem;display:flex;align-items:center;gap:8px}}
+.price-list li{{padding:10px 0;color:var(--text2);font-size:0.95rem;display:flex;align-items:center;gap:10px}}
 .price-list li::before{{content:'\u2714\ufe0f';font-size:14px}}
+@keyframes shimmer{{0%{{background-position:-200% 0}}100%{{background-position:200% 0}}}}
+.price-card .btn-price{{display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;border-radius:14px;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}}
 
 /* ═══ CTA ═══ */
 .cta{{text-align:center;padding:50px 20px}}
@@ -975,14 +979,75 @@ if('serviceWorker' in navigator){{
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
     <p data-i18n="hero.subtitle" data-i18n-vars='{{"assets":"{activos}"}}'>Se\u00f1ales de trading automatizadas con Inteligencia Artificial, an\u00e1lisis de noticias y datos institucionales. An\u00e1lisis continuo en {activos} activos de clase mundial.</p>
     <div class="hero-buttons">
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-primary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Unirse GRATIS a Telegram</span></a>
+      <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f451 Ver Planes y Servicios</a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Telegram Gratis</span></a>
     </div>
     <div class="stats-bar">
       <div class="stat-item"><div class="stat-value">{wr}%</div><div class="stat-label" data-i18n="stats.winrate">Tasa de Acierto</div></div>
       <div class="stat-item"><div class="stat-value blue">{total}</div><div class="stat-label" data-i18n="stats.signals">Se\u00f1ales Generadas</div></div>
       <div class="stat-item"><div class="stat-value gold">{pips:+,.0f}</div><div class="stat-label" data-i18n="stats.pips">Ganancia Acumulada</div></div>
       <div class="stat-item"><div class="stat-value purple">24/7</div><div class="stat-label" data-i18n="stats.analysis">An\u00e1lisis Activo</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING — Visible inmediatamente después del Hero -->
+<section class="pricing fade-in" id="pricing">
+  <div class="section-title" style="margin-bottom:40px">
+    <h2 style="background:linear-gradient(135deg,#fff,#ffd740,#00e676);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f4b0 <span data-i18n="pricing.title" style="-webkit-text-fill-color:inherit">Servicios y Planes</span></h2>
+    <p data-i18n="pricing.subtitle" style="font-size:1.1rem">Elige el plan que mejor se adapte a tu estilo de trading.</p>
+  </div>
+  <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
+    <div class="price-card" style="border:1px solid rgba(96,165,250,0.3);box-shadow:0 0 20px rgba(96,165,250,0.1)">
+      <div class="price-name" style="color:#60a5fa;font-size:1.3rem" data-i18n="pricing.community">Comunidad</div>
+      <div class="price-amount" style="color:#60a5fa;text-shadow:0 0 20px rgba(96,165,250,0.5)" data-i18n="pricing.free">GRATIS</div>
+      <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
+      <ul class="price-list">
+        <li style="color:#90caf9">&#128227; Resumen diario de mercado</li>
+        <li style="color:#90caf9">&#128218; Educaci\u00f3n y an\u00e1lisis general</li>
+        <li style="color:#90caf9">&#129309; Soporte de la comunidad</li>
+        <li style="color:#90caf9">&#128202; Dashboard p\u00fablico limitado</li>
+      </ul>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5);border-radius:14px;color:#fff;font-weight:800;font-size:1.05rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 20px rgba(66,165,245,0.4);transition:all .3s">&#128172; Unirse Gratis</a>
+    </div>
+    <div class="price-card featured" style="border:2px solid #ffd740;box-shadow:0 0 40px rgba(255,215,64,0.3),0 0 80px rgba(255,215,64,0.1);transform:scale(1.03)">
+      <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#ffd740);box-shadow:0 0 25px rgba(255,215,64,.7);animation:pulse 2s infinite;font-size:14px;padding:8px 28px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
+      <div class="price-name" style="color:#ffd740;font-size:1.4rem" data-i18n="pricing.vip">VIP Pro</div>
+      <div class="price-amount" style="font-size:3.5rem">
+        <span class="old">$299/mes</span>
+        $149<span data-i18n="pricing.month">/mes USDT</span>
+      </div>
+      <div class="countdown" id="offerCountdown">
+        <div class="countdown-item"><div class="countdown-val" id="cdDays">--</div><div class="countdown-lbl" data-i18n="countdown.days">D\u00edas</div></div>
+        <div class="countdown-item"><div class="countdown-val" id="cdHours">--</div><div class="countdown-lbl" data-i18n="countdown.hours">Horas</div></div>
+        <div class="countdown-item"><div class="countdown-val" id="cdMins">--</div><div class="countdown-lbl" data-i18n="countdown.mins">Min</div></div>
+        <div class="countdown-item"><div class="countdown-val" id="cdSecs">--</div><div class="countdown-lbl" data-i18n="countdown.secs">Seg</div></div>
+      </div>
+      <ul class="price-list" style="margin-top:20px">
+        <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP/SL</li>
+        <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
+        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas en tiempo real</li>
+        <li style="color:#ffd740">&#128161; Soporte prioritario</li>
+        <li style="color:#ffd740">&#129302; An\u00e1lisis multi-IA exclusivo</li>
+        <li style="color:#ffd740">&#128200; Briefing matutino + Cierre nocturno</li>
+      </ul>
+      <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s">\U0001f451 Suscribirme al VIP</a>
+    </div>
+    <div class="price-card" style="position:relative;border:2px solid #00e676;box-shadow:0 0 40px rgba(0,230,118,0.3),0 0 80px rgba(0,230,118,0.1)">
+      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 25px rgba(0,200,83,.7);animation:pulse 2s infinite;font-size:14px;padding:8px 28px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
+      <div class="price-name" style="color:#00e676;font-size:1.4rem" data-i18n="pricing.copy_name">Copy Trading</div>
+      <div class="price-amount" style="font-size:1.8rem;color:#00e676;font-weight:900;text-shadow:0 0 25px rgba(0,230,118,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
+      <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5</p>
+      <ul class="price-list" style="color:#e0e0e0">
+        <li style="color:#00e676" data-i18n="pricing.cp1">&#9889; Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
+        <li style="color:#00e676" data-i18n="pricing.cp2">&#128640; Copia autom\u00e1tica en tiempo real</li>
+        <li style="color:#00e676" data-i18n="pricing.cp3">&#127919; SL y TP colocados autom\u00e1ticamente</li>
+        <li style="color:#ffd740" data-i18n="pricing.cp4">&#128176; Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
+        <li style="color:#00e676" data-i18n="pricing.cp5">&#127970; Broker regulado XM (MT5)</li>
+        <li style="color:#00e676" data-i18n="pricing.cp6">&#129302; Sin intervenci\u00f3n manual requerida</li>
+      </ul>
+      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(0,230,118,0.5);transition:all 0.3s">&#128640; Empezar Copy Trading</a>
     </div>
   </div>
 </section>
@@ -1143,67 +1208,6 @@ if('serviceWorker' in navigator){{
   </div>
 </section>
 
-<!-- PRICING -->
-<section class="pricing fade-in" id="pricing">
-  <div class="section-title">
-    <h2>\U0001f4b0 <span data-i18n="pricing.title">Servicios y Planes</span></h2>
-    <p data-i18n="pricing.subtitle">Empieza gratis y escala cuando est\u00e9s listo.</p>
-  </div>
-  <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
-    <div class="price-card" style="border:1px solid rgba(96,165,250,0.3);box-shadow:0 0 20px rgba(96,165,250,0.1)">
-      <div class="price-name" style="color:#60a5fa;font-size:1.2rem" data-i18n="pricing.community">Comunidad</div>
-      <div class="price-amount" style="color:#60a5fa;text-shadow:0 0 15px rgba(96,165,250,0.4)" data-i18n="pricing.free">GRATIS</div>
-      <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
-      <ul class="price-list">
-        <li style="color:#90caf9">&#128227; Resumen diario de mercado</li>
-        <li style="color:#90caf9">&#128218; Educaci\u00f3n y an\u00e1lisis general</li>
-        <li style="color:#90caf9">&#129309; Soporte de la comunidad</li>
-        <li style="color:#90caf9">&#128202; Dashboard p\u00fablico limitado</li>
-      </ul>
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:14px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5);border-radius:12px;color:#fff;font-weight:700;text-decoration:none;cursor:pointer;box-shadow:0 0 15px rgba(66,165,245,0.4)">&#128172; Unirse Gratis</a>
-    </div>
-    <div class="price-card featured" style="border:2px solid #ffd740;box-shadow:0 0 30px rgba(255,215,64,0.3),0 0 60px rgba(255,215,64,0.1)">
-      <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#ffd740);box-shadow:0 0 20px rgba(255,215,64,.6);animation:pulse 2s infinite">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
-      <div class="price-name" style="color:#ffd740;font-size:1.3rem" data-i18n="pricing.vip">VIP Pro</div>
-      <div class="price-amount">
-        <span class="old">$299/mes</span>
-        $149<span data-i18n="pricing.month">/mes USDT</span>
-      </div>
-      <div class="countdown" id="offerCountdown">
-        <div class="countdown-item"><div class="countdown-val" id="cdDays">--</div><div class="countdown-lbl" data-i18n="countdown.days">D\u00edas</div></div>
-        <div class="countdown-item"><div class="countdown-val" id="cdHours">--</div><div class="countdown-lbl" data-i18n="countdown.hours">Horas</div></div>
-        <div class="countdown-item"><div class="countdown-val" id="cdMins">--</div><div class="countdown-lbl" data-i18n="countdown.mins">Min</div></div>
-        <div class="countdown-item"><div class="countdown-val" id="cdSecs">--</div><div class="countdown-lbl" data-i18n="countdown.secs">Seg</div></div>
-      </div>
-      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.trial" data-i18n-vars='{{"days":"5"}}'>5 d\u00edas h\u00e1biles de prueba GRATIS</p>
-      <ul class="price-list">
-        <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP/SL</li>
-        <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
-        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas en tiempo real</li>
-        <li style="color:#ffd740">&#128161; Soporte prioritario</li>
-        <li style="color:#ffd740">&#129302; An\u00e1lisis multi-IA exclusivo</li>
-        <li style="color:#ffd740">&#128200; Gr\u00e1ficos de entrada y salida</li>
-      </ul>
-      <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:12px;color:#000;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 0 25px rgba(255,215,64,0.5)">&#11088; Empezar Prueba Gratis</a>
-    </div>
-    <div class="price-card" style="position:relative;opacity:1;border:2px solid #00e676;box-shadow:0 0 30px rgba(0,230,118,0.3),0 0 60px rgba(0,230,118,0.1)">
-      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 20px rgba(0,200,83,.6);animation:pulse 2s infinite">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
-      <div class="price-name" style="color:#00e676;font-size:1.3rem" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.6rem;color:#00e676;font-weight:900;text-shadow:0 0 20px rgba(0,230,118,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
-      <p style="color:#b0bec5;margin-bottom:16px;font-size:0.95rem" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5</p>
-      <ul class="price-list" style="color:#e0e0e0">
-        <li style="color:#00e676" data-i18n="pricing.cp1">&#9889; Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
-        <li style="color:#00e676" data-i18n="pricing.cp2">&#128640; Copia autom\u00e1tica en tiempo real</li>
-        <li style="color:#00e676" data-i18n="pricing.cp3">&#127919; SL y TP colocados autom\u00e1ticamente</li>
-        <li style="color:#ffd740" data-i18n="pricing.cp4">&#128176; Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
-        <li style="color:#00e676" data-i18n="pricing.cp5">&#127970; Broker regulado XM (MT5)</li>
-        <li style="color:#00e676" data-i18n="pricing.cp6">&#129302; Sin intervenci\u00f3n manual requerida</li>
-      </ul>
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:12px;color:#000;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 0 25px rgba(0,230,118,0.5);transition:all 0.3s">&#128640; Empezar Copy Trading</a>
-    </div>
-  </div>
-</section>
-
 <!-- FAQ -->
 <section class="faq fade-in" id="faq">
   <div class="section-title">
@@ -1266,12 +1270,13 @@ if('serviceWorker' in navigator){{
 </section>
 
 <!-- CTA -->
-<section class="cta fade-in">
-  <h2>\U0001f680 <span data-i18n="cta.title">Empieza Hoy \u2014 Sin Riesgo</span></h2>
-  <p data-i18n="cta.subtitle" data-i18n-vars='{{"days":"5"}}'>5 d\u00edas h\u00e1biles de prueba gratuita. Sin tarjeta de cr\u00e9dito. Cancela cuando quieras.</p>
+<section class="cta fade-in" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
+  <h2 style="background:linear-gradient(135deg,#fff,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f680 Empieza a Operar con IA</h2>
+  <p style="font-size:1.1rem">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
   <div class="hero-buttons">
-    <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Activar Trial VIP Gratis</span></a>
-    <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4ac <span data-i18n="cta.btn_community">Unirse a la Comunidad</span></a>
+    <a href="#pricing" class="btn btn-primary">\U0001f451 Ver Planes</a>
+    <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-secondary" style="border-color:rgba(0,230,118,0.3);color:#00e676">&#128640; Copy Trading</a>
+    <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4ac Comunidad Gratis</a>
   </div>
 </section>
 
