@@ -1179,7 +1179,7 @@ if('serviceWorker' in navigator){{
       <ul class="price-list">
         <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP/SL</li>
         <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
-        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas 24/7</li>
+        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas en tiempo real</li>
         <li style="color:#ffd740">&#128161; Soporte prioritario</li>
         <li style="color:#ffd740">&#129302; An\u00e1lisis multi-IA exclusivo</li>
         <li style="color:#ffd740">&#128200; Gr\u00e1ficos de entrada y salida</li>
