@@ -361,9 +361,9 @@ def api_sync():
     try:
         data = request.get_json(force=True) or {}
         with _lock:
-            for key in ("operaciones_activas", "historial_operaciones", "estadisticas_diarias",
+            for key in ("operaciones_activas", "estadisticas_diarias",
                         "winning_trades", "bot_active", "auto_trading", "assets_count",
-                        "capital_usuario", "mt5_status", "active_ops_detail"):
+                        "mt5_status", "active_ops_detail"):
                 if key in data:
                     _store[key] = data[key]
             _store["ultimo_sync"] = time.time()
