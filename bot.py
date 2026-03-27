@@ -405,6 +405,12 @@ _ultimo_reporte_diario: str = ""            # "YYYY-MM-DD" — evita enviar dobl
 _fecha_stats_diarias: str = ""              # "YYYY-MM-DD" — auto-reset si cambia el día
 REPORTE_HORA = 6                            # Hora local (Andorra) para enviar reporte diario (6:30)
 REPORTE_MINUTO = 30                         # Minuto del reporte diario
+BRIEFING_HORA = 7                           # Hora local (Andorra) para briefing matutino (7:00)
+BRIEFING_MINUTO = 0
+CIERRE_HORA = 22                            # Hora local (Andorra) para reporte de cierre nocturno
+CIERRE_MINUTO = 0
+_ultimo_briefing_diario: str = ""           # "YYYY-MM-DD" — evita enviar doble
+_ultimo_cierre_diario: str = ""             # "YYYY-MM-DD" — evita enviar doble
 
 # ── CACHÉS DE OPTIMIZACIÓN ────────────────────────────────────
 _cache_ml_modelos = {}  # {ticker: {'model': obj, 'timestamp': float}}
@@ -3544,6 +3550,81 @@ def parsear_senal_externa(texto: str):
     }
 
 
+def _ejecutar_senal_manual(senal: dict, chat_id: str, nombre_admin: str = "Admin"):
+    """Ejecuta señal manual del admin: MT5 + envía al canal VIP.
+    Soporta señales enviadas por Telegram (reenviadas desde WhatsApp u otra app)."""
+    ticker = senal['ticker']
+    nombre = senal['nombre']
+    tipo = senal['tipo']
+    entrada = senal.get('entrada', 0)
+    sl = senal['sl']
+    tp1 = senal['tp1']
+    tp2 = senal.get('tp2', tp1)
+    tp3 = senal.get('tp3', tp2)
+
+    # Si entrada es 0, usar precio de mercado
+    if entrada == 0 or entrada is None:
+        cot = obtener_cotizacion_tv(ticker)
+        if cot:
+            entrada = cot['precio']
+        else:
+            p = obtener_precio_actual(ticker)
+            if p:
+                entrada = p
+            else:
+                enviar_telegram(f"❌ No se pudo obtener precio actual de {nombre}", chat_id)
+                return
+
+    niveles = {'sl': sl, 'tp1': tp1, 'tp2': tp2, 'tp3': tp3}
+
+    # Confirmar al admin
+    enviar_telegram(
+        f"📡 *SEÑAL MANUAL DETECTADA*\n"
+        f"{'🟢 COMPRA' if tipo == 'COMPRA' else '🔴 VENTA'} {nombre}\n"
+        f"Entrada: `{fmt(entrada, ticker)}`\n"
+        f"SL: `{fmt(sl, ticker)}` | TP1: `{fmt(tp1, ticker)}`\n"
+        f"Ejecutando en MT5 + Canal VIP...",
+        chat_id
+    )
+
+    # Ejecutar en MT5
+    _mt5_ok = False
+    if MT5_AVAILABLE:
+        try:
+            _mt5_ok = _ejecutar_orden_en_cuenta(
+                ticker, tipo, CAPITAL_USUARIO, RIESGO_POR_TRADE,
+                entrada, sl, tp1, cuenta_name="MANUAL"
+            )
+        except Exception as e:
+            logger.warning(f"📡 Error MT5 señal manual: {e}")
+
+    # Registrar operación activa
+    op_id = f"{ticker}_{tipo}_{int(time.time())}"
+    with _lock_ops:
+        operaciones_activas[op_id] = {
+            'ticker': ticker, 'nombre': nombre, 'tipo': tipo,
+            'entrada': entrada, 'sl': sl, 'tp1': tp1, 'tp2': tp2, 'tp3': tp3,
+            'timestamp': time.time(), 'hora': ahora().strftime("%H:%M"),
+            'fuente': 'manual', 'estrategia': 'manual',
+            'mt5_ejecutado': _mt5_ok, 'score': 5,
+        }
+    guardar_estado()
+
+    # Enviar al canal VIP con formato profesional
+    ind_mock = {'estrategia': 'manual', 'confianza_total': 100}
+    msg_canal = mensaje_nueva_senal(nombre, ticker, tipo, entrada, niveles, ind_mock, 5, [], fuente="Manual", premium=True, nivel_senal="PREMIUM")
+    enviar_canal(msg_canal)
+
+    # Confirmar resultado
+    enviar_telegram(
+        f"✅ Señal ejecutada\n"
+        f"{'✅ MT5 OK' if _mt5_ok else '⚠️ Solo Telegram (MT5 no disponible)'}\n"
+        f"📡 Enviada al canal VIP",
+        chat_id
+    )
+    log_op(f"📡 SEÑAL MANUAL: {nombre} {tipo} E:{entrada} SL:{sl} TP:{tp1} by {nombre_admin} | MT5:{'OK' if _mt5_ok else 'NO'}")
+
+
 # ============================================================
 #  AUTOMATIZACIÓN DE ÓRDENES - METATRADER 5 (XM)
 # ============================================================
@@ -4503,13 +4584,25 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     # Confianza real desde indicadores
     _conf_display = ind.get('confianza_total', 0)
 
+    # Estrategia display
+    _estrategia = ind.get('estrategia', '')
+    _estr_map = {
+        'breakout': '💥 Breakout', 'reversal': '🔄 Reversal', 'momentum': '🚀 Momentum',
+        'scalper': '⚡ Scalper', 'copier': '📡 Copier'
+    }
+    _estr_txt = _estr_map.get(_estrategia, '')
+
     return (
         f"{cabecera}\n"
-        f"Entrada: `{f_(precio)}`\n"
-        f"SL: `{f_(niveles['sl'])}`\n"
-        f"TP1: `{f_(niveles['tp1'])}`\n"
-        f"TP2: `{f_(niveles['tp2'])}`\n"
-        f"TP3: `{f_(niveles['tp3'])}`"
+        f"━━━━━━━━━━━━━━\n"
+        f"📍 Entrada: `{f_(precio)}`\n"
+        f"🛑 SL: `{f_(niveles['sl'])}` ({fmt_dist(sl_dist)})\n"
+        f"🎯 TP1: `{f_(niveles['tp1'])}` ({fmt_dist(tp1_dist)})\n"
+        f"🎯 TP2: `{f_(niveles['tp2'])}` ({fmt_dist(tp2_dist)})\n"
+        f"🏁 TP3: `{f_(niveles['tp3'])}` ({fmt_dist(tp3_dist)})\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📊 R:R *{rr_ratio}* | Score *{score_display}/5*"
+        + (f" | {_estr_txt}" if _estr_txt else "")
     )
 
 
@@ -4525,18 +4618,22 @@ def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="
         m = int(duracion_seg // 60)
         h = int(m // 60)
         m = m % 60
-        txt_dur = f"\n⏱️ {h}h {m}m" if h > 0 else f"\n⏱️ {m}m"
+        txt_dur = f"\n⏱️ Duración: {h}h {m}m" if h > 0 else f"\n⏱️ Duración: {m}m"
     txt_perc = f"  (+{perc_profit:.2f}%)" if perc_profit is not None else ""
+    tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
     return (
-        f"✅ *{nivel_tp}* — {nombre}\n"
-        f"{emoji_nivel} +{pips:.1f} {unidad_medida(ticker)}{txt_perc}\n"
-        f"Entrada {f_(entrada)} → Cierre {f_(salida)}"
-        + (txt_dur if txt_dur else "")
+        f"✅ *{nivel_tp} ALCANZADO* — {nombre}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"{tipo_emoji}\n"
+        f"{emoji_nivel} *+{pips:.1f} {unidad_medida(ticker)}*{txt_perc}\n"
+        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`"
+        + (txt_dur if txt_dur else "") +
+        f"\n━━━━━━━━━━━━━━"
     )
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker):
     cat = get_categoria(ticker)
-    pips_abs = abs(pips)  # Siempre mostrar valor absoluto con signo −
+    pips_abs = abs(pips)
     if cat == "crypto":
         p_txt = f"{pips_abs:.2f}%"
     elif cat == "forex":
@@ -4547,21 +4644,25 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker):
     cabecera = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
 
     return (
-        f"🛑 *SL* — {nombre}\n"
-        f"{cabecera}  −{p_txt}\n"
-        f"Entrada {f_(entrada)}  →  Cierre {f_(salida)}"
+        f"🛑 *STOP LOSS* — {nombre}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"{cabecera}  *−{p_txt}*\n"
+        f"📍 Entrada `{f_(entrada)}`  →  Cierre `{f_(salida)}`\n"
+        f"━━━━━━━━━━━━━━"
     )
 
 def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
     cat = get_categoria(ticker)
     p_txt = f"{pips:.2f}%" if cat == "crypto" else f"{pips:.1f} {unidad_medida(ticker)}"
     f_ = lambda v: fmt(v, ticker)
-    signo = "+" if pips > 0 else "-"
+    signo = "+" if pips > 0 else ""
     emoji = "🟢" if pips > 0 else "🔴"
     return (
-        f"⏰ *CIERRE 24H* — {nombre}\n"
-        f"{emoji} {tipo} {signo}{p_txt}\n"
-        f"Entrada {f_(entrada)} → Cierre {f_(salida)}"
+        f"⏰ *CIERRE AUTO 24H* — {nombre}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"{emoji} {tipo} *{signo}{p_txt}*\n"
+        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
+        f"━━━━━━━━━━━━━━"
     )
 
 def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
@@ -6343,7 +6444,40 @@ def cmd_estado_bot():
         f"💾 *Abiertas:* {len(operaciones_activas)}  │  *Historial:* {len(historial_operaciones)}"
     )
 
-# Los comandos de pausa y reanudación han sido eliminados para un funcionamiento 24/7.
+def cmd_mi_cuenta(user_id):
+    """Muestra info de cuenta del usuario: VIP status, historial, stats."""
+    # VIP status
+    sub = suscripciones_vip.get(user_id)
+    if user_id in ADMIN_IDS:
+        vip_txt = "👑 *VIP PERMANENTE* (Admin)"
+    elif sub and sub.get("entrada_confirmada", False):
+        try:
+            expira = datetime.fromisoformat(sub["expira"])
+            dias_r = (expira - ahora().replace(tzinfo=None)).days
+            vip_txt = f"💎 *VIP ACTIVO* — {dias_r} días restantes"
+        except Exception:
+            vip_txt = "💎 *VIP ACTIVO*"
+    else:
+        vip_txt = "📢 Sin suscripción VIP"
+
+    # Stats personales
+    ganadas = estadisticas_diarias.get("ganadas", 0)
+    perdidas = estadisticas_diarias.get("perdidas", 0)
+    total = ganadas + perdidas
+    wr = (ganadas / total * 100) if total > 0 else 0
+    pips_net = estadisticas_diarias.get("pips_ganados", 0) - estadisticas_diarias.get("pips_perdidos", 0)
+
+    return (
+        f"💰 *MI CUENTA*\n"
+        f"━━━━━━━━━━\n\n"
+        f"{vip_txt}\n\n"
+        f"📊 *Hoy:*\n"
+        f"   Señales: *{total}* | WR: *{wr:.0f}%*\n"
+        f"   Pips netos: *{pips_net:+.1f}*\n"
+        f"   ✅ {ganadas} ganadas | ❌ {perdidas} perdidas\n\n"
+        f"🔔 Operaciones abiertas: *{len(operaciones_activas)}*\n"
+        f"💰 Capital: *${CAPITAL_USUARIO:.0f}*"
+    )
 
 
 _tasa_eur_usdt_cache = {"valor": 1.08, "ts": 0}
@@ -6512,8 +6646,7 @@ def cmd_vip(user_id: str = None):
     # ── Pago pendiente: NO bloquear, integrar como info extra en menú ──
     _tiene_pago_pendiente = user_id and user_id in pagos_pendientes_vip
 
-    # ── No es VIP: menú principal ──
-    puede_trial = user_id and user_id not in _vip_trials_usados
+    # ── No es VIP: menú principal (SIN prueba gratis) ──
 
     texto = (
         "👑 *CANAL VIP — BuySell365.pro*\n"
@@ -6521,26 +6654,21 @@ def cmd_vip(user_id: str = None):
         "✅ Senales IA: Oro, Forex, NASDAQ, S&P 500\n"
         "✅ Alta precision | Entrada, SL, TP exactos\n"
         "✅ Notificaciones en tiempo real a Telegram\n"
-        "✅ Gestion de riesgo | Trading en Vivo\n\n"
+        "✅ Gestion de riesgo | Trading en Vivo\n"
+        "✅ Briefing matutino + Cierre nocturno\n"
+        "✅ Soporte directo con el admin\n\n"
     )
 
-    # Trial PRIMERO (si puede)
-    if puede_trial:
-        texto += (
-            f"🎁 *PRUEBA 5 DIAS HABILES GRATIS*\n"
-            f"━━━━━━━━━━\n"
-            f"💪 _Prueba nuestras senales sin compromiso._\n"
-            f"_Si te convence, suscribete con 50% OFF._ 🚀\n\n"
-        )
-
-    # Precio con descuento (después de trial)
+    # Precio
     if pi["en_descuento"]:
         texto += (
-            f"🔥 *50% OFF en tu primer mes*\n"
-            f"⏰ _Oferta hasta {VIP_DESCUENTO_HASTA}_\n\n"
+            f"🔥 *OFERTA DE LANZAMIENTO — 50% OFF*\n"
+            f"💰 ~{M}{pi['precio_regular']}~ → *{M}{precio}/mes*\n"
+            f"⏰ _Oferta hasta {VIP_DESCUENTO_HASTA}_\n"
+            f"📅 _Quedan {pi['dias_restantes_desc']} dias_\n\n"
         )
     else:
-        texto += f"💰 Suscripcion mensual disponible\n\n"
+        texto += f"💰 *{M}{precio}/mes* — Suscripcion mensual\n\n"
 
     # Términos compactos
     texto += (
@@ -6556,17 +6684,15 @@ def cmd_vip(user_id: str = None):
         monto_pend = pend.get("monto_unico", 0)
         texto += f"\n\n💡 _Tienes un pago pendiente de {monto_pend:.3f} USDT_"
 
-    # Botones — Trial gratis PRIMERO y más visible
+    # Botones — Pago directo (sin trial)
     btn_pago = f"💰 SUSCRIBIRME (50% OFF)" if pi["en_descuento"] else f"💰 SUSCRIBIRME"
     botones = []
-    if puede_trial:
-        botones.append([{"text": f"🎁 5 DIAS HABILES GRATIS — PROBAR AHORA", "callback_data": "vip_trial_gratis"}])
-    botones.append([{"text": "📊 VER DASHBOARD", "url": "https://buysell365.pro"}])
+    botones.append([{"text": "📊 VER RESULTADOS EN VIVO", "url": "https://buysell365.pro"}])
     botones.append([{"text": btn_pago, "callback_data": "vip_pagar_usdt"}])
     if _tiene_pago_pendiente:
         monto_pend = pagos_pendientes_vip[user_id].get("monto_unico", 0)
         botones.append([{"text": f"⏳ VER PAGO PENDIENTE ({monto_pend:.3f} USDT)", "callback_data": "vip_ver_pago_pendiente"}])
-    botones.append([{"text": "❓ ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}])
+    botones.append([{"text": f"❓ CONTACTAR ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}])
     return texto, {"inline_keyboard": botones}
 
 
@@ -7154,14 +7280,21 @@ def _enviar_aviso_vip(user_id: str, dias_restantes: int):
             }
         )
     else:
+        _urgencia = "🔴" if dias_restantes <= 1 else "🟡" if dias_restantes <= 3 else "⚠️"
         enviar_telegram(
-            f"⚠️ *VIP expira en {dias_restantes} dia(s)*\n\n"
-            "Renueva para no perder las senales.",
+            f"{_urgencia} *Tu VIP expira en {dias_restantes} dia(s)*\n\n"
+            f"🔄 *Renueva ahora* para no perder acceso:\n"
+            f"  • Senales IA en tiempo real\n"
+            f"  • Briefing matutino + Cierre nocturno\n"
+            f"  • Notificaciones TP/SL al instante\n\n"
+            f"💰 Precio: *{p}{VIP_MONEDA}/mes*\n"
+            f"👇 Pulsa el boton para renovar al instante:",
             user_id,
             teclado={
-                "inline_keyboard": [[
-                    {"text": f"🔄 RENOVAR ({p}{VIP_MONEDA})", "callback_data": "vip_pagar_usdt"}
-                ]]
+                "inline_keyboard": [
+                    [{"text": f"🔄 RENOVAR AHORA ({p}{VIP_MONEDA})", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": f"❓ CONTACTAR ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
+                ]
             }
         )
 
@@ -8698,6 +8831,13 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return cmd_resumen(), crear_teclado_principal()
     if t in ("/noticias", "/news", "noticias", "📅 noticias"):
         return cmd_noticias(), crear_teclado_principal()
+    if t in ("☀️ briefing", "/briefing", "briefing", "/mercado hoy", "mercado hoy"):
+        cmd_briefing()
+        return None
+    if t in ("💰 mi cuenta", "/cuenta", "mi cuenta", "cuenta"):
+        return cmd_mi_cuenta(user_id), crear_teclado_principal()
+    if t in ("💎 vip", "/vip", "vip"):
+        return cmd_vip(user_id, nombre_user, username_user), crear_teclado_principal()
     if t in ("🚀 análisis oro"):
         return cmd_analisis("ORO"), crear_teclado_principal()
     if t in ("🔍 análisis nasdaq"):
@@ -8894,9 +9034,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         _procesar_codigo_invitacion(_code_detectado, remitente, nombre_code)
         return None  # Se maneja internamente
 
-    if t in ("/briefing", "briefing", "/mercado hoy", "mercado hoy"):
-        cmd_briefing()
-        return "📊 Briefing enviado al grupo."
+    # briefing ya se maneja en la sección de botones rápidos arriba
     # /modo eliminado del chat público — se configura internamente
     # /capital eliminado del chat público — info privada del trader
 
@@ -12733,7 +12871,7 @@ def enviar_resumen_diario():
 # ============================================================
 
 def enviar_briefing_matutino():
-    """Envía el briefing del mercado a las 8:00 UTC."""
+    """Envía el briefing del mercado a las 7:00 AM hora Andorra al canal VIP."""
     hora = ahora().strftime("%H:%M")
     fg = get_fear_greed()
     noticias = cargar_calendario_economico()
@@ -12752,40 +12890,160 @@ def enviar_briefing_matutino():
             dt_utc = tz_ny.localize(dt).astimezone(pytz.UTC)
             diff = (dt_utc - ahora_utc).total_seconds() / 3600
             if 0 <= diff <= 24:
-                noticias_hoy.append(f"   🔴 {n.get('country','')} — {n.get('title','')}")
+                _hora_local = dt_utc.astimezone(BOT_TZ).strftime("%H:%M")
+                noticias_hoy.append(f"   🔴 {_hora_local} — {n.get('country','')} {n.get('title','')}")
         except Exception:
             continue
 
+    # Contexto IA para el briefing
+    _ia_outlook = ""
+    try:
+        _ia_outlook = _ia_responder(
+            "Dame un outlook de 2 líneas para hoy: ORO, EURUSD, NASDAQ. Menciona niveles clave y qué sesión será más activa.",
+            "Canal VIP"
+        ) or ""
+    except Exception:
+        pass
+
     lineas = [
-        f"☀️ *BRIEFING* {ahora().strftime('%d/%m')} | {hora}\n"
+        f"☀️ *BUENOS DÍAS — BRIEFING* {ahora().strftime('%d/%m/%Y')} | {hora}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
     ]
+
+    # Tabla de activos
+    lineas.append("\n📊 *PANORAMA DE MERCADO*")
+    _alcistas = []
+    _bajistas = []
+    _neutros = []
     for nombre_act, ticker in ACTIVOS.items():
         ind = _cache_ind.get(ticker)
         if ind:
             if ind['ema9'] > ind['ema20'] > ind['ema50']:
-                tend = "📈 ALCISTA"
+                _alcistas.append(f"   📈 *{nombre_act}*  RSI {ind['rsi']:.0f}")
             elif ind['ema9'] < ind['ema20'] < ind['ema50']:
-                tend = "📉 BAJISTA"
+                _bajistas.append(f"   📉 *{nombre_act}*  RSI {ind['rsi']:.0f}")
             else:
-                tend = "➡️  NEUTRO"
-            rsi_txt = f"RSI {ind['rsi']:.0f}"
-            lineas.append(f"   {nombre_act}  │  {tend}  │  {rsi_txt}\n")
-        else:
-            lineas.append(f"   {nombre_act}  │  ⏳ Sin datos\n")
+                _neutros.append(f"   ➡️ *{nombre_act}*  RSI {ind['rsi']:.0f}")
 
-    lineas.append(f"😱 F&G: {fg}/100")
+    if _alcistas:
+        lineas.append("🟢 *Alcistas:*")
+        lineas.extend(_alcistas)
+    if _bajistas:
+        lineas.append("🔴 *Bajistas:*")
+        lineas.extend(_bajistas)
+    if _neutros:
+        lineas.append("⚪ *Neutros:*")
+        lineas.extend(_neutros)
+
+    lineas.append(f"\n😱 Fear & Greed: *{fg}/100*")
 
     if noticias_hoy:
-        lineas.append("📰 *Noticias:*")
-        lineas.extend(noticias_hoy[:4])
-        lineas.append("")
+        lineas.append("\n📰 *Noticias Alto Impacto:*")
+        lineas.extend(noticias_hoy[:5])
     else:
-        lineas.append("📰 Sin noticias de impacto")
+        lineas.append("\n📰 Sin noticias de alto impacto hoy")
+
+    if _ia_outlook:
+        lineas.append(f"\n💡 *IA Outlook:*\n{_ia_outlook[:300]}")
+
+    # Operaciones activas overnight
+    with _lock_ops:
+        n_activas = len(operaciones_activas)
+    if n_activas > 0:
+        lineas.append(f"\n🔔 *{n_activas} operaciones activas* desde ayer")
 
     lineas.append(
-        f"⚙️ Modo: *{MODO_RIESGO.upper()}* | Score min: {get_min_score_efectivo()}/5"
+        f"\n⚙️ Modo: *{MODO_RIESGO.upper()}* | Score min: {get_min_score_efectivo()}/5"
     )
-    enviar_telegram_temporal("\n".join(lineas), destino=CHANNEL_ID, delay_borrado=600)
+    lineas.append("━━━━━━━━━━━━━━━━━━━━")
+
+    enviar_canal("\n".join(lineas))
+
+
+def enviar_cierre_nocturno():
+    """Envía reporte de cierre del día a las 22:00 hora Andorra al canal VIP."""
+    momento = ahora()
+    hora = momento.strftime("%H:%M")
+    es_domingo = (momento.weekday() == 6)
+
+    # Estadísticas del día
+    ganadas = estadisticas_diarias.get("ganadas", 0)
+    perdidas = estadisticas_diarias.get("perdidas", 0)
+    total = ganadas + perdidas
+    wr = (ganadas / total * 100) if total > 0 else 0
+    pips_g = estadisticas_diarias.get("pips_ganados", 0)
+    pips_p = estadisticas_diarias.get("pips_perdidos", 0)
+    pips_net = pips_g - pips_p
+
+    # Operaciones activas que siguen abiertas
+    with _lock_ops:
+        n_activas = len(operaciones_activas)
+
+    lineas = []
+
+    if es_domingo:
+        lineas.append(f"🏆 *CIERRE SEMANAL* | {momento.strftime('%d/%m/%Y')} {hora}")
+    else:
+        lineas.append(f"🌙 *CIERRE DEL DÍA* | {momento.strftime('%d/%m/%Y')} {hora}")
+
+    lineas.append("━━━━━━━━━━━━━━━━━━━━")
+
+    if total > 0:
+        emoji_resultado = "🟢" if pips_net > 0 else "🔴" if pips_net < 0 else "⚪"
+        lineas.append(f"\n📊 *RESULTADOS*")
+        lineas.append(f"   {emoji_resultado} Pips netos: *{pips_net:+.1f}*")
+        lineas.append(f"   ✅ Ganadas: *{ganadas}*  |  ❌ Perdidas: *{perdidas}*")
+        lineas.append(f"   🎯 Win Rate: *{wr:.0f}%*")
+
+        # Mejor y peor operación del día
+        if historial_operaciones:
+            mejor = max(historial_operaciones, key=lambda x: x.get('pips', 0))
+            peor = min(historial_operaciones, key=lambda x: x.get('pips', 0))
+            if mejor.get('pips', 0) > 0:
+                lineas.append(f"   🏆 Mejor: *{mejor['nombre']}* +{mejor['pips']:.1f}")
+            if peor.get('pips', 0) < 0:
+                lineas.append(f"   💔 Peor: *{peor['nombre']}* {peor['pips']:.1f}")
+    else:
+        lineas.append(f"\n📊 Sin operaciones cerradas hoy")
+
+    if n_activas > 0:
+        lineas.append(f"\n🔔 *{n_activas} operaciones* siguen abiertas overnight")
+
+    lineas.append(f"\n💰 Capital: *${CAPITAL_USUARIO:.0f}*")
+
+    # IA resumen nocturno
+    try:
+        _ia_cierre = _ia_responder(
+            f"Resume el día de trading en 2 líneas. Resultados: {ganadas}W/{perdidas}L, pips netos: {pips_net:+.1f}. Da una perspectiva para mañana.",
+            "Canal VIP"
+        ) or ""
+        if _ia_cierre:
+            lineas.append(f"\n💡 *IA:* {_ia_cierre[:250]}")
+    except Exception:
+        pass
+
+    lineas.append("\n━━━━━━━━━━━━━━━━━━━━")
+    lineas.append("Buenas noches. Nos vemos mañana a las 7:00 AM 🌙")
+
+    enviar_canal("\n".join(lineas))
+
+    # Enviar al grupo público solo si positivo
+    if GROUP_ID and GROUP_ID != CHANNEL_ID and pips_net > 0 and total > 0:
+        enviar_grupo(
+            f"🏆 *RESULTADOS DEL DÍA*\n"
+            f"✅ {ganadas}W / ❌ {perdidas}L | WR: {wr:.0f}%\n"
+            f"📊 +{pips_net:.0f} Pips netos",
+            incluir_promo=True
+        )
+
+    # Reset estadísticas diarias
+    with _lock_ops:
+        estadisticas_diarias.update({"ganadas": 0, "perdidas": 0, "pips_ganados": 0.0, "pips_perdidos": 0.0})
+    if es_domingo:
+        with _lock_ops:
+            historial_operaciones.clear()
+    guardar_estado()
+
 
 def enviar_notificacion_sesion(sesion):
     """Envía notificación de apertura de sesión (Londres o Nueva York)."""
@@ -12817,13 +13075,14 @@ def enviar_notificacion_sesion(sesion):
     enviar_telegram_temporal("\n".join(lineas), destino=CHANNEL_ID, delay_borrado=600, teclado=teclado)
 
 def crear_teclado_principal():
-    """Crea un Menú Persistente (ReplyKeyboardMarkup) en la parte inferior para máxima automatización."""
+    """Menú persistente con botones rápidos organizados por función."""
     return {
         "keyboard": [
             [{"text": "📊 Señales Activas"}, {"text": "📈 Resumen Diario"}],
             [{"text": "🚀 Análisis Oro"}, {"text": "🔍 Análisis NASDAQ"}],
-            [{"text": "📅 Noticias"}, {"text": "⚙️ Estado Bot"}],
-            [{"text": "❓ Ayuda"}]
+            [{"text": "📅 Noticias"}, {"text": "☀️ Briefing"}],
+            [{"text": "💰 Mi Cuenta"}, {"text": "⚙️ Estado Bot"}],
+            [{"text": "💎 VIP"}, {"text": "❓ Ayuda"}]
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False
@@ -13044,11 +13303,16 @@ def revisar_niveles_operaciones():
             # Gráfico desactivado — hace el mensaje muy largo
             # ruta_img = generar_grafico_operacion(df, ticker, tipo, op['entrada'], precio_salida, tag, niveles=op) if df is not None else None
 
-            # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP) — se borra en 15 min
-            enviar_telegram_temporal(msg, destino=CHANNEL_ID, delay_borrado=900)
+            # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP)
+            enviar_canal(msg)
 
-            # 2. 🚫 Resultados de trades MT5 NO se envían al grupo público
-            #    (solo van al canal VIP privado — línea 12026 arriba)
+            # 2. 📢 Enviar VICTORIAS al grupo público (marketing)
+            if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
+                enviar_grupo(
+                    f"✅ *{nivel_tp if toca_tp1 else 'WIN'}* — {nombre}\n"
+                    f"+{pips:.1f} {unidad_medida(ticker)}",
+                    incluir_promo=True
+                )
             
             # Limpiar archivo de imagen generado
             if ruta_img and os.path.exists(ruta_img):
@@ -14079,21 +14343,44 @@ def loop_vip_check():
     Hilo de verificación VIP:
     - Cada 5 min: revisa depósitos en Binance, entradas pendientes, expiraciones
     - Cada 30 min: auditoría de membresías (¿siguen en el canal?)
-    - Reporte diario al admin a las 9:00 AM
+    - Reporte diario al admin a las 6:30 AM
+    - Briefing matutino al canal VIP a las 7:00 AM
+    - Cierre nocturno al canal VIP a las 22:00
     - Limpia pagos pendientes con >24h sin completar
     - Limpia códigos de invitación viejos (>30 días)
     """
-    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion
+    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario
     time.sleep(120)  # Esperar 2 min tras arranque
     _ultima_auditoria = time.time()
     logger.info("👑 Loop VIP check iniciado")
 
     while True:
         try:
-            # 0. 📊 REPORTE DIARIO AL ADMIN (9:00 AM)
+            # 0. 📊 REPORTE DIARIO AL ADMIN (6:30 AM)
             ahora_check = ahora().replace(tzinfo=None)
-            if (ahora_check.hour > REPORTE_HORA or (ahora_check.hour == REPORTE_HORA and ahora_check.minute >= REPORTE_MINUTO)) and _ultimo_reporte_diario != ahora_check.strftime("%Y-%m-%d"):
+            hoy_str_check = ahora_check.strftime("%Y-%m-%d")
+            es_finde = ahora_check.weekday() >= 5
+
+            if (ahora_check.hour > REPORTE_HORA or (ahora_check.hour == REPORTE_HORA and ahora_check.minute >= REPORTE_MINUTO)) and _ultimo_reporte_diario != hoy_str_check:
                 _generar_reporte_diario()
+
+            # 0b. ☀️ BRIEFING MATUTINO AL CANAL VIP (7:00 AM L-V)
+            if not es_finde and (ahora_check.hour > BRIEFING_HORA or (ahora_check.hour == BRIEFING_HORA and ahora_check.minute >= BRIEFING_MINUTO)) and _ultimo_briefing_diario != hoy_str_check:
+                _ultimo_briefing_diario = hoy_str_check
+                try:
+                    enviar_briefing_matutino()
+                    log_sistema("☀️ Briefing matutino enviado al canal VIP")
+                except Exception as e:
+                    logger.error(f"❌ Error enviando briefing matutino: {e}")
+
+            # 0c. 🌙 CIERRE NOCTURNO AL CANAL VIP (22:00 L-V)
+            if not es_finde and (ahora_check.hour > CIERRE_HORA or (ahora_check.hour == CIERRE_HORA and ahora_check.minute >= CIERRE_MINUTO)) and _ultimo_cierre_diario != hoy_str_check:
+                _ultimo_cierre_diario = hoy_str_check
+                try:
+                    enviar_cierre_nocturno()
+                    log_sistema("🌙 Cierre nocturno enviado al canal VIP")
+                except Exception as e:
+                    logger.error(f"❌ Error enviando cierre nocturno: {e}")
 
             # 1. Verificar depósitos en Binance (matchear pagos pendientes)
             if pagos_pendientes_vip and BINANCE_API_KEY and BINANCE_API_SECRET:
@@ -15032,8 +15319,19 @@ def loop_polling():
                                 manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
                                 continue
                             else:
-                                # 🤖 IA: si es admin en privado, responder con Gemini
-                                if user_id in ADMIN_IDS and _procesar_ia_telegram(texto, chat_id, user_id, nombre_u):
+                                # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
+                                # Formato: "Sell Gold Now / Target 4447 / Sl 4468" o similar
+                                if user_id in ADMIN_IDS:
+                                    _senal_manual = parsear_senal_externa(texto)
+                                    if _senal_manual:
+                                        try:
+                                            _ejecutar_senal_manual(_senal_manual, chat_id, nombre_u)
+                                        except Exception as _e_sm:
+                                            enviar_telegram(f"❌ Error ejecutando señal: {_e_sm}", chat_id)
+                                        continue
+
+                                # 🤖 IA: admin + VIP pueden preguntar por chat privado
+                                if _procesar_ia_telegram(texto, chat_id, user_id, nombre_u):
                                     continue
                                 # 💬 Privado: enviar bienvenida VIP al chat directo
                                 manejar_usuario_nuevo(msg, from_user, texto)
@@ -15328,8 +15626,8 @@ def _inicializar_gemini():
         logger.warning(f"🤖 Gemini AI no disponible: {e}")
         return False
 
-def _ia_responder(pregunta, user_name="Trader"):
-    """Genera respuesta IA con contexto del bot."""
+def _ia_responder(pregunta, user_name="Trader", contexto_extra=""):
+    """Genera respuesta IA con contexto completo del bot."""
     global _gemini_model
     if not _gemini_model:
         if not _inicializar_gemini():
@@ -15353,30 +15651,47 @@ def _ia_responder(pregunta, user_name="Trader"):
     _ops_texto = "\n".join(_ctx_ops) if _ctx_ops else "Sin operaciones abiertas"
 
     # Stats del bot
-    _wr = f"{len([h for h in historial_operaciones if h.get('resultado') == 'WIN'])/max(1,len(historial_operaciones))*100:.1f}%" if historial_operaciones else "N/A"
+    _wins = len([h for h in historial_operaciones if h.get('resultado') == 'WIN'])
+    _total_hist = len(historial_operaciones)
+    _wr = f"{_wins / max(1, _total_hist) * 100:.1f}%" if historial_operaciones else "N/A"
     _capital = f"${CAPITAL_USUARIO:.2f}"
     _n_ops = len(operaciones_activas)
+    _pips_net = estadisticas_diarias.get("pips_ganados", 0) - estadisticas_diarias.get("pips_perdidos", 0)
 
-    prompt = f"""Eres BuySell365 Pro, un asistente de trading con IA. Responde en español, breve y profesional.
+    # Indicadores de mercado actuales
+    _mercado_ctx = []
+    for nombre_act, ticker in list(ACTIVOS.items())[:6]:
+        ind = _cache_ind.get(ticker)
+        if ind:
+            _tend = "ALCISTA" if ind.get('ema9', 0) > ind.get('ema20', 0) > ind.get('ema50', 0) else \
+                    "BAJISTA" if ind.get('ema9', 0) < ind.get('ema20', 0) < ind.get('ema50', 0) else "NEUTRO"
+            _mercado_ctx.append(f"{nombre_act}: {_tend} RSI={ind.get('rsi', 0):.0f}")
+    _mercado_txt = " | ".join(_mercado_ctx) if _mercado_ctx else "Sin datos de mercado"
 
-CONTEXTO ACTUAL:
-- Capital: {_capital}
-- Win Rate historico: {_wr}
+    prompt = f"""Eres BuySell365 Pro, asistente IA de trading profesional. Responde en español.
+
+CONTEXTO ACTUAL ({ahora().strftime('%d/%m %H:%M')} Andorra):
+- Capital: {_capital} | Win Rate: {_wr} ({_wins}W/{_total_hist - _wins}L)
+- Pips hoy: {_pips_net:+.1f}
 - Operaciones activas: {_n_ops}
-- Posiciones MT5:
-{_ops_texto}
-- Pares que operamos: ORO, EUR/USD, GBP/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, AUD/CAD, EUR/CHF, NASDAQ, S&P 500, US30, GER40, GBP/JPY, y mas
-- Modos: Scalper M5, Premium M15, Signal Copier (tiempo real)
-- El usuario se llama {user_name}
+- Posiciones MT5: {_ops_texto}
+- Mercado: {_mercado_txt}
+- Modo riesgo: {MODO_RIESGO}
+- Scanner: {'ACTIVO' if not escaneo_pausado else 'PAUSADO'}
+{f'- Extra: {contexto_extra}' if contexto_extra else ''}
+
+PARES: ORO, EUR/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, AUD/CAD, EUR/CHF, NASDAQ, S&P 500, US30, GER40, GBP/JPY
+MODOS: Scalper M5 (7 pares), Premium M15 (6 pares), Signal Copier (SureShotFX, Learn2Trade)
 
 REGLAS:
-- Responde breve (max 300 caracteres)
-- Si preguntan por operaciones abiertas, muestra las posiciones MT5
-- Si preguntan por estado del bot, da resumen rapido
-- Si piden cerrar operacion, di que debe usar /cerrar o hacerlo en MT5
-- Si preguntan por señales, explica los 3 modos
-- No inventes datos que no tienes
-- Usa emojis moderadamente
+- Responde MAX 500 caracteres, profesional y conciso
+- Si preguntan por ops abiertas, muestra posiciones MT5 con P&L
+- Si preguntan por un par, da tendencia + RSI + soporte/resistencia si lo sabes
+- Si preguntan "como va", da resumen del dia (pips, wins, losses)
+- Si piden cerrar, di que use /cerrar o MT5 directamente
+- NO inventes datos. Si no sabes, di "no tengo esa info"
+- Usa emojis con moderacion
+- El usuario se llama {user_name}
 
 PREGUNTA: {pregunta}"""
 
@@ -15387,41 +15702,47 @@ PREGUNTA: {pregunta}"""
         logger.warning(f"🤖 Gemini error: {e}")
         return None
 
+
 def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
-    """Procesa mensaje con IA si es admin en chat privado. Retorna True si respondió."""
-    if user_id not in ADMIN_IDS:
+    """Procesa mensaje con IA. Admin: comandos + IA. VIP: solo IA (lectura)."""
+    es_admin = user_id in ADMIN_IDS
+    es_vip = user_id in suscripciones_vip and suscripciones_vip[user_id].get("entrada_confirmada", False)
+
+    if not es_admin and not es_vip:
         return False
 
     texto_lower = texto.lower().strip()
 
-    # Comando directo: "cierra todo" o "cerrar todo"
-    if any(cmd in texto_lower for cmd in ["cierra todo", "cerrar todo", "close all"]):
-        n_cerradas = _cerrar_todas_posiciones_mt5()
-        enviar_telegram(f"✅ {n_cerradas} posiciones cerradas en MT5", chat_id)
-        return True
-
-    # Comando: "cierra oro" o "cierra gold" o "cierra eurusd"
-    _pares_cierre = {
-        "oro": "GOLD", "gold": "GOLD", "xauusd": "GOLD",
-        "eurusd": "EURUSD", "gbpusd": "GBPUSD", "usdjpy": "USDJPY",
-        "nasdaq": "US100Cash", "us100": "US100Cash", "nas100": "US100Cash",
-        "sp500": "US500Cash", "us500": "US500Cash",
-        "audcad": "AUDCAD", "eurchf": "EURCHF", "usdcad": "USDCAD",
-        "gbpjpy": "GBPJPY", "gbpnzd": "GBPNZD",
-    }
-    for palabra, mt5_sym in _pares_cierre.items():
-        if any(cmd in texto_lower for cmd in [f"cierra {palabra}", f"cerrar {palabra}", f"close {palabra}"]):
-            n = _cerrar_posiciones_por_simbolo(mt5_sym)
-            enviar_telegram(f"✅ {n} posiciones de {mt5_sym} cerradas", chat_id)
+    # Comandos directos: SOLO admin
+    if es_admin:
+        if any(cmd in texto_lower for cmd in ["cierra todo", "cerrar todo", "close all"]):
+            n_cerradas = _cerrar_todas_posiciones_mt5()
+            enviar_telegram(f"✅ {n_cerradas} posiciones cerradas en MT5", chat_id)
             return True
 
-    # IA respuesta general
+        _pares_cierre = {
+            "oro": "GOLD", "gold": "GOLD", "xauusd": "GOLD",
+            "eurusd": "EURUSD", "gbpusd": "GBPUSD", "usdjpy": "USDJPY",
+            "nasdaq": "US100Cash", "us100": "US100Cash", "nas100": "US100Cash",
+            "sp500": "US500Cash", "us500": "US500Cash",
+            "audcad": "AUDCAD", "eurchf": "EURCHF", "usdcad": "USDCAD",
+            "gbpjpy": "GBPJPY", "gbpnzd": "GBPNZD",
+        }
+        for palabra, mt5_sym in _pares_cierre.items():
+            if any(cmd in texto_lower for cmd in [f"cierra {palabra}", f"cerrar {palabra}", f"close {palabra}"]):
+                n = _cerrar_posiciones_por_simbolo(mt5_sym)
+                enviar_telegram(f"✅ {n} posiciones de {mt5_sym} cerradas", chat_id)
+                return True
+
+    # IA respuesta general (admin + VIP)
     if not _GEMINI_KEY:
         return False
 
-    respuesta = _ia_responder(texto, nombre)
+    # VIP users get limited context
+    _extra = "" if es_admin else "Usuario VIP (solo lectura, sin comandos de cierre)"
+    respuesta = _ia_responder(texto, nombre, contexto_extra=_extra)
     if respuesta:
-        enviar_telegram(respuesta, chat_id)
+        enviar_telegram(f"🤖 {respuesta}", chat_id)
         return True
     return False
 
