@@ -40,17 +40,28 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ============================================================
 _lock = threading.RLock()
 
+# Cargar historial real si existe
+_historial_real = []
+try:
+    import json as _json
+    _hr_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
+    if os.path.exists(_hr_path):
+        with open(_hr_path, "r") as _f:
+            _historial_real = _json.load(_f)
+except Exception:
+    pass
+
 # Bot state — pushed by the bot every ~30 seconds
 _store = {
     "operaciones_activas": {},
-    "historial_operaciones": [],
+    "historial_operaciones": _historial_real,
     "estadisticas_diarias": {"ganadas": 0, "perdidas": 0, "pips_ganados": 0.0, "pips_perdidos": 0.0, "senales_hoy": 0},
     "winning_trades": [],
     "bot_active": False,
     "auto_trading": True,
     "ultimo_sync": 0,
     "assets_count": 20,
-    "capital_usuario": 550.0,
+    "capital_usuario": 1000.0,
     "mt5_status": "DESCONECTADO",
     "active_ops_detail": [],  # Pre-computed by bot for /api/active_ops
 }
