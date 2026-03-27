@@ -1189,13 +1189,13 @@ if('serviceWorker' in navigator){{
     <div class="price-card" style="position:relative;opacity:1;border:2px solid #00e676;box-shadow:0 0 30px rgba(0,230,118,0.3),0 0 60px rgba(0,230,118,0.1)">
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 20px rgba(0,200,83,.6);animation:pulse 2s infinite">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
       <div class="price-name" style="color:#00e676;font-size:1.3rem" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:2.2rem;color:#00e676;font-weight:900;text-shadow:0 0 20px rgba(0,230,118,0.5)" data-i18n="pricing.copy_price">GRATIS</div>
+      <div class="price-amount" style="font-size:1.6rem;color:#00e676;font-weight:900;text-shadow:0 0 20px rgba(0,230,118,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
       <p style="color:#b0bec5;margin-bottom:16px;font-size:0.95rem" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5</p>
       <ul class="price-list" style="color:#e0e0e0">
         <li style="color:#00e676" data-i18n="pricing.cp1">&#9889; Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
         <li style="color:#00e676" data-i18n="pricing.cp2">&#128640; Copia autom\u00e1tica en tiempo real</li>
         <li style="color:#00e676" data-i18n="pricing.cp3">&#127919; SL y TP colocados autom\u00e1ticamente</li>
-        <li style="color:#ffd740" data-i18n="pricing.cp4">&#128176; Sin cuota mensual \u2014 solo pagas si ganas</li>
+        <li style="color:#ffd740" data-i18n="pricing.cp4">&#128176; Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
         <li style="color:#00e676" data-i18n="pricing.cp5">&#127970; Broker regulado XM (MT5)</li>
         <li style="color:#00e676" data-i18n="pricing.cp6">&#129302; Sin intervenci\u00f3n manual requerida</li>
       </ul>

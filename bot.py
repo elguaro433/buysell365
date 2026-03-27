@@ -9940,13 +9940,13 @@ section{{padding:50px 20px}}
     <div class="price-card" style="position:relative;opacity:0.7">
       <div class="price-badge" style="background:linear-gradient(135deg,#ff9800,#f57c00);box-shadow:0 0 16px rgba(255,152,0,.4)">⏳ <span data-i18n="pricing.copy_badge">PROXIMAMENTE</span></div>
       <div class="price-name" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Proximamente disponible</div>
+      <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Sin cuota fija</div>
       <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia automatica todas nuestras operaciones en tu cuenta MT5</p>
       <ul class="price-list" style="opacity:0.5">
         <li data-i18n="pricing.cp1">Operativa automatizada — Oro, Forex e \u00cdndices</li>
         <li data-i18n="pricing.cp2">Copia automatica en tiempo real</li>
         <li data-i18n="pricing.cp3">SL y TP colocados automaticamente</li>
-        <li data-i18n="pricing.cp4">Sin cuota mensual — solo pagas si ganas</li>
+        <li data-i18n="pricing.cp4">Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
         <li data-i18n="pricing.cp5">Broker regulado XM (MT5)</li>
         <li data-i18n="pricing.cp6">Sin intervencion manual requerida</li>
       </ul>
