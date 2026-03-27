@@ -3528,8 +3528,10 @@ def parsear_senal_externa(texto: str):
         entrada = 0
 
     if entrada is None or not sl or not tps:
+        logger.info(f"📡 Parser: falta datos — entrada={entrada} sl={sl} tps={tps}")
         return None
 
+    logger.info(f"📡 Parser ÉXITO: {activo} {tipo} entrada={entrada} sl={sl} tp={tps}")
     return {
         'ticker': MT5_TICKER_MAP.get(activo, activo),
         'nombre': activo,
@@ -8593,6 +8595,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
 
     # ── 0. DETECTAR SEÑAL EXTERNA (Solo admin — protección contra inyección) ────
     senal = parsear_senal_externa(texto) if es_admin else None
+    if senal is None and es_admin:
+        logger.info(f"📡 Parser señal: no detectó señal en: {texto[:60]}")
     if senal:
         ticker = senal['ticker']
         tipo = senal['tipo']
@@ -16849,9 +16853,20 @@ def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
 
         precio_entrada = tick.ask if tipo == "BUY" else tick.bid
         sl_distance = abs(precio_entrada - sl_price)
+        tp_distance = abs(precio_entrada - tp_price)
         if sl_distance <= 0:
             logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: sl_distance=0 (SL igual a precio)")
             return False
+
+        # Verificar stop level mínimo del broker (evita "Invalid stops")
+        _stop_level = symbol_info.trade_stops_level * symbol_info.point
+        if _stop_level > 0:
+            if sl_distance < _stop_level:
+                logger.info(f"🔪 Scalper: {mt5_symbol} SL demasiado cerca ({sl_distance:.5f} < {_stop_level:.5f}) — skip")
+                return False
+            if tp_distance < _stop_level:
+                logger.info(f"🔪 Scalper: {mt5_symbol} TP demasiado cerca ({tp_distance:.5f} < {_stop_level:.5f}) — skip")
+                return False
 
         # Calcular valor del pip
         tick_size = symbol_info.trade_tick_size

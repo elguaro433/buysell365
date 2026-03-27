@@ -472,6 +472,7 @@ async def main():
         -1001422000261,   # Sureshot FX VIP
         -1001661400724,   # SureShot GOLD (VIP)
         -1001700795303,   # Sureshot INDICES (VIP)
+        -1001442994799,   # Learn 2 Trade Crypto VIP
     }
     # Auto-discover: buscar canales Learn2Trade VIP y agregarlos
     L2T_KEYWORDS = ["learn 2 trade", "learn2trade", "l2t"]
