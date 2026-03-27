@@ -1150,21 +1150,21 @@ if('serviceWorker' in navigator){{
     <p data-i18n="pricing.subtitle">Empieza gratis y escala cuando est\u00e9s listo.</p>
   </div>
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
-    <div class="price-card">
-      <div class="price-name" data-i18n="pricing.community">Comunidad</div>
-      <div class="price-amount" data-i18n="pricing.free">GRATIS</div>
-      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
+    <div class="price-card" style="border:1px solid rgba(96,165,250,0.3);box-shadow:0 0 20px rgba(96,165,250,0.1)">
+      <div class="price-name" style="color:#60a5fa;font-size:1.2rem" data-i18n="pricing.community">Comunidad</div>
+      <div class="price-amount" style="color:#60a5fa;text-shadow:0 0 15px rgba(96,165,250,0.4)" data-i18n="pricing.free">GRATIS</div>
+      <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
-        <li data-i18n="pricing.c1">Resumen diario de mercado</li>
-        <li data-i18n="pricing.c2">Educaci\u00f3n y an\u00e1lisis general</li>
-        <li data-i18n="pricing.c3">Soporte de la comunidad</li>
-        <li data-i18n="pricing.c4">Dashboard p\u00fablico limitado</li>
+        <li style="color:#90caf9">&#128227; Resumen diario de mercado</li>
+        <li style="color:#90caf9">&#128218; Educaci\u00f3n y an\u00e1lisis general</li>
+        <li style="color:#90caf9">&#129309; Soporte de la comunidad</li>
+        <li style="color:#90caf9">&#128202; Dashboard p\u00fablico limitado</li>
       </ul>
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.join_free">Unirse Gratis</a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:14px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5);border-radius:12px;color:#fff;font-weight:700;text-decoration:none;cursor:pointer;box-shadow:0 0 15px rgba(66,165,245,0.4)">&#128172; Unirse Gratis</a>
     </div>
-    <div class="price-card featured">
-      <div class="price-badge">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
-      <div class="price-name" data-i18n="pricing.vip">VIP Pro</div>
+    <div class="price-card featured" style="border:2px solid #ffd740;box-shadow:0 0 30px rgba(255,215,64,0.3),0 0 60px rgba(255,215,64,0.1)">
+      <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#ffd740);box-shadow:0 0 20px rgba(255,215,64,.6);animation:pulse 2s infinite">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
+      <div class="price-name" style="color:#ffd740;font-size:1.3rem" data-i18n="pricing.vip">VIP Pro</div>
       <div class="price-amount">
         <span class="old">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
@@ -1177,29 +1177,29 @@ if('serviceWorker' in navigator){{
       </div>
       <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.trial" data-i18n-vars='{{"days":"5"}}'>5 d\u00edas h\u00e1biles de prueba GRATIS</p>
       <ul class="price-list">
-        <li data-i18n="pricing.v1">Se\u00f1ales en tiempo real con TP/SL</li>
-        <li data-i18n="pricing.v2">Canal VIP privado de Telegram</li>
-        <li data-i18n="pricing.v4">Alertas instant\u00e1neas 24/7</li>
-        <li data-i18n="pricing.v5">Soporte prioritario</li>
-        <li data-i18n="pricing.v6">An\u00e1lisis multi-IA exclusivo</li>
-        <li data-i18n="pricing.v7">Gr\u00e1ficos de entrada y salida</li>
+        <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP/SL</li>
+        <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
+        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas 24/7</li>
+        <li style="color:#ffd740">&#128161; Soporte prioritario</li>
+        <li style="color:#ffd740">&#129302; An\u00e1lisis multi-IA exclusivo</li>
+        <li style="color:#ffd740">&#128200; Gr\u00e1ficos de entrada y salida</li>
       </ul>
-      <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Empezar Prueba Gratis</a>
+      <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:12px;color:#000;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 0 25px rgba(255,215,64,0.5)">&#11088; Empezar Prueba Gratis</a>
     </div>
-    <div class="price-card" style="position:relative;opacity:0.7">
-      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 16px rgba(0,200,83,.4)">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
-      <div class="price-name" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:1.4rem;color:var(--green);font-weight:900" data-i18n="pricing.copy_price">GRATIS</div>
-      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5 a trav\u00e9s de XM</p>
-      <ul class="price-list">
-        <li data-i18n="pricing.cp1">Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
-        <li data-i18n="pricing.cp2">Copia autom\u00e1tica en tiempo real</li>
-        <li data-i18n="pricing.cp3">SL y TP colocados autom\u00e1ticamente</li>
-        <li data-i18n="pricing.cp4">Sin cuota mensual \u2014 solo pagas si ganas</li>
-        <li data-i18n="pricing.cp5">Broker regulado XM (MT5)</li>
-        <li data-i18n="pricing.cp6">Sin intervenci\u00f3n manual requerida</li>
+    <div class="price-card" style="position:relative;opacity:1;border:2px solid #00e676;box-shadow:0 0 30px rgba(0,230,118,0.3),0 0 60px rgba(0,230,118,0.1)">
+      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 20px rgba(0,200,83,.6);animation:pulse 2s infinite">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
+      <div class="price-name" style="color:#00e676;font-size:1.3rem" data-i18n="pricing.copy_name">Copy Trading</div>
+      <div class="price-amount" style="font-size:2.2rem;color:#00e676;font-weight:900;text-shadow:0 0 20px rgba(0,230,118,0.5)" data-i18n="pricing.copy_price">GRATIS</div>
+      <p style="color:#b0bec5;margin-bottom:16px;font-size:0.95rem" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5</p>
+      <ul class="price-list" style="color:#e0e0e0">
+        <li style="color:#00e676" data-i18n="pricing.cp1">&#9889; Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
+        <li style="color:#00e676" data-i18n="pricing.cp2">&#128640; Copia autom\u00e1tica en tiempo real</li>
+        <li style="color:#00e676" data-i18n="pricing.cp3">&#127919; SL y TP colocados autom\u00e1ticamente</li>
+        <li style="color:#ffd740" data-i18n="pricing.cp4">&#128176; Sin cuota mensual \u2014 solo pagas si ganas</li>
+        <li style="color:#00e676" data-i18n="pricing.cp5">&#127970; Broker regulado XM (MT5)</li>
+        <li style="color:#00e676" data-i18n="pricing.cp6">&#129302; Sin intervenci\u00f3n manual requerida</li>
       </ul>
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:12px 24px;background:linear-gradient(135deg,#00c853,#00e676);border-radius:8px;color:#fff;font-weight:600;text-decoration:none;cursor:pointer">&#128640; Empezar Copy Trading</a>
+      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:12px;color:#000;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 0 25px rgba(0,230,118,0.5);transition:all 0.3s">&#128640; Empezar Copy Trading</a>
     </div>
   </div>
 </section>
