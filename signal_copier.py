@@ -157,16 +157,11 @@ def _send_tp_celebration(signal: dict) -> None:
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
 
-    # Calcular ganancia en puntos/pips
-    pts = round(abs(tp - entry), 2)
-    puntos_texto = f"+{pts:.1f} pts" if pair in ("GOLD", "XAUUSD") else f"+{pts:.5f}".rstrip("0").rstrip(".")
-
     msg = (
         f"🎯🚀🚀🚀 *¡¡TP ALCANZADO!!*\n\n"
         f"{dir_emoji} *{dir_es} {pair}*\n"
         f"📍 Entrada: {fmt(entry)}\n"
-        f"🎯 TP: {fmt(tp)} ✅\n"
-        f"💰 Ganancia: *{puntos_texto}*\n\n"
+        f"🎯 TP: {fmt(tp)} ✅\n\n"
         f"*¡¡SEÑAL GANADORA!! 🏆*\n"
         f"🎉🎉🎉🎉🎉"
     )
@@ -212,11 +207,11 @@ def _send_sl_notification(signal: dict) -> None:
         return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
     msg = (
-        f"🛡️ *SL ALCANZADO*\n\n"
-        f"{dir_emoji} {dir_es} {pair}\n"
-        f"📍 Entrada: {fmt(entry)}\n"
-        f"🛡️ SL: {fmt(sl)}\n\n"
-        f"_Señal cerrada con protección de capital._"
+        f"🔴 *SL tocado — {dir_es} {pair}*\n\n"
+        f"El mercado tocó nuestro stop loss.\n"
+        f"Capital protegido ✅\n\n"
+        f"💪 *¡La próxima va a ser ganadora!*\n"
+        f"Seguimos con la misma disciplina 🎯"
     )
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"

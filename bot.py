@@ -6541,10 +6541,11 @@ def cmd_vip(user_id: str = None):
 
     # Términos compactos
     texto += (
-        "📜 _Servicio de senales educativas, no es asesoria_\n"
-        "_financiera. El usuario es responsable de sus_\n"
-        "_decisiones. No hay reembolsos. Al suscribirte_\n"
-        "_aceptas estos terminos._"
+        "📜 _Al suscribirte aceptas nuestros Términos y_\n"
+        "_Condiciones: servicio educativo de señales,_\n"
+        "_no asesoría financiera. Sin reembolsos._\n\n"
+        "💳 _Pago con tarjeta procesado de forma segura_\n"
+        "_a través de Wise — plataforma regulada 100% segura._"
     )
 
     # Info pago pendiente (si existe)
