@@ -13982,24 +13982,46 @@ def loop_publicidad_grupo():
 
     # ── Anuncios rotativos ──
     ANUNCIOS = [
-        # 1 — Copy Trading piloto automático
+        # 1 — Cómo funciona: flujo real XM + BuySell365Pro
         (
-            "🚀 *¿Y SI TU DINERO TRABAJARA SOLO?*\n"
+            "🤖 *COPY TRADING — 3 PASOS Y LISTO*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
-            "⚡ Nuestro bot opera *por ti* en tiempo real\n"
-            "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
-            "🌍 Forex · Índices · Oro — 24/7\n"
-            "💰 Pagas *solo si ganas* — sin mensualidad fija\n\n"
-            "🔥 *Sin pantallas. Sin estrés. Sin perder señales.*",
+            "📲 *Entra al enlace* → llegarás a *XM Copy Trading*\n"
+            "   🏦 Broker regulado · 15 años en el mercado\n"
+            "   🔒 Fondos seguros · plataforma oficial\n\n"
+            "1️⃣  *Regístrate* en XM _(gratis, 2 minutos)_\n"
+            "2️⃣  *Busca* BuySell365Pro y pulsa *Copiar*\n"
+            "3️⃣  ¡Listo! Tu cuenta opera *sola* 24/7\n\n"
+            "💰 *Sin mensualidad — pagas solo si ganas*\n"
+            "🔥 *Sin pantallas. Sin estrés. 100% automático.*",
             {"inline_keyboard": [[
-                {"text": "🤖 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 2 — Canal VIP señales IA
+        # 2 — Seguridad y regulación XM
+        (
+            "🏦 *OPERA EN LA PLATAFORMA MÁS SEGURA*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Nuestro Copy Trading funciona sobre *XM*,\n"
+            "uno de los brokers más regulados del mundo:\n\n"
+            "🛡️ Regulado por CySEC, ASIC, FSC y más\n"
+            "🔒 Fondos segregados — tu dinero protegido\n"
+            "📊 Plataforma 100% transparente y auditada\n"
+            "🌍 +5 millones de clientes en 196 países\n\n"
+            "✅ *Tú ves cada operación en tiempo real*\n"
+            "✅ *Retiras tus fondos cuando quieras*\n\n"
+            "👇 *Accede ahora y copia nuestra estrategia*",
+            {"inline_keyboard": [[
+                {"text": "🏦 IR A XM COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+            ], [
+                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🌐 Web", "url": "https://buysell365.pro"}
+            ]]}
+        ),
+        # 3 — Señales VIP con ejemplo real
         (
             "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -14014,62 +14036,44 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "💎 UNIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
             ], [
-                {"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 3 — Por qué elegirnos
+        # 4 — Transparencia total: qué ve el inversor
         (
-            "🏆 *TRADING PROFESIONAL — AL ALCANCE DE TODOS*\n"
+            "👁️ *TRANSPARENCIA TOTAL — VES TODO EN TIEMPO REAL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📊 *Lo que ofrecemos:*\n\n"
-            "🔵 Señales VIP con IA → entrada, TP y SL exactos\n"
-            "🤖 Copy Trading → tu cuenta opera sola en MT5\n"
-            "⚡ Ejecución en milisegundos\n"
-            "🌍 20+ pares: EUR/USD · GBP/JPY · NASDAQ · ORO\n"
-            "💼 Copy Trading sin mensualidad fija\n\n"
-            "❓ *¿Tienes dudas?* Escríbenos — te respondemos al instante",
+            "Con XM Copy Trading *no hay letra pequeña*:\n\n"
+            "📊 Ves cada operación abierta al instante\n"
+            "💼 Ves el historial completo de la estrategia\n"
+            "📈 Ves el rendimiento real de BuySell365Pro\n"
+            "🔓 Retiras tus fondos *cuando quieras*\n"
+            "💰 Comisión *solo sobre ganancias reales*\n\n"
+            "🎯 *Sin sorpresas. Sin trucos. 100% regulado.*\n\n"
+            "👇 *Entra y copia la estrategia gratis*",
             {"inline_keyboard": [[
-                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-                {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
-            ], [
-                {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
-            ]]}
-        ),
-        # 4 — Cómo funciona Copy Trading
-        (
-            "⚙️ *¿CÓMO FUNCIONA EL COPY TRADING?*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "3 pasos. Así de simple:\n\n"
-            "1️⃣  Conectas tu cuenta MT5 a nuestra red\n"
-            "2️⃣  Nuestro bot replica cada operación al instante\n"
-            "3️⃣  Recibes ganancias — *pagas solo si ganas*\n\n"
-            "✅ Sin experiencia necesaria\n"
-            "✅ Compatible con XM, IC Markets y más\n"
-            "✅ Funciona 24/7 en piloto automático\n\n"
-            "🚀 *Empieza hoy — sin compromisos*",
-            {"inline_keyboard": [[
-                {"text": "🤖 QUIERO COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "📊 VER ESTRATEGIA EN XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
                 {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 5 — Combo VIP + Copy Trading
+        # 5 — Combo completo VIP + Copy Trading
         (
             "🔥 *DOS SERVICIOS. UN OBJETIVO: GANAR*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💎 *Canal VIP — Señales con IA*\n"
+            "🤖 *Copy Trading en XM* — piloto automático\n"
+            "   ├ 🏦 Broker regulado · fondos seguros\n"
+            "   ├ 🔄 Copia BuySell365Pro con 1 clic\n"
+            "   └ 💰 Pagas solo si ganas — sin cuota fija\n\n"
+            "💎 *Canal VIP* — señales con IA\n"
             "   ├ 📍 Entry · 🎯 TP · 🛡️ SL exactos\n"
-            "   ├ 📊 Análisis diario de mercados\n"
-            "   └ ⚡ Alertas en tiempo real\n\n"
-            "🤖 *Copy Trading — Sin mensualidad*\n"
-            "   ├ 🔄 Bot replica operaciones en tu MT5\n"
-            "   ├ 💰 Pagas solo sobre ganancias reales\n"
-            "   └ 🌍 Activo 24/7 — sin intervención\n\n"
+            "   ├ 📊 20+ pares en tiempo real\n"
+            "   └ ⚡ Alertas al instante en Telegram\n\n"
             "👇 *Elige tu plan y empieza ahora*",
             {"inline_keyboard": [[
-                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "🤖 COPY TRADING XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
             ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
