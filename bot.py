@@ -15615,28 +15615,27 @@ def _cmd_scalper_estado():
 #  Solo para ADMIN (Emmanuel) en chat privado
 # ============================================================
 
-_GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
-_gemini_model = None
+_GROQ_KEY = os.getenv("GROQ_API_KEY", "")
+_groq_client = None
 
-def _inicializar_gemini():
-    global _gemini_model
-    if not _GEMINI_KEY:
+def _inicializar_groq():
+    global _groq_client
+    if not _GROQ_KEY:
         return False
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=_GEMINI_KEY)
-        _gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-        logger.info("🤖 Gemini AI inicializado correctamente")
+        from groq import Groq as GroqClient
+        _groq_client = GroqClient(api_key=_GROQ_KEY)
+        logger.info("🤖 Groq AI (Llama 3.3 70B) inicializado correctamente")
         return True
     except Exception as e:
-        logger.warning(f"🤖 Gemini AI no disponible: {e}")
+        logger.warning(f"🤖 Groq AI no disponible: {e}")
         return False
 
 def _ia_responder(pregunta, user_name="Trader", contexto_extra=""):
     """Genera respuesta IA con contexto completo del bot."""
-    global _gemini_model
-    if not _gemini_model:
-        if not _inicializar_gemini():
+    global _groq_client
+    if not _groq_client:
+        if not _inicializar_groq():
             return None
 
     # Construir contexto del bot
@@ -15702,10 +15701,15 @@ REGLAS:
 PREGUNTA: {pregunta}"""
 
     try:
-        response = _gemini_model.generate_content(prompt)
-        return response.text[:1000] if response.text else None
+        response = _groq_client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            max_tokens=400,
+            temperature=0.7,
+        )
+        return response.choices[0].message.content[:1000]
     except Exception as e:
-        logger.warning(f"🤖 Gemini error: {e}")
+        logger.warning(f"🤖 Groq error: {e}")
         return None
 
 
@@ -15741,7 +15745,7 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
                 return True
 
     # IA respuesta general (admin + VIP)
-    if not _GEMINI_KEY:
+    if not _GROQ_KEY:
         return False
 
     # VIP users get limited context
@@ -15826,9 +15830,9 @@ def _cerrar_posiciones_por_simbolo(mt5_symbol):
         logger.error(f"Error cerrando {mt5_symbol}: {e}")
     return count
 
-# Inicializar Gemini al arrancar
-if _GEMINI_KEY:
-    _inicializar_gemini()
+# Inicializar Groq AI al arrancar
+if _GROQ_KEY:
+    _inicializar_groq()
 
 # ============================================================
 #  📡 SIGNAL COPIER — Lee señales externas y ejecuta en MT5
