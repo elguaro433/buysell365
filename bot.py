@@ -4592,17 +4592,21 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     }
     _estr_txt = _estr_map.get(_estrategia, '')
 
+    # Score visual con estrellas
+    _stars = "⭐" * min(score_display, 5) + "☆" * max(0, 5 - score_display)
+
     return (
         f"{cabecera}\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"📍 Entrada: `{f_(precio)}`\n"
-        f"🛑 SL: `{f_(niveles['sl'])}` ({fmt_dist(sl_dist)})\n"
-        f"🎯 TP1: `{f_(niveles['tp1'])}` ({fmt_dist(tp1_dist)})\n"
-        f"🎯 TP2: `{f_(niveles['tp2'])}` ({fmt_dist(tp2_dist)})\n"
-        f"🏁 TP3: `{f_(niveles['tp3'])}` ({fmt_dist(tp3_dist)})\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"📊 R:R *{rr_ratio}* | Score *{score_display}/5*"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📍 *Entrada:* `{f_(precio)}`\n\n"
+        f"🛑 *SL:* `{f_(niveles['sl'])}` \\({fmt_dist(sl_dist)}\\)\n"
+        f"🎯 *TP1:* `{f_(niveles['tp1'])}` \\({fmt_dist(tp1_dist)}\\)\n"
+        f"🎯 *TP2:* `{f_(niveles['tp2'])}` \\({fmt_dist(tp2_dist)}\\)\n"
+        f"🏁 *TP3:* `{f_(niveles['tp3'])}` \\({fmt_dist(tp3_dist)}\\)\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 *R:R {rr_ratio}* | {_stars}"
         + (f" | {_estr_txt}" if _estr_txt else "")
+        + f"\n⏰ {hora} | 🌐 buysell365\\.pro"
     )
 
 
@@ -4685,27 +4689,49 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
 
 def cmd_ayuda():
     return (
-        "🤖 *COMANDOS BuySell365.pro*\n\n"
-        "📈 *Senales*\n"
-        "   `/senales` — Operaciones abiertas\n"
-        "   `/resumen` — Resumen del dia\n"
-        "   `/winrate` — Estadisticas\n\n"
-        "🔍 *Analisis*\n"
-        "   `/analisis [activo]` — Analisis tecnico\n"
-        "   `/precio [activo]` — Precio en vivo\n"
-        "   `/precios` — Todos los precios\n\n"
-        "🌍 *Mercados*\n"
-        "   `/mercados` — Activos monitoreados\n"
-        "   `/horarios` — Sesiones de mercado\n"
-        "   `/noticias` — Calendario economico\n"
-        "   `/sentimiento` · `/tendencia` · `/pivots`\n\n"
-        "📊 *Herramientas*\n"
-        "   `/web` — Trading en Vivo\n"
-        "   `/estado` — Estado del sistema\n\n"
-        "👑 *VIP*\n"
-        f"   `/vip` — Canal VIP (5 dias habiles gratis)\n"
-        "   `/copy` — Copy Trading (proximamente)\n\n"
-        "💡 _Preguntame: \"Analiza el oro\" o \"Precio del nasdaq\"_"
+        "🤖 *BuySell365 Pro — Menu Principal*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "📡 *SENALES Y TRADING*\n"
+        "   /senales — Operaciones abiertas\n"
+        "   /resumen — Resumen del dia\n"
+        "   /precios — Precios en tiempo real\n"
+        "   /winrate — Estadisticas de rendimiento\n\n"
+        "🔍 *ANALISIS DE MERCADO*\n"
+        "   /analisis \\[activo\\] — Analisis tecnico completo\n"
+        "   /tendencia — Tendencias del mercado\n"
+        "   /noticias — Calendario economico\n"
+        "   /sentimiento — Fear & Greed Index\n\n"
+        "🌍 *INFORMACION*\n"
+        "   /horarios — Sesiones de mercado\n"
+        "   /mercados — Activos que operamos\n"
+        "   /estado — Estado del sistema\n"
+        "   /web — Dashboard en vivo\n\n"
+        "👑 *SERVICIOS*\n"
+        "   /vip — Canal VIP con senales premium\n"
+        "   /copy — Copy Trading automatico\n\n"
+        "💬 _Tambien puedes preguntarme directamente:_\n"
+        "_\"Analiza el oro\" · \"Precio del nasdaq\" · \"Como va el mercado\"_"
+    )
+
+
+def cmd_copy():
+    """Información sobre Copy Trading"""
+    return (
+        "🚀 *COPY TRADING — BuySell365 Pro*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "Copia automatica de todas nuestras operaciones\n"
+        "directamente en tu cuenta MT5\\.\n\n"
+        "✅ Oro, Forex e Indices\n"
+        "✅ SL y TP colocados automaticamente\n"
+        "✅ Sin cuota fija — solo pagas un pequeno % si ganas\n"
+        "✅ Broker regulado XM \\(MT5\\)\n"
+        "✅ Sin intervencion manual\n\n"
+        "📊 *Como funciona:*\n"
+        "1\\. Abres cuenta en XM con nuestro enlace\n"
+        "2\\. Conectas tu MT5 a nuestro servidor\n"
+        "3\\. Las operaciones se copian automaticamente\n"
+        "4\\. Tu solo ves las ganancias crecer\n\n"
+        "🌐 Mas info: buysell365\\.pro"
     )
 
 def cmd_senales():
@@ -7543,14 +7569,24 @@ def _generar_reporte_diario():
             ]}
         )
 
-        # Enviar resumen al canal VIP
+        # Enviar resumen profesional al canal VIP
+        _wr_emoji = "🟢" if wr >= 60 else ("🟡" if wr >= 40 else "🔴")
+        _pips_emoji = "📈" if pips_net > 0 else "📉"
         _canal_msg = (
-            f"📊 *RESUMEN DEL DÍA — {hoy_str}*\n"
-            f"Señales: {total_senales} | WR: {wr:.0f}% | Pips: {pips_net:+.1f}\n"
-            f"Capital: ${CAPITAL_USUARIO:.0f}"
+            f"📊 *RESUMEN DEL DÍA*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 {hoy_str}\n\n"
+            f"📡 Senales: *{total_senales}*\n"
+            f"{_wr_emoji} Win Rate: *{wr:.0f}%* ({ganadas}W/{perdidas}L)\n"
+            f"{_pips_emoji} Pips netos: *{pips_net:+.1f}*\n"
+            f"💰 Capital: *${CAPITAL_USUARIO:.0f}*\n"
         )
         if _ia_market:
-            _canal_msg += f"\n\n💡 {_ia_market[:200]}"
+            _canal_msg += f"\n💡 *IA Market:*\n{_ia_market[:300]}\n"
+        _canal_msg += (
+            f"\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"🌐 buysell365\\.pro | /menu"
+        )
         try:
             enviar_canal(_canal_msg)
         except Exception:
@@ -8819,9 +8855,29 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         }
         return start_txt, start_botones
 
-    if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "❓ ayuda"):
-        res_ayuda = f"👋 ¡Hola *{nombre_user}*! " + cmd_ayuda()
-        return res_ayuda, crear_teclado_principal()
+    if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "/menu", "❓ ayuda"):
+        res_ayuda = cmd_ayuda()
+        _menu_markup = {
+            "inline_keyboard": [
+                [{"text": "📊 Senales", "callback_data": "/senales"},
+                 {"text": "💰 Precios", "callback_data": "/precios"}],
+                [{"text": "📋 Resumen", "callback_data": "/resumen"},
+                 {"text": "📰 Noticias", "callback_data": "/noticias"}],
+                [{"text": "👑 VIP", "callback_data": "/vip"},
+                 {"text": "🚀 Copy Trading", "url": "https://buysell365.pro/#servicios"}],
+                [{"text": "🌐 Dashboard Web", "url": "https://buysell365.pro"},
+                 {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+            ]
+        }
+        return res_ayuda, _menu_markup
+    if t in ("/copy", "copy", "copy trading", "copytrade", "copytrading"):
+        _copy_markup = {
+            "inline_keyboard": [
+                [{"text": "🚀 Empezar Copy Trading", "url": "https://buysell365.pro/#servicios"}],
+                [{"text": "📋 Menu", "callback_data": "/menu"}]
+            ]
+        }
+        return cmd_copy(), _copy_markup
     if t in ("/señales", "/senales", "/operaciones", "/abiertas", "/activas", "activas",
              "señales", "senales", "señales activas", "📊 señales activas"):
         return cmd_senales(), crear_teclado_principal()
@@ -14724,38 +14780,59 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     p = pi["precio"]
     desc_label = f" (50% OFF)" if pi["en_descuento"] else ""
 
-    bienvenida = f"👋 *Hola {nombre}!* Bienvenido a *BuySell365.pro*\n\n"
+    bienvenida = (
+        f"👋 *Hola {nombre}\\!* Bienvenido a *BuySell365 Pro*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🤖 *Trading con Inteligencia Artificial*\n\n"
+    )
 
     if puede_trial:
         bienvenida += (
-            f"🎁 *5 DIAS HABILES GRATIS* en nuestro canal VIP:\n"
-            "✅ Senales IA: Oro, Forex, NASDAQ, S&P 500\n"
-            "✅ Entry, SL, TP exactos | Riesgo controlado\n\n"
-            "🚀 *Copy Trading* — copia nuestras operaciones en tu cuenta\n\n"
-            f"Despues: {p}{VIP_MONEDA}/mes{desc_label}. Sin compromiso."
+            "🔥 *OFERTA DE BIENVENIDA:*\n\n"
+            "📡 *Canal VIP* — Senales en tiempo real\n"
+            "   • Oro, Forex, NASDAQ, S&P 500\n"
+            "   • Entry, SL y 3 TPs exactos\n"
+            "   • Analisis multi\\-IA exclusivo\n\n"
+            "🚀 *Copy Trading* — Sin cuota fija\n"
+            "   • Copia automatica en tu cuenta MT5\n"
+            "   • Solo pagas un pequeno % si ganas\n"
+            "   • Broker regulado XM\n\n"
+            f"💎 *VIP Pro:* {p}{VIP_MONEDA}/mes{desc_label}\n"
+            "🎁 *5 dias habiles GRATIS* para que lo pruebes\n\n"
+            "🌐 *Web:* buysell365\\.pro"
         )
     else:
         bienvenida += (
-            "Canal VIP con senales de alta precision:\n"
-            "✅ Oro, Forex, NASDAQ, S&P 500\n"
-            "✅ Entry, SL, TP exactos\n"
-            "✅ Notificaciones en tiempo real\n\n"
-            f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
+            "📡 *Canal VIP* — Senales en tiempo real\n"
+            "   • Oro, Forex, NASDAQ, S&P 500\n"
+            "   • Entry, SL y 3 TPs exactos\n"
+            "   • Analisis multi\\-IA exclusivo\n\n"
+            "🚀 *Copy Trading* — Sin cuota fija\n"
+            "   • Copia automatica en tu cuenta MT5\n"
+            "   • Solo pagas un pequeno % si ganas\n\n"
+            f"💎 *VIP Pro:* {p}{VIP_MONEDA}/mes{desc_label}\n\n"
+            "🌐 *Web:* buysell365\\.pro"
         )
 
     if puede_trial:
         markup = {
             "inline_keyboard": [
-                [{"text": f"🎁 5 DIAS HABILES GRATIS", "callback_data": "vip_trial_gratis"}],
-                [{"text": f"💰 PAGAR {p}{VIP_MONEDA}{desc_label}", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+                [{"text": "🎁 PRUEBA GRATIS 5 DIAS", "callback_data": "vip_trial_gratis"}],
+                [{"text": f"💎 VIP PRO — {p}{VIP_MONEDA}/mes{desc_label}", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "🚀 Copy Trading", "url": "https://buysell365.pro/#servicios"},
+                 {"text": "📊 Dashboard", "url": "https://buysell365.pro"}],
+                [{"text": "📋 Menu Completo", "callback_data": "/menu"},
+                 {"text": "⏰ Horarios", "callback_data": "/horarios"}]
             ]
         }
     else:
         markup = {
             "inline_keyboard": [
-                [{"text": f"💰 SUSCRIBIRSE AL VIP ({p}{VIP_MONEDA}{desc_label})", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+                [{"text": f"💎 VIP PRO — {p}{VIP_MONEDA}/mes{desc_label}", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "🚀 Copy Trading", "url": "https://buysell365.pro/#servicios"},
+                 {"text": "📊 Dashboard", "url": "https://buysell365.pro"}],
+                [{"text": "📋 Menu Completo", "callback_data": "/menu"},
+                 {"text": "⏰ Horarios", "callback_data": "/horarios"}]
             ]
         }
 
@@ -14826,17 +14903,17 @@ def loop_polling():
     try:
         _cmds = [
             {"command": "start", "description": "Iniciar el bot"},
-            {"command": "senales", "description": "Ver señales activas"},
-            {"command": "estado", "description": "Estado del bot y mercado"},
-            {"command": "resumen", "description": "Resumen del día"},
-            {"command": "noticias", "description": "Calendario económico"},
-            {"command": "tendencia", "description": "Tendencias del mercado"},
+            {"command": "menu", "description": "Menu principal con botones"},
+            {"command": "senales", "description": "Operaciones abiertas"},
             {"command": "precios", "description": "Precios en tiempo real"},
-            {"command": "analisis", "description": "Análisis técnico de un activo"},
-            {"command": "sentimiento", "description": "Fear & Greed index"},
-            {"command": "vip", "description": "Acceso VIP / Trial gratis"},
-            {"command": "web", "description": "Dashboard web"},
-            {"command": "ayuda", "description": "Lista de comandos"},
+            {"command": "resumen", "description": "Resumen del dia"},
+            {"command": "analisis", "description": "Analisis tecnico de un activo"},
+            {"command": "noticias", "description": "Calendario economico"},
+            {"command": "tendencia", "description": "Tendencias del mercado"},
+            {"command": "vip", "description": "Canal VIP con senales premium"},
+            {"command": "copy", "description": "Copy Trading automatico"},
+            {"command": "web", "description": "Dashboard en vivo"},
+            {"command": "ayuda", "description": "Todos los comandos"},
         ]
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
