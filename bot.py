@@ -16047,7 +16047,7 @@ PAR_PROFILES = {
     # ━━━━ EURUSD — Multi-TF mean reversion scalp + premium breakout ━━━━
     "EURUSD": {
         "identity": {"mt5": "EURUSD", "yf": "EURUSD=X", "display": "EUR/USD", "category": "forex", "currencies": ["EUR", "USD"], "pip_size": 0.0001},
-        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 20},
+        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 50},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
@@ -16058,7 +16058,7 @@ PAR_PROFILES = {
     # ━━━━ GOLD — Momentum breakout, SELL only scalper, London open ━━━━
     "GOLD": {
         "identity": {"mt5": "GOLD", "yf": "GC=F", "display": "ORO", "category": "commodity", "currencies": ["USD"], "pip_size": 0.01},
-        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.0, "sl_atr": 1.2, "max_spread": 80},
+        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 200},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
@@ -16069,7 +16069,7 @@ PAR_PROFILES = {
     # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "scalper": {"enabled": True, "strategies": ["bb_rsi"], "rsi_period": 7, "rsi_buy": 40, "rsi_sell": 60, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 2.5, "sl_atr": 1.5, "max_spread": 500},
+        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
@@ -16113,7 +16113,7 @@ PAR_PROFILES = {
     # ━━━━ AUDCAD — Fibonacci range trading, Asian + London ━━━━
     "AUDCAD": {
         "identity": {"mt5": "AUDCAD", "yf": None, "display": "AUD/CAD", "category": "forex", "currencies": ["AUD", "CAD"], "pip_size": 0.0001},
-        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 1.8, "sl_atr": 1.5, "max_spread": 60},
+        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
         "sl_tp": {},
@@ -16124,7 +16124,7 @@ PAR_PROFILES = {
     # ━━━━ EURCHF — Mean reversion SNB, baja volatilidad, London ━━━━
     "EURCHF": {
         "identity": {"mt5": "EURCHF", "yf": None, "display": "EUR/CHF", "category": "forex", "currencies": ["EUR", "CHF"], "pip_size": 0.0001},
-        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 3.0, "sl_atr": 2.5, "max_spread": 45},
+        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 30},
         "sl_tp": {},
@@ -16135,7 +16135,7 @@ PAR_PROFILES = {
     # ━━━━ USDCAD — Oil correlation + Fibonacci, NY session ━━━━
     "USDCAD": {
         "identity": {"mt5": "USDCAD", "yf": None, "display": "USD/CAD", "category": "forex", "currencies": ["USD", "CAD"], "pip_size": 0.0001},
-        "scalper": {"enabled": True, "strategies": ["fibonacci"], "rsi_period": 7, "rsi_buy": 45, "rsi_sell": 55, "fib_buy": 0.35, "fib_sell": 0.65, "bb_period": 20, "bb_std": 2.0, "adx_period": 10, "adx_min": 10, "adx_max": 50, "vol_min": 0.3, "tp_atr": 1.8, "sl_atr": 1.5, "max_spread": 40},
+        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
         "sl_tp": {},
@@ -16178,7 +16178,7 @@ for _pp_key, _pp_val in PAR_PROFILES.items():
         }
 
 # Configuración del Scalper
-SCALPER_ACTIVO = True  # Master switch para activar/desactivar scalper
+SCALPER_ACTIVO = False  # Desactivado — no rentable, en revisión
 SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
 
 # Risk Management del Scalper
@@ -17751,12 +17751,6 @@ def _arrancar_interno():
     _iniciar_hilo("polling", loop_polling)
     _iniciar_hilo("health",  loop_health_check)
     _iniciar_hilo("vip",     loop_vip_check)
-    # 🔪 SCALPER SILENCIOSO — solo MT5, sin Telegram
-    if MT5_AVAILABLE and SCALPER_ACTIVO:
-        _iniciar_hilo("scalper", loop_scalper)
-        _sc_names = ", ".join(SCALPER_ACTIVOS.keys())
-        log_sistema(f"🔪 Scalper Silencioso activado — {len(SCALPER_ACTIVOS)} activos | {_sc_names}")
-
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
     # Signal Copier como subprocess independiente (Telethon necesita su propio event loop limpio)
     _copier_process = None
@@ -17805,97 +17799,10 @@ def _arrancar_interno():
     #     log_sistema("📡 Signal Copier activado como proceso independiente")
     log_sistema("📡 Signal Copier: ejecutar manualmente 'python signal_copier.py'")
 
-    # 📊 MONITOR CUENTA REAL — lee MSC Gold Stable Pro y envía a Telegram
-    # Cada 60s: lock MT5 → login real → leer posiciones → login demo → unlock
-    _monitor_real_posiciones: dict = {}
+    # 📊 MONITOR CUENTA REAL — desactivado (cambiar login rompe AutoTrading en MT5)
+    # Las señales de MSC Gold se monitorean desde mql5.com
 
-    def _loop_monitor_real():
-        """Monitorea cuenta real periódicamente cambiando de cuenta."""
-        nonlocal _monitor_real_posiciones
-        _REAL_LOGIN = int(os.getenv("MT5_REAL_LOGIN", "88849791"))
-        _REAL_PASS = os.getenv("MT5_REAL_PASS", "")
-        _REAL_SERVER = os.getenv("MT5_REAL_SERVER", "XMGlobal-MT5 4")
-        _DEMO_LOGIN = int(os.getenv("MT5_LOGIN", "336093063"))
-        _DEMO_PASS = os.getenv("MT5_PASSWORD", "")
-        _DEMO_SERVER = os.getenv("MT5_SERVER", "XMGlobal-MT5 9")
-
-        time.sleep(120)  # Esperar arranque completo
-        logger.info("📊 Monitor REAL: iniciando monitoreo cada 60s")
-
-        while True:
-            try:
-                time.sleep(60)
-                positions = None
-                with _lock_mt5:
-                    # Cambiar a real
-                    if not _REAL_PASS:
-                        continue  # No hay credenciales reales configuradas
-                    ok_real = mt5.login(_REAL_LOGIN, password=_REAL_PASS, server=_REAL_SERVER)
-                    if ok_real:
-                        time.sleep(1)
-                        positions = mt5.positions_get()
-                    else:
-                        logger.warning(f"📊 Monitor REAL: login real fallido")
-                    # Volver a demo SIEMPRE
-                    ok_demo = mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
-                    if not ok_demo:
-                        logger.error(f"📊 CRÍTICO: no se pudo volver a demo — reintentando")
-                        time.sleep(2)
-                        mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER)
-
-                if positions:
-                    current_tickets = {p.ticket for p in positions}
-                    for pos in positions:
-                        if pos.ticket not in _monitor_real_posiciones:
-                            _dir = "COMPRA" if pos.type == 0 else "VENTA"
-                            emoji = "🟢" if pos.type == 0 else "🔴"
-                            msg = (
-                                f"{emoji} *{_dir} {pos.symbol}*\n"
-                                f"Entrada: {pos.price_open}\n"
-                                f"SL: {pos.sl}\n"
-                                f"TP: {pos.tp}"
-                            )
-                            enviar_canal(msg)
-                            logger.info(f"📊 REAL: Nueva posición {_dir} {pos.symbol} @ {pos.price_open}")
-                            _monitor_real_posiciones[pos.ticket] = {
-                                "symbol": pos.symbol, "type": pos.type,
-                                "price_open": pos.price_open,
-                            }
-
-                    # Detectar cerradas
-                    cerradas = set(_monitor_real_posiciones.keys()) - current_tickets
-                    for ticket in cerradas:
-                        info = _monitor_real_posiciones[ticket]
-                        msg = f"🔄 *{info['symbol']}* — CIERRE"
-                        enviar_canal(msg)
-                        logger.info(f"📊 REAL: Posición cerrada {info['symbol']}")
-                        del _monitor_real_posiciones[ticket]
-                else:
-                    # Sin posiciones — limpiar
-                    if _monitor_real_posiciones:
-                        for ticket, info in list(_monitor_real_posiciones.items()):
-                            msg = f"🔄 *{info['symbol']}* — CIERRE"
-                            enviar_canal(msg)
-                        _monitor_real_posiciones.clear()
-
-            except Exception as e:
-                logger.error(f"📊 Monitor REAL error: {e}")
-                # Asegurar que volvemos a demo
-                try:
-                    with _lock_mt5:
-                        if not mt5.login(_DEMO_LOGIN, password=_DEMO_PASS, server=_DEMO_SERVER):
-                            logger.error("📊 CRÍTICO: no se pudo volver a demo después de error")
-                except Exception as e2:
-                    logger.error(f"📊 CRÍTICO: error volviendo a demo: {e2}")
-
-    # Monitor REAL desactivado — cambiar login rompe AutoTrading en MT5
-    # Las señales de MSC Gold se monitorean manualmente o desde mql5.com
-    # _MT5_LOGIN_ACTUAL = os.getenv("MT5_LOGIN", "")
-    # if str(_MT5_LOGIN_ACTUAL) == "336093063" and MT5_AVAILABLE:
-    #     _iniciar_hilo("monitor_real", _loop_monitor_real)
-    #     log_sistema("📊 Monitor cuenta REAL activado — leyendo MSC Gold Stable Pro cada 60s")
-
-    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, scalper, watchdog, copier")
+    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, watchdog")
 
     # 🐕 WATCHDOG — vigila y reinicia hilos muertos cada 60s
     _iniciar_hilo("watchdog", _watchdog)
