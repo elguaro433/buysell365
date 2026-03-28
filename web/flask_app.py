@@ -1054,6 +1054,34 @@ if('serviceWorker' in navigator){{
   </div>
 </section>
 
+<!-- HOW IT WORKS -->
+<section class="fade-in" id="how-it-works" style="padding:60px 20px">
+  <div class="section-title" style="margin-bottom:32px">
+    <h2>\U0001f680 <span data-i18n="how.title">C\u00f3mo Funciona</span></h2>
+    <p data-i18n="how.subtitle">En 3 simples pasos empiezas a recibir se\u00f1ales</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:24px;max-width:1000px;margin:0 auto">
+    <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,255,200,.05),rgba(0,100,255,.05));border:1px solid rgba(0,212,170,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
+      <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00ffc8,#00d4aa);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">1</div>
+      <div style="font-size:2.5rem;margin:12px 0">\U0001f4f2</div>
+      <h3 style="color:#00ffc8;font-size:1.1rem;margin-bottom:8px">Unete al Canal</h3>
+      <p style="color:var(--text2);font-size:.9rem">Unete a nuestro grupo de Telegram gratis o activa el canal VIP para se\u00f1ales premium.</p>
+    </div>
+    <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(255,200,0,.05),rgba(255,150,0,.05));border:1px solid rgba(255,200,0,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
+      <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ffd700,#f0b90b);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">2</div>
+      <div style="font-size:2.5rem;margin:12px 0">\U0001f4ca</div>
+      <h3 style="color:#ffd700;font-size:1.1rem;margin-bottom:8px">Recibe Se\u00f1ales</h3>
+      <p style="color:var(--text2);font-size:.9rem">Nuestra IA analiza +20 activos cada 3 minutos y te envia se\u00f1ales con Entry, SL y 3 TPs exactos.</p>
+    </div>
+    <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,230,118,.05),rgba(0,180,90,.05));border:1px solid rgba(0,230,118,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
+      <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00e676,#00c853);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">3</div>
+      <div style="font-size:2.5rem;margin:12px 0">\U0001f4b0</div>
+      <h3 style="color:#00e676;font-size:1.1rem;margin-bottom:8px">Opera o Copia</h3>
+      <p style="color:var(--text2);font-size:.9rem">Ejecuta las se\u00f1ales manualmente o activa el Copy Trading para que se copien automaticamente en tu MT5.</p>
+    </div>
+  </div>
+</section>
+
 <!-- FEATURES -->
 <section class="features fade-in" id="features" style="padding:40px 20px">
   <div class="section-title" style="margin-bottom:24px">
