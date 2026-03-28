@@ -6558,15 +6558,22 @@ def cmd_vip(user_id: str = None):
     btn_pago = f"💰 SUSCRIBIRME (50% OFF)" if pi["en_descuento"] else f"💰 SUSCRIBIRME"
     botones = []
     botones.append([{"text": "📊 VER RESULTADOS EN VIVO", "url": "https://buysell365.pro"}])
-    botones.append([{"text": btn_pago + " 💰 USDT/Binance", "callback_data": "vip_pagar_usdt"}])
+    # Métodos de pago en la misma fila si es posible
+    fila_pago = [{"text": btn_pago + " — USDT/Binance", "callback_data": "vip_pagar_usdt"}]
+    botones.append(fila_pago)
     if WISE_PAY_LINK:
-        botones.append([{"text": "💳 PAGAR CON TARJETA (Visa/Mastercard)", "callback_data": "vip_pagar_tarjeta"}])
+        botones.append([{"text": "💳 PAGAR CON TARJETA — Visa/Mastercard (Wise)", "callback_data": "vip_pagar_tarjeta"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
         if pend_info.get("monto_unico"):
             monto_pend = pend_info.get("monto_unico", 0)
             botones.append([{"text": f"⏳ VER PAGO PENDIENTE ({monto_pend:.3f} USDT)", "callback_data": "vip_ver_pago_pendiente"}])
-    botones.append([{"text": f"❓ CONTACTAR ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}])
+    # Botón Términos y Condiciones + Cancelar
+    botones.append([
+        {"text": "📜 Términos y Condiciones", "url": "https://buysell365.pro/terminos"},
+        {"text": "❌ Cancelar", "callback_data": "vip_cancelar"},
+    ])
+    botones.append([{"text": f"❓ Contactar Admin", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}])
     return texto, {"inline_keyboard": botones}
 
 
@@ -15162,17 +15169,23 @@ def loop_polling():
                             username_cb = from_user.get("username", "")
                             precio_t   = _vip_precio_info()["precio"]
                             enviar_telegram(
-                                "💳 *PAGO VIP — TARJETA BANCARIA*\n\n"
-                                f"💶 Importe: *{precio_t:.2f} EUR*\n\n"
-                                "👇 Pulsa el botón para pagar con Visa o Mastercard:\n\n"
-                                "⚠️ *IMPORTANTE:* En el campo _Referencia_ o _Nota_\n"
-                                f"escribe tu usuario de Telegram: *@{username_cb or nombre_cb}*\n\n"
-                                "✅ _Una vez recibido el pago, el admin te activa el VIP en minutos._\n"
-                                f"_Ayuda: {ADMIN_USER}_",
+                                "💳 *PAGO VIP — TARJETA BANCARIA*\n"
+                                "━━━━━━━━━━\n\n"
+                                f"💶 Importe: *{precio_t:.0f} EUR / mes*\n\n"
+                                "🔒 *Plataforma de pago: Wise*\n"
+                                "_Empresa regulada por la FCA (Reino Unido)._\n"
+                                "_+16 millones de clientes · 100% segura._\n\n"
+                                "👇 Pulsa el botón — te redirige a Wise\n"
+                                "Acepta Visa · Mastercard · débito\n\n"
+                                "⚠️ En el campo *Referencia/Nota* escribe:\n"
+                                f"`@{username_cb or nombre_cb}`\n\n"
+                                "✅ _El admin activa tu VIP en minutos._",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "💳 PAGAR CON TARJETA AHORA", "url": WISE_PAY_LINK}],
-                                    [{"text": f"❓ CONTACTAR ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
+                                    [{"text": "💳 PAGAR CON TARJETA — Wise (100% Seguro)", "url": WISE_PAY_LINK}],
+                                    [{"text": "📜 Términos y Condiciones", "url": "https://buysell365.pro/terminos"}],
+                                    [{"text": f"❓ Contactar Admin", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}],
+                                    [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
                                 ]}
                             )
                             # Notificar al admin
