@@ -4577,7 +4577,7 @@ def cmd_ayuda():
         "   `/estado` — Estado del sistema\n\n"
         "👑 *VIP*\n"
         f"   `/vip` — Canal VIP Premium\n"
-        "   `/copy` — Copy Trading (proximamente)\n\n"
+        "   `/copy` — Copy Trading en XM (activo 🟢)\n\n"
         "💡 _Preguntame: \"Analiza el oro\" o \"Precio del nasdaq\"_"
     )
 
@@ -8830,15 +8830,22 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                              "copiar trades", "como copio", "quiero copiar",
                              "copiar automatico", "copia automatica")):
         return (
-            "⏳ *COPY TRADING — Proximamente*\n"
+            "🤖 *COPY TRADING — BuySell365 Pro*\n"
             "━━━━━━━━━━\n\n"
-            "Estamos optimizando nuestro sistema de Copy Trading para ofrecerte la mejor experiencia.\n\n"
-            "📢 Te notificaremos cuando este disponible.\n\n"
-            "Mientras tanto, recibe nuestras señales Premium en tiempo real:\n"
-            "👉 Escribe /vip para mas informacion",
+            "⚡ Tu cuenta opera *automáticamente* 24/7\n"
+            "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
+            "🏦 Sobre *XM* — broker regulado (CySEC, ASIC)\n"
+            "🔒 +5M clientes · fondos segregados\n"
+            "💰 *Sin mensualidad — pagas solo si ganas*\n\n"
+            "3️⃣ pasos para empezar:\n"
+            "1️⃣ Regístrate en XM _(gratis, 2 min)_\n"
+            "2️⃣ Copia la estrategia *BuySell365Pro*\n"
+            "3️⃣ Tu cuenta opera sola 🚀\n\n"
+            "👇 Pulsa el botón para activarlo ahora:",
             {"inline_keyboard": [
-                [{"text": "👑 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 DASHBOARD", "url": "https://buysell365.pro"}]
+                [{"text": "🚀 ACTIVAR COPY TRADING AHORA", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                [{"text": "📊 Ver Rendimiento en Vivo", "url": "https://buysell365.pro"}],
+                [{"text": "💎 Canal VIP — Señales", "callback_data": "vip_pagar_usdt"}],
             ]}
         )
 
@@ -9776,20 +9783,20 @@ section{{padding:50px 20px}}
       </ul>
       <a href="https://t.me/BUYSELL365_PRO_BOT?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
     </div>
-    <div class="price-card" style="position:relative;opacity:0.7">
-      <div class="price-badge" style="background:linear-gradient(135deg,#ff9800,#f57c00);box-shadow:0 0 16px rgba(255,152,0,.4)">⏳ <span data-i18n="pricing.copy_badge">PROXIMAMENTE</span></div>
+    <div class="price-card" style="position:relative;">
+      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#1b5e20);box-shadow:0 0 16px rgba(0,200,83,.4)">🟢 ACTIVO</div>
       <div class="price-name" data-i18n="pricing.copy_name">Copy Trading</div>
       <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Sin cuota fija</div>
-      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Copia automatica todas nuestras operaciones en tu cuenta MT5</p>
-      <ul class="price-list" style="opacity:0.5">
+      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Tu cuenta opera sola 24/7 sobre XM — broker regulado. Pagas solo si ganas.</p>
+      <ul class="price-list">
         <li data-i18n="pricing.cp1">Operativa automatizada — Oro, Forex e \u00cdndices</li>
         <li data-i18n="pricing.cp2">Copia automatica en tiempo real</li>
         <li data-i18n="pricing.cp3">SL y TP colocados automaticamente</li>
         <li data-i18n="pricing.cp4">Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
-        <li data-i18n="pricing.cp5">Broker regulado XM (MT5)</li>
+        <li data-i18n="pricing.cp5">Broker regulado XM — CySEC, ASIC</li>
         <li data-i18n="pricing.cp6">Sin intervencion manual requerida</li>
       </ul>
-      <div style="width:100%;text-align:center;margin-top:16px;padding:12px 24px;background:linear-gradient(135deg,#666,#444);border-radius:8px;color:#fff;font-weight:600;cursor:not-allowed">🔔 Proximamente</div>
+      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px">🚀 Activar Copy Trading</a>
     </div>
   </div>
 </section>
@@ -11067,9 +11074,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
                 <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM</a>
-                <span class="cta-btn" style="background:linear-gradient(135deg,#666,#444);border:none;padding:12px 24px;cursor:not-allowed;opacity:0.6">&#9200; COPY TRADING - PROXIMAMENTE</span>
+                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="padding:12px 24px">&#129302; COPY TRADING XM</a>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:12px">Broker regulado XM &mdash; CySEC, ASIC &mdash; +5M clientes &mdash; pagas solo si ganas</p>
         </div>
     </div>
 
