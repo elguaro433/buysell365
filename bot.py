@@ -15047,9 +15047,11 @@ def loop_polling():
                             "/reiniciar": "🔄 Reiniciando bot...",
                             "/apagar": "🔴 Apagando bot...",
                             "vip_trial_gratis": "💰 Redirigiendo a pago...",
-                            "vip_pagar_usdt": "💰 Cargando pago...",
+                            "vip_pagar_usdt": "📋 Cargando términos...",
+                            "vip_aceptar_terminos": "✅ Términos aceptados — elige método...",
                             "vip_trial_confirmar": "💰 Redirigiendo a pago...",
-                            "vip_pagar_confirmar": "💳 Procesando pago...",
+                            "vip_pagar_confirmar": "💰 Cargando instrucciones USDT...",
+                            "vip_pagar_tarjeta": "💳 Cargando pago con tarjeta...",
                         }.get(texto, "⏳ Procesando...")
                         try:
                             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery",
@@ -15079,45 +15081,69 @@ def loop_polling():
                             )
                             continue
 
-                        # ── Callback VIP: pago USDT (paso 1 → mostrar términos) ──
+                        # ── Callback VIP: PASO 1 — Mostrar Términos (sin método de pago aún) ──
                         if texto == "vip_pagar_usdt":
                             pi_p = _vip_precio_info()
                             _dm_pago = enviar_telegram(
-                                f"📋 *TERMINOS DE SUSCRIPCION VIP*\n"
+                                f"📋 *TÉRMINOS DE SUSCRIPCIÓN VIP*\n"
                                 f"━━━━━━━━━━\n\n"
                                 f"💰 Precio: *{pi_p['precio']}{VIP_MONEDA}/mes*\n"
-                                f"💎 Pago unico mensual via USDT ({VIP_RED}).\n\n"
+                                f"📆 Pago único mensual\n\n"
                                 f"📜 *Condiciones:*\n"
-                                f"• Servicio de senales educativas.\n"
-                                f"  _No es asesoria financiera._\n"
+                                f"• Servicio de señales educativas.\n"
+                                f"  _No es asesoría financiera._\n"
                                 f"• El usuario es responsable de\n"
                                 f"  sus decisiones de trading.\n"
                                 f"• *No hay reembolsos* una vez\n"
                                 f"  confirmado el pago.\n"
-                                f"• Verificacion automatica en ~5 min.\n"
-                                f"• Acceso por 30 dias desde el pago.\n\n"
-                                f"👇 *Al pulsar ACEPTO confirmas estos terminos:*",
+                                f"• Acceso por 30 días desde el pago.\n\n"
+                                f"👇 *Al pulsar ACEPTO confirmas estos términos\n"
+                                f"y podrás elegir tu método de pago:*",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "✅ ACEPTO — VER INSTRUCCIONES DE PAGO", "callback_data": "vip_pagar_confirmar"}],
-                                    [{"text": "❌ CANCELAR", "callback_data": "vip_cancelar"}]
+                                    [{"text": "✅ ACEPTO — ELEGIR MÉTODO DE PAGO", "callback_data": "vip_aceptar_terminos"}],
+                                    [{"text": "📜 Leer Términos completos", "url": "https://buysell365.pro/terminos"}],
+                                    [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
                                 ]}
                             )
-                            # 🆕 Si el DM falló y el botón se pulsó desde grupo → avisar en grupo
                             if _dm_pago is None and tipo_chat in ("group", "supergroup"):
-                                _nombre_cb_pago = escapar_markdown(from_user.get("first_name", "Trader"))  # H-11
+                                _nombre_cb_pago = escapar_markdown(from_user.get("first_name", "Trader"))
                                 _aviso_dm_p = enviar_telegram(
                                     f"👋 *{_nombre_cb_pago}*, para ver las opciones de pago "
                                     f"necesito que primero me escribas por privado:\n\n"
-                                    f"👉 Abre @Andoperandobot y pulsa *Start*\n"
-                                    f"👉 Luego vuelve aqui y pulsa el boton de nuevo.",
+                                    f"👉 Abre @{BOT_USERNAME} y pulsa *Start*\n"
+                                    f"👉 Luego vuelve aquí y pulsa el botón de nuevo.",
                                     chat_id
                                 )
                                 if _aviso_dm_p:
                                     programar_borrado(chat_id, _aviso_dm_p, 120)
                             continue
 
-                        # ── Callback VIP: pago confirmado (paso 2 → instrucciones) ──
+                        # ── Callback VIP: PASO 2 — Términos aceptados → elegir método ──
+                        if texto == "vip_aceptar_terminos":
+                            pi_p = _vip_precio_info()
+                            _botones_metodo = {"inline_keyboard": [
+                                [{"text": "💰 PAGAR CON BINANCE (USDT/Crypto)", "callback_data": "vip_pagar_confirmar"}],
+                            ]}
+                            if WISE_PAY_LINK:
+                                _botones_metodo["inline_keyboard"].append(
+                                    [{"text": "💳 PAGAR CON TARJETA — Visa/Mastercard (Wise)", "callback_data": "vip_pagar_tarjeta"}]
+                                )
+                            _botones_metodo["inline_keyboard"].append(
+                                [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}]
+                            )
+                            enviar_telegram(
+                                f"✅ *Términos aceptados*\n\n"
+                                f"💰 Precio: *{pi_p['precio']}{VIP_MONEDA}/mes*\n\n"
+                                f"Elige tu método de pago:\n\n"
+                                f"• 💰 *Binance* — USDT crypto (TRC20)\n"
+                                f"• 💳 *Tarjeta* — Visa/Mastercard vía Wise",
+                                user_id,
+                                teclado=_botones_metodo
+                            )
+                            continue
+
+                        # ── Callback VIP: PASO 3 — Instrucciones USDT Binance ──
                         if texto == "vip_pagar_confirmar":
                             nombre_cb = from_user.get("first_name", "Trader")
                             username_cb = from_user.get("username", "")
