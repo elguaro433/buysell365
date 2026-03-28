@@ -528,7 +528,7 @@ def send_to_channel(signal, executed, detail):
         f"{dir_emoji} *{dir_es} — {pair_display}*",
         f"",
         f"📍 Entrada: `{entry_display}`",
-        f"🎯 Take Profit: `{fmt(tp)}`",
+        f"🎯 TP: `{fmt(tp)}`",
         f"🛡️ Stop Loss: `{fmt(sl)}`",
     ]
 
