@@ -1407,7 +1407,7 @@ class ManagementConsole:
                 self._dash_mt5_capital_lbl.config(text="MT5: sin datos", fg=TEXT_SEC)
 
         _update()
-        self.root.after(15000, self._refresh_mt5_capital_loop)
+        self.root.after(8000, self._refresh_mt5_capital_loop)
 
     # --------------------------------------------------------
     #  P&L CHART DRAWING
