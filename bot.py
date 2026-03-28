@@ -4710,7 +4710,7 @@ def cmd_ayuda():
         "   `/web` — Trading en Vivo\n"
         "   `/estado` — Estado del sistema\n\n"
         "👑 *VIP*\n"
-        f"   `/vip` — Canal VIP (5 dias habiles gratis)\n"
+        f"   `/vip` — Canal VIP Premium\n"
         "   `/copy` — Copy Trading (proximamente)\n\n"
         "💡 _Preguntame: \"Analiza el oro\" o \"Precio del nasdaq\"_"
     )
@@ -8812,14 +8812,11 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             f"   /web — Dashboard en vivo\n"
             f"   /ayuda — Todos los comandos\n\n"
         )
-        if _puede_trial_start:
-            start_txt += f"🎁 *Prueba 5 dias habiles GRATIS* en el canal VIP → /vip 🚀"
-        else:
-            start_txt += f"👑 *Canal VIP* con señales completas → /vip"
+        start_txt += f"👑 *Canal VIP* con señales completas → /vip"
 
         start_botones = {
             "inline_keyboard": [
-                [{"text": f"🎁 5 DIAS HABILES GRATIS", "callback_data": "vip_trial_gratis"}] if _puede_trial_start else [{"text": "👑 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "👑 SUSCRIBIRSE AL VIP", "callback_data": "vip_pagar_usdt"}],
                 [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                 [{"text": "🌐 Web en Vivo", "url": "https://buysell365.pro/dashboard"}],
             ]
@@ -8969,12 +8966,10 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     if t in ("/vip", "vip", "acceso", "premium", "pagar", "suscripcion", "suscribirse", "/suscripcion",
              "canal", "canal vip", "entrar al canal", "quiero entrar", "como entro",
              "unirme", "quiero unirme", "membresia", "membresía",
-             "prueba", "prueba gratis", "gratis", "trial", "probar", "dias gratis",
-             "quiero probar", "probar gratis", "prueba gratuita") or \
+             "suscribirme", "quiero suscribirme") or \
        any(p in t for p in ("canal vip", "entrar al canal", "quiero entrar", "quiero unirme",
                              "como entro al", "como me uno", "acceso al canal", "acceso vip",
-                             "quiero acceso", "me interesa el vip", "suscribirme al",
-                             "prueba gratis", "dias gratis", "quiero probar")):
+                             "quiero acceso", "me interesa el vip", "suscribirme al")):
         return cmd_vip(user_id=remitente)
 
     # ── COPY TRADING ──
@@ -14292,16 +14287,15 @@ def _verificar_entradas_pendientes():
                 log_vip(f"✅ CÓDIGO CONFIRMADO: {uid} ({sub.get('nombre','?')}) entró al canal | Código:{codigo_txt} | Expira:{expira_real.strftime('%Y-%m-%d')} | {dias_acceso} dias activos")
             else:
                 enviar_telegram(
-                    f"🎉 *TRIAL ACTIVADA — 5 DIAS HABILES GRATIS*\n"
+                    f"👑 *VIP ACTIVADO*\n"
                     f"━━━━━━━━━━\n\n"
                     f"✅ Ya estas dentro del canal VIP\n"
-                    f"⏳ Te quedan *5 dias habiles* de acceso\n"
                     f"📅 Expira: *{expira_real.strftime('%Y-%m-%d')}*\n\n"
                     f"📊 _Recibiras senales IA con Entry, SL y TP exactos._\n"
-                    f"🚀 _Aprovecha al maximo tu prueba!_",
+                    f"🚀 _Bienvenido al canal premium!_",
                     uid
                 )
-                log_vip(f"✅ TRIAL CONFIRMADA: {uid} ({sub.get('nombre','?')}) entró al canal | Expira:{expira_real.strftime('%Y-%m-%d')} | {VIP_TRIAL_DIAS} dias activos")
+                log_vip(f"✅ ACCESO CONFIRMADO: {uid} ({sub.get('nombre','?')}) entró al canal | Expira:{expira_real.strftime('%Y-%m-%d')} | {VIP_TRIAL_DIAS} dias activos")
             time.sleep(0.5)
         else:
             # ¿Pasaron >24h sin entrar?
@@ -14744,21 +14738,12 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
             f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
         )
 
-    if puede_trial:
-        markup = {
-            "inline_keyboard": [
-                [{"text": f"🎁 5 DIAS HABILES GRATIS", "callback_data": "vip_trial_gratis"}],
-                [{"text": f"💰 PAGAR {p}{VIP_MONEDA}{desc_label}", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
-            ]
-        }
-    else:
-        markup = {
-            "inline_keyboard": [
-                [{"text": f"💰 SUSCRIBIRSE AL VIP ({p}{VIP_MONEDA}{desc_label})", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
-            ]
-        }
+    markup = {
+        "inline_keyboard": [
+            [{"text": f"💰 SUSCRIBIRSE AL VIP ({p}{VIP_MONEDA}{desc_label})", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+        ]
+    }
 
     # Enviar al grupo (visible para el usuario) o al chat privado
     destino = grupo_chat_id or user_id
@@ -14897,49 +14882,19 @@ def loop_polling():
                         if chat_id == CHANNEL_ID or tipo_chat == "channel":
                             _fallback_dest = GROUP_ID if GROUP_ID else chat_id
 
-                        # ── Callback VIP: trial gratis (paso 1 → mostrar términos) ──
-                        if texto == "vip_trial_gratis":
+                        # ── Callback VIP: trial eliminado — redirigir a pago ──
+                        if texto in ("vip_trial_gratis", "vip_trial_confirmar"):
                             pi_t = _vip_precio_info()
-                            _dm_trial = enviar_telegram(
-                                f"📋 *TERMINOS DEL TRIAL GRATUITO*\n"
+                            enviar_telegram(
+                                f"👑 *CANAL VIP — BuySell365.pro*\n"
                                 f"━━━━━━━━━━\n\n"
-                                f"🎁 Acceso al canal VIP por *5 dias habiles gratis*.\n"
-                                f"📅 Despues del trial: *{pi_t['precio']}{VIP_MONEDA}/mes*.\n"
-                                f"🚫 No se cobra nada durante el trial.\n\n"
-                                f"📜 *Condiciones:*\n"
-                                f"• Servicio de senales educativas.\n"
-                                f"  _No es asesoria financiera._\n"
-                                f"• El usuario es responsable de\n"
-                                f"  sus decisiones de trading.\n"
-                                f"• Una prueba gratuita por persona.\n"
-                                f"• Al finalizar el trial, el acceso\n"
-                                f"  se desactiva automaticamente.\n\n"
-                                f"👇 *Al pulsar ACEPTO confirmas estos terminos:*",
+                                f"💰 Suscripcion mensual: *{pi_t['precio']}{VIP_MONEDA}/mes*\n\n"
+                                f"Pulsa el boton para ver instrucciones de pago.",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "✅ ACEPTO — ACTIVAR TRIAL", "callback_data": "vip_trial_confirmar"}],
-                                    [{"text": "❌ CANCELAR", "callback_data": "vip_cancelar"}]
+                                    [{"text": f"💰 SUSCRIBIRME ({pi_t['precio']}{VIP_MONEDA})", "callback_data": "vip_pagar_usdt"}]
                                 ]}
                             )
-                            # 🆕 Si el DM falló y el botón se pulsó desde grupo → avisar en grupo
-                            if _dm_trial is None and tipo_chat in ("group", "supergroup"):
-                                _nombre_cb_trial = escapar_markdown(from_user.get("first_name", "Trader"))  # H-11 FIX
-                                _aviso_dm = enviar_telegram(
-                                    f"👋 *{_nombre_cb_trial}*, para activar tu trial necesito "
-                                    f"que primero me escribas por privado:\n\n"
-                                    f"👉 Abre @Andoperandobot y pulsa *Start*\n"
-                                    f"👉 Luego vuelve aqui y pulsa el boton de nuevo.",
-                                    chat_id
-                                )
-                                if _aviso_dm:
-                                    programar_borrado(chat_id, _aviso_dm, 120)
-                            continue
-
-                        # ── Callback VIP: trial confirmado (paso 2 → activar) ──
-                        if texto == "vip_trial_confirmar":
-                            nombre_cb = from_user.get("first_name", "Trader")
-                            username_cb = from_user.get("username", "")
-                            _otorgar_trial_vip(user_id, nombre_cb, username_cb)
                             continue
 
                         # ── Callback VIP: pago USDT (paso 1 → mostrar términos) ──
