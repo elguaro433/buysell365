@@ -6664,7 +6664,9 @@ def _mostrar_instrucciones_pago(chat_id: str, user_id: str, nombre: str, usernam
     _pago_teclado = {
         "inline_keyboard": [
             [{"text": "💰 ABRIR BINANCE PARA PAGAR", "url": "https://app.binance.com/en/my/wallet/account/main/withdrawal/crypto/USDT"}],
-            [{"text": f"❓ AYUDA — {ADMIN_USER}", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
+            [{"text": f"❓ AYUDA — {ADMIN_USER}", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}],
+            [{"text": "◀️ Volver al menú de pago", "callback_data": "vip_aceptar_terminos"}],
+            [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
         ]
     }
     msg_id = enviar_telegram(
@@ -15122,7 +15124,7 @@ def loop_polling():
                                     chat_id
                                 )
                                 if _aviso_dm_p:
-                                    programar_borrado(chat_id, _aviso_dm_p, 120)
+                                    programar_borrado(chat_id, _aviso_dm_p, 30)  # 30s
                             continue
 
                         # ── Callback VIP: PASO 2 — Términos aceptados → elegir método ──
@@ -15534,7 +15536,7 @@ def loop_polling():
                         # mensajes de usuarios no autorizados también se borren
                         # EXCEPTO mensajes del ADMIN — solo él puede borrar los suyos
                         if (es_grupo or es_canal) and msg.get("message_id") and user_id not in ADMIN_IDS:
-                            programar_borrado(chat_id, msg.get("message_id"))
+                            programar_borrado(chat_id, msg.get("message_id"), 15)  # 15s: grupo limpio rápido
 
                         # 🎟️ DETECCIÓN DE CÓDIGO DE INVITACIÓN — cualquier usuario, grupo o privado
                         _match_code_poll = re.match(r'^BS365-[A-Z0-9]{4}$', texto.strip().upper())
@@ -15727,7 +15729,7 @@ def loop_polling():
                                             aviso = f"💬 *{_nombre_u}*, te envie la informacion por mensaje privado 📩"
                                             aviso_id = enviar_telegram(aviso, _chat_id)
                                             if aviso_id:
-                                                programar_borrado(_chat_id, aviso_id, 90)
+                                                programar_borrado(_chat_id, aviso_id, 25)  # 25s
                                             return  # No enviar nada más al grupo
                                         else:
                                             # ❌ DM falló — usuario no ha hecho /start
@@ -15738,7 +15740,7 @@ def loop_polling():
                                             )
                                             aviso_id = enviar_telegram(aviso, _chat_id)
                                             if aviso_id:
-                                                programar_borrado(_chat_id, aviso_id, 120)
+                                                programar_borrado(_chat_id, aviso_id, 30)  # 30s
                                             return
                                     except Exception as e_dm:
                                         logger.warning(f"⚠️ DM VIP falló para {_user_id}: {e_dm}")
@@ -16003,7 +16005,7 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
             _aviso = f"💬 *{escapar_markdown(nombre)}*, te respondí por privado 📩"
             _aviso_id = enviar_telegram(_aviso, chat_id)
             if _aviso_id:
-                programar_borrado(chat_id, _aviso_id, 90)
+                programar_borrado(chat_id, _aviso_id, 25)  # 25s: aviso breve
         else:
             # DM falló → responder directo en el grupo (más corto)
             _resp_corta = respuesta[:300] + ("..." if len(respuesta) > 300 else "")
