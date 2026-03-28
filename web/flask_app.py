@@ -1277,6 +1277,36 @@ if('serviceWorker' in navigator){{
 </section>
 
 
+<!-- WHY CHOOSE US -->
+<section class="fade-in" style="padding:60px 20px">
+  <div class="section-title" style="margin-bottom:32px">
+    <h2>\U0001f3c6 <span>Por Qu\u00e9 Elegirnos</span></h2>
+    <p>Lo que nos diferencia de otros servicios de se\u00f1ales</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;max-width:1100px;margin:0 auto">
+    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:10px">\U0001f916</div>
+      <h4 style="color:#00ffc8;margin-bottom:8px">IA Real, No Opiniones</h4>
+      <p style="color:var(--text2);font-size:.85rem">Nuestro bot analiza datos reales cada 3 minutos. Sin emociones, sin sesgos — solo datos y algoritmos.</p>
+    </div>
+    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4b0</div>
+      <h4 style="color:#ffd700;margin-bottom:8px">Copy Trading Sin Cuota</h4>
+      <p style="color:var(--text2);font-size:.85rem">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias. Riesgo cero para ti.</p>
+    </div>
+    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4ca</div>
+      <h4 style="color:#00e676;margin-bottom:8px">100% Transparente</h4>
+      <p style="color:var(--text2);font-size:.85rem">Dashboard p\u00fablico con resultados en vivo. Cada operaci\u00f3n visible con entrada, SL, TP y resultado.</p>
+    </div>
+    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:10px">\u26a1</div>
+      <h4 style="color:#a855f7;margin-bottom:8px">Ejecuci\u00f3n Instant\u00e1nea</h4>
+      <p style="color:var(--text2);font-size:.85rem">Las se\u00f1ales se ejecutan en menos de 1 segundo. Sin retrasos, sin slippage. Tu cuenta siempre sincronizada.</p>
+    </div>
+  </div>
+</section>
+
 <!-- SIGNAL PREVIEW -->
 <section style="padding:60px 20px;text-align:center" class="fade-in">
 <div style="max-width:500px;margin:0 auto">

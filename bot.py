@@ -8878,6 +8878,24 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             ]
         }
         return cmd_copy(), _copy_markup
+    # /ia [pregunta] — Análisis IA del mercado
+    if t.startswith("/ia ") or t.startswith("ia "):
+        _ia_pregunta = texto.strip()[3:].strip() if t.startswith("/ia") else texto.strip()[3:].strip()
+        if not _ia_pregunta:
+            return "💡 Escribe tu pregunta. Ejemplo:\n`/ia como va el oro hoy?`\n`/ia analiza el nasdaq`"
+        _ia_resp = _ia_responder(_ia_pregunta, nombre_user)
+        if _ia_resp:
+            return f"🤖 *BuySell365 IA*\n━━━━━━━━━━━━━━\n{_ia_resp}", crear_teclado_principal()
+        return "⚠️ IA no disponible ahora. La cuota se renueva diariamente. Intenta mas tarde.", crear_teclado_principal()
+    if t in ("/ia", "ia"):
+        return ("🤖 *BuySell365 IA*\n━━━━━━━━━━━━━━\n"
+                "Preguntame lo que quieras sobre el mercado:\n\n"
+                "💡 Ejemplos:\n"
+                "• `/ia como va el oro hoy?`\n"
+                "• `/ia analiza el nasdaq`\n"
+                "• `/ia que mercados estan abiertos?`\n"
+                "• `/ia resumen del dia`\n\n"
+                "📊 Tengo datos en vivo de +20 activos."), crear_teclado_principal()
     if t in ("/señales", "/senales", "/operaciones", "/abiertas", "/activas", "activas",
              "señales", "senales", "señales activas", "📊 señales activas"):
         return cmd_senales(), crear_teclado_principal()
@@ -15789,6 +15807,28 @@ PREGUNTA: {pregunta}"""
         return response.text[:1000] if response.text else None
     except Exception as e:
         logger.warning(f"🤖 Gemini error: {e}")
+        # FALLBACK: respuesta basada en datos del bot cuando Gemini falla
+        _lower = pregunta.lower()
+        if any(w in _lower for w in ["como va", "resumen", "estado", "hoy"]):
+            return (
+                f"📊 Resumen del dia:\n"
+                f"💰 Capital: {_capital}\n"
+                f"📈 Win Rate: {_wr}\n"
+                f"📉 Pips netos: {_pips_net:+.1f}\n"
+                f"📡 Ops activas: {_n_ops}\n"
+                f"🤖 Scanner: {'Activo' if not escaneo_pausado else 'Pausado'}\n\n"
+                f"💡 IA Gemini no disponible temporalmente."
+            )
+        elif any(w in _lower for w in ["oro", "gold", "xau"]):
+            _ind_oro = _cache_ind.get("GC=F", {})
+            if _ind_oro:
+                return f"🥇 ORO: RSI={_ind_oro.get('rsi',0):.0f} | ADX={_ind_oro.get('adx',0):.0f} | Precio: {_ind_oro.get('close',0):.2f}"
+            return "🥇 ORO: sin datos disponibles ahora."
+        elif any(w in _lower for w in ["nasdaq", "nq", "us100"]):
+            _ind_nq = _cache_ind.get("NQ=F", {})
+            if _ind_nq:
+                return f"📈 NASDAQ: RSI={_ind_nq.get('rsi',0):.0f} | ADX={_ind_nq.get('adx',0):.0f} | Precio: {_ind_nq.get('close',0):.2f}"
+            return "📈 NASDAQ: sin datos disponibles ahora."
         return None
 
 
