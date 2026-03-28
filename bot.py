@@ -271,6 +271,9 @@ VIP_CHECK_INTERVALO  = 300         # Revisar depósitos cada 5 minutos (segundos
 BINANCE_API_KEY      = os.getenv("BINANCE_API_KEY", "").strip()
 BINANCE_API_SECRET   = os.getenv("BINANCE_API_SECRET", "").strip()
 WISE_API_TOKEN       = os.getenv("WISE_API_TOKEN", "").strip()  # Token solo lectura Wise API
+WISE_IBAN            = os.getenv("WISE_IBAN", "BE09 9673 1557 9257").strip()
+WISE_BIC             = os.getenv("WISE_BIC", "TRWIBEB1XXX").strip()
+WISE_NOMBRE          = os.getenv("WISE_NOMBRE", "Emmanuel Diaz Sánchez").strip()
 
 # ✅ FILTRO DE COSTES (Spread máximo permitido en puntos)
 # Si el spread es mayor a esto, el bot no entrará para proteger el capital.
@@ -6913,23 +6916,24 @@ def _mostrar_instrucciones_pago_wise(chat_id: str, user_id: str, nombre: str, us
     guardar_estado()
 
     precio = _vip_precio_info()["precio"]
-    iban_show = _wise_iban or "Solicítalo a " + ADMIN_USER
     teclado = {"inline_keyboard": [
         [{"text": "❓ AYUDA — " + ADMIN_USER, "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
     ]}
     enviar_telegram(
         "🏦 *PAGO VIP — WISE / TRANSFERENCIA BANCARIA*\n\n"
-        f"💶 Precio: *{precio}€/mes*\n\n"
+        f"💶 Precio: *{precio:.2f}€/mes*\n\n"
         f"📋 *Datos de transferencia:*\n"
-        f"• Nombre: *Emmanuel Diaz*\n"
-        f"• IBAN: `{iban_show}`\n"
+        f"• Beneficiario: `{WISE_NOMBRE}`\n"
+        f"• IBAN: `{WISE_IBAN}`\n"
+        f"• BIC/SWIFT: `{WISE_BIC}`\n"
         f"• Importe: *{precio:.2f} EUR*\n\n"
         f"📝 *IMPORTANTE — Referencia de pago:*\n"
         f"`{ref}`\n\n"
-        f"⚠️ Debes escribir exactamente `{ref}` en el campo\n"
+        f"⚠️ Escribe exactamente `{ref}` en el campo\n"
         f"_Referencia_ o _Concepto_ de tu transferencia.\n\n"
         "✅ _Verificación automática en ~5 min._\n"
         "🌍 _Acepta EUR desde cualquier país (SEPA)_\n"
+        "🇪🇺 _Sin comisiones desde zona SEPA_\n"
         f"_Ayuda: {ADMIN_USER}_",
         chat_id,
         teclado=teclado
