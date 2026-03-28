@@ -15489,10 +15489,14 @@ def loop_polling():
                         
                         # Los canales, admins anónimos y administradores siempre están autorizados
                         _es_admin_anonimo_check = str(from_user.get("id", "")) in ("1087968824", "136817688")
+                        # VIP activo también pasa directo — no se mezcla con usuarios nuevos
+                        es_vip_activo = (user_id in suscripciones_vip
+                                         and suscripciones_vip[user_id].get("entrada_confirmada", False))
                         usuario_no_autorizado = (USERS_AUTORIZADOS and user_id not in USERS_AUTORIZADOS
                                                 and user_id != str(CHANNEL_ID)
                                                 and not es_canal
-                                                and not _es_admin_anonimo_check)
+                                                and not _es_admin_anonimo_check
+                                                and not es_vip_activo)
 
                         # Palabras clave que se responden públicamente en el grupo
                         _t = texto.strip().lower()
@@ -15562,11 +15566,14 @@ def loop_polling():
                                     manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
                                 continue
                             elif (es_grupo or es_canal) and es_tema_publico:
-                                # 📢 Tema público → IA responde en DM, y procesar_mensaje da respuesta en grupo
-                                _procesar_ia_telegram(
+                                # 📢 Tema público → IA en DM + aviso breve en grupo
+                                # Si IA no responde (rate limit) → bienvenida normal
+                                _ia_atendio2 = _procesar_ia_telegram(
                                     texto, chat_id, user_id, nombre_u, es_grupo_publico=True
                                 )
-                                pass  # Continuar a procesar_mensaje normalmente
+                                if not _ia_atendio2:
+                                    manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
+                                continue  # No pasar a procesar_mensaje — evita doble respuesta
                             else:
                                 # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
                                 # Formato: "Sell Gold Now / Target 4447 / Sl 4468" o similar
@@ -15595,11 +15602,18 @@ def loop_polling():
                         def _procesar_en_pool(_texto=texto, _remitente=remitente, _es_admin=es_admin_role,
                                               _chat_id=chat_id, _es_grupo=es_grupo, _es_canal=es_canal,
                                               _usuario_no_autorizado=usuario_no_autorizado,
-                                              _user_id=user_id):
+                                              _user_id=user_id,
+                                              _es_vip=es_vip_activo):
                             try:
                                 res = procesar_mensaje(_texto, _remitente, es_admin=_es_admin)
                                 respuesta = res[0] if isinstance(res, tuple) else res
                                 teclado   = res[1] if isinstance(res, tuple) else None
+
+                                # 👑 VIP en GRUPO → siempre al DM (su mensaje fue auto-borrado, grupo queda limpio)
+                                if _es_vip and _es_grupo and not _es_canal and not _es_admin:
+                                    if respuesta:
+                                        enviar_telegram(respuesta, _user_id, teclado=teclado)
+                                    return
 
                                 # 📢 Detectar si la respuesta contiene info VIP/pago privada
                                 _es_respuesta_vip = respuesta and ("CANAL VIP" in respuesta or "PAGO VIP" in respuesta or "PAGO PENDIENTE" in respuesta or "DIAS GRATIS ACTIVADOS" in respuesta or "TRIAL ACTIVA" in respuesta or "VIP ACTIVO" in respuesta or "VIP PERMANENTE" in respuesta)
@@ -15631,7 +15645,8 @@ def loop_polling():
 
                                 # 📊 En GRUPO: comandos protegidos → TEASER sin detalles (protege info VIP)
                                 # ⚠️ En CANAL (VIP): NO teaser — mostrar contenido COMPLETO (usuarios pagaron)
-                                if _es_cmd_protegido and _es_grupo and not _es_canal:
+                                # ⚠️ VIP en grupo: ya redirigido arriba al DM — esta línea solo aplica a no-VIP
+                                if _es_cmd_protegido and _es_grupo and not _es_canal and not _es_vip:
                                     if _es_cmd_ayuda:
                                         teaser = (
                                             f"👋 *Bienvenido a BuySell365.pro*\n"
@@ -15730,8 +15745,8 @@ def loop_polling():
                                         # Fallback: enviar al grupo con borrado rápido
                                         pass
 
-                                # 📢 Añadir CTA al canal VIP solo en GRUPO (público), NO en canal VIP
-                                if respuesta and _es_grupo and not _es_canal and _usuario_no_autorizado and not _es_respuesta_vip:
+                                # 📢 Añadir CTA al canal VIP solo en GRUPO (público), NO en canal VIP ni a VIPs
+                                if respuesta and _es_grupo and not _es_canal and _usuario_no_autorizado and not _es_respuesta_vip and not _es_vip:
                                     promos_grupo = [
                                         (
                                             f"\n\n━━━━━━━━━━\n"
