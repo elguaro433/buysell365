@@ -15631,6 +15631,18 @@ def loop_polling():
                                 respuesta = res[0] if isinstance(res, tuple) else res
                                 teclado   = res[1] if isinstance(res, tuple) else None
 
+                                # 🤖 IA FALLBACK — si procesar_mensaje no supo responder, IA entra automático
+                                if not respuesta:
+                                    _nombre_fb = directorio_usuarios.get(_user_id, {}).get("nombre", "")
+                                    _es_priv_fb = not (_es_grupo or _es_canal)
+                                    _es_grp_fb  = _es_grupo and not _es_canal
+                                    _procesar_ia_telegram(
+                                        _texto, _chat_id, _user_id, _nombre_fb,
+                                        es_privado=_es_priv_fb,
+                                        es_grupo_publico=_es_grp_fb
+                                    )
+                                    return
+
                                 # 👑 VIP en GRUPO → siempre al DM (su mensaje fue auto-borrado, grupo queda limpio)
                                 if _es_vip and _es_grupo and not _es_canal and not _es_admin:
                                     if respuesta:
