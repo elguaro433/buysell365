@@ -366,6 +366,19 @@ def api_sync():
                         "mt5_status", "active_ops_detail"):
                 if key in data:
                     _store[key] = data[key]
+            # historial_operaciones: merge (dedupe by id or ticker+fecha+hora)
+            if "historial_operaciones" in data:
+                incoming = data["historial_operaciones"]
+                if isinstance(incoming, list) and incoming:
+                    existing = {
+                        f"{h.get('ticker','')}{h.get('fecha','')}{h.get('hora','')}": h
+                        for h in _store.get("historial_operaciones", [])
+                    }
+                    for h in incoming:
+                        k = f"{h.get('ticker','')}{h.get('fecha','')}{h.get('hora','')}"
+                        existing[k] = h
+                    merged = sorted(existing.values(), key=lambda x: (x.get('fecha',''), x.get('hora','')))
+                    _store["historial_operaciones"] = merged[-500:]  # keep last 500
             _store["ultimo_sync"] = time.time()
         _save_store()
         # Return any pending signals for the bot

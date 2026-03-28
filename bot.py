@@ -14558,6 +14558,120 @@ def _procesar_comandos_launcher():
         return None
 
 
+def loop_sync_mt5_real():
+    """Sincroniza el historial real de MT5 con Render cada 60 segundos.
+    Lee los deals cerrados de los últimos 3 días y los sube via /api/sync."""
+    global historial_operaciones
+    print("📡 Loop sync MT5 real iniciado — actualizando dashboard cada 60s")
+    time.sleep(20)  # esperar inicialización
+
+    # Mapa pip_size por símbolo
+    # Divisores de pip — misma convencion que calcular_pips() en bot.py
+    _PIP = {
+        "XAUUSD": 1.0, "GOLD": 1.0,           # ORO: 1 pip = $1 movimiento
+        "US100Cash": 1.0, "US100": 1.0,        # NASDAQ: 1 pip = 1 punto
+        "US500Cash": 1.0, "US500": 1.0,        # S&P 500: 1 pip = 1 punto
+        "DE40Cash": 1.0, "UK100Cash": 1.0,     # DAX / FTSE: 1 pip = 1 punto
+        "USDJPY": 0.01, "GBPJPY": 0.01,        # JPY: 1 pip = 0.01
+        "EURJPY": 0.01, "AUDJPY": 0.01,
+        "EURUSD": 0.0001, "AUDUSD": 0.0001,    # Forex: 1 pip = 0.0001
+        "AUDCAD": 0.0001, "EURCHF": 0.0001,
+        "USDCAD": 0.0001, "GBPUSD": 0.0001,
+    }
+    _NOMBRE = {
+        "XAUUSD": "ORO", "EURUSD": "EUR/USD", "USDJPY": "USD/JPY", "GBPJPY": "GBP/JPY",
+        "AUDUSD": "AUD/USD", "AUDCAD": "AUD/CAD", "EURCHF": "EUR/CHF", "USDCAD": "USD/CAD",
+        "GBPUSD": "GBP/USD", "US100Cash": "NASDAQ", "US500Cash": "S&P 500",
+        "DE40Cash": "DAX", "UK100Cash": "FTSE 100", "US100": "NASDAQ", "US500": "S&P 500",
+    }
+
+    def _pip_size(sym):
+        for k, v in _PIP.items():
+            if k.upper() in sym.upper():
+                return v
+        return 0.01 if "JPY" in sym.upper() else 0.0001
+
+    def _nombre(sym):
+        for k, v in _NOMBRE.items():
+            if k.upper() in sym.upper():
+                return v
+        return sym
+
+    def _extraer_historial_mt5(dias=3):
+        try:
+            import MetaTrader5 as mt5
+            from datetime import datetime, timedelta
+            date_from = datetime.now() - timedelta(days=dias)
+            date_to   = datetime.now() + timedelta(hours=2)
+            deals = mt5.history_deals_get(date_from, date_to)
+            if deals is None or len(deals) == 0:
+                return []
+            # Agrupar por position_id
+            positions = {}
+            for d in deals:
+                pid = d.position_id
+                positions.setdefault(pid, []).append(d)
+            result = []
+            for pid, dl in positions.items():
+                opens  = [d for d in dl if d.entry == 0]
+                closes = [d for d in dl if d.entry == 1]
+                if not opens or not closes:
+                    continue
+                od = opens[0]
+                cd = closes[-1]
+                sym  = od.symbol
+                pip  = _pip_size(sym)
+                tipo = "COMPRA" if od.type == 0 else "VENTA"
+                pips = round(((cd.price - od.price) / pip) if tipo == "COMPRA" else ((od.price - cd.price) / pip), 1)
+                close_dt = datetime.fromtimestamp(cd.time)
+                result.append({
+                    "nombre":        _nombre(sym),
+                    "ticker":        sym,
+                    "tipo":          tipo,
+                    "pips":          pips,
+                    "fecha":         close_dt.strftime("%d/%m/%Y"),
+                    "hora":          close_dt.strftime("%H:%M"),
+                    "precio_entrada": round(od.price, 5),
+                    "precio_salida":  round(cd.price, 5),
+                    "profit_usd":     round(cd.profit, 2),
+                    "fuente":         "mt5_real",
+                })
+            return result
+        except Exception as e:
+            logger.debug(f"loop_sync_mt5_real: error extrayendo deals: {e}")
+            return []
+
+    _ultimo_sync_real = 0
+
+    while True:
+        try:
+            now_t = time.time()
+            if now_t - _ultimo_sync_real >= 60:
+                nuevos = _extraer_historial_mt5(dias=3)
+                if nuevos:
+                    # Merge en historial_operaciones (evitar duplicados por ticker+fecha+hora)
+                    with _lock_ops:
+                        existentes_keys = {
+                            f"{h.get('ticker','')}{h.get('fecha','')}{h.get('hora','')}": True
+                            for h in historial_operaciones
+                        }
+                        added = 0
+                        for h in nuevos:
+                            k = f"{h.get('ticker','')}{h.get('fecha','')}{h.get('hora','')}"
+                            if k not in existentes_keys:
+                                historial_operaciones.append(h)
+                                existentes_keys[k] = True
+                                added += 1
+                        if added > 0:
+                            historial_operaciones.sort(key=lambda x: (x.get('fecha',''), x.get('hora','')))
+                            logger.info(f"📡 MT5 real: +{added} operaciones nuevas añadidas al historial")
+                            guardar_estado()
+                _ultimo_sync_real = now_t
+        except Exception as e:
+            logger.error(f"⚠️ Error en loop_sync_mt5_real: {e}")
+        time.sleep(15)
+
+
 def loop_escaneo():
     """Hilo dedicado al escaneo continuo de SEÑALES."""
     global ultimo_escaneo
@@ -16902,6 +17016,8 @@ def _arrancar_interno():
     _iniciar_hilo("vip",        loop_vip_check)
     _iniciar_hilo("publicidad", loop_publicidad_grupo)
     _iniciar_hilo("publicidad_canal", loop_publicidad_canal)
+    if MT5_AVAILABLE:
+        _iniciar_hilo("mt5_real_sync", loop_sync_mt5_real)
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
     # Signal Copier como subprocess independiente (Telethon necesita su propio event loop limpio)
     _copier_process = None
