@@ -45,9 +45,14 @@ log = logging.getLogger("copier")
 # === SYMBOL MAP ===
 SYMBOL_MAP = {
     "XAUUSD": "GOLD", "GOLD": "GOLD", "ORO": "GOLD",
-    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "NASDAQ100": "US100Cash", "NQ": "US100Cash",
     "US30": "US30Cash", "DOW": "US30Cash", "DJ30": "US30Cash",
     "SPX500": "US500Cash", "SP500": "US500Cash", "US500": "US500Cash",
+    "AUDJPY": "AUDJPY", "NZDJPY": "NZDJPY", "CADJPY": "CADJPY",
+    "EURJPY": "EURJPY", "CHFJPY": "CHFJPY",
+    "GBPUSD": "GBPUSD", "GBPJPY": "GBPJPY", "GBPAUD": "GBPAUD", "GBPNZD": "GBPNZD",
+    "AUDUSD": "AUDUSD", "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
+    "BRENT": "BRENT", "UKOIL": "BRENT", "OIL": "BRENT",
     "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
     "USDJPY": "USDJPY", "EURJPY": "EURJPY", "GBPJPY": "GBPJPY",
@@ -61,49 +66,98 @@ SYMBOL_MAP = {
 MAGIC_COPIER = 20260325
 
 # === PARSER ===
-def parse_signal(text):
-    """Parse trading signal from text. Returns dict or None."""
+def parse_signal(text, chat_title=""):
+    """Parse trading signal from text. Returns dict or None.
+    Soporta formatos: SureShotFX, Learn2Trade VIP.
+    """
     if not text or len(text) < 10:
         return None
 
-    upper = text.upper().replace("\n", " ").replace("  ", " ").replace("/", "").strip()
+    upper = text.upper().replace("\n", " ").replace("  ", " ").strip()
+    # Versión sin slash para búsqueda de pares (AUDJPY, GBPUSD...)
+    upper_noslash = upper.replace("/", "")
 
-    # Skip update/close messages (English + Spanish)
-    # Skip noise messages (info, ads, errors)
+    # ── FILTROS DE RUIDO — ignorar completamente ──
     _ignore_keywords = [
         "SSF COPIER", "SSF TRADE COPIER", "AUTOMATIZACION", "CUPON", "SURESHOTFX.COM",
-        "INVALID PARAMETERS", "INVALID ORDER", "MARKET IS TOO VOLATILE", "RISK SMALL",
+        "INVALID PARAMETERS", "INVALID ORDER", "MARKET IS TOO VOLATILE",
         "GOLD ANALYSIS", "LET'S WAIT", "HOLA MIEMBROS", "HELLO VIP",
         "SL UPDATED", "HIT OUR RISK",
+        "ALGOBOT", "REVOLUTIONARY TRADING", "DAILY PICKS", "MATCHBETS",
+        "BTC DOMINANCE", "ALTCOIN", "ETHEREUM", "BITCOIN",
+        "WEEKLY OUTLOOK", "MARKET OUTLOOK", "RESEARCH DESK",
+        "STAY SHARP", "SIGNALS WILL FOLLOW", "HEY TRADERS",
+        "FAILED TO TRIGGER", "GETTING DELETED", "BECOME INVALID IF NOT TRIGGERED",
+        "FED SPEAKERS", "GEOPOLITICAL", "ECONOMIC DATA",
     ]
     if any(w in upper for w in _ignore_keywords):
         return None
 
-    # Update/close messages (English + Spanish)
+    # ── MENSAJES DE ACTUALIZACIÓN ──
     _update_keywords = [
-        "CLOSE HALF", "CLOSE PARTIAL", "FULL CLOSE", "MOVE SL", "RUNNING", "PIPS PROFIT",
-        "STOP LOSS HIT", "TP HIT", "HIT OUR RISK",
-        "CIERRA LA MITAD", "CIERRE DE LA MITAD", "CIERRE MEDIO", "CIERRE PARCIAL",
-        "MOVER SL", "MOVER EL SL", "MOVIMOS EL SL",
-        "CERRAR COMPLETAMENTE", "EN CURSO CON", "GANANCIA DE",
+        "CLOSE HALF", "CLOSE PARTIAL", "FULL CLOSE", "MOVE SL", "PIPS PROFIT",
+        "STOP LOSS HIT", "TP HIT", "HIT OUR RISK", "PIPS IN PROFIT",
+        "CIERRA LA MITAD", "CIERRE PARCIAL", "MOVER SL", "CERRAR COMPLETAMENTE",
+        "RUNNING WITH", "CURRENTLY RUNNING",
     ]
     if any(w in upper for w in _update_keywords):
-        return _parse_update(text, upper)
+        return _parse_update(text, upper_noslash)
 
-    # Detect direction (including LIMIT orders — treated as market orders)
+    # ── DETECTAR FUENTE ──
+    source = "Externa"
+    chat_lower = chat_title.lower()
+    text_lower = text.lower()
+    if "sureshot" in chat_lower or "ssf" in text_lower:
+        source = "SureShotFX"
+    elif "learn" in chat_lower or "l2t" in text_lower:
+        source = "Learn2Trade"
+
+    # ── DETECTAR DIRECCIÓN ──
+    # Learn2Trade usa ▲▲▲=BUY y ▼▼▼=SELL
     direction = None
-    is_limit = "LIMIT" in upper
-    if any(w in upper for w in ["BUY", "COMPRA", "LONG"]):
+    order_type = "Market"   # Market | Limit | Stop
+    is_limit = False
+
+    # Flechas Learn2Trade
+    arrow_up   = text.count("▲") + text.count("🔺")
+    arrow_down = text.count("▼") + text.count("🔻")
+    if arrow_up > arrow_down:
         direction = "BUY"
-    elif any(w in upper for w in ["SELL", "VENTA", "SHORT"]):
+    elif arrow_down > arrow_up:
         direction = "SELL"
+
+    # "Order type: Buy Limit / Sell Stop / etc."
+    ot_match = re.search(r'ORDER\s*TYPE\s*[:\s]+(BUY|SELL)\s*(LIMIT|STOP|MARKET)?', upper)
+    if ot_match:
+        direction = ot_match.group(1)
+        ot_sub = (ot_match.group(2) or "MARKET").strip()
+        if ot_sub == "LIMIT":
+            order_type = "Limit"
+            is_limit = True
+        elif ot_sub == "STOP":
+            order_type = "Stop"
+        else:
+            order_type = "Market"
+
+    # Fallback: BUY/SELL en el texto
+    if not direction:
+        if any(w in upper_noslash for w in ["BUY", "COMPRA", "LONG"]):
+            direction = "BUY"
+        elif any(w in upper_noslash for w in ["SELL", "VENTA", "SHORT"]):
+            direction = "SELL"
     if not direction:
         return None
 
-    # Detect pair
+    # Si es LIMIT también desde otras menciones
+    if "LIMIT" in upper:
+        is_limit = True
+        if order_type == "Market":
+            order_type = "Limit"
+
+    # ── DETECTAR PAR ──
     pair_found = None
     for alias, mt5_sym in SYMBOL_MAP.items():
-        if re.search(rf'\b{alias}\b', upper):
+        if re.search(rf'\b{alias}\b', upper_noslash):
             pair_found = (alias, mt5_sym)
             break
     if not pair_found:
@@ -111,59 +165,56 @@ def parse_signal(text):
 
     alias, mt5_symbol = pair_found
 
-    # Extract SL and TP (multiple formats)
-    sl_match = re.search(r'(?:SL|STOP\s*LOSS)[:\s]*(\d+\.?\d*)', upper)
-    tp_match = re.search(r'(?:TP|TAKE\s*PROFIT|TARGET)[:\s]*(\d+\.?\d*)', upper)
+    # ── EXTRAER PRECIOS ──
+    # Eliminar símbolos de moneda para parsear números
+    upper_clean = re.sub(r'[$€£]', '', upper)
 
-    # Extract entry price (multiple formats)
-    entry_match = re.search(r'(?:ENTRY\s*PRICE|ENTRADA)[:\s]*(\d+\.?\d*)', upper)
-    if not entry_match:
-        entry_match = re.search(rf'(?:BUY|SELL|COMPRA|VENTA)\s+(?:DE\s+)?(?:{alias}\s+)?(\d+\.?\d*)', upper)
-    if not entry_match:
-        entry_match = re.search(rf'{alias}\s+(?:BUY|SELL|COMPRA|VENTA)\s+(\d+\.?\d*)', upper)
+    sl_match  = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s]+(\d+\.?\d*)', upper_clean)
+    tp_match  = re.search(r'(?:TP\d?|TAKE\s*PROFIT|TARGET)\s*[:\s]+(\d+\.?\d*)', upper_clean)
+    entry_match = re.search(r'(?:ENTRY\s*(?:PRICE)?|ENTRADA)\s*[:\s]+(\d+\.?\d*)', upper_clean)
 
     if not sl_match or not tp_match:
         return None
 
     try:
-        sl = float(sl_match.group(1))
-        tp = float(tp_match.group(1))
-        # Entry price: use from text if available, otherwise 0 (will use market price)
+        sl    = float(sl_match.group(1))
+        tp    = float(tp_match.group(1))
         entry = float(entry_match.group(1)) if entry_match else 0.0
     except (ValueError, IndexError):
         return None
 
     if sl <= 0 or tp <= 0:
         return None
-    # entry=0 es OK — se usará precio de mercado en execute_in_mt5()
 
-    # Detect trader
-    trader = "Desconocido"
-    trader_match = re.search(r'(?:Trade by|Operaci[oó]n de)\s+(\w+)', text, re.IGNORECASE)
-    if trader_match:
-        trader = trader_match.group(1)
+    # ── RRR ──
+    rrr = ""
+    rrr_match = re.search(r'RR+R?\s*[:\s]+(\d+:\d+)', upper)
+    if rrr_match:
+        rrr = rrr_match.group(1)
 
-    # Detect source
-    source = "Externa"
-    text_lower = text.lower()
-    if "sureshot" in text_lower or "ssf" in text_lower:
-        source = "SureShotFX"
-    elif "learn2trade" in text_lower or "l2t" in text_lower:
-        source = "Learn2Trade"
-    elif "jessica" in text_lower:
-        source = "JessicaGold"
+    # ── TIPO DE SWING/SCALP ──
+    style = ""
+    if "SWING" in upper:
+        style = "Swing"
+    elif "SCALP" in upper:
+        style = "Scalp"
+    elif "INTRADAY" in upper:
+        style = "Intraday"
 
     return {
-        "type": "new_signal",
-        "pair": alias,
+        "type":       "new_signal",
+        "pair":       alias,
         "mt5_symbol": mt5_symbol,
-        "direction": direction,
-        "entry": entry,
-        "sl": sl,
-        "tp": tp,
-        "source": source,
-        "trader": trader,
-        "raw": text[:200],
+        "direction":  direction,
+        "order_type": order_type,
+        "is_limit":   is_limit,
+        "entry":      entry,
+        "sl":         sl,
+        "tp":         tp,
+        "rrr":        rrr,
+        "style":      style,
+        "source":     source,
+        "raw":        text[:300],
     }
 
 
@@ -432,30 +483,79 @@ NO digas si aprobar o rechazar. Solo el análisis."""
 
 # === TELEGRAM BOT SEND ===
 def send_to_channel(signal, executed, detail):
-    """Send ONLY new signals to BuySell365 channel. No updates, no closes."""
+    """Envía señales al canal BuySell365 en formato español profesional."""
     import requests
 
-    # Solo enviar señales de apertura — nada de cierres ni updates
     if signal["type"] == "update":
-        return  # No enviar al canal
+        return  # Solo señales de apertura
 
-    _dir = "COMPRA" if signal["direction"] == "BUY" else "VENTA"
-    tipo_emoji = "🟢" if signal["direction"] == "BUY" else "🔴"
-    _entry_display = signal['entry'] if signal['entry'] > 0 else "Mercado"
-    msg = (
-        f"{tipo_emoji} {_dir} {signal['pair']}\n"
-        f"Entrada: {_entry_display}\n"
-        f"SL: {signal['sl']}\n"
-        f"TP: {signal['tp']}"
-    )
+    direction  = signal["direction"]
+    pair       = signal["pair"]
+    entry      = signal["entry"]
+    sl         = signal["sl"]
+    tp         = signal["tp"]
+    source     = signal.get("source", "Externa")
+    order_type = signal.get("order_type", "Market")
+    is_limit   = signal.get("is_limit", False)
+    rrr        = signal.get("rrr", "")
+    style      = signal.get("style", "")
+
+    dir_es    = "COMPRA" if direction == "BUY" else "VENTA"
+    dir_emoji = "🟢" if direction == "BUY" else "🔴"
+    src_emoji = "📡" if source == "SureShotFX" else "🔔"
+
+    # Nombre para mostrar del par
+    pair_display = pair.replace("USDJPY","USD/JPY").replace("AUDJPY","AUD/JPY") \
+                       .replace("GBPJPY","GBP/JPY").replace("EURUSD","EUR/USD") \
+                       .replace("GBPUSD","GBP/USD").replace("NZDUSD","NZD/USD") \
+                       .replace("USDCAD","USD/CAD").replace("USDCHF","USD/CHF") \
+                       .replace("EURJPY","EUR/JPY").replace("CADJPY","CAD/JPY") \
+                       .replace("GBPAUD","GBP/AUD").replace("GBPNZD","GBP/NZD") \
+                       .replace("AUDUSD","AUD/USD").replace("US100Cash","NASDAQ") \
+                       .replace("US500Cash","S&P 500").replace("US30Cash","DOW 30")
+
+    # Tipo de orden en español
+    tipo_es = {"Market": "A Mercado", "Limit": "Orden Límite", "Stop": "Orden Stop"}.get(order_type, order_type)
+
+    # Formato de precios
+    def fmt(v):
+        if v <= 0: return "—"
+        return f"{v:.5f}".rstrip('0').rstrip('.') if v < 100 else f"{v:.2f}"
+
+    entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
+
+    lines = [
+        f"{src_emoji} *SEÑAL COPIADA — {source}*",
+        f"━━━━━━━━━━━━━━━━━━",
+        f"{dir_emoji} *{dir_es} — {pair_display}*",
+        f"📋 Tipo: {tipo_es}" + (f" | {style}" if style else ""),
+        f"",
+        f"📍 Entrada: `{entry_display}`",
+        f"🎯 Take Profit: `{fmt(tp)}`",
+        f"🛡️ Stop Loss: `{fmt(sl)}`",
+    ]
+    if rrr:
+        lines.append(f"⚖️ RRR: {rrr}")
+    if is_limit:
+        lines.append(f"⏰ _Orden Límite — válida 24h_")
+    lines += [
+        f"",
+        f"📊 _Señal procesada por BuySell365 Pro_",
+    ]
+
+    msg = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        resp = requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg}, timeout=10)
+        resp = requests.post(url, json={
+            "chat_id": CHANNEL_ID,
+            "text": msg,
+            "parse_mode": "Markdown"
+        }, timeout=10)
         if resp.status_code == 200:
-            log.info(f"📡 ENVIADO AL CANAL: {msg[:80]}")
+            log.info(f"📡 ENVIADO AL CANAL: {dir_es} {pair_display} ({source})")
         else:
-            log.warning(f"📡 Error enviando al canal: {resp.status_code} {resp.text[:100]}")
+            log.warning(f"📡 Error canal: {resp.status_code} {resp.text[:100]}")
     except Exception as e:
         log.warning(f"Error sending to channel: {e}")
 
@@ -497,7 +597,7 @@ async def main():
                 return
 
             # Parse the signal
-            signal = parse_signal(text)
+            signal = parse_signal(text, chat_title=chat_title)
             if not signal:
                 return
 
