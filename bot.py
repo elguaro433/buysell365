@@ -257,15 +257,15 @@ def _kill_switch_activo() -> bool:
 # ============================================================
 #  CONFIGURACIÓN VIP — SUSCRIPCIONES CON PAGO USDT (BINANCE)
 # ============================================================
-VIP_PRECIO_EUR       = 149         # Precio actual en EUR (lanzamiento 50% OFF)
-VIP_PRECIO_REGULAR   = 299         # Precio regular en EUR
+VIP_PRECIO_USD       = 149         # Precio actual en USD USDT (lanzamiento 50% OFF)
+VIP_PRECIO_REGULAR   = 299         # Precio regular en USD USDT
 VIP_DESCUENTO_HASTA  = "2026-07-30"  # Fecha límite del descuento de lanzamiento
-VIP_PRECIO_POST_DESC = 299         # Precio después del descuento en EUR
-VIP_MONEDA           = "€"         # Símbolo de moneda para mostrar al cliente
+VIP_PRECIO_POST_DESC = 299         # Precio después del descuento en USD USDT
+VIP_MONEDA           = "$"         # Símbolo de moneda USDT para mostrar al cliente
 VIP_WALLET_USDT      = "TEw97pnhpbB9GtrzjnoX6WQy25ost1HUDA"  # Binance USDT TRC20
 VIP_RED              = "TRC20"     # Red de pago
 VIP_DURACION_DIAS    = 30          # Duración de la suscripción en días
-VIP_TRIAL_DIAS       = 7           # 7 días calendario = 5 días hábiles (L-V). NO cambiar.
+VIP_TRIAL_DIAS       = 30          # Duración estándar de suscripción (30 días). NO cambiar.
 VIP_AVISO_DIAS       = 7           # FIX 2026-03-19: Secuencia 7d→3d→1d (antes solo 3d)
 VIP_CHECK_INTERVALO  = 300         # Revisar depósitos cada 5 minutos (segundos)
 BINANCE_API_KEY      = os.getenv("BINANCE_API_KEY", "").strip()
@@ -1742,13 +1742,11 @@ def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 30
     # 📢 Marca de agua publicitaria para el grupo
     if incluir_promo and ADMIN_USER:
         promos = [
-            f"\n\n💎 *¿QUIERES ESTAS SEÑALES EN VIVO?*\nRecibe entradas con alta precision.\n🎁 *Escribe /vip — 5 dias habiles GRATIS + 50% en tu primer mes* 🔥",
-            f"\n\n🚀 *SEÑALES DE TRADING EN TIEMPO REAL*\nAnalisis tecnico automatizado con IA.\n🎁 *Escribe /vip — Prueba 5 dias habiles GRATIS + 50% OFF* 🔥",
-            f"\n\n🔥 *UNETE AL CANAL VIP*\nSenales diarias de Oro, Forex e Indices.\n🎁 *Escribe /vip — 5 dias habiles GRATIS + 50% en tu primer mes* 🔥",
-            # Copy Trading desactivado hasta nuevo aviso
-            # "\n\n🚀 *COPY TRADING DISPONIBLE*\n...",
-            # "\n\n📈 *COPIA NUESTRAS OPERACIONES 24/7*\n...",
-            # "\n\n💰 *COPY TRADING AUTOMATICO*\n..."
+            f"\n\n💎 *¿QUIERES ESTAS SEÑALES EN VIVO?*\nRecibe entradas con alta precision.\n👉 *Escribe /vip — Acceso VIP por solo $149 USDT/mes* 🔥",
+            f"\n\n🚀 *SEÑALES DE TRADING EN TIEMPO REAL*\nAnalisis tecnico automatizado con IA.\n👉 *Escribe /vip — Canal VIP $149 USDT/mes* 🚀",
+            f"\n\n🔥 *UNETE AL CANAL VIP*\nSenales diarias de Oro, Forex e Indices.\n👉 *Escribe /vip — Solo $149 USDT/mes* 💎",
+            f"\n\n📈 *COPY TRADING DISPONIBLE*\nCopia nuestras operaciones automaticamente.\n👉 *Escribe /vip para mas informacion* 🤖",
+            f"\n\n🤖 *COPY TRADING AUTOMATICO 24/7*\nNuestro bot opera por ti sin que hagas nada.\n👉 *Escribe /vip — $149 USDT/mes* 📊",
         ]
         mensaje += random.choice(promos)
         
@@ -1767,7 +1765,7 @@ def notificar_fomo_grupo(nombre: str, tipo: str):
          f"\U0001f4e2 Escribe /vip para recibir todas las se\u00f1ales"),
         (f"*{nombre}* — Operaci\u00f3n en curso\n"
          f"[Dashboard en vivo]({DASHBOARD_URL})\n"
-         f"\U0001f525 Escribe /vip — 5 d\u00edas GRATIS"),
+         f"\U0001f525 Escribe /vip — $149 USDT/mes"),
         (f"*{nombre}* — Se\u00f1al detectada\n"
          f"[Rendimiento en vivo]({DASHBOARD_URL})\n"
          f"\U0001f4b0 Escribe /vip — Se\u00f1ales Premium con IA"),
@@ -6543,7 +6541,7 @@ def _vip_precio_info() -> dict:
 
     if en_descuento:
         return {
-            "precio": VIP_PRECIO_EUR,
+            "precio": VIP_PRECIO_USD,
             "precio_regular": VIP_PRECIO_REGULAR,
             "en_descuento": True,
             "descuento_pct": 50,
@@ -6562,7 +6560,7 @@ def _vip_precio_info() -> dict:
 
 
 def cmd_vip(user_id: str = None):
-    """💎 Muestra info VIP compacta + botón de pago/trial. Precios en EUR."""
+    """💎 Muestra info VIP compacta + botón de pago/trial. Precios en USD USDT."""
     pi = _vip_precio_info()
     precio = pi["precio"]
     M = VIP_MONEDA  # €
@@ -6594,7 +6592,7 @@ def cmd_vip(user_id: str = None):
                     "━━━━━━━━━━\n\n"
                     "👇 Tienes un link para entrar al canal VIP.\n"
                     f"⏰ _Usa el link en las proximas 24h._\n\n"
-                    f"✅ Los *5 dias habiles* empiezan cuando entres.\n"
+                    f"✅ Tu acceso VIP esta activo.\n"
                     f"📌 Intentos restantes: *{intentos_restantes}*"
                 ), {
                     "inline_keyboard": [
@@ -6733,160 +6731,24 @@ def _generar_monto_vip(user_id: str) -> float:
 
 
 def _otorgar_trial_vip(user_id: str, nombre: str, username: str = ""):
-    """Otorga acceso VIP gratuito por VIP_TRIAL_DIAS días (trial inteligente).
-    La trial NO se marca como 'usada' hasta que el usuario entre al canal.
-    Si no entra en 24h, se revoca y puede reintentar (máx 3 intentos)."""
-    global suscripciones_vip, _vip_trials_usados, _trial_intentos
-
-    # 🔒 Verificar si ya agotó intentos o ya usó trial
-    if user_id in _vip_trials_usados:
-        pi = _vip_precio_info()
-        enviar_telegram(
-            "⚠️ *Ya usaste tu prueba gratuita.*\n\n"
-            f"💰 Para acceder al canal VIP, la suscripcion es de *{pi['precio']}{VIP_MONEDA}/mes*.\n"
-            "👉 Escribe /vip para ver las instrucciones de pago.",
-            user_id,
-            teclado={
-                "inline_keyboard": [[
-                    {"text": f"💰 PAGAR {pi['precio']}{VIP_MONEDA}", "callback_data": "vip_pagar_usdt"}
-                ]]
-            }
-        )
-        return
-
-    intentos = _trial_intentos.get(user_id, 0)
-    if intentos >= 3:
-        # Agotó intentos → marcar como usado permanentemente
-        _vip_trials_usados.add(user_id)
-        guardar_estado()
-        pi = _vip_precio_info()
-        enviar_telegram(
-            "⚠️ *Has agotado tus intentos de prueba gratuita.*\n\n"
-            f"💰 Suscribete por *{pi['precio']}{VIP_MONEDA}/mes* → /vip",
-            user_id,
-            teclado={
-                "inline_keyboard": [[
-                    {"text": f"💰 PAGAR {pi['precio']}{VIP_MONEDA}", "callback_data": "vip_pagar_usdt"}
-                ]]
-            }
-        )
-        return
-
-    # BUG-2 FIX: Incrementar intentos ANTES de crear link (previene bypass en 3er intento)
-    _trial_intentos[user_id] = intentos + 1
-    guardar_estado()
-
-    # Si ya tiene trial pendiente de entrada, recordar el link
-    if user_id in suscripciones_vip:
-        sub = suscripciones_vip[user_id]
-        if not sub.get("entrada_confirmada", True):
-            # Ya tiene un link pendiente
-            invite = sub.get("invite_link", "")
-            if invite:
-                enviar_telegram(
-                    "⏳ *Ya tienes un link de trial pendiente.*\n\n"
-                    "👇 Pulsa el boton para entrar al canal VIP.\n"
-                    "_Tienes 24h para usarlo._",
-                    user_id,
-                    teclado={"inline_keyboard": [[
-                        {"text": "👑 ENTRAR AL CANAL VIP", "url": invite}
-                    ]]}
-                )
-                return
-        else:
-            # Ya tiene VIP activo confirmado
-            enviar_telegram(
-                "✅ *Ya tienes acceso VIP activo.*\n"
-                "Escribe /vip para ver tu estado.",
-                user_id
-            )
-            return
-
-    ahora_dt = ahora().replace(tzinfo=None)
-    inicio = ahora_dt.strftime("%Y-%m-%dT%H:%M:%S")
-    # Expira 24h después para el link (el timer real de 5 días hábiles empieza al entrar al canal)
-    link_expira_dt = ahora_dt + timedelta(hours=25)  # 24h + 1h gracia para el link
-
-    # 1. Crear invite link único (expira en 25h, no en 5 días hábiles)
-    invite_link = ""
-    try:
-        expire_unix = int(link_expira_dt.timestamp())
-        r = requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/createChatInviteLink",
-            json={
-                "chat_id": CHANNEL_ID,
-                "expire_date": expire_unix,
-                "member_limit": 1,
-                "name": f"TRIAL-{user_id[-6:]}-{ahora().strftime('%m%d')}"
-            },
-            timeout=15
-        )
-        if r.status_code == 200:
-            invite_link = r.json().get("result", {}).get("invite_link", "")
-            logger.info(f"🔗 Trial invite link creado para {user_id}: {invite_link}")
-        else:
-            logger.error(f"❌ Error creando trial invite link: {r.status_code} {r.text[:200]}")
-    except Exception as e:
-        logger.error(f"❌ Excepción creando trial invite link: {e}")
-
-    # 2. Guardar suscripción como trial PENDIENTE DE ENTRADA
-    # ⚠️ NO se añade a _vip_trials_usados hasta que entre al canal
-    with _lock_ops:
-        suscripciones_vip[user_id] = {
-            "nombre": nombre,
-            "username": username,
-            "inicio": inicio,
-            "expira": inicio,  # Provisional — se recalcula al entrar al canal
-            "aviso_enviado": False,
-            "monto_pagado": 0,
-            "tx_id": "trial_gratis",
-            "invite_link": invite_link,
-            "es_trial": True,
-            "entrada_confirmada": False,  # 🔑 PENDIENTE DE ENTRADA
+    """No se otorgan trials gratuitos. Redirige al pago VIP."""
+    pi = _vip_precio_info()
+    enviar_telegram(
+        "💎 *ACCESO VIP — CANAL PREMIUM*\n"
+        "━━━━━━━━━━\n\n"
+        f"📊 Señales diarias con Entry, SL y TP exactos.\n"
+        f"🤖 Copy Trading automatico 24/7.\n"
+        f"📈 Analisis IA con Groq Llama.\n\n"
+        f"💰 Precio: *{pi['precio']}{VIP_MONEDA} USDT/mes*\n\n"
+        "👇 Escribe /vip para ver instrucciones de pago.",
+        user_id,
+        teclado={
+            "inline_keyboard": [[
+                {"text": f"💰 PAGAR {pi['precio']}{VIP_MONEDA} USDT", "callback_data": "vip_pagar_usdt"}
+            ]]
         }
-        # BUG-2: intentos ya incrementado arriba antes de crear link
-    guardar_estado()
-
-    log_vip(f"🎁 TRIAL CREADO: {nombre} (@{username}) ID:{user_id} | Intento:{intentos+1}/3 | Link:{'OK' if invite_link else 'ERROR'} | Pendiente de entrada")
-
-    # 3. Enviar link al usuario
-    if invite_link:
-        enviar_telegram(
-            f"🎁 *5 DIAS HABILES GRATIS*\n"
-            f"━━━━━━━━━━\n\n"
-            f"👇 Pulsa el boton para entrar al canal VIP.\n"
-            f"⏰ _Tienes 24 horas para usar este link._\n\n"
-            f"✅ Los *5 dias habiles* empiezan cuando entres.\n"
-            f"📊 _Senales IA con Entry, SL y TP exactos._",
-            user_id,
-            teclado={
-                "inline_keyboard": [[
-                    {"text": "👑 ENTRAR AL CANAL VIP", "url": invite_link}
-                ]]
-            }
-        )
-    else:
-        enviar_telegram(
-            "✅ *TRIAL LISTO*\n\n"
-            "Hubo un problema generando el enlace.\n"
-            f"Contacta a {ADMIN_USER} para recibir tu acceso.",
-            user_id
-        )
-
-    # 4. Notificar al admin
-    admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
-    if admin_id:
-        enviar_telegram(
-            "🎁 *NUEVO TRIAL VIP ACTIVADO*\n"
-            "━━━━━━━━━━\n"
-            f"👤 {nombre} (@{username})\n"
-            f"🆔 ID: `{user_id}`\n"
-            f"📅 Trial: {VIP_TRIAL_DIAS} dias\n"
-            f"🔗 Link: {invite_link or 'Error'}",
-            admin_id
-        )
-
-    logger.info(f"🎁 Trial VIP otorgado a {nombre} ({user_id}) por {VIP_TRIAL_DIAS} dias")
+    )
+    logger.info(f"🔄 Trial redirigido a pago para {nombre} ({user_id})")
 
 
 def _mostrar_instrucciones_pago(chat_id: str, user_id: str, nombre: str, username: str = "", fallback_chat: str = None):
@@ -7215,7 +7077,7 @@ def _revocar_acceso_vip(user_id: str, notificar: bool = True):
         elif era_trial:
             pi = _vip_precio_info()
             enviar_telegram(
-                "⏳ *Tu prueba gratis termino.*\n\n"
+                "⏳ *Tu suscripcion VIP expiro.*\n\n"
                 f"💰 Suscribete por *${pi['precio']}/mes* → /vip",
                 user_id,
                 teclado={
@@ -7759,7 +7621,7 @@ def _procesar_codigo_invitacion(code: str, user_id: str, nombre: str):
         f"🎟️ *CÓDIGO DE INVITACIÓN*\n"
         f"━━━━━━━━━━\n\n"
         f"📋 Código: `{code}`\n"
-        f"⏳ Acceso: *{dias} dias GRATIS*\n\n"
+        f"⏳ Acceso: *{dias} dias*\n\n"
         f"📜 *Condiciones:*\n"
         f"• Servicio de senales educativas.\n"
         f"  _No es asesoria financiera._\n"
@@ -7847,7 +7709,7 @@ def _activar_codigo_invitacion(code: str, user_id: str, nombre: str, username: s
             f"🎉 *CÓDIGO ACTIVADO* ✅\n"
             f"━━━━━━━━━━\n\n"
             f"🎟️ Código: `{code}`\n"
-            f"⏳ Acceso: *{dias} dias GRATIS*\n\n"
+            f"⏳ Acceso: *{dias} dias*\n\n"
             f"👇 *Entra al canal VIP:*\n"
             f"_Tienes 24h para entrar. El timer de {dias} dias empieza cuando entres._",
             user_id,
@@ -9749,7 +9611,7 @@ section{{padding:50px 20px}}
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
     <p data-i18n="hero.subtitle" data-i18n-assets="{_activos_trading}">Se\u00f1ales de trading automatizadas con Inteligencia Artificial, an\u00e1lisis de noticias y datos institucionales. An\u00e1lisis continuo en {_activos_trading} activos de clase mundial.</p>
     <div class="hero-buttons">
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-primary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Unirse GRATIS a Telegram</span></a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-primary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Unirse a Telegram</span></a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
     </div>
     <div class="stats-bar">
@@ -9872,12 +9734,12 @@ section{{padding:50px 20px}}
 <section class="pricing fade-in" id="pricing">
   <div class="section-title">
     <h2>\U0001f4b0 <span data-i18n="pricing.title">Servicios y Planes</span></h2>
-    <p data-i18n="pricing.subtitle">Empieza gratis y escala cuando est\u00e9s listo.</p>
+    <p data-i18n="pricing.subtitle">Accede a señales profesionales de trading.</p>
   </div>
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
     <div class="price-card">
       <div class="price-name" data-i18n="pricing.community">Comunidad</div>
-      <div class="price-amount" data-i18n="pricing.free">GRATIS</div>
+      <div class="price-amount" data-i18n="pricing.free">LIBRE</div>
       <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
         <li data-i18n="pricing.c1">Resumen diario de mercado</li>
@@ -9900,7 +9762,7 @@ section{{padding:50px 20px}}
         <div class="countdown-item"><div class="countdown-val" id="cdMins">--</div><div class="countdown-lbl" data-i18n="countdown.mins">Min</div></div>
         <div class="countdown-item"><div class="countdown-val" id="cdSecs">--</div><div class="countdown-lbl" data-i18n="countdown.secs">Seg</div></div>
       </div>
-      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.trial" data-i18n-days="5">5 d\u00edas h\u00e1biles de prueba GRATIS</p>
+      <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.trial" data-i18n-days="5">$149 USDT / mes</p>
       <ul class="price-list">
         <li data-i18n="pricing.v1">Se\u00f1ales en tiempo real con TP/SL</li>
         <li data-i18n="pricing.v2">Canal VIP privado de Telegram</li>
@@ -9937,7 +9799,7 @@ section{{padding:50px 20px}}
   </div>
   <div class="faq-list">
     <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q1">\u00bfEs realmente gratis unirse?</div>
+      <div class="faq-q" data-i18n="faq.q1">\u00bfC\u00f3mo funciona la suscripci\u00f3n VIP?</div>
       <div class="faq-a" data-i18n="faq.a1">S\u00ed. El grupo p\u00fablico de Telegram es 100% gratuito. Recibes res\u00famenes de mercado, educaci\u00f3n y an\u00e1lisis general. El plan VIP Pro tiene una prueba gratuita de 5 d\u00edas h\u00e1biles sin necesidad de tarjeta de cr\u00e9dito.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
@@ -10619,8 +10481,8 @@ def pagina_terminos():
 
     <h2 data-i18n="terms.s4_title">4. Suscripci&oacute;n VIP</h2>
     <ul>
-        <li data-i18n="terms.s4_trial">Periodo de prueba: 5 d&iacute;as h&aacute;biles gratuitos al registrarse.</li>
-        <li data-i18n="terms.s4_price">Precio: {VIP_PRECIO_EUR} {VIP_MONEDA}/mes (pago en USDT TRC20).</li>
+        <li data-i18n="terms.s4_trial">Acceso VIP mensual: $149 USDT/mes sin periodo de prueba.</li>
+        <li data-i18n="terms.s4_price">Precio: {VIP_PRECIO_USD} {VIP_MONEDA}/mes (pago en USDT TRC20).</li>
         <li data-i18n="terms.s4_renew">Renovaci&oacute;n: Manual. No hay cobros autom&aacute;ticos ni recurrentes.</li>
         <li data-i18n="terms.s4_cancel">Cancelaci&oacute;n: Puedes dejar de pagar en cualquier momento. El acceso contin&uacute;a hasta que expire tu periodo pagado.</li>
         <li data-i18n="terms.s4_refund">Reembolsos: No se ofrecen reembolsos una vez procesado el pago, ya que el servicio digital se activa inmediatamente.</li>
@@ -11201,7 +11063,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> SL y TP autom&aacute;ticos</div>
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
-                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM GRATIS</a>
+                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM</a>
                 <span class="cta-btn" style="background:linear-gradient(135deg,#666,#444);border:none;padding:12px 24px;cursor:not-allowed;opacity:0.6">&#9200; COPY TRADING - PROXIMAMENTE</span>
             </div>
             <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
@@ -13361,7 +13223,7 @@ def enviar_resumen_semanal():
         f"🏆 Mejor senal: *{mejor.get('nombre', '???')}* (+{mejor.get('pips', 0):.1f} pips)\n\n"
         f"━━━━━━━━━━\n"
         f"💎 *¿Quieres recibir estas senales?*\n"
-        f"🎁 Escribe /vip — *5 dias habiles GRATIS*\n\n"
+        f"💎 Escribe /vip — *Canal VIP $149 USDT/mes*\n\n"
         f"⚠️ _No es asesoria financiera. Resultados pasados no garantizan resultados futuros._"
     )
     enviar_grupo(msg, incluir_promo=False)
@@ -14246,7 +14108,7 @@ def _verificar_entradas_pendientes():
             if es_codigo:
                 codigo_txt = sub.get("codigo", "?")
                 enviar_telegram(
-                    f"🎉 *ACCESO ACTIVADO — {dias_acceso} DIAS GRATIS*\n"
+                    f"🎉 *ACCESO ACTIVADO — {dias_acceso} DIAS*\n"
                     f"━━━━━━━━━━\n\n"
                     f"🎟️ Código: `{codigo_txt}`\n"
                     f"✅ Ya estas dentro del canal VIP\n"
@@ -14674,31 +14536,20 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     _cooldown_bienvenida[user_id] = _ahora
     username = f"@{user_info.get('username')}" if user_info.get('username') else "Sin @alias"
 
-    # 1. Bienvenida Estratégica con Trial Gratis
-    puede_trial = user_id not in _vip_trials_usados
-
+    # 1. Bienvenida con info de pago VIP
     pi = _vip_precio_info()
     p = pi["precio"]
     desc_label = f" (50% OFF)" if pi["en_descuento"] else ""
 
     bienvenida = f"👋 *Hola {nombre}!* Bienvenido a *BuySell365.pro*\n\n"
 
-    if puede_trial:
-        bienvenida += (
-            f"🎁 *5 DIAS HABILES GRATIS* en nuestro canal VIP:\n"
-            "✅ Senales IA: Oro, Forex, NASDAQ, S&P 500\n"
-            "✅ Entry, SL, TP exactos | Riesgo controlado\n\n"
-            "🚀 *Copy Trading* — copia nuestras operaciones en tu cuenta\n\n"
-            f"Despues: {p}{VIP_MONEDA}/mes{desc_label}. Sin compromiso."
-        )
-    else:
-        bienvenida += (
-            "Canal VIP con senales de alta precision:\n"
-            "✅ Oro, Forex, NASDAQ, S&P 500\n"
-            "✅ Entry, SL, TP exactos\n"
-            "✅ Notificaciones en tiempo real\n\n"
-            f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
-        )
+    bienvenida += (
+        "Canal VIP con senales de alta precision:\n"
+        "✅ Oro, Forex, NASDAQ, S&P 500\n"
+        "✅ Entry, SL, TP exactos\n"
+        "✅ Copy Trading automatico 24/7\n\n"
+        f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
+    )
 
     markup = {
         "inline_keyboard": [
@@ -14782,7 +14633,7 @@ def loop_polling():
             {"command": "precios", "description": "Precios en tiempo real"},
             {"command": "analisis", "description": "Análisis técnico de un activo"},
             {"command": "sentimiento", "description": "Fear & Greed index"},
-            {"command": "vip", "description": "Acceso VIP / Trial gratis"},
+            {"command": "vip", "description": "Acceso VIP premium / $149 USDT"},
             {"command": "web", "description": "Dashboard web"},
             {"command": "ayuda", "description": "Lista de comandos"},
         ]
@@ -14826,9 +14677,9 @@ def loop_polling():
                             "/semana": "📊 Calculando semana...",
                             "/horarios": "🕐 Cargando horarios...",
                             "/vip": "👑 Abriendo VIP...",
-                            "vip_trial_gratis": "🎁 Preparando trial...",
+                            "vip_trial_gratis": "💰 Redirigiendo a pago...",
                             "vip_pagar_usdt": "💰 Cargando pago...",
-                            "vip_trial_confirmar": "✅ Activando trial...",
+                            "vip_trial_confirmar": "💰 Redirigiendo a pago...",
                             "vip_pagar_confirmar": "💳 Procesando pago...",
                         }.get(texto, "⏳ Procesando...")
                         try:
@@ -14986,7 +14837,7 @@ def loop_polling():
                                             f"📊 *{n_ops} operacion{_pl} activa{_pl}*"
                                             f" · 🟢{n_buy} 🔴{n_sell}\n\n"
                                             f"🔒 _Entry, SL y TP disponibles en el canal VIP._\n"
-                                            f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                         )
                                     else:
                                         cb_respuesta = "📭 *Sin operaciones abiertas.* Te aviso cuando haya señal. 📡"
@@ -15004,7 +14855,7 @@ def loop_polling():
                                         f"⚙️ *Bot activo* ✅ · {n_ops} operaciones abiertas\n"
                                         f"📊 Win Rate hoy: *{_wr_e:.0f}%* ({_total_e} señales)\n\n"
                                         f"🔒 _Panel completo en el canal VIP._\n"
-                                        f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                     )
                                 else:
                                     cb_respuesta = cmd_estado()
@@ -15018,7 +14869,7 @@ def loop_polling():
                                         f"Señales: {_total_r} · Win Rate: *{_wr_r:.0f}%*\n"
                                         f"Pips netos: *{_pips_r:+.1f}*\n\n"
                                         f"🔒 _Historial completo en el canal VIP._\n"
-                                        f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                     )
                                 else:
                                     cb_respuesta = cmd_resumen()
@@ -15030,7 +14881,7 @@ def loop_polling():
                                     cb_respuesta = (
                                         f"🔍 *Análisis {activo}* — contenido VIP\n\n"
                                         f"🔒 _Disponible en el canal VIP._\n"
-                                        f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                     )
                                 else:
                                     activo = texto.replace("/analisis_", "").upper()
@@ -15060,7 +14911,7 @@ def loop_polling():
                                         f"📈 *Resumen semanal* — contenido VIP\n"
                                         f"Señales hoy: {_total_r} · WR: *{_wr_r:.0f}%*\n\n"
                                         f"🔒 _Detalles completos en el canal VIP._\n"
-                                        f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                     )
                                 else:
                                     cb_respuesta = cmd_semana()
@@ -15323,7 +15174,7 @@ def loop_polling():
                                             f"👑 *CANAL VIP*\n"
                                             f"   Señales IA · Analisis · Entry/SL/TP\n"
                                             f"   Monitoreo 24/7 · Win Rate en vivo\n\n"
-                                            f"🎁 *Escribe /vip — 5 dias habiles GRATIS* 🚀"
+                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes* 🚀"
                                         )
                                     elif _es_cmd_analisis:
                                         # Extraer nombre del activo del texto
@@ -15333,7 +15184,7 @@ def loop_polling():
                                             f"📊 _Auditoria completa: IA, patrones, metricas,\n"
                                             f"pronostico y lectura del mercado._\n\n"
                                             f"🔒 _Disponible en el canal VIP._\n"
-                                            f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                         )
                                     elif _es_cmd_trades:
                                         with _lock_ops:
@@ -15347,7 +15198,7 @@ def loop_polling():
                                                 f"📊 *{n_ops} operacion{_pl} activa{_pl}*"
                                                 f" · 🟢{n_buy} 🔴{n_sell}\n\n"
                                                 f"🔒 _Entry, SL y TP disponibles en el canal VIP._\n"
-                                                f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                                f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                             )
                                         else:
                                             teaser = "📭 *Sin operaciones abiertas.* Te aviso cuando haya señal. 📡"
@@ -15361,7 +15212,7 @@ def loop_polling():
                                             f"📊 Win Rate hoy: *{_wr_e:.0f}%* ({_total_e} señales)\n\n"
                                             f"🔒 _Panel completo en el canal VIP y la web._\n"
                                             f"🌐 buysell365.pro/dashboard\n"
-                                            f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                         )
                                     else:  # _es_cmd_resumen
                                         _total_r = estadisticas_diarias["ganadas"] + estadisticas_diarias["perdidas"]
@@ -15372,7 +15223,7 @@ def loop_polling():
                                             f"Señales: {_total_r} · Win Rate: *{_wr_r:.0f}%*\n"
                                             f"Pips netos: *{_pips_r:+.1f}*\n\n"
                                             f"🔒 _Historial completo en el canal VIP._\n"
-                                            f"🎁 *Escribe /vip — 5 dias habiles GRATIS*"
+                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
                                         )
                                     msg_id = enviar_telegram(teaser, _chat_id)
                                     if msg_id and (_es_grupo or _es_canal):
@@ -15418,21 +15269,21 @@ def loop_polling():
                                             f"\n\n━━━━━━━━━━\n"
                                             f"💎 *¿Te interesa recibir senales completas?*\n"
                                             f"Canal VIP con entrada, SL y TP exactos.\n"
-                                            f"🎁 *5 dias habiles GRATIS + 50% OFF en el primer mes*\n"
+                                            f"💎 *Canal VIP — $149 USDT/mes — Copy Trading incluido*\n"
                                             f"👉 Escribe /vip"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
                                             f"📊 *Senales IA de alta precision*\n"
                                             f"Oro, Forex, NASDAQ, S&P 500 — Entry, SL, TP.\n"
-                                            f"🎁 *5 dias habiles GRATIS + 50% OFF en el primer mes*\n"
+                                            f"💎 *Canal VIP — $149 USDT/mes — Copy Trading incluido*\n"
                                             f"👉 Escribe /vip"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
                                             f"📊 *SENALES PREMIUM CON IA*\n"
                                             f"Recibe todas las senales en tiempo real.\n"
-                                            f"👉 Escribe /vip — 5 dias GRATIS"
+                                            f"👉 Escribe /vip — Canal VIP $149 USDT/mes"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
