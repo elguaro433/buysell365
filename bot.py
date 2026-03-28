@@ -14179,6 +14179,141 @@ def _verificar_entradas_pendientes():
                 time.sleep(0.5)
 
 
+def loop_publicidad_grupo():
+    """
+    Hilo de publicidad automática en el grupo:
+    - Publica un anuncio rotativo cada PUBLICIDAD_INTERVALO segundos
+    - Borra el anuncio anterior antes de publicar el nuevo
+    - Promueve Copy Trading y el Canal VIP
+    """
+    PUBLICIDAD_INTERVALO = 30 * 60   # 30 minutos entre anuncios
+    PUBLICIDAD_PRIMERA_ESPERA = 5 * 60  # Esperar 5 min al arrancar
+
+    _ultimo_anuncio_id = None   # Message ID del último anuncio enviado
+    _indice_anuncio = 0
+
+    # ── Anuncios rotativos ──
+    ANUNCIOS = [
+        # 1 — Copy Trading principal
+        (
+            "🤖 *COPY TRADING — OPERA EN PILOTO AUTOMÁTICO*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Nuestro bot copia exactamente las mismas operaciones de nuestros analistas,\n"
+            "directamente en tu cuenta MT5 — *sin que hagas nada*.\n\n"
+            "✅ Sin pantallas. Sin estrés. Sin perder señales.\n"
+            "📊 Entry, Stop Loss y Take Profit automáticos.\n"
+            "🌍 Opera Forex, Oro e Índices 24/7.\n"
+            "💰 Comisión solo sobre ganancias reales.\n\n"
+            "👉 *Escribe /vip para más información*",
+            {"inline_keyboard": [[
+                {"text": "🤖 QUIERO COPY TRADING", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "📲 Contactar Admin", "url": "https://t.me/BUYSELL365_PRO_BOT"}
+            ]]}
+        ),
+        # 2 — Canal VIP señales
+        (
+            "💎 *CANAL VIP — SEÑALES CON ENTRADA EXACTA*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Recibe señales profesionales generadas por IA con:\n\n"
+            "📍 *Entry* — precio exacto de entrada\n"
+            "🛡️ *Stop Loss* — protección de capital\n"
+            "🎯 *Take Profit* — objetivo de ganancia\n"
+            "📈 Análisis técnico multi-timeframe\n\n"
+            "💰 Solo *$149 USDT/mes*\n"
+            "📊 Oro, Forex, Índices — 24 horas, 5 días.\n\n"
+            "👉 *Escribe /vip para suscribirte*",
+            {"inline_keyboard": [[
+                {"text": "💎 SUSCRIBIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+            ], [
+                {"text": "🌐 Ver Web", "url": "https://buysell365.pro"}
+            ]]}
+        ),
+        # 3 — Resultados / prueba social
+        (
+            "📈 *RESULTADOS REALES — BUYSELL365 PRO*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏆 Señales con IA: análisis técnico en tiempo real\n"
+            "🤖 Copy Trading: operaciones automáticas en tu cuenta\n"
+            "🌍 Mercados cubiertos: XAU/USD, EUR/USD, GBP/JPY, US100\n"
+            "⚡ Velocidad de ejecución: milisegundos\n\n"
+            "📊 *Suscripción VIP: $149 USDT/mes*\n"
+            "💼 Copy Trading: comisión solo sobre beneficios\n\n"
+            "¿Listo para operar de forma profesional?\n"
+            "👇 Únete ahora",
+            {"inline_keyboard": [[
+                {"text": "🚀 EMPEZAR AHORA", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
+            ]]}
+        ),
+        # 4 — Copy Trading detalle comisión
+        (
+            "💼 *COPY TRADING — SIN RIESGO INICIAL*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🔑 Así funciona nuestro Copy Trading:\n\n"
+            "1️⃣ Conectas tu cuenta MT5 a nuestra red\n"
+            "2️⃣ Nuestro bot replica cada operación en tu cuenta\n"
+            "3️⃣ Pagas solo cuando *tú* generas ganancias\n\n"
+            "✅ Sin mensualidad fija en Copy Trading\n"
+            "✅ Sin señales manuales que seguir\n"
+            "✅ Compatible con cuentas XM, IC Markets y más\n\n"
+            "📲 *Contacta al admin para activar tu Copy Trading*",
+            {"inline_keyboard": [[
+                {"text": "📲 ACTIVAR COPY TRADING", "url": "https://t.me/BUYSELL365_PRO_BOT"}
+            ], [
+                {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+            ]]}
+        ),
+        # 5 — Combo VIP + Copy Trading
+        (
+            "🔥 *DOS SERVICIOS. UN SOLO OBJETIVO: GANAR*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📡 *Canal VIP* — $149 USDT/mes\n"
+            "  └ Señales IA con Entry, SL y TP exactos\n"
+            "  └ Análisis diario de mercados\n"
+            "  └ Alertas de precio en tiempo real\n\n"
+            "🤖 *Copy Trading* — sin mensualidad\n"
+            "  └ Bot replica operaciones en tu MT5\n"
+            "  └ Comisión solo sobre ganancias reales\n"
+            "  └ Funciona 24/7 sin que hagas nada\n\n"
+            "👉 *Escribe /vip para contratar cualquiera de los dos*",
+            {"inline_keyboard": [[
+                {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🤖 COPY TRADING", "url": "https://t.me/BUYSELL365_PRO_BOT"}
+            ]]}
+        ),
+    ]
+
+    time.sleep(PUBLICIDAD_PRIMERA_ESPERA)
+
+    while True:
+        try:
+            if not GROUP_ID:
+                time.sleep(PUBLICIDAD_INTERVALO)
+                continue
+
+            texto, teclado = ANUNCIOS[_indice_anuncio % len(ANUNCIOS)]
+            _indice_anuncio += 1
+
+            # Borrar anuncio anterior
+            if _ultimo_anuncio_id:
+                try:
+                    borrar_mensaje_telegram(GROUP_ID, _ultimo_anuncio_id)
+                except Exception:
+                    pass
+                _ultimo_anuncio_id = None
+
+            # Publicar nuevo anuncio (sin auto-borrado — lo borra el propio loop)
+            nuevo_id = enviar_telegram(texto, destino=GROUP_ID, teclado=teclado)
+            if nuevo_id:
+                _ultimo_anuncio_id = nuevo_id
+                logger.info(f"📢 Publicidad enviada al grupo (msg_id={nuevo_id}, anuncio={(_indice_anuncio-1) % len(ANUNCIOS) + 1}/{len(ANUNCIOS)})")
+
+        except Exception as e:
+            logger.error(f"⚠️ Error en loop_publicidad_grupo: {e}")
+
+        time.sleep(PUBLICIDAD_INTERVALO)
+
+
 def loop_vip_check():
     """
     Hilo de verificación VIP:
@@ -16597,12 +16732,13 @@ def _watchdog():
     """
     time.sleep(90)  # Esperar a que arranquen todos
     _target_map = {
-        "scanner": loop_escaneo,
-        "monitor": loop_monitor_alta_frecuencia,
-        "polling": loop_polling,
-        "health":  loop_health_check,
-        "vip":     loop_vip_check,
-        "delete_sched": _hilo_borrado_scheduler,  # M-FIX: Monitorear hilo de borrado
+        "scanner":    loop_escaneo,
+        "monitor":    loop_monitor_alta_frecuencia,
+        "polling":    loop_polling,
+        "health":     loop_health_check,
+        "vip":        loop_vip_check,
+        "publicidad": loop_publicidad_grupo,
+        "delete_sched": _hilo_borrado_scheduler,
     }
     while True:
         try:
@@ -16752,11 +16888,12 @@ def _arrancar_interno():
         print("☁️ BuySell365 Pro — Web-Cloud iniciado...")
 
     # ── INICIAR TODOS LOS HILOS (registrados para watchdog) ──
-    _iniciar_hilo("scanner", loop_escaneo)
-    _iniciar_hilo("monitor", loop_monitor_alta_frecuencia)
-    _iniciar_hilo("polling", loop_polling)
-    _iniciar_hilo("health",  loop_health_check)
-    _iniciar_hilo("vip",     loop_vip_check)
+    _iniciar_hilo("scanner",    loop_escaneo)
+    _iniciar_hilo("monitor",    loop_monitor_alta_frecuencia)
+    _iniciar_hilo("polling",    loop_polling)
+    _iniciar_hilo("health",     loop_health_check)
+    _iniciar_hilo("vip",        loop_vip_check)
+    _iniciar_hilo("publicidad", loop_publicidad_grupo)
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
     # Signal Copier como subprocess independiente (Telethon necesita su propio event loop limpio)
     _copier_process = None
