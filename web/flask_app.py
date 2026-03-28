@@ -989,7 +989,7 @@ if('serviceWorker' in navigator){{
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-vars='{{"ops":"{n_ops}"}}'>{'Bot activo' if is_alive else 'Dashboard Online'} \u2014 {n_ops} operaciones en vivo</span></div>
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
-    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial y canales VIP aliados. Forex, Oro e \u00cdndices \u2014 m\u00e1s de 20 activos en tiempo real, 24/5.</p>
+    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial. Forex, Oro e \u00cdndices \u2014 m\u00e1s de 20 activos analizados en tiempo real, 24/5.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f451 Ver Planes y Servicios</a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
@@ -1121,7 +1121,7 @@ if('serviceWorker' in navigator){{
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\u26a1</div>
       <h3 data-i18n="features.mt5.title">Ejecuci\u00f3n Autom\u00e1tica</h3>
-      <p data-i18n="features.mt5.desc">Conexi\u00f3n directa a MetaTrader 5. Las \u00f3rdenes se ejecutan en menos de 1 segundo con Stop Loss y hasta 3 niveles de ganancia autom\u00e1ticos.</p>
+      <p data-i18n="features.mt5.desc">Conexi\u00f3n directa a MetaTrader 5. Las \u00f3rdenes se ejecutan en milisegundos con Stop Loss y TP autom\u00e1ticos.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon blue">\U0001f6e1\ufe0f</div>
@@ -1261,7 +1261,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q2">\u00bfC\u00f3mo recibo las se\u00f1ales?</div>
-      <div class="faq-a" data-i18n="faq.a2">Las se\u00f1ales se env\u00edan directamente a tu Telegram en tiempo real. Cada se\u00f1al incluye: activo, direcci\u00f3n (compra/venta), precio de entrada, Stop Loss y hasta 3 Take Profits.</div>
+      <div class="faq-a" data-i18n="faq.a2">Las se\u00f1ales se env\u00edan directamente a tu Telegram en tiempo real. Cada se\u00f1al incluye: activo, direcci\u00f3n (compra/venta), precio de entrada, TP y Stop Loss exactos.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q3">\u00bfNecesito experiencia en trading?</div>
