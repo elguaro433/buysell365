@@ -15545,6 +15545,9 @@ def loop_polling():
                             # VIP y canal
                             "vip", "canal", "premium", "suscripcion", "membresia",
                             "unirme", "pagar", "acceso", "prueba", "gratis", "trial", "probar",
+                            # Copy Trading — respuesta pública directa en el grupo
+                            "copy", "copytrading", "copy trading", "copiar", "copio",
+                            "copy trading", "copiar operaciones", "quiero copiar",
                             # Saludos y ayuda
                             "hola", "buenos", "buenas", "ayuda", "help",
                             # Herramientas
@@ -15585,10 +15588,13 @@ def loop_polling():
                             usuario_no_autorizado = False
 
                         if usuario_no_autorizado:
-                            if es_grupo or es_canal:
-                                # 📢 TODO mensaje de usuario en grupo → redirigir al chat privado
+                            if (es_grupo or es_canal) and not es_tema_publico:
+                                # 📢 Mensaje sin tema público → redirigir al chat privado
                                 manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
                                 continue
+                            elif (es_grupo or es_canal) and es_tema_publico:
+                                # 📢 Tema público (copy, vip, señales...) → responder directo en el grupo
+                                pass  # Continuar a procesar_mensaje normalmente
                             else:
                                 # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
                                 # Formato: "Sell Gold Now / Target 4447 / Sl 4468" o similar
