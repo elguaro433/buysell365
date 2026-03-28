@@ -697,6 +697,7 @@ def guardar_estado():
                 "alertas_precio": alertas_precio,
                 "modo_riesgo": MODO_RIESGO,
                 "capital_usuario": CAPITAL_USUARIO,
+                "mt5_login": os.getenv("MT5_LOGIN", ""),
                 "activos_desactivados": list(activos_desactivados),
                 "historial_operaciones": historial_operaciones,
                 "estadisticas_diarias": estadisticas_diarias,
@@ -713,7 +714,6 @@ def guardar_estado():
                 "mt5_pausado": mt5_pausado,
                 "mt5_solo_premium": mt5_solo_premium,
                 "escaneo_pausado": escaneo_pausado,
-                "scalper_activo": SCALPER_ACTIVO,
                 # H-07 FIX: Persistir cooldowns de cierres (keys son tuples → convertir a strings)
                 "_cooldown_cierres": {f"{k[0]}|{k[1]}": v for k, v in _cooldown_cierres.items()},
                 # FIX 2026-03-19: Diagnóstico por activo para consola
@@ -857,14 +857,11 @@ def cargar_estado():
                     if isinstance(urd, str):
                         _ultimo_reporte_diario = urd
 
-                    # Cargar mt5_pausado, mt5_solo_premium, escaneo_pausado, SCALPER_ACTIVO
-                    global mt5_pausado, mt5_solo_premium, escaneo_pausado, SCALPER_ACTIVO
+                    # Cargar mt5_pausado, mt5_solo_premium, escaneo_pausado
+                    global mt5_pausado, mt5_solo_premium, escaneo_pausado
                     mt5_pausado = bool(data.get("mt5_pausado", False))
                     mt5_solo_premium = bool(data.get("mt5_solo_premium", False))
                     escaneo_pausado = bool(data.get("escaneo_pausado", False))
-                    if "scalper_activo" in data:
-                        SCALPER_ACTIVO = bool(data["scalper_activo"])
-
                     # H-07 FIX: Cargar cooldowns de cierres (keys guardadas como "ticker|tipo")
                     _cd_data = data.get("_cooldown_cierres")
                     if isinstance(_cd_data, dict):
@@ -4595,7 +4592,7 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     _estrategia = ind.get('estrategia', '')
     _estr_map = {
         'breakout': '💥 Breakout', 'reversal': '🔄 Reversal', 'momentum': '🚀 Momentum',
-        'scalper': '⚡ Scalper', 'copier': '📡 Copier'
+        'copier': '📡 Copier'
     }
     _estr_txt = _estr_map.get(_estrategia, '')
 
@@ -7414,17 +7411,15 @@ def cmd_reanudar():
 
 
 def cmd_pausar_todo():
-    """Pausa TODO: scanner premium, scalper y ejecución MT5."""
-    global mt5_pausado, escaneo_pausado, SCALPER_ACTIVO
+    """Pausa TODO: scanner premium y ejecución MT5."""
+    global mt5_pausado, escaneo_pausado
     mt5_pausado = True
     escaneo_pausado = True
-    SCALPER_ACTIVO = False
     guardar_estado()
-    log_sistema("🛑 PAUSA TOTAL activada por admin — scanner, scalper y MT5 detenidos")
+    log_sistema("🛑 PAUSA TOTAL activada por admin — scanner y MT5 detenidos")
     return (
         "🛑 *TODO PAUSADO*\n\n"
         "⏸️ Scanner Premium — DETENIDO\n"
-        "⏸️ Scalper — DETENIDO\n"
         "⏸️ MT5 — NO ejecuta ordenes\n\n"
         "📌 Las posiciones abiertas se mantienen.\n"
         "No se abren operaciones nuevas.\n\n"
@@ -7433,17 +7428,15 @@ def cmd_pausar_todo():
 
 
 def cmd_reanudar_todo():
-    """Reanuda TODO: scanner premium, scalper y ejecución MT5."""
-    global mt5_pausado, escaneo_pausado, SCALPER_ACTIVO
+    """Reanuda TODO: scanner premium y ejecución MT5."""
+    global mt5_pausado, escaneo_pausado
     mt5_pausado = False
     escaneo_pausado = False
-    SCALPER_ACTIVO = True
     guardar_estado()
     log_sistema("▶️ PAUSA TOTAL desactivada por admin — todo reactivado")
     return (
         "▶️ *TODO ACTIVO*\n\n"
         "🟢 Scanner Premium — ACTIVO\n"
-        "🟢 Scalper — ACTIVO\n"
         "🟢 MT5 — Ejecutando ordenes\n\n"
         "⏸️ Escribe `pausar todo` para detener todo"
     )
@@ -8732,7 +8725,7 @@ def respuesta_fallback_inteligente(texto: str, activo_detectado: str, intencion_
 
 def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     """Interpreta el mensaje con lenguaje natural y responde de forma conversacional."""
-    global SCALPER_ACTIVO, mt5_pausado, escaneo_pausado
+    global mt5_pausado, escaneo_pausado
     t = texto.strip().lower()
     
     # 👤 Obtener nombre del usuario para personalizar
@@ -8864,10 +8857,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "🔧 *COMANDOS DE ADMINISTRADOR*\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
             "⏸️ *Control del bot:*\n"
-            "• `/pausar` — Pausa total (señales+scalper+MT5)\n"
+            "• `/pausar` — Pausa total (señales+MT5)\n"
             "• `/reanudar` — Reactiva todo\n"
-            "• `/pausar scalper` — Solo pausar scalper\n"
-            "• `/play scalper` — Reactivar scalper\n"
             "• `/reiniciar` — Reiniciar proceso\n"
             "• `/apagar` — Apagar bot\n"
             "• `/reset` — Reset stats diarias\n\n"
@@ -8884,22 +8875,19 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "• `/activar [activo]` — Activar escaneo\n"
             "• `/desactivar [activo]` — Desactivar escaneo\n"
             "• `/capital [monto]` — Cambiar capital base\n"
-            "• `/scalper` — Estado del scalper\n"
             "• `/logs` — Últimas líneas del log\n"
             "• `/briefing` — Enviar briefing al grupo"
         )
-    # 🛑 /pausar — Pausa TOTAL: detiene señales, scalper y ejecuciones MT5
+    # 🛑 /pausar — Pausa TOTAL: detiene señales y ejecuciones MT5
     if t in ("/pausar", "/pause", "pausar", "pausar todo", "stop trading"):
         if not es_admin: return "⛔ Solo administradores pueden pausar el bot."
         global mt5_pausado, escaneo_pausado
         mt5_pausado = True
         escaneo_pausado = True
-        SCALPER_ACTIVO = False
         guardar_estado()
         log_sistema("🛑 PAUSA TOTAL activada desde Telegram")
         return ("🛑 *PAUSA TOTAL ACTIVADA*\n\n"
                 "• Señales Premium: ⏸️ pausadas\n"
-                "• Scalper: ⏸️ pausado\n"
                 "• Ejecuciones MT5: ⏸️ pausadas\n\n"
                 "Las operaciones abiertas siguen activas.\n"
                 "Usa /reanudar para reactivar todo.")
@@ -8909,12 +8897,10 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         if not es_admin: return "⛔ Solo administradores pueden reanudar el bot."
         mt5_pausado = False
         escaneo_pausado = False
-        SCALPER_ACTIVO = True
         guardar_estado()
         log_sistema("▶️ TODO REACTIVADO desde Telegram")
         return ("▶️ *TODO REACTIVADO*\n\n"
                 "• Señales Premium: ✅ activas\n"
-                "• Scalper: ✅ activo\n"
                 "• Ejecuciones MT5: ✅ activas\n\n"
                 "El bot vuelve a operar normalmente.")
 
@@ -9050,20 +9036,6 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         if not es_admin: return "⛔ Solo administradores."
         return cmd_reanudar_todo()
 
-    # ── Scalper control ──
-    if t in ("/pausar scalper", "pausar scalper", "/stop scalper", "stop scalper",
-             "/scalper stop", "scalper stop", "/scalper pausar", "scalper pausar"):
-        if not es_admin: return "⛔ Solo administradores."
-        return _cmd_scalper_pausar()
-
-    if t in ("/play scalper", "play scalper", "/scalper play", "scalper play",
-             "/continuar scalper", "continuar scalper", "/scalper on", "scalper on",
-             "/start scalper", "start scalper", "/reanudar scalper", "reanudar scalper"):
-        if not es_admin: return "⛔ Solo administradores."
-        return _cmd_scalper_reanudar()
-
-    if t in ("/scalper", "/scalper estado", "scalper estado", "scalper status"):
-        return _cmd_scalper_estado()
 
     # ── 2. COMANDOS CON PARÁMETRO ─────────────────────────────
     if t.startswith("/precio "):
@@ -14601,7 +14573,7 @@ def _cerrar_operacion_manual(op_key):
 
 def _procesar_comandos_launcher():
     """Lee y ejecuta comandos del launcher via .bot.cmd"""
-    global SCALPER_ACTIVO, escaneo_pausado, mt5_pausado
+    global escaneo_pausado, mt5_pausado
     if not os.path.exists(_CMD_FILE):
         return None
     try:
@@ -14611,27 +14583,17 @@ def _procesar_comandos_launcher():
         if not cmd:
             return None
         log_sistema(f"📩 Comando del launcher: {cmd}")
-        if cmd == "scalper_pause":
-            SCALPER_ACTIVO = False
-            guardar_estado()
-            print("🔪 Scalper PAUSADO por consola")
-        elif cmd == "scalper_resume":
-            SCALPER_ACTIVO = True
-            guardar_estado()
-            print("🔪 Scalper REANUDADO por consola")
-        elif cmd == "force_scan":
+        if cmd == "force_scan":
             print("🔍 Escaneo inmediato solicitado por consola")
             return "force_scan"
         elif cmd == "pause_all":
             mt5_pausado = True
             escaneo_pausado = True
-            SCALPER_ACTIVO = False
             guardar_estado()
             print("🛑 PAUSA TOTAL por consola")
         elif cmd == "resume_all":
             mt5_pausado = False
             escaneo_pausado = False
-            SCALPER_ACTIVO = True
             guardar_estado()
             print("▶️ TODO REACTIVADO por consola")
         elif cmd.startswith("close_op:"):
@@ -14653,7 +14615,7 @@ def loop_escaneo():
     _errores_consecutivos = 0
 
     while True:
-        # 📩 Procesar comandos del launcher (scalper pause, force scan, etc.)
+        # 📩 Procesar comandos del launcher (force scan, pause, etc.)
         _launcher_cmd = _procesar_comandos_launcher()
         _forzar_escaneo = (_launcher_cmd == "force_scan")
 
@@ -15527,49 +15489,6 @@ def loop_polling():
             time.sleep(_backoff)
             _backoff = min(_backoff * 2, _max_backoff)
 
-# ── Comandos Telegram del Scalper ──
-
-def _cmd_scalper_pausar():
-    """Pausa el scalper desde Telegram."""
-    global SCALPER_ACTIVO
-    SCALPER_ACTIVO = False
-    print("🔪 Scalper PAUSADO por comando Telegram")
-    return "🔪 *Scalper PAUSADO* ⏸️\n\nEl scalper no abrirá nuevas posiciones.\nPosiciones abiertas se seguirán gestionando.\n\n📌 Para reanudar: `play scalper`"
-
-def _cmd_scalper_reanudar():
-    """Reanuda el scalper desde Telegram."""
-    global SCALPER_ACTIVO
-    SCALPER_ACTIVO = True
-    print("🔪 Scalper REANUDADO por comando Telegram")
-    return "🔪 *Scalper ACTIVO* ▶️\n\nEl scalper está buscando señales de nuevo.\n\n📌 Para pausar: `pausar scalper`"
-
-def _cmd_scalper_estado():
-    """Muestra estado del scalper."""
-    estado = "✅ ACTIVO" if SCALPER_ACTIVO else "⏸️ PAUSADO"
-    pos_abiertas = 0
-    try:
-        if MT5_AVAILABLE:
-            with _lock_mt5:
-                positions = mt5.positions_get()
-            if positions:
-                pos_abiertas = sum(1 for p in positions if p.magic == SCALPER_MAGIC)
-    except:
-        pass
-
-    return (
-        f"🔪 *Scalper Silencioso — Estado*\n\n"
-        f"▪️ Estado: {estado}\n"
-        f"▪️ Trades hoy: {_scalper_trades_hoy}\n"
-        f"▪️ Posiciones abiertas: {pos_abiertas}\n"
-        f"▪️ P&L diario: ${_scalper_pnl_diario:+.2f}\n"
-        f"▪️ Pérdidas seguidas: {_scalper_perdidas_consecutivas}\n"
-        f"▪️ Lote: Mínimo del broker (bajo riesgo)\n"
-        f"▪️ Estrategia: BB(20,2) + RSI(7) M5\n\n"
-        f"📌 Comandos:\n"
-        f"`pausar scalper` — Detener\n"
-        f"`play scalper` — Reanudar\n"
-        f"`/scalper` — Ver estado"
-    )
 
 # ============================================================
 #  🤖 IA ASISTENTE — Gemini AI para respuestas inteligentes
@@ -16047,99 +15966,90 @@ PAR_PROFILES = {
     # ━━━━ EURUSD — Multi-TF mean reversion scalp + premium breakout ━━━━
     "EURUSD": {
         "identity": {"mt5": "EURUSD", "yf": "EURUSD=X", "display": "EUR/USD", "category": "forex", "currencies": ["EUR", "USD"], "pip_size": 0.0001},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 50},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
-    # ━━━━ GOLD — Momentum breakout, SELL only scalper, London open ━━━━
+    # ━━━━ GOLD — Momentum breakout, London open ━━━━
     "GOLD": {
         "identity": {"mt5": "GOLD", "yf": "GC=F", "display": "ORO", "category": "commodity", "currencies": ["USD"], "pip_size": 0.01},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 200},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ US500 (S&P 500) — Mean reversion + momentum, solo premium ━━━━
     "US500Cash": {
         "identity": {"mt5": "US500Cash", "yf": "ES=F", "display": "S&P 500", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 40, "rsi_ob": 60, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.5, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 300},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 8.0},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ USDJPY — Carry trade + trend following, Tokyo + NY ━━━━
     "USDJPY": {
         "identity": {"mt5": "USDJPY", "yf": "USDJPY=X", "display": "USD/JPY", "category": "forex", "currencies": ["USD", "JPY"], "pip_size": 0.01},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.003, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": 60, "rsi_gate_sell": 40, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 80},
         "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ GBPJPY — "The Beast", London breakout, alta volatilidad ━━━━
     "GBPJPY": {
         "identity": {"mt5": "GBPJPY", "yf": "GBPJPY=X", "display": "GBP/JPY", "category": "forex", "currencies": ["GBP", "JPY"], "pip_size": 0.01},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 70, "adx_min": 18, "bb_squeeze": 0.012, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": 20, "rev4_allowed": True},
         "risk": {"risk_pct": 0.004, "max_sl_pips": 150},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.8, "tp2_mult": 2.5, "tp3_mult": 3.5, "ze_mult": 0.3, "min_sl": 0.200},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["GBP", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ AUDCAD — Fibonacci range trading, Asian + London ━━━━
     "AUDCAD": {
         "identity": {"mt5": "AUDCAD", "yf": None, "display": "AUD/CAD", "category": "forex", "currencies": ["AUD", "CAD"], "pip_size": 0.0001},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
         "sl_tp": {},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["AUD", "CAD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ EURCHF — Mean reversion SNB, baja volatilidad, London ━━━━
     "EURCHF": {
         "identity": {"mt5": "EURCHF", "yf": None, "display": "EUR/CHF", "category": "forex", "currencies": ["EUR", "CHF"], "pip_size": 0.0001},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 30},
         "sl_tp": {},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["EUR", "CHF"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ USDCAD — Oil correlation + Fibonacci, NY session ━━━━
     "USDCAD": {
         "identity": {"mt5": "USDCAD", "yf": None, "display": "USD/CAD", "category": "forex", "currencies": ["USD", "CAD"], "pip_size": 0.0001},
-        "scalper": {"enabled": False, "strategies": []},
         "premium": {"enabled": False},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 40},
         "sl_tp": {},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4], "scalper_horario": (0, 24)},
+        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD", "CAD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
@@ -16160,48 +16070,6 @@ def get_par_profile(ticker=None, mt5_symbol=None):
         return _PROFILE_BY_MT5.get(mt5_symbol)
     return None
 
-# ── Auto-generate SCALPER_ACTIVOS from PAR_PROFILES (backward compat) ──
-SCALPER_ACTIVOS = {}
-for _pp_key, _pp_val in PAR_PROFILES.items():
-    if _pp_val.get("scalper", {}).get("enabled"):
-        _sc_cfg = _pp_val["scalper"]
-        SCALPER_ACTIVOS[_pp_key] = {
-            "mt5": _pp_val["identity"]["mt5"],
-            "tipo": _pp_val["identity"]["category"],
-            "horario": _pp_val["time_filter"]["scalper_horario"],
-            "max_spread": _sc_cfg["max_spread"],
-            "tp_atr": _sc_cfg["tp_atr"],
-            "sl_atr": _sc_cfg["sl_atr"],
-            "estrategia": _sc_cfg["strategies"][0] if _sc_cfg.get("strategies") else "bb_rsi",
-            "solo_sell": _pp_val["behavior"].get("solo_sell", False),
-            "_profile": _pp_val,
-        }
-
-# Configuración del Scalper
-SCALPER_ACTIVO = False  # Desactivado — no rentable, en revisión
-SCALPER_MAGIC = 20260318  # Magic number para identificar trades del scalper en MT5
-
-# Risk Management del Scalper
-SCALPER_RIESGO_POR_TRADE = 0.008   # 0.8% del capital por trade (demo — equilibrado)
-SCALPER_MAX_LOSS_DIARIO = 0.03     # 3% máximo pérdida diaria → para todo
-SCALPER_MAX_CONSECUTIVAS = 4       # 4 pérdidas seguidas → pausa 30 min
-SCALPER_MAX_POSICIONES = 5         # Máximo 5 posiciones abiertas simultáneas (7 activos)
-SCALPER_TIMEOUT_MINUTOS = 45       # FIX 2026-03-19: 60→45 min para scalping más rápido
-SCALPER_BREAKEVEN_PCT = 0.4        # Mover SL a breakeven al 40% del TP
-SCALPER_INTERVALO = 30             # Segundos entre escaneos (rápido para scalping)
-
-# Estado interno del scalper
-_scalper_pnl_diario = 0.0
-_scalper_perdidas_consecutivas = 0
-_scalper_pausa_hasta = None
-_scalper_trades_hoy = 0
-_scalper_posiciones = {}  # {ticket: {symbol, tipo, entrada, sl, tp, tiempo}}
-_lock_scalper = threading.Lock()
-
-# FIX 2026-03-20: Cooldown por dirección después de pérdida
-# {symbol_tipo: timestamp_hasta} — ej: {"EURUSD_BUY": 1711000000}
-_scalper_cooldown_direccion: dict = {}
-SCALPER_COOLDOWN_MINUTOS = 30  # No repetir misma dirección en 30 min tras pérdida
 
 # ============================================================
 #  MEJORAS ESTRATÉGICAS v4 — 10 módulos de optimización
@@ -16511,23 +16379,7 @@ def _trailing_stop_dinamico(posicion, precio_actual, indicadores):
     tipo = posicion.get('tipo', '')
     entrada = posicion.get('entrada', 0)
     sl_actual = posicion.get('sl', 0)
-    es_scalper = posicion.get('estrategia', '') in ('scalper_bb_rsi', 'scalper_fibonacci')
-
     es_compra = tipo.upper() in ("COMPRA", "BUY", "LONG")
-
-    if es_scalper:
-        # Scalper: trail con EMA9 (si disponible)
-        ema9 = indicadores.get('ema9', 0)
-        if ema9 > 0:
-            if es_compra:
-                nuevo_sl = ema9 - atr * 0.3  # EMA9 - 30% ATR buffer
-                if nuevo_sl > sl_actual and nuevo_sl < precio_actual:
-                    return nuevo_sl
-            else:
-                nuevo_sl = ema9 + atr * 0.3
-                if nuevo_sl < sl_actual and nuevo_sl > precio_actual:
-                    return nuevo_sl
-        return None
 
     # Determinar multiplicador ATR por volatilidad
     if adx > 35:
@@ -16867,702 +16719,6 @@ def _auto_optimizar_semanal():
         logger.error(f"🔧 Error en auto-optimización semanal: {e}")
 
 
-def _scalper_descargar_m5(mt5_symbol):
-    """Descarga 500 velas M5 desde MT5 para un símbolo."""
-    try:
-        with _lock_mt5:
-            mt5.symbol_select(mt5_symbol, True)
-            rates = mt5.copy_rates_from_pos(mt5_symbol, mt5.TIMEFRAME_M5, 0, 500)
-        if rates is not None and len(rates) > 100:
-            df = pd.DataFrame(rates)
-            df['datetime'] = pd.to_datetime(df['time'], unit='s')
-            df.set_index('datetime', inplace=True)
-            df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'tick_volume': 'Volume'}, inplace=True)
-            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            return df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
-    except Exception as e:
-        logger.warning(f"⚠️ Scalper: Error descargando M5 {mt5_symbol}: {e}")
-    return None
-
-
-def _scalper_calcular_indicadores(df, profile=None):
-    """Calcula indicadores para scalping M5 con parámetros del perfil."""
-    try:
-        _sc = profile["scalper"] if profile else {}
-        _rsi_p = _sc.get("rsi_period", 7)
-        _bb_p = _sc.get("bb_period", 20)
-        _bb_s = _sc.get("bb_std", 2.0)
-        _adx_p = _sc.get("adx_period", 10)
-
-        close = pd.Series(df['Close'].values, dtype=float)
-        high = pd.Series(df['High'].values, dtype=float)
-        low = pd.Series(df['Low'].values, dtype=float)
-
-        if len(close) < 100:
-            return None
-
-        rsi = ta.rsi(close, length=_rsi_p)
-        bb = ta.bbands(close, length=_bb_p, std=_bb_s)
-        ema20 = ta.ema(close, length=20)
-        ema50 = ta.ema(close, length=50)
-        adx_df = ta.adx(high, low, close, length=_adx_p)
-        atr = ta.atr(high, low, close, length=14)
-
-        # Volumen: ratio vs SMA(20)
-        vol = pd.Series(df['Volume'].values, dtype=float)
-        vol_sma = ta.sma(vol, length=20)
-        _last_vol_sma = float(vol_sma.iloc[-1]) if vol_sma is not None and len(vol_sma) > 0 and not pd.isna(vol_sma.iloc[-1]) else 0
-        vol_ratio = float(vol.iloc[-1]) / _last_vol_sma if _last_vol_sma > 0 else 1.0
-
-        if rsi is None or bb is None or ema50 is None or ema20 is None:
-            return None
-
-        # Fibonacci: rango de últimas 20 velas H1 (240 M5 = 20 H1)
-        fib_lookback = min(240, len(close) - 1)
-        fib_high = float(high.iloc[-fib_lookback:].max())
-        fib_low = float(low.iloc[-fib_lookback:].min())
-        fib_range = fib_high - fib_low
-        fib_pos = (float(close.iloc[-1]) - fib_low) / fib_range if fib_range > 0 else 0.5
-        fib_236 = fib_low + fib_range * 0.236
-        fib_764 = fib_low + fib_range * 0.764
-
-        return {
-            "precio": float(close.iloc[-1]),
-            "open": float(df['Open'].iloc[-1]),
-            "high": float(high.iloc[-1]),
-            "low": float(low.iloc[-1]),
-            "rsi": float(rsi.iloc[-1]),
-            "rsi_prev": float(rsi.iloc[-2]),
-            "bb_up": float(get_col(bb, 'BBU').iloc[-1]),
-            "bb_mid": float(get_col(bb, 'BBM').iloc[-1]),
-            "bb_lo": float(get_col(bb, 'BBL').iloc[-1]),
-            "ema20": float(ema20.iloc[-1]),
-            "ema50": float(ema50.iloc[-1]),
-            "tendencia": "ALCISTA" if float(ema20.iloc[-1]) > float(ema50.iloc[-1]) else "BAJISTA",
-            "adx": float(get_col(adx_df, 'ADX_').iloc[-1]),
-            "atr": float(atr.iloc[-1]),
-            "fib_pos": fib_pos,
-            "fib_236": fib_236,
-            "fib_764": fib_764,
-            "fib_high": fib_high,
-            "fib_low": fib_low,
-            "vol_ratio": vol_ratio,
-        }
-    except Exception as e:
-        logger.warning(f"⚠️ Scalper: Error calculando indicadores: {e}")
-        return None
-
-
-def _scalper_evaluar_senal(ind, config):
-    """
-    Evalúa señal de scalping: BB(20,2) + RSI(7) Mean Reversion M5.
-    3 variantes de entrada:
-      A: BB touch + RSI en zona extrema (principal)
-      B: Rechazo fuerte de BB (mecha larga)
-      C: RSI extremo + precio cerca de BB
-    Filtros por backtest: bloquea NASDAQ SELL y GOLD BUY (perdedores).
-    Retorna: ("BUY"/"SELL", razón) o (None, razón)
-    """
-    if not ind:
-        return None, "Sin indicadores"
-
-    # [5] CIRCUIT BREAKER GLOBAL: bloquear scalper si está activo
-    try:
-        if _circuit_breaker_check():
-            return None, "Circuit Breaker activo"
-    except Exception:
-        pass
-
-    adx = ind['adx']
-    rsi = ind['rsi']
-    rsi_prev = ind.get('rsi_prev', rsi)
-    precio = ind['precio']
-    symbol = config.get('mt5', '')
-
-    # PAR_PROFILES lookup for per-pair thresholds
-    _pp = config.get('_profile')
-    _sc = _pp["scalper"] if _pp else {}
-    _beh = _pp["behavior"] if _pp else {}
-    _adx_min = _sc.get("adx_min", 10)
-    _adx_max = _sc.get("adx_max", 50)
-    _rsi_buy = _sc.get("rsi_buy", 40)
-    _rsi_sell = _sc.get("rsi_sell", 60)
-    _vol_min = _sc.get("vol_min", 0.3)
-
-    if adx < _adx_min:
-        return None, f"ADX={adx:.0f} muy bajo (min {_adx_min})"
-    if adx > _adx_max:
-        return None, f"ADX={adx:.0f} muy alto (max {_adx_max})"
-
-    # Filtro ATR mínimo
-    if ind['atr'] <= 0:
-        return None, "ATR=0"
-
-    # 🔴 Filtro volumen: mercado muerto = no scalp
-    # FIX 2026-03-19: si vol=0 (sin datos de volumen, común en forex MT5), no bloquear
-    _svol = ind.get('vol_ratio', 1.0)
-    if _svol > 0 and _svol < _vol_min:
-        return None, f"Vol={_svol:.1f}x bajo (mín {_vol_min}x)"
-
-    bb_lo = ind['bb_lo']
-    bb_up = ind['bb_up']
-    bb_mid = (bb_lo + bb_up) / 2
-    low = ind['low']
-    high = ind['high']
-    close = ind.get('close', precio)
-    tendencia = ind.get('tendencia', 'NEUTRAL')
-
-    # FIX 2026-03-20: FILTRO DE TENDENCIA EMA20 vs EMA50
-    # Solo bloquea contra-tendencia cuando ADX>35 (tendencia MUY fuerte)
-    # Mean reversion NECESITA operar contra tendencia moderada — solo bloquear extremos
-    def _filtro_tendencia(tipo_op):
-        """Mean reversion = operar CONTRA tendencia. No filtrar por tendencia.
-        FIX 2026-03-20: Eliminado filtro tendencia para scalper mean reversion.
-        La protección ya existe: R:R 1.67:1, cooldown 30min, trailing stop."""
-        return True
-
-    # FIX 2026-03-20: COOLDOWN POR DIRECCIÓN (30 min tras pérdida)
-    _now_ts = time.time()
-    def _en_cooldown(tipo_op):
-        """Retorna True si hay cooldown activo para esta dirección O cooldown general del par."""
-        # Cooldown por dirección
-        key = f"{symbol}_{tipo_op}"
-        hasta = _scalper_cooldown_direccion.get(key, 0)
-        if _now_ts < hasta:
-            return True
-        # Cooldown GENERAL por par (15 min entre cualquier trade del mismo par)
-        key_general = f"{symbol}_ANY"
-        hasta_general = _scalper_cooldown_direccion.get(key_general, 0)
-        return _now_ts < hasta_general
-
-    # Helper: check BUY/SELL blocks from profile
-    def _block_check(tipo_op):
-        if tipo_op == "BUY" and _beh.get("block_buy"):
-            return True, f"{symbol} BUY bloqueado (perfil)"
-        if tipo_op == "SELL" and _beh.get("block_sell"):
-            return True, f"{symbol} SELL bloqueado (perfil)"
-        return False, ""
-
-    # ── Variante A: BB touch + RSI en zona extrema (principal) ──
-    if (low <= bb_lo and rsi < _rsi_buy and _adx_min <= adx <= _adx_max):
-        blocked, msg = _block_check("BUY")
-        if blocked: return None, msg
-        if not _filtro_tendencia("BUY"): return None, f"BUY bloqueado (tendencia {tendencia})"
-        if _en_cooldown("BUY"): return None, f"BUY en cooldown 30min"
-        return "BUY", f"BB+RSI-A Buy | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-    if (high >= bb_up and rsi > _rsi_sell and _adx_min <= adx <= _adx_max):
-        blocked, msg = _block_check("SELL")
-        if blocked: return None, msg
-        if not _filtro_tendencia("SELL"): return None, f"SELL bloqueado (tendencia {tendencia})"
-        if _en_cooldown("SELL"): return None, f"SELL en cooldown 30min"
-        return "SELL", f"BB+RSI-A Sell | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-    # ── Variante B: Rechazo fuerte de BB (mecha larga) ──
-    wick_upper = high - close
-    wick_lower = close - low
-
-    if (low < bb_lo and close > bb_lo and wick_lower > wick_upper * 1.5
-            and rsi < (_rsi_buy + 8) and _adx_min <= adx <= _adx_max):
-        blocked, msg = _block_check("BUY")
-        if blocked: return None, msg
-        if not _filtro_tendencia("BUY"): return None, f"BUY-B bloqueado (tendencia {tendencia})"
-        if _en_cooldown("BUY"): return None, f"BUY-B en cooldown 30min"
-        return "BUY", f"BB+RSI-B Buy (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-    if (high > bb_up and close < bb_up and wick_upper > wick_lower * 1.5
-            and rsi > (_rsi_sell - 8) and _adx_min <= adx <= _adx_max):
-        blocked, msg = _block_check("SELL")
-        if blocked: return None, msg
-        if not _filtro_tendencia("SELL"): return None, f"SELL-B bloqueado (tendencia {tendencia})"
-        if _en_cooldown("SELL"): return None, f"SELL-B en cooldown 30min"
-        return "SELL", f"BB+RSI-B Sell (rechazo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-    # ── Variante C: RSI extremo + precio cerca de BB ──
-    if (rsi < 30 and close < (bb_lo + (bb_mid - bb_lo) * 0.3)
-            and _adx_min <= adx <= _adx_max):
-        blocked, msg = _block_check("BUY")
-        if blocked: return None, msg
-        if not _filtro_tendencia("BUY"): return None, f"BUY-C bloqueado (tendencia {tendencia})"
-        if _en_cooldown("BUY"): return None, f"BUY-C en cooldown 30min"
-        return "BUY", f"BB+RSI-C Buy (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-    if (rsi > 70 and close > (bb_up - (bb_up - bb_mid) * 0.3)
-            and _adx_min <= adx <= _adx_max):
-        blocked, msg = _block_check("SELL")
-        if blocked: return None, msg
-        if not _filtro_tendencia("SELL"): return None, f"SELL-C bloqueado (tendencia {tendencia})"
-        if _en_cooldown("SELL"): return None, f"SELL-C en cooldown 30min"
-        return "SELL", f"BB+RSI-C Sell (RSI extremo) | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-    # ── Variante D: FIBONACCI Mean Reversion ──
-    estrategia = config.get('estrategia', 'bb_rsi')
-    if estrategia == 'fibonacci':
-        fib_pos = ind.get('fib_pos', 0.5)
-        _fib_buy = _sc.get("fib_buy", 0.35)
-        _fib_sell = _sc.get("fib_sell", 0.65)
-        _fib_rsi_buy = _sc.get("rsi_buy", 45)
-        _fib_rsi_sell = _sc.get("rsi_sell", 55)
-
-        if fib_pos < _fib_buy and rsi < _fib_rsi_buy and _adx_min <= adx <= _adx_max:
-            blocked, msg = _block_check("BUY")
-            if blocked: return None, msg
-            if not _filtro_tendencia("BUY"): return None, f"FIB BUY bloqueado (tendencia {tendencia})"
-            if _en_cooldown("BUY"): return None, f"FIB BUY en cooldown 30min"
-            return "BUY", f"FIB Buy | Pos={fib_pos:.1%} < {_fib_buy:.0%} | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-        if fib_pos > _fib_sell and rsi > _fib_rsi_sell and _adx_min <= adx <= _adx_max:
-            blocked, msg = _block_check("SELL")
-            if blocked: return None, msg
-            if not _filtro_tendencia("SELL"): return None, f"FIB SELL bloqueado (tendencia {tendencia})"
-            if _en_cooldown("SELL"): return None, f"FIB SELL en cooldown 30min"
-            return "SELL", f"FIB Sell | Pos={fib_pos:.1%} > {_fib_sell:.0%} | RSI={rsi:.0f} | ADX={adx:.0f} | {tendencia}"
-
-        return None, f"FIB neutral (pos={fib_pos:.1%})"
-
-    return None, "Sin señal scalping"
-
-
-def _scalper_ejecutar_orden(mt5_symbol, tipo, sl_price, tp_price, config):
-    """Ejecuta orden de scalping en MT5. Sin Telegram, sin estadísticas del bot principal."""
-    global _scalper_trades_hoy, _scalper_posiciones
-
-    if not MT5_AVAILABLE or not AUTO_TRADING:
-        logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: MT5={MT5_AVAILABLE} AutoTrading={AUTO_TRADING}")
-        return False
-
-    try:
-        with _lock_mt5:
-            symbol_info = mt5.symbol_info(mt5_symbol)
-        if symbol_info is None:
-            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: symbol_info=None (símbolo no encontrado en MT5)")
-            return False
-
-        # Verificar spread
-        if symbol_info.spread > config['max_spread']:
-            logger.info(f"🔪 Scalper: {mt5_symbol} spread={symbol_info.spread} > max={config['max_spread']} — skip")
-            return False
-
-        # Calcular lote basado en riesgo 0.5%
-        capital_real = _obtener_capital_real_mt5()
-        riesgo_dinero = capital_real * SCALPER_RIESGO_POR_TRADE
-        with _lock_mt5:
-            tick = mt5.symbol_info_tick(mt5_symbol)
-        if not tick:
-            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: tick=None (sin precio)")
-            return False
-
-        precio_entrada = tick.ask if tipo == "BUY" else tick.bid
-        sl_distance = abs(precio_entrada - sl_price)
-        tp_distance = abs(precio_entrada - tp_price)
-        if sl_distance <= 0:
-            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: sl_distance=0 (SL igual a precio)")
-            return False
-
-        # Verificar stop level mínimo del broker (evita "Invalid stops")
-        _stop_level = symbol_info.trade_stops_level * symbol_info.point
-        if _stop_level > 0:
-            if sl_distance < _stop_level:
-                logger.info(f"🔪 Scalper: {mt5_symbol} SL demasiado cerca ({sl_distance:.5f} < {_stop_level:.5f}) — skip")
-                return False
-            if tp_distance < _stop_level:
-                logger.info(f"🔪 Scalper: {mt5_symbol} TP demasiado cerca ({tp_distance:.5f} < {_stop_level:.5f}) — skip")
-                return False
-
-        # Calcular valor del pip
-        tick_size = symbol_info.trade_tick_size
-        tick_value = symbol_info.trade_tick_value
-        if tick_size <= 0 or tick_value <= 0:
-            logger.info(f"🔪 Scalper BLOQUEADO {mt5_symbol}: tick_size={tick_size} tick_value={tick_value}")
-            return False
-
-        lote_calculado = riesgo_dinero / (sl_distance / tick_size * tick_value)
-        lote_calculado = max(symbol_info.volume_min, min(round(lote_calculado, 2), symbol_info.volume_max))
-        # SCALPER: Siempre usar lote mínimo para empezar (bajo riesgo)
-        lote = symbol_info.volume_min
-        # Ajustar al step del volumen
-        vol_step = symbol_info.volume_step
-        if vol_step > 0:
-            lote = round(round(lote / vol_step) * vol_step, 2)
-
-        order_type = mt5.ORDER_TYPE_BUY if tipo == "BUY" else mt5.ORDER_TYPE_SELL
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": mt5_symbol,
-            "volume": lote,
-            "type": order_type,
-            "price": precio_entrada,
-            "sl": round(sl_price, symbol_info.digits),
-            "tp": round(tp_price, symbol_info.digits),
-            "deviation": 20,
-            "magic": SCALPER_MAGIC,
-            "comment": "BuySell365 Scalper",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
-        }
-
-        with _lock_mt5:
-            result = mt5.order_send(request)
-
-        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-            with _lock_scalper:
-                _scalper_trades_hoy += 1
-                # Cooldown general 15 min para este par (evitar sobre-operar)
-                _scalper_cooldown_direccion[f"{mt5_symbol}_ANY"] = time.time() + 15 * 60
-                _scalper_posiciones[result.order] = {
-                    "symbol": mt5_symbol,
-                    "tipo": tipo,
-                    "entrada": precio_entrada,
-                    "sl": sl_price,
-                    "tp": tp_price,
-                    "lote": lote,
-                    "tiempo": datetime.now(),
-                }
-            logger.info(f"🔪 SCALPER EJECUTADO {tipo}: {mt5_symbol} @ {precio_entrada:.5g} | SL={sl_price:.5g} | TP={tp_price:.5g} | Lote={lote} | Trade #{_scalper_trades_hoy}")
-            return True
-        else:
-            rc = result.retcode if result else "None"
-            comment = getattr(result, 'comment', '') if result else ''
-            logger.info(f"🔪 Scalper: Orden RECHAZADA {mt5_symbol} — retcode={rc} comment={comment}")
-            return False
-
-    except Exception as e:
-        logger.error(f"🔪 Scalper: Error ejecutando orden {mt5_symbol}: {e}")
-        return False
-
-
-def _scalper_gestionar_posiciones():
-    """
-    Gestiona posiciones abiertas del scalper:
-    - Breakeven al 40% del camino al TP
-    - Cierre por timeout (60 min)
-    - Tracking de P&L diario
-    """
-    global _scalper_pnl_diario, _scalper_perdidas_consecutivas, _scalper_posiciones
-
-    if not MT5_AVAILABLE:
-        return
-
-    try:
-        with _lock_mt5:
-            positions = mt5.positions_get()
-        if positions is None:
-            return
-
-        scalper_positions = [p for p in positions if p.magic == SCALPER_MAGIC]
-
-        # Limpiar posiciones cerradas del tracking
-        tickets_abiertos = {p.ticket for p in scalper_positions}
-        with _lock_scalper:
-            cerradas = [t for t in _scalper_posiciones if t not in tickets_abiertos]
-            for ticket in cerradas:
-                pos_info = _scalper_posiciones.pop(ticket, None)
-                if pos_info:
-                    # Buscar resultado en historial
-                    try:
-                        desde = pos_info['tiempo'] - timedelta(minutes=5)
-                        hasta = datetime.now() + timedelta(minutes=5)
-                        with _lock_mt5:
-                            deals = mt5.history_deals_get(desde, hasta, group=pos_info['symbol'])
-                        if deals:
-                            for deal in deals:
-                                if deal.position_id == ticket and deal.entry == mt5.DEAL_ENTRY_OUT:
-                                    profit = deal.profit
-                                    _scalper_pnl_diario += profit
-                                    if profit < 0:
-                                        _scalper_perdidas_consecutivas += 1
-                                        # FIX 2026-03-20: Cooldown 30min para misma dirección tras pérdida
-                                        _cd_key = f"{pos_info['symbol']}_{pos_info['tipo']}"
-                                        _scalper_cooldown_direccion[_cd_key] = time.time() + SCALPER_COOLDOWN_MINUTOS * 60
-                                        print(f"🔪 Cooldown 30min activado: {_cd_key}")
-                                    else:
-                                        _scalper_perdidas_consecutivas = 0
-                                    print(f"🔪 Scalper CERRADO: {pos_info['symbol']} {pos_info['tipo']} | P&L=${profit:.2f} | Día=${_scalper_pnl_diario:.2f} | Racha={_scalper_perdidas_consecutivas}")
-                                    # Notificar al admin directamente (chat privado)
-                                    try:
-                                        _sc_emoji = "✅" if profit >= 0 else "🛑"
-                                        _sc_msg = (
-                                            f"{_sc_emoji} *Scalper* — {pos_info.get('symbol', '?')}\n"
-                                            f"{pos_info.get('tipo', '?')}  {'$+' if profit >= 0 else '$'}{profit:.2f}\n"
-                                            f"P&L día: ${_scalper_pnl_diario:+.2f}"
-                                        )
-                                        if USERS_AUTORIZADOS:
-                                            enviar_telegram_temporal(_sc_msg, destino=USERS_AUTORIZADOS[0], delay_borrado=600)
-                                    except Exception:
-                                        pass
-                                    break
-                    except Exception:
-                        pass
-
-        # Gestionar posiciones activas
-        for pos in scalper_positions:
-            info = None
-            with _lock_scalper:
-                info = _scalper_posiciones.get(pos.ticket)
-            if not info:
-                continue
-
-            # Timeout: cerrar si lleva más de 60 minutos
-            minutos_abierta = (datetime.now() - info['tiempo']).total_seconds() / 60
-            if minutos_abierta >= SCALPER_TIMEOUT_MINUTOS:
-                print(f"🔪 Scalper TIMEOUT: {pos.symbol} — {minutos_abierta:.0f} min — cerrando")
-                _scalper_cerrar_posicion(pos)
-                continue
-
-            # Trailing Stop Progresivo: proteger ganancias conforme avanza el precio
-            tp_dist = abs(info['tp'] - info['entrada'])
-            if tp_dist > 0:
-                with _lock_mt5:
-                    _tick_be = mt5.symbol_info_tick(pos.symbol)
-                _spread_be = (_tick_be.ask - _tick_be.bid) if _tick_be else 0
-
-                if info['tipo'] == "BUY":
-                    avance = pos.price_current - info['entrada']
-                else:
-                    avance = info['entrada'] - pos.price_current
-
-                if avance > tp_dist * SCALPER_BREAKEVEN_PCT:
-                    # Trailing progresivo: SL sigue al precio asegurando ganancia
-                    # Nivel 1 (40% TP): SL a breakeven (entrada + spread)
-                    # Nivel 2 (60% TP): SL a 30% del avance
-                    # Nivel 3 (80% TP): SL a 60% del avance
-                    if avance > tp_dist * 0.80:
-                        trail_pct = 0.60  # Asegurar 60% de la ganancia
-                    elif avance > tp_dist * 0.60:
-                        trail_pct = 0.30  # Asegurar 30% de la ganancia
-                    else:
-                        trail_pct = 0.0   # Breakeven
-
-                    if info['tipo'] == "BUY":
-                        nuevo_sl = info['entrada'] + _spread_be + (avance * trail_pct)
-                        if pos.sl < nuevo_sl:
-                            _scalper_modificar_sl(pos, nuevo_sl)
-                            if trail_pct > 0:
-                                print(f"📈 Scalper TRAIL: {pos.symbol} BUY SL→{nuevo_sl:.5g} (aseg. {trail_pct*100:.0f}%)")
-                    elif info['tipo'] == "SELL":
-                        nuevo_sl = info['entrada'] - _spread_be - (avance * trail_pct)
-                        if pos.sl > nuevo_sl:
-                            _scalper_modificar_sl(pos, nuevo_sl)
-                            if trail_pct > 0:
-                                print(f"📈 Scalper TRAIL: {pos.symbol} SELL SL→{nuevo_sl:.5g} (aseg. {trail_pct*100:.0f}%)")
-
-    except Exception as e:
-        logger.error(f"🔪 Scalper: Error gestionando posiciones: {e}")
-
-
-def _scalper_cerrar_posicion(pos):
-    """Cierra una posición del scalper."""
-    try:
-        tipo_cierre = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
-        with _lock_mt5:
-            tick = mt5.symbol_info_tick(pos.symbol)
-        if not tick:
-            return
-        precio = tick.bid if pos.type == mt5.ORDER_TYPE_BUY else tick.ask
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": pos.symbol,
-            "volume": pos.volume,
-            "type": tipo_cierre,
-            "position": pos.ticket,
-            "price": precio,
-            "deviation": 20,
-            "magic": SCALPER_MAGIC,
-            "comment": "Scalper timeout",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
-        }
-        with _lock_mt5:
-            result = mt5.order_send(request)
-        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"🔪 Scalper: Posición {pos.ticket} cerrada OK")
-        else:
-            rc = result.retcode if result else "None"
-            logger.warning(f"🔪 Scalper: Error cerrando {pos.ticket} — retcode={rc}")
-    except Exception as e:
-        logger.error(f"🔪 Scalper: Error cerrando posición {pos.ticket}: {e}")
-
-
-def _scalper_modificar_sl(pos, nuevo_sl):
-    """Modifica el SL de una posición (breakeven)."""
-    try:
-        request = {
-            "action": mt5.TRADE_ACTION_SLTP,
-            "symbol": pos.symbol,
-            "position": pos.ticket,
-            "sl": nuevo_sl,
-            "tp": pos.tp,
-            "magic": SCALPER_MAGIC,
-        }
-        with _lock_mt5:
-            result = mt5.order_send(request)
-        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-            print(f"🔪 Scalper BE: {pos.symbol} SL movido a breakeven {nuevo_sl:.5g}")
-    except Exception as e:
-        logger.warning(f"🔪 Scalper: Error moviendo SL {pos.ticket}: {e}")
-
-
-def _scalper_reset_diario():
-    """Reset contadores diarios a medianoche."""
-    global _scalper_pnl_diario, _scalper_perdidas_consecutivas, _scalper_trades_hoy, _scalper_pausa_hasta
-    _scalper_pnl_diario = 0.0
-    _scalper_perdidas_consecutivas = 0
-    _scalper_trades_hoy = 0
-    _scalper_pausa_hasta = None
-
-
-def loop_scalper():
-    """
-    🔪 HILO PRINCIPAL DEL SCALPER SILENCIOSO
-    Corre cada 30 segundos. Solo opera en MT5 (sin Telegram, sin estadísticas).
-    Estrategia: BB(20,2) + RSI(7) Mean Reversion en velas M5.
-    """
-    global _scalper_pnl_diario, _scalper_perdidas_consecutivas, _scalper_pausa_hasta
-
-    time.sleep(30)  # Esperar a que MT5 se conecte
-    print("🔪 Scalper Silencioso iniciado — BB+RSI Mean Reversion M5")
-
-    _ultimo_dia = None
-
-    while True:
-        try:
-            # 📩 Procesar comandos del launcher (si el scanner no los atrapo primero)
-            _procesar_comandos_launcher()
-
-            if not SCALPER_ACTIVO or not MT5_AVAILABLE or not AUTO_TRADING:
-                time.sleep(SCALPER_INTERVALO)
-                continue
-
-            now = ahora()  # Hora Andorra
-
-            # Reset diario
-            if _ultimo_dia != now.date():
-                _scalper_reset_diario()
-                _ultimo_dia = now.date()
-                print(f"🔪 Scalper: Nuevo día {_ultimo_dia} — contadores reseteados")
-
-            # No operar fines de semana
-            if now.weekday() >= 5:
-                time.sleep(60)
-                continue
-
-            # Gestionar posiciones abiertas (siempre, incluso en pausa)
-            _scalper_gestionar_posiciones()
-
-            # Check límite de pérdida diaria (3%)
-            capital = _obtener_capital_real_mt5()
-            if capital > 0 and _scalper_pnl_diario <= -(capital * SCALPER_MAX_LOSS_DIARIO):
-                if _scalper_trades_hoy > 0:  # Solo imprimir una vez
-                    print(f"🔪 Scalper STOP: Pérdida diaria ${_scalper_pnl_diario:.2f} >= 3% de ${capital:.0f} — parado hasta mañana")
-                time.sleep(60)
-                continue
-
-            # Check pausa por pérdidas consecutivas
-            if _scalper_pausa_hasta and now < _scalper_pausa_hasta:
-                time.sleep(SCALPER_INTERVALO)
-                continue
-            elif _scalper_pausa_hasta and now >= _scalper_pausa_hasta:
-                _scalper_pausa_hasta = None
-                _scalper_perdidas_consecutivas = 0
-                print("🔪 Scalper: Pausa terminada — reanudando operaciones")
-
-            if _scalper_perdidas_consecutivas >= SCALPER_MAX_CONSECUTIVAS:
-                _scalper_pausa_hasta = now + timedelta(minutes=30)
-                print(f"🔪 Scalper PAUSA: {_scalper_perdidas_consecutivas} pérdidas seguidas — pausando 30 min")
-                time.sleep(SCALPER_INTERVALO)
-                continue
-
-            # Check máximo de posiciones abiertas
-            with _lock_scalper:
-                n_abiertas = len(_scalper_posiciones)
-            if n_abiertas >= SCALPER_MAX_POSICIONES:
-                time.sleep(SCALPER_INTERVALO)
-                continue
-
-            # ── ESCANEAR CADA ACTIVO ──
-            hora_local = now.hour
-            for nombre, config in SCALPER_ACTIVOS.items():
-                mt5_sym = config['mt5']
-                h_inicio, h_fin = config['horario']
-
-                # Filtro horario por activo
-                if hora_local < h_inicio or hora_local >= h_fin:
-                    continue
-
-                # Filtro best_days from PAR_PROFILES
-                _pp_loop = config.get('_profile')
-                if _pp_loop:
-                    _best_days = _pp_loop.get("time_filter", {}).get("best_days")
-                    if _best_days is not None and now.weekday() not in _best_days:
-                        continue  # Skip non-peak days for this pair
-
-                # No abrir si ya hay posición del scalper en este símbolo
-                # Verificar tanto en dict interno como en MT5 directamente
-                with _lock_scalper:
-                    ya_en_dict = any(p['symbol'] == mt5_sym for p in _scalper_posiciones.values())
-                ya_en_mt5 = False
-                try:
-                    if MT5_AVAILABLE:
-                        with _lock_mt5:
-                            positions = mt5.positions_get(symbol=mt5_sym)
-                        if positions:
-                            ya_en_mt5 = any(p.magic == SCALPER_MAGIC for p in positions)
-                except:
-                    pass
-                if ya_en_dict or ya_en_mt5:
-                    continue
-
-                # FIX 2026-03-20: GBPUSD eliminado, ya no necesita filtro correlación
-
-                # Descargar datos M5
-                df = _scalper_descargar_m5(mt5_sym)
-                if df is None or len(df) < 100:
-                    continue
-
-                # Calcular indicadores
-                ind = _scalper_calcular_indicadores(df, profile=config.get('_profile'))
-                if not ind:
-                    continue
-
-                # Evaluar señal
-                tipo, razon = _scalper_evaluar_senal(ind, config)
-                # FIX 2026-03-20: Log de cada evaluación para diagnóstico
-                _sc_rsi = ind.get('rsi', 0)
-                _sc_adx = ind.get('adx', 0)
-                _sc_tend = ind.get('tendencia', '?')
-                _sc_fib = ind.get('fib_pos', 0.5)
-                logger.info(f"🔪 Scalper {mt5_sym}: RSI={_sc_rsi:.1f} ADX={_sc_adx:.1f} {_sc_tend} Fib={_sc_fib:.0%} => {tipo or 'NADA'} ({razon})")
-                if tipo is None:
-                    continue
-
-                # Calcular TP y SL dinámicos basados en ATR
-                atr = ind['atr']
-                if atr <= 0:
-                    continue
-
-                sl_dist = atr * config['sl_atr']
-                tp_dist = atr * config['tp_atr']
-
-                if tipo == "BUY":
-                    sl_price = ind['precio'] - sl_dist
-                    tp_price = ind['precio'] + tp_dist
-                else:
-                    sl_price = ind['precio'] + sl_dist
-                    tp_price = ind['precio'] - tp_dist
-
-                # EJECUTAR
-                logger.info(f"🔪 Scalper SEÑAL EJECUTANDO: {mt5_sym} {tipo} — {razon} | SL={sl_price:.5g} TP={tp_price:.5g}")
-                ok = _scalper_ejecutar_orden(mt5_sym, tipo, sl_price, tp_price, config)
-                logger.info(f"🔪 Scalper RESULTADO: {mt5_sym} {tipo} — {'EJECUTADO' if ok else 'FALLIDO'}")
-
-        except Exception as e:
-            logger.error(f"🔪 Scalper: Error en loop principal: {e}")
-            import traceback
-            traceback.print_exc()
-
-        time.sleep(SCALPER_INTERVALO)
-
 
 # ============================================================
 #  ARRANQUE
@@ -17595,7 +16751,6 @@ def _watchdog():
         "polling": loop_polling,
         "health":  loop_health_check,
         "vip":     loop_vip_check,
-        "scalper": loop_scalper,  # 🔪 Scalper silencioso
         "delete_sched": _hilo_borrado_scheduler,  # M-FIX: Monitorear hilo de borrado
     }
     while True:
