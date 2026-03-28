@@ -8727,6 +8727,26 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 "• Ejecuciones MT5: ✅ activas\n\n"
                 "El bot vuelve a operar normalmente.")
 
+    # ⏸️ /pausarmt5 — Solo pausa ejecuciones MT5 (scanner sigue activo)
+    if t in ("/pausarmt5", "pausarmt5", "pausar mt5", "pausa mt5"):
+        if not es_admin: return "⛔ Solo administradores."
+        global mt5_pausado
+        mt5_pausado = True
+        guardar_estado()
+        log_sistema("⏸️ MT5 PAUSADO desde Telegram")
+        return ("⏸️ *MT5 PAUSADO*\n\n"
+                "Las señales siguen analizándose pero NO se ejecutarán órdenes en MT5.\n"
+                "Usa /reanudarmt5 para reactivar la ejecución.")
+
+    # ▶️ /reanudarmt5 — Reactiva solo MT5
+    if t in ("/reanudarmt5", "reanudarmt5", "reanudar mt5", "activar mt5"):
+        if not es_admin: return "⛔ Solo administradores."
+        mt5_pausado = False
+        guardar_estado()
+        log_sistema("▶️ MT5 REACTIVADO desde Telegram")
+        return ("▶️ *MT5 REACTIVADO*\n\n"
+                "Las ejecuciones automáticas en MT5 están activas nuevamente.")
+
     if t in ("/reiniciar", "reiniciar bot", "reiniciar proceso", "restart", "reboot"):
         if not es_admin: return "⛔ Solo administradores pueden reiniciar el proceso del bot."
         enviar_telegram("🔄 *Reiniciando proceso del bot...*", remitente)
@@ -14974,6 +14994,7 @@ def loop_polling():
                         # FIX 2026-03-19: Feedback contextual en vez de genérico "Procesando..."
                         _cb_feedback = {
                             "/activas": "📊 Cargando señales...",
+                            "/senales": "📊 Cargando señales...",
                             "/estado": "📈 Cargando estado...",
                             "/resumen": "📋 Generando resumen...",
                             "/precios": "💰 Consultando precios...",
@@ -14981,6 +15002,13 @@ def loop_polling():
                             "/semana": "📊 Calculando semana...",
                             "/horarios": "🕐 Cargando horarios...",
                             "/vip": "👑 Abriendo VIP...",
+                            "/cuenta": "💰 Cargando cuenta...",
+                            "/pausar": "⏸️ Pausando scanner y MT5...",
+                            "/reanudar": "▶️ Reactivando todo...",
+                            "/pausarmt5": "⏸️ Pausando MT5...",
+                            "/reanudarmt5": "▶️ Reactivando MT5...",
+                            "/reiniciar": "🔄 Reiniciando bot...",
+                            "/apagar": "🔴 Apagando bot...",
                             "vip_trial_gratis": "💰 Redirigiendo a pago...",
                             "vip_pagar_usdt": "💰 Cargando pago...",
                             "vip_trial_confirmar": "💰 Redirigiendo a pago...",
@@ -15115,6 +15143,31 @@ def loop_polling():
                                 "👋 Cancelado. Escribe /vip cuando quieras volver a ver las opciones.",
                                 user_id
                             )
+                            continue
+
+                        # ── Callbacks PROPIETARIO — controles exclusivos del dueño ──
+                        _propietario_cb = str(ADMIN_IDS[0]) if ADMIN_IDS else None
+                        _owner_cmds = {"/pausar", "/reanudar", "/pausarmt5", "/reanudarmt5",
+                                       "/reiniciar", "/apagar", "/cuenta", "/senales"}
+                        if texto in _owner_cmds and user_id in ADMIN_IDS:
+                            try:
+                                _res_owner = procesar_mensaje(texto, user_id, es_admin=True)
+                                _txt_owner = _res_owner[0] if isinstance(_res_owner, tuple) else _res_owner
+                                _tkl_owner = _res_owner[1] if isinstance(_res_owner, tuple) else None
+                                if _txt_owner:
+                                    enviar_telegram(_txt_owner, user_id, teclado=_tkl_owner)
+                                # Si fue pausar/reanudar, actualizar el panel del propietario
+                                if texto in ("/pausar", "/reanudar", "/pausarmt5", "/reanudarmt5"):
+                                    import time as _time_cb
+                                    _time_cb.sleep(0.5)
+                                    # Refresh del panel: re-generar /start del propietario
+                                    _refresh = procesar_mensaje("/start", user_id, es_admin=True)
+                                    _rtxt = _refresh[0] if isinstance(_refresh, tuple) else _refresh
+                                    _rtkl = _refresh[1] if isinstance(_refresh, tuple) else None
+                                    if _rtxt:
+                                        enviar_telegram(_rtxt, user_id, teclado=_rtkl)
+                            except Exception as _e_owner:
+                                logger.error(f"Error callback propietario '{texto}': {_e_owner}")
                             continue
 
                         # ── Callbacks generales (botones inline del canal/grupo) ──
