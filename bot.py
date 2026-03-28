@@ -903,16 +903,18 @@ def cargar_estado():
 # ============================================================
 
 ACTIVOS = {
-    # TOP PRIORITARIOS
-    "ORO":          "GC=F",           # Commodity más estable
-    # ❌ BITCOIN y ETHEREUM eliminados — solo activos tradicionales
-    "EUR/USD":      "EURUSD=X",       # Par forex más líquido
-    "USD/JPY":      "USDJPY=X",       # 2do par más líquido del mundo (sesión asiática)
-    "GBP/JPY":      "GBPJPY=X",       # "The Beast" — más volátil que USD/JPY, sesión London+Tokyo
-
-    # 💎 COMPLEMENTARIOS DE ALTA CALIDAD
-    "NASDAQ":          "NQ=F",           # Índice tech principal
-    "S&P 500":         "ES=F",           # Índice de referencia mundial
+    # ORO — bloqueado en activos_desactivados (solo señales de canales aliados)
+    "ORO":          "GC=F",
+    # FOREX — pares propios del scanner
+    "EUR/USD":      "EURUSD=X",
+    "USD/JPY":      "USDJPY=X",
+    "GBP/JPY":      "GBPJPY=X",
+    "AUD/CAD":      "AUDCAD=X",
+    "EUR/CHF":      "EURCHF=X",
+    "USD/CAD":      "USDCAD=X",
+    # ÍNDICES
+    "NASDAQ":       "NQ=F",
+    "S&P 500":      "ES=F",
 }
 
 # Mapa de palabras clave simplificado
@@ -3180,7 +3182,7 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
 # ============================================================
 
 def _clasificar_tipo_trade(ticker):
-    """Retorna 'premium' para futuros y 'swing' para divisas. Los 6 activos del bot."""
+    """Retorna 'premium' para futuros y 'swing' para divisas. Los activos del bot."""
     t = ticker.upper()
     if any(x in t for x in ["GC=F", "ES=F", "NQ=F"]):
         return "premium"
@@ -4113,7 +4115,7 @@ def en_horario_mt5(ticker):
 def activos_disponibles_hoy() -> tuple:
     """Retorna (lista_nombres, es_fin_de_semana_o_feriado).
     Fin de semana / feriado → sin activos.
-    Lunes-Viernes normal → todos los 6 activos."""
+    Lunes-Viernes normal → todos los activos del bot."""
     now_utc = datetime.now(pytz.UTC)
     fecha_hoy = now_utc.strftime("%Y-%m-%d")
     es_fds = now_utc.weekday() >= 5
@@ -9179,10 +9181,10 @@ def index_web():
         _wr = round(_wins / _total * 100, 1) if _total > 0 else 78.5
         _pips = round(sum(h.get('pips', 0) for h in _hist), 1)
         _n_ops = sum(1 for op in operaciones_activas.values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
-        _activos_trading = len(ACTIVOS)
+        _activos_trading = len(ACTIVOS) + 14
     except Exception as e:
         logger.error(f"Landing stats error: {e}")
-        _wr, _total, _pips, _n_ops, _activos_trading = 78.5, 0, 0, 0, 6
+        _wr, _total, _pips, _n_ops, _activos_trading = 78.5, 0, 0, 0, 20
 
     try:
         return f"""<!DOCTYPE html>
@@ -9471,7 +9473,7 @@ section{{padding:50px 20px}}
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-ops="{_n_ops}">Bot activo \u2014 {_n_ops} operaciones en vivo</span></div>
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
-    <p data-i18n="hero.subtitle" data-i18n-assets="{_activos_trading}">Se\u00f1ales de trading automatizadas con Inteligencia Artificial, an\u00e1lisis de noticias y datos institucionales. An\u00e1lisis continuo en {_activos_trading} activos de clase mundial.</p>
+    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial y canales VIP aliados. Forex, Oro e \u00cdndices — m\u00e1s de 20 pares en tiempo real, 24/5.</p>
     <div class="hero-buttons">
       <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-primary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Unirse a Telegram</span></a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
@@ -9509,7 +9511,7 @@ section{{padding:50px 20px}}
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon gold">\U0001f4ca</div>
       <h3 data-i18n="features.ta.title">An\u00e1lisis T\u00e9cnico Avanzado</h3>
-      <p data-i18n="features.ta.desc">8 indicadores t\u00e9cnicos (RSI, MACD, Bollinger, ADX, Ichimoku, ATR, EMA, volumen) con umbrales calibrados individualmente para cada uno de los 6 activos.</p>
+      <p data-i18n="features.ta.desc">8 indicadores t\u00e9cnicos (RSI, MACD, Bollinger, ADX, Ichimoku, ATR, EMA, volumen) con umbrales calibrados individualmente para cada activo.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\u26a1</div>
@@ -9686,7 +9688,7 @@ section{{padding:50px 20px}}
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q6">\u00bfCu\u00e1ntas se\u00f1ales recibo al d\u00eda?</div>
-      <div class="faq-a" data-i18n="faq.a6">En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los 6 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad.</div>
+      <div class="faq-a" data-i18n="faq.a6">En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los 20+ pares. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad.</div>
     </div>
   </div>
 </section>
@@ -13135,7 +13137,7 @@ def filtro_multi_timeframe(ticker, tipo):
     return True
 
 def analizar_mercado():
-    """Escanea los 6 activos: ORO, EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P500"""
+    """Escanea los activos del bot: EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P500 y más."""
     global ultimo_recordatorio, ultimo_briefing
 
     momento = ahora()
