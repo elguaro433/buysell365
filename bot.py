@@ -382,7 +382,8 @@ MODO_RIESGO = "normal"
 alertas_precio = []  # [{"ticker", "nombre", "precio", "tipo": ">="|"<="}]
 
 # Activos desactivados por suscripción
-activos_desactivados = set()
+# ORO bloqueado por decisión del operador hasta nuevo aviso
+activos_desactivados = {"ORO", "GC=F", "GOLD"}
 
 # Briefing matutino y notificaciones de sesión
 ultimo_briefing = time.time()  # Esperar desde arranque antes del primer briefing
@@ -15968,7 +15969,7 @@ PAR_PROFILES = {
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
         "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": True, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
     "US100Cash": {
