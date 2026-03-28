@@ -6560,6 +6560,9 @@ def cmd_vip(user_id: str = None):
     # Métodos de pago en la misma fila si es posible
     fila_pago = [{"text": btn_pago + " — USDT/Binance", "callback_data": "vip_pagar_usdt"}]
     botones.append(fila_pago)
+    admin_user_clean = ADMIN_USER.replace("@", "")
+    precio_t = pi["precio"]
+    botones.append([{"text": "💬 Otro método de pago — Hablar con Admin", "url": f"https://t.me/{admin_user_clean}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{precio_t:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
         if pend_info.get("monto_unico"):
@@ -15126,17 +15129,19 @@ def loop_polling():
                         # ── Callback VIP: PASO 2 — Términos aceptados → elegir método ──
                         if texto == "vip_aceptar_terminos":
                             pi_p = _vip_precio_info()
+                            _admin_clean_p = ADMIN_USER.replace("@", "")
+                            _precio_p = pi_p['precio']
                             _botones_metodo = {"inline_keyboard": [
                                 [{"text": "💰 PAGAR CON BINANCE (USDT/Crypto)", "callback_data": "vip_pagar_confirmar"}],
+                                [{"text": "💬 Otro método — Hablar con Admin", "url": f"https://t.me/{_admin_clean_p}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{_precio_p:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}],
+                                [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
                             ]}
-                            _botones_metodo["inline_keyboard"].append(
-                                [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}]
-                            )
                             enviar_telegram(
                                 f"✅ *Términos aceptados*\n\n"
-                                f"💰 Precio: *{pi_p['precio']}{VIP_MONEDA}/mes*\n\n"
-                                f"Pulsa el botón para recibir las instrucciones de pago\n"
-                                f"vía *USDT/Binance* — activación inmediata ⚡",
+                                f"💰 Precio: *{_precio_p}{VIP_MONEDA}/mes*\n\n"
+                                f"Elige tu método de pago:\n\n"
+                                f"• 💰 *USDT/Binance* — activación inmediata ⚡\n"
+                                f"• 💬 *Otro método* — el admin te gestiona el pago",
                                 user_id,
                                 teclado=_botones_metodo
                             )
