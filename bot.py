@@ -15631,6 +15631,19 @@ def loop_polling():
                                 respuesta = res[0] if isinstance(res, tuple) else res
                                 teclado   = res[1] if isinstance(res, tuple) else None
 
+                                # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                # 👑 ADMIN en PRIVADO — fast-track sin filtros
+                                # Respuesta directa garantizada, sin checks de grupo
+                                # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                                if _es_admin and not _es_grupo and not _es_canal:
+                                    if respuesta:
+                                        enviar_telegram(respuesta, _chat_id, teclado=teclado)
+                                    else:
+                                        # procesar_mensaje no supo → IA del propietario sin límites
+                                        _nombre_adm = directorio_usuarios.get(_user_id, {}).get("nombre", "Emmanuel")
+                                        _procesar_ia_telegram(_texto, _chat_id, _user_id, _nombre_adm)
+                                    return
+
                                 # 🤖 IA FALLBACK — si procesar_mensaje no supo responder, IA entra automático
                                 if not respuesta:
                                     _nombre_fb = directorio_usuarios.get(_user_id, {}).get("nombre", "")
@@ -16029,7 +16042,14 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
         return False
 
     if es_admin:
-        _extra = "Admin/propietario del bot — acceso total"
+        _extra = (
+            "Eres el asistente personal de Emmanuel Díaz, propietario único y fundador de BuySell365 Pro. "
+            "Tienes acceso TOTAL sin restricciones. "
+            "Puedes ayudarle con: análisis de mercado avanzado, estrategias de trading, "
+            "gestión de su bot (estado, VIPs, señales, MT5), configuración del sistema, "
+            "marketing y ventas del servicio, respuestas a clientes, y cualquier otra consulta. "
+            "Habla siempre en el idioma del mensaje. Sé directo, técnico y sin limitaciones."
+        )
     elif es_vip:
         _extra = "Usuario VIP activo — solo lectura, sin comandos de cierre"
     elif es_privado:
