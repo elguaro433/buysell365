@@ -556,13 +556,10 @@ def send_to_channel(signal, executed, detail):
     entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
     lines = [
-        f"{dir_emoji} *{dir_es} — {pair_display}*",
-        f"",
-        f"📍 Entrada: `{entry_display}`",
-        f"🎯 TP: `{fmt(tp)}`",
-        f"🛡️ SL: `{fmt(sl)}`",
-        f"",
-        f"_BuySell365.pro_",
+        f"{dir_emoji} *{dir_es} {pair_display}*",
+        f"📍 `{entry_display}`",
+        f"🎯 `{fmt(tp)}`",
+        f"🛡️ `{fmt(sl)}`",
     ]
 
     msg = "\n".join(lines)
