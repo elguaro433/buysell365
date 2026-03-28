@@ -13737,9 +13737,9 @@ def _reconectar_mt5(max_intentos=3):
     _mt5_path = os.getenv("MT5_PATH", "").strip()
     if not _mt5_path:
         # Auto-detectar MT5 en rutas comunes
-        for _p in [r'C:\Program Files\XM Global MT5\terminal64.exe',
-                    r'C:\Program Files\XM MT5\terminal64.exe',
-                    r'C:\Program Files\MetaTrader 5\terminal64.exe']:
+        for _p in [r'C:\Program Files\MetaTrader 5\terminal64.exe',
+                    r'C:\Program Files\XM Global MT5\terminal64.exe',
+                    r'C:\Program Files\XM MT5\terminal64.exe']:
             if os.path.isfile(_p):
                 _mt5_path = _p
                 break
