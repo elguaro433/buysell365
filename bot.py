@@ -15633,11 +15633,37 @@ def loop_polling():
 
                                 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                 # 👑 ADMIN en PRIVADO — fast-track sin filtros
-                                # Respuesta directa garantizada, sin checks de grupo
+                                # Respuesta directa + panel de control siempre visible
                                 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                                 if _es_admin and not _es_grupo and not _es_canal:
+                                    # Panel de control compacto — siempre disponible
+                                    _panel_ctrl = {"inline_keyboard": [
+                                        [
+                                            {"text": "⏸️ Pausar Scanner" if not escaneo_pausado else "▶️ Activar Scanner",
+                                             "callback_data": "/pausar" if not escaneo_pausado else "/reanudar"},
+                                            {"text": "⏸️ Pausar MT5" if not mt5_pausado else "▶️ Activar MT5",
+                                             "callback_data": "/pausarmt5" if not mt5_pausado else "/reanudarmt5"},
+                                        ],
+                                        [
+                                            {"text": "🔄 Reiniciar", "callback_data": "/reiniciar"},
+                                            {"text": "🔴 Apagar Bot", "callback_data": "/apagar"},
+                                        ],
+                                        [
+                                            {"text": "📊 Señales", "callback_data": "/senales"},
+                                            {"text": "📋 Resumen", "callback_data": "/resumen"},
+                                            {"text": "⚙️ Estado", "callback_data": "/estado"},
+                                        ],
+                                        [
+                                            {"text": "👑 VIPs", "callback_data": "/vips"},
+                                            {"text": "💰 Capital", "callback_data": "/cuenta"},
+                                            {"text": "🌐 Dashboard", "url": "https://buysell365.pro/dashboard"},
+                                        ],
+                                    ]}
+                                    # Si la respuesta ya tiene su propio teclado (ej: /vip con botones de pago),
+                                    # usarlo — sino, adjuntar panel de control
+                                    _teclado_final = teclado if teclado else _panel_ctrl
                                     if respuesta:
-                                        enviar_telegram(respuesta, _chat_id, teclado=teclado)
+                                        enviar_telegram(respuesta, _chat_id, teclado=_teclado_final)
                                     else:
                                         # procesar_mensaje no supo → IA del propietario sin límites
                                         _nombre_adm = directorio_usuarios.get(_user_id, {}).get("nombre", "Emmanuel")
