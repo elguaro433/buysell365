@@ -1003,7 +1003,7 @@ if('serviceWorker' in navigator){{
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
     <div class="price-card" style="border:1px solid rgba(77,159,255,0.3);box-shadow:0 0 30px rgba(77,159,255,0.1)">
       <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">Comunidad</div>
-      <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:3rem" data-i18n="pricing.free">GRATIS</div>
+      <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:2rem" data-i18n="pricing.free">Acceso Libre</div>
       <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
         <li style="color:#90caf9">&#128227; Resumen diario de mercado</li>
@@ -1011,7 +1011,7 @@ if('serviceWorker' in navigator){{
         <li style="color:#90caf9">&#129309; Soporte de la comunidad</li>
         <li style="color:#90caf9">&#128202; Dashboard p\u00fablico limitado</li>
       </ul>
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5,#64b5f6);border-radius:14px;color:#fff;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 25px rgba(66,165,245,0.5);transition:all .3s">&#128172; Unirse Gratis</a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5,#64b5f6);border-radius:14px;color:#fff;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 25px rgba(66,165,245,0.5);transition:all .3s">&#128172; Unirse al Grupo</a>
     </div>
     <div class="price-card featured" style="border:2px solid #fbbf24;box-shadow:0 0 50px rgba(251,191,36,0.3),0 0 100px rgba(251,191,36,0.1);transform:scale(1.04)">
       <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
@@ -1246,8 +1246,8 @@ if('serviceWorker' in navigator){{
   </div>
   <div class="faq-list">
     <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q1">\u00bfEs realmente gratis unirse?</div>
-      <div class="faq-a" data-i18n="faq.a1">S\u00ed. El grupo p\u00fablico de Telegram es 100% gratuito. Recibes res\u00famenes de mercado, educaci\u00f3n y an\u00e1lisis general. El plan VIP Pro tiene una prueba gratuita de 5 d\u00edas h\u00e1biles sin necesidad de tarjeta de cr\u00e9dito.</div>
+      <div class="faq-q" data-i18n="faq.q1">¿Cómo funciona el grupo de comunidad?</div>
+      <div class="faq-a" data-i18n="faq.a1">El grupo público de Telegram te da acceso a resúmenes diarios de mercado, educación y análisis general. Para recibir señales VIP en tiempo real con Entry, SL y 3 TPs exactos, necesitas el plan VIP Pro. El Copy Trading funciona sin cuota fija — solo pagas un pequeño % si ganas.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q2">\u00bfC\u00f3mo recibo las se\u00f1ales?</div>
@@ -1965,8 +1965,8 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                 </div>
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
-                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM GRATIS</a>
-                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="background:linear-gradient(135deg,#00c853,#00e676);border:none;padding:12px 24px">&#128640; COPY TRADING GRATIS</a>
+                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; ÚNETE AL CANAL</a>
+                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="background:linear-gradient(135deg,#00c853,#00e676);border:none;padding:12px 24px">&#128640; EMPEZAR COPY TRADING</a>
             </div>
             <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
         </div>

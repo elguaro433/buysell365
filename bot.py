@@ -4157,20 +4157,27 @@ def sync_mt5_positions():
             # Guardar en CSV permanente
             _guardar_historial_csv(hist_data)
 
-            # Notificar
+            # Notificar TP/SL al canal VIP
             _unidad = unidad_medida(ticker)
             cat = get_categoria(ticker)
             p_txt = f"{pips:.2f}%" if cat == "crypto" else f"{pips:.1f} {_unidad}"
             signo = "+" if pips > 0 else ""
-            emoji = "\U0001f7e2" if pips > 0 else "\U0001f534"
+            if pips > 0:
+                emoji_res = "✅"
+                tipo_cierre = "TP ALCANZADO"
+                color = "🟢"
+            else:
+                emoji_res = "🛑"
+                tipo_cierre = "SL ACTIVADO"
+                color = "🔴"
             msg = (
-                f"\U0001f504 *CIERRE DETECTADO* \u2014 {nombre}\n"
-                f"{emoji} {tipo} {signo}{p_txt}\n"
-                f"Entrada {fmt(entrada, ticker)} \u2192 Cierre {fmt(precio_cierre, ticker)}"
+                f"{emoji_res} <b>{tipo_cierre}</b> — {nombre}\n"
+                f"{color} {tipo} | {signo}{p_txt}\n"
+                f"📥 Entrada: {fmt(entrada, ticker)}\n"
+                f"📤 Cierre: {fmt(precio_cierre, ticker)}"
             )
-            # CIERRE DETECTADO: solo log, NO enviar al canal (usuario prefiere solo señales)
-            # enviar_canal(msg)
-            logger.info(f"\U0001f504 SYNC: {nombre} {tipo} cerrada externamente | {signo}{p_txt} | tag:MANUAL")
+            enviar_canal(msg)
+            logger.info(f"🔔 {tipo_cierre}: {nombre} {tipo} | {signo}{p_txt}")
             guardar_estado()
 
     except Exception as e:
@@ -15429,7 +15436,7 @@ def loop_polling():
                                 # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
                                 # Formato: "Sell Gold Now / Target 4447 / Sl 4468" o similar
                                 if user_id in ADMIN_IDS:
-                                    _senal_manual = parsear_senal_externa(texto)
+                                    _senal_manual = _parsear_senal_externa(texto)
                                     if _senal_manual:
                                         try:
                                             _ejecutar_senal_manual(_senal_manual, chat_id, nombre_u)
