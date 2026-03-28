@@ -989,11 +989,11 @@ if('serviceWorker' in navigator){{
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-vars='{{"ops":"{n_ops}"}}'>{'Bot activo' if is_alive else 'Dashboard Online'} \u2014 {n_ops} operaciones en vivo</span></div>
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
-    <p data-i18n="hero.subtitle" data-i18n-vars='{{"assets":"{activos}"}}'>Se\u00f1ales de trading automatizadas con Inteligencia Artificial, an\u00e1lisis de noticias y datos institucionales. An\u00e1lisis continuo en {activos} activos de clase mundial.</p>
+    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial y canales VIP aliados. Forex, Oro e \u00cdndices \u2014 m\u00e1s de 20 activos en tiempo real, 24/5.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f451 Ver Planes y Servicios</a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Telegram Gratis</span></a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Telegram</span></a>
     </div>
     <div class="stats-bar">
       <div class="stat-item"><div class="stat-value">{wr}%</div><div class="stat-label" data-i18n="stats.winrate">WIN RATE</div></div>
