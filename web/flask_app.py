@@ -2537,14 +2537,16 @@ def pagina_terminos():
 <title>T&eacute;rminos y Condiciones — BuySell365 Pro</title>
 <style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:'Inter',sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.7;padding:20px}}.container{{max-width:800px;margin:0 auto}}h1{{color:#f0b90b;font-size:1.8rem;margin-bottom:10px}}h2{{color:#58a6ff;font-size:1.2rem;margin-top:25px;margin-bottom:8px}}p,li{{font-size:0.95rem;margin-bottom:8px}}ul{{padding-left:20px}}.date{{color:#8b949e;font-size:0.85rem;margin-bottom:20px}}a{{color:#58a6ff}}.back{{display:inline-block;margin-top:30px;padding:10px 20px;background:#f0b90b;color:#000;border-radius:8px;text-decoration:none;font-weight:bold}}</style></head>
 <body><div class="container">
-<h1>&#128221; T&eacute;rminos y Condiciones</h1><p class="date">&Uacute;ltima actualizaci&oacute;n: 12 de marzo de 2026</p>
-<h2>1. Descripci&oacute;n del Servicio</h2><p>BuySell365 es una herramienta automatizada de an&aacute;lisis t&eacute;cnico que genera alertas informativas sobre activos financieros mediante indicadores t&eacute;cnicos, modelos de IA y datos institucionales.</p>
-<h2>2. No es Asesor&iacute;a Financiera</h2><p>BuySell365 NO proporciona asesor&iacute;a financiera. Las se&ntilde;ales son an&aacute;lisis t&eacute;cnicos automatizados con fines informativos y educativos.</p>
-<h2>3. Riesgo de Inversi&oacute;n</h2><p>Operar en mercados financieros conlleva un alto riesgo de p&eacute;rdida de capital. Los resultados pasados no garantizan resultados futuros.</p>
-<h2>4. Suscripci&oacute;n VIP</h2><ul><li>Periodo de prueba: 5 d&iacute;as h&aacute;biles gratuitos.</li><li>Precio: {VIP_PRECIO_EUR} {VIP_MONEDA}/mes (USDT TRC20).</li><li>Renovaci&oacute;n manual. Sin cobros autom&aacute;ticos.</li><li>No se ofrecen reembolsos una vez procesado el pago.</li></ul>
-<h2>5. Uso Aceptable</h2><ul><li>No redistribuir las se&ntilde;ales VIP.</li><li>No usar bots para extraer contenido.</li><li>Respetar a los miembros de la comunidad.</li></ul>
-<h2>6. Limitaci&oacute;n de Responsabilidad</h2><p>BuySell365 no ser&aacute; responsable de p&eacute;rdidas financieras derivadas del uso de las se&ntilde;ales.</p>
-<h2>7. Contacto</h2><p><a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a> en Telegram.</p>
+<h1>&#128221; T&eacute;rminos y Condiciones</h1><p class="date">&Uacute;ltima actualizaci&oacute;n: 28 de marzo de 2026</p>
+<h2>1. Qu&eacute; es BuySell365</h2><p>BuySell365 es una herramienta automatizada de an&aacute;lisis t&eacute;cnico que genera alertas informativas sobre activos financieros. Las se&ntilde;ales se basan en indicadores t&eacute;cnicos, modelos de Machine Learning y an&aacute;lisis de sentimiento. Son de car&aacute;cter informativo y educativo &mdash; no son recomendaciones de inversi&oacute;n.</p>
+<h2>2. No es Asesor&iacute;a Financiera</h2><p>BuySell365 NO proporciona asesor&iacute;a financiera ni recomendaciones personalizadas. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n. Consulta a un profesional financiero antes de operar con dinero real.</p>
+<h2>3. Riesgo de Inversi&oacute;n</h2><p>Operar en mercados financieros conlleva un alto riesgo de p&eacute;rdida de capital. Los resultados pasados no garantizan resultados futuros. Nunca inviertas dinero que no puedas permitirte perder.</p>
+<h2>4. Suscripci&oacute;n VIP</h2><ul><li>Precio: $149 USDT/mes, pagado manualmente en USDT TRC20.</li><li>Sin cobros autom&aacute;ticos ni recurrentes. T&uacute; decides cu&aacute;ndo renovar.</li><li>Cancela cuando quieras: simplemente no renuevas y el acceso expira al final del periodo pagado.</li><li>No se ofrecen reembolsos una vez procesado el pago, ya que el acceso al canal VIP se activa de forma inmediata.</li></ul>
+<h2>5. Uso Aceptable</h2><ul><li>No redistribuir ni revender las se&ntilde;ales del canal VIP.</li><li>No usar bots ni scrapers para extraer contenido del canal.</li><li>No enviar spam en el grupo de Telegram.</li><li>Respetar a los dem&aacute;s miembros de la comunidad.</li></ul>
+<h2>6. Limitaci&oacute;n de Responsabilidad</h2><p>BuySell365 y su equipo no ser&aacute;n responsables de p&eacute;rdidas financieras derivadas del uso del servicio. Al usar el servicio aceptas que operas bajo tu propia responsabilidad.</p>
+<h2>7. Disponibilidad</h2><p>Trabajamos para mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida. Puede haber pausas por mantenimiento o actualizaciones.</p>
+<h2>8. Modificaciones</h2><p>Podemos actualizar estos t&eacute;rminos en cualquier momento. Los cambios se publican en esta p&aacute;gina. El uso continuado del servicio implica la aceptaci&oacute;n de los cambios.</p>
+<h2>9. Contacto</h2><p><a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a> en Telegram.</p>
 <a href="/dashboard" class="back">&larr; Volver</a></div></body></html>"""
 
 @app.route("/privacidad")
@@ -2554,13 +2556,13 @@ def pagina_privacidad():
 <title>Pol&iacute;tica de Privacidad — BuySell365 Pro</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.7;padding:20px}.container{max-width:800px;margin:0 auto}h1{color:#f0b90b;font-size:1.8rem;margin-bottom:10px}h2{color:#58a6ff;font-size:1.2rem;margin-top:25px;margin-bottom:8px}p,li{font-size:0.95rem;margin-bottom:8px}ul{padding-left:20px}.date{color:#8b949e;font-size:0.85rem;margin-bottom:20px}a{color:#58a6ff}.back{display:inline-block;margin-top:30px;padding:10px 20px;background:#f0b90b;color:#000;border-radius:8px;text-decoration:none;font-weight:bold}</style></head>
 <body><div class="container">
-<h1>&#128274; Pol&iacute;tica de Privacidad</h1><p class="date">&Uacute;ltima actualizaci&oacute;n: 12 de marzo de 2026</p>
-<h2>1. Datos que Recopilamos</h2><p>Solo datos de Telegram: ID, nombre de usuario, nombre y estado VIP. NO recopilamos email, tel&eacute;fono ni datos bancarios.</p>
-<h2>2. C&oacute;mo Usamos los Datos</h2><ul><li>Gestionar suscripciones VIP.</li><li>Enviar se&ntilde;ales y notificaciones.</li><li>Mejorar el servicio (estad&iacute;sticas an&oacute;nimas).</li></ul>
-<h2>3. Verificaci&oacute;n de Pagos</h2><p>Pagos en USDT TRC20 verificados autom&aacute;ticamente via API de Binance. No almacenamos datos de wallets.</p>
-<h2>4. Seguridad</h2><ul><li>Servidor privado con acceso restringido.</li><li>Comunicaci&oacute;n cifrada con HTTPS.</li><li>No compartimos datos con terceros.</li></ul>
-<h2>5. Tus Derechos</h2><p>Acceso, rectificaci&oacute;n, eliminaci&oacute;n y portabilidad. Contacta: <a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a></p>
-<h2>6. Cookies</h2><p>No usamos cookies, analytics ni tracking de terceros.</p>
+<h1>&#128274; Pol&iacute;tica de Privacidad</h1><p class="date">&Uacute;ltima actualizaci&oacute;n: 28 de marzo de 2026</p>
+<h2>1. Datos que Recopilamos</h2><p>Solo datos de Telegram: ID de usuario, nombre de usuario, nombre de pila y estado VIP (activo o expirado). NO recopilamos email, tel&eacute;fono, ubicaci&oacute;n ni datos bancarios.</p>
+<h2>2. C&oacute;mo Usamos los Datos</h2><ul><li>Gestionar suscripciones VIP (activaci&oacute;n, expiraci&oacute;n y verificaci&oacute;n de pago).</li><li>Enviarte se&ntilde;ales y notificaciones del servicio.</li><li>Mejorar el servicio mediante estad&iacute;sticas an&oacute;nimas.</li></ul>
+<h2>3. Verificaci&oacute;n de Pagos</h2><p>Pagos en USDT TRC20 verificados autom&aacute;ticamente via API de Binance. No almacenamos datos financieros ni n&uacute;meros de wallet.</p>
+<h2>4. Almacenamiento y Seguridad</h2><ul><li>Servidor privado con acceso restringido.</li><li>Comunicaci&oacute;n web cifrada con HTTPS.</li><li>Datos en formato JSON en el servidor, sin base de datos externa.</li><li>No compartimos tus datos con terceros.</li></ul>
+<h2>5. Tus Derechos</h2><p>Tienes derecho a acceso, rectificaci&oacute;n, eliminaci&oacute;n y portabilidad de tus datos. Contacta: <a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a></p>
+<h2>6. Cookies y Analytics</h2><p>Esta web usa Google Analytics (gtag.js) para medir el tr&aacute;fico de forma an&oacute;nima. Google Analytics puede usar cookies propias. No usamos tracking de publicidad ni vendemos datos. Puedes desactivar Google Analytics desde la configuraci&oacute;n de tu navegador.</p>
 <a href="/dashboard" class="back">&larr; Volver</a></div></body></html>"""
 
 @app.route("/login")
