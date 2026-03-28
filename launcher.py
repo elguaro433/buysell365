@@ -368,9 +368,9 @@ def _make_scrollable(parent, bg=BG_MAIN):
 #  BOT MANAGER
 # ============================================================
 _MT5_PATHS = [
+    r'C:\Program Files\MetaTrader 5\terminal64.exe',
     r'C:\Program Files\XM Global MT5\terminal64.exe',
     r'C:\Program Files\XM MT5\terminal64.exe',
-    r'C:\Program Files\MetaTrader 5\terminal64.exe',
 ]
 
 
