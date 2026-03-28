@@ -14866,7 +14866,7 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     # Cooldown: máximo 1 bienvenida por usuario cada 10 minutos
     _ahora = time.time()
     if user_id in _cooldown_bienvenida and (_ahora - _cooldown_bienvenida[user_id]) < 600:
-        return
+        return False  # Indica que NO se envió (cooldown activo)
     _cooldown_bienvenida[user_id] = _ahora
 
     # ── Menú completo para el chat PRIVADO ──
@@ -14931,6 +14931,8 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
             f"{'✅ DM enviado' if dm_ok else '⚠️ No ha hecho /start aún'}"
         )
         enviar_telegram(aviso_admin, admin_id)
+
+    return True  # Bienvenida enviada correctamente
 
 # 🛡️ RATE LIMITER POR USUARIO — máx 4 comandos cada 30 segundos
 _rate_limit_usuarios: dict = {}
@@ -15588,11 +15590,29 @@ def loop_polling():
                                             enviar_telegram(f"❌ Error ejecutando señal: {_e_sm}", chat_id)
                                         continue
 
-                                # 🤖 IA: admin + VIP pueden preguntar por chat privado
-                                if _procesar_ia_telegram(texto, chat_id, user_id, nombre_u):
+                                # 🤖 IA: responde a TODOS en privado (admin, VIP y nuevos)
+                                if _procesar_ia_telegram(texto, chat_id, user_id, nombre_u, es_privado=True):
                                     continue
-                                # 💬 Privado: enviar bienvenida VIP al chat directo
-                                manejar_usuario_nuevo(msg, from_user, texto)
+                                # 💬 Si la IA no responde (cooldown/sin Groq): menú con botones o bienvenida
+                                _enviado_bienvenida = manejar_usuario_nuevo(msg, from_user, texto)
+                                if not _enviado_bienvenida:
+                                    # Ya pasó el cooldown de bienvenida → menú rápido con botones
+                                    _np = escapar_markdown(from_user.get("first_name", ""))
+                                    _admin_c = ADMIN_USER.replace("@", "")
+                                    enviar_telegram(
+                                        f"👋 *{_np}*, ¿en qué puedo ayudarte?\n\n"
+                                        "📊 *BuySell365 Pro* — señales con entrada,\n"
+                                        "SL y TP exactos en tiempo real 🎯\n\n"
+                                        "👇 Elige lo que más te interesa:",
+                                        chat_id,
+                                        teclado={"inline_keyboard": [
+                                            [{"text": "💎 VER PLANES VIP — Señales", "callback_data": "vip_pagar_usdt"}],
+                                            [{"text": "🤖 Copy Trading en XM (gratis)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                                            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}],
+                                            [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
+                                            [{"text": f"❓ Hablar con Admin", "url": f"https://t.me/{_admin_c}"}],
+                                        ]}
+                                    )
                                 continue
 
                         # Admin anónimo: GroupAnonymousBot o Channel_Bot son admins del grupo/canal
@@ -15940,16 +15960,17 @@ USER MESSAGE: {pregunta}"""
 
 _ia_cooldown_grupo: dict = {}   # user_id → timestamp último uso IA en grupo
 
-def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=False):
+def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=False, es_privado=False):
     """Procesa mensaje con IA.
     - Admin: comandos + IA completa
     - VIP: IA (lectura)
-    - Cualquier usuario en grupo público: IA de atención al cliente con rate limit
+    - Grupo público: IA atención al cliente con rate limit 3 min
+    - Privado nuevo usuario: IA comercial con rate limit 2 min
     """
     es_admin = user_id in ADMIN_IDS
     es_vip = user_id in suscripciones_vip and suscripciones_vip[user_id].get("entrada_confirmada", False)
 
-    if not es_admin and not es_vip and not es_grupo_publico:
+    if not es_admin and not es_vip and not es_grupo_publico and not es_privado:
         return False
 
     # Rate limit para usuarios no-VIP en grupo: 1 respuesta IA cada 3 minutos
@@ -15959,6 +15980,14 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
         if _ahora_ia - _last < 180:
             return False  # Silencio — ya respondió hace menos de 3 min
         _ia_cooldown_grupo[user_id] = _ahora_ia
+
+    # Rate limit para nuevos usuarios en privado: 1 respuesta IA cada 2 minutos
+    if es_privado and not es_admin and not es_vip:
+        _ahora_ia = time.time()
+        _last = _ia_cooldown_grupo.get(f"priv_{user_id}", 0)
+        if _ahora_ia - _last < 120:
+            return False  # Dejar pasar al menú de botones
+        _ia_cooldown_grupo[f"priv_{user_id}"] = _ahora_ia
 
     texto_lower = texto.lower().strip()
 
@@ -15991,6 +16020,12 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
         _extra = "Admin/propietario del bot — acceso total"
     elif es_vip:
         _extra = "Usuario VIP activo — solo lectura, sin comandos de cierre"
+    elif es_privado:
+        _extra = ("Usuario nuevo en chat privado interesado en el servicio. "
+                  "Responde de forma comercial y amigable. "
+                  "Si pregunta por señales, precios, copy trading o VIP, "
+                  "explica brevemente el servicio y dile que pulse /vip para ver los planes. "
+                  "Sé conciso — máximo 3-4 líneas.")
     else:
         _extra = "Usuario del grupo público — atención al cliente. Si pregunta por señales o VIP, invítalo a escribir /vip en privado."
 
