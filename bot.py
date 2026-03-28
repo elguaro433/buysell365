@@ -15589,11 +15589,19 @@ def loop_polling():
 
                         if usuario_no_autorizado:
                             if (es_grupo or es_canal) and not es_tema_publico:
-                                # 📢 Mensaje sin tema público → redirigir al chat privado
-                                manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
+                                # 📢 Mensaje sin tema público → IA atiende en privado
+                                # Primero intenta IA, si no hay Groq → bienvenida normal
+                                _ia_atendio = _procesar_ia_telegram(
+                                    texto, chat_id, user_id, nombre_u, es_grupo_publico=True
+                                )
+                                if not _ia_atendio:
+                                    manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
                                 continue
                             elif (es_grupo or es_canal) and es_tema_publico:
-                                # 📢 Tema público (copy, vip, señales...) → responder directo en el grupo
+                                # 📢 Tema público → IA responde en DM, y procesar_mensaje da respuesta en grupo
+                                _procesar_ia_telegram(
+                                    texto, chat_id, user_id, nombre_u, es_grupo_publico=True
+                                )
                                 pass  # Continuar a procesar_mensaje normalmente
                             else:
                                 # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
@@ -15901,32 +15909,40 @@ def _ia_responder(pregunta, user_name="Trader", contexto_extra=""):
             _mercado_ctx.append(f"{nombre_act}: {_tend} RSI={ind.get('rsi', 0):.0f}")
     _mercado_txt = " | ".join(_mercado_ctx) if _mercado_ctx else "Sin datos de mercado"
 
-    prompt = f"""Eres BuySell365 Pro, asistente IA de trading profesional. Responde en español.
+    prompt = f"""You are BuySell365 Pro, a professional AI trading assistant.
 
-CONTEXTO ACTUAL ({ahora().strftime('%d/%m %H:%M')} Andorra):
+CRITICAL RULE — LANGUAGE DETECTION:
+Detect the language of the user's message and ALWAYS respond in that SAME language.
+Examples: if user writes in English → reply in English. French → French. Portuguese → Portuguese.
+Spanish → Spanish. Italian → Italian. Arabic → Arabic. German → German. Etc.
+NEVER respond in a different language than the user's message.
+
+CURRENT CONTEXT ({ahora().strftime('%d/%m %H:%M')} Andorra):
 - Capital: {_capital} | Win Rate: {_wr} ({_wins}W/{_total_hist - _wins}L)
-- Pips hoy: {_pips_net:+.1f}
-- Operaciones activas: {_n_ops}
-- Posiciones MT5: {_ops_texto}
-- Mercado: {_mercado_txt}
-- Modo riesgo: {MODO_RIESGO}
-- Scanner: {'ACTIVO' if not escaneo_pausado else 'PAUSADO'}
+- Pips today: {_pips_net:+.1f}
+- Active operations: {_n_ops}
+- MT5 positions: {_ops_texto}
+- Market: {_mercado_txt}
+- Risk mode: {MODO_RIESGO}
+- Scanner: {'ACTIVE' if not escaneo_pausado else 'PAUSED'}
 {f'- Extra: {contexto_extra}' if contexto_extra else ''}
 
-PARES: ORO, EUR/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, AUD/CAD, EUR/CHF, NASDAQ, S&P 500, US30, GER40, GBP/JPY
-MODOS: Scalper M5 (7 pares), Premium M15 (6 pares), Signal Copier (SureShotFX, Learn2Trade)
+PAIRS: GOLD/XAUUSD, EUR/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, NASDAQ, S&P 500, US30, GBP/JPY
+SERVICES: VIP Channel (signals with Entry+SL+TP), Copy Trading (auto-account on XM broker)
 
-REGLAS:
-- Responde MAX 500 caracteres, profesional y conciso
-- Si preguntan por ops abiertas, muestra posiciones MT5 con P&L
-- Si preguntan por un par, da tendencia + RSI + soporte/resistencia si lo sabes
-- Si preguntan "como va", da resumen del dia (pips, wins, losses)
-- Si piden cerrar, di que use /cerrar o MT5 directamente
-- NO inventes datos. Si no sabes, di "no tengo esa info"
-- Usa emojis con moderacion
-- El usuario se llama {user_name}
+RULES:
+- MAX 500 characters. Be warm, professional and helpful.
+- If user asks about signals/trading → mention VIP channel and invite to write /vip
+- If user asks about copy trading → explain it and invite to write /copy
+- If asking about open positions → show MT5 positions with P&L
+- If asking about a pair → give trend + RSI if available
+- If asking "how's it going" → brief daily summary (pips, wins, losses)
+- NEVER invent data. If unknown, say so honestly.
+- Use emojis moderately. Be friendly and helpful.
+- User's name is {user_name}
+- For VIP/payment questions → always tell them to write in private chat for security
 
-PREGUNTA: {pregunta}"""
+USER MESSAGE: {pregunta}"""
 
     try:
         response = _groq_client.chat.completions.create(
@@ -15941,13 +15957,27 @@ PREGUNTA: {pregunta}"""
         return None
 
 
-def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
-    """Procesa mensaje con IA. Admin: comandos + IA. VIP: solo IA (lectura)."""
+_ia_cooldown_grupo: dict = {}   # user_id → timestamp último uso IA en grupo
+
+def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=False):
+    """Procesa mensaje con IA.
+    - Admin: comandos + IA completa
+    - VIP: IA (lectura)
+    - Cualquier usuario en grupo público: IA de atención al cliente con rate limit
+    """
     es_admin = user_id in ADMIN_IDS
     es_vip = user_id in suscripciones_vip and suscripciones_vip[user_id].get("entrada_confirmada", False)
 
-    if not es_admin and not es_vip:
+    if not es_admin and not es_vip and not es_grupo_publico:
         return False
+
+    # Rate limit para usuarios no-VIP en grupo: 1 respuesta IA cada 3 minutos
+    if es_grupo_publico and not es_admin and not es_vip:
+        _ahora_ia = time.time()
+        _last = _ia_cooldown_grupo.get(user_id, 0)
+        if _ahora_ia - _last < 180:
+            return False  # Silencio — ya respondió hace menos de 3 min
+        _ia_cooldown_grupo[user_id] = _ahora_ia
 
     texto_lower = texto.lower().strip()
 
@@ -15972,17 +16002,39 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre):
                 enviar_telegram(f"✅ {n} posiciones de {mt5_sym} cerradas", chat_id)
                 return True
 
-    # IA respuesta general (admin + VIP)
+    # IA respuesta general (admin + VIP + grupo público)
     if not _GROQ_KEY:
         return False
 
-    # VIP users get limited context
-    _extra = "" if es_admin else "Usuario VIP (solo lectura, sin comandos de cierre)"
+    if es_admin:
+        _extra = "Admin/propietario del bot — acceso total"
+    elif es_vip:
+        _extra = "Usuario VIP activo — solo lectura, sin comandos de cierre"
+    else:
+        _extra = "Usuario del grupo público — atención al cliente. Si pregunta por señales o VIP, invítalo a escribir /vip en privado."
+
     respuesta = _ia_responder(texto, nombre, contexto_extra=_extra)
-    if respuesta:
+    if not respuesta:
+        return False
+
+    # Para usuarios del grupo público: responder en DM + aviso breve en el grupo
+    if es_grupo_publico and not es_admin and not es_vip:
+        dm_ok = enviar_telegram(f"🤖 {respuesta}", user_id)
+        if dm_ok:
+            _aviso = f"💬 *{escapar_markdown(nombre)}*, te respondí por privado 📩"
+            _aviso_id = enviar_telegram(_aviso, chat_id)
+            if _aviso_id:
+                programar_borrado(chat_id, _aviso_id, 90)
+        else:
+            # DM falló → responder directo en el grupo (más corto)
+            _resp_corta = respuesta[:300] + ("..." if len(respuesta) > 300 else "")
+            _mid = enviar_telegram(f"🤖 {_resp_corta}", chat_id)
+            if _mid:
+                programar_borrado(chat_id, _mid, 120)
+    else:
         enviar_telegram(f"🤖 {respuesta}", chat_id)
-        return True
-    return False
+
+    return True
 
 
 def _cerrar_todas_posiciones_mt5():
