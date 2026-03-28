@@ -525,22 +525,11 @@ def send_to_channel(signal, executed, detail):
     entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
     lines = [
-        f"{src_emoji} *SEÑAL COPIADA — {source}*",
-        f"━━━━━━━━━━━━━━━━━━",
         f"{dir_emoji} *{dir_es} — {pair_display}*",
-        f"📋 Tipo: {tipo_es}" + (f" | {style}" if style else ""),
         f"",
         f"📍 Entrada: `{entry_display}`",
         f"🎯 Take Profit: `{fmt(tp)}`",
         f"🛡️ Stop Loss: `{fmt(sl)}`",
-    ]
-    if rrr:
-        lines.append(f"⚖️ RRR: {rrr}")
-    if is_limit:
-        lines.append(f"⏰ _Orden Límite — válida 24h_")
-    lines += [
-        f"",
-        f"📊 _Señal procesada por BuySell365 Pro_",
     ]
 
     msg = "\n".join(lines)
