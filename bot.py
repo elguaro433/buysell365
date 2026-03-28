@@ -13982,90 +13982,97 @@ def loop_publicidad_grupo():
 
     # ── Anuncios rotativos ──
     ANUNCIOS = [
-        # 1 — Copy Trading principal
+        # 1 — Copy Trading piloto automático
         (
-            "🤖 *COPY TRADING — OPERA EN PILOTO AUTOMÁTICO*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Nuestro bot copia exactamente las mismas operaciones de nuestros analistas,\n"
-            "directamente en tu cuenta MT5 — *sin que hagas nada*.\n\n"
-            "✅ Sin pantallas. Sin estrés. Sin perder señales.\n"
-            "📊 Entry, Stop Loss y Take Profit automáticos.\n"
-            "🌍 Opera Forex, Oro e Índices 24/7.\n"
-            "💰 Comisión solo sobre ganancias reales.\n\n"
-            "👉 *Escribe /vip para más información*",
+            "🚀 *¿Y SI TU DINERO TRABAJARA SOLO?*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
+            "⚡ Nuestro bot opera *por ti* en tiempo real\n"
+            "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
+            "🌍 Forex · Índices · Oro — 24/7\n"
+            "💰 Pagas *solo si ganas* — sin mensualidad fija\n\n"
+            "🔥 *Sin pantallas. Sin estrés. Sin perder señales.*",
             {"inline_keyboard": [[
-                {"text": "🤖 QUIERO COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "🤖 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "📲 Contactar Admin", "url": "https://t.me/BUYSELL365_PRO_BOT"}
+                {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 2 — Canal VIP señales
+        # 2 — Canal VIP señales IA
         (
-            "💎 *CANAL VIP — SEÑALES CON ENTRADA EXACTA*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Recibe señales profesionales generadas por IA con:\n\n"
-            "📍 *Entry* — precio exacto de entrada\n"
-            "🛡️ *SL* — protección de capital\n"
-            "🎯 *TP* — objetivo de ganancia\n"
-            "📈 Análisis técnico multi-timeframe\n"
-            "📊 Forex, Índices — 24 horas, 5 días.\n\n"
-            "👉 *Escribe /vip para suscribirte*",
+            "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📡 Recibe alertas profesionales al instante:\n\n"
+            "🟢 COMPRA — EUR/USD\n"
+            "📍 Entrada: `1.0845`\n"
+            "🎯 TP: `1.0910`  ·  🛡️ SL: `1.0800`\n\n"
+            "✅ Análisis IA multi-timeframe\n"
+            "✅ 20+ pares: Forex, Índices y más\n"
+            "✅ Alertas 24h — nunca pierdas una señal\n\n"
+            "👇 *Únete al canal VIP ahora*",
             {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+                {"text": "💎 UNIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
             ], [
-                {"text": "🌐 Ver Web", "url": "https://buysell365.pro"}
+                {"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 3 — Resultados / prueba social
+        # 3 — Por qué elegirnos
         (
-            "📈 *RESULTADOS REALES — BUYSELL365 PRO*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🏆 Señales con IA: análisis técnico en tiempo real\n"
-            "🤖 Copy Trading: operaciones automáticas en tu cuenta\n"
-            "🌍 Mercados cubiertos: XAU/USD, EUR/USD, GBP/JPY, US100\n"
-            "⚡ Velocidad de ejecución: milisegundos\n\n"
-            "💼 Copy Trading: comisión solo sobre beneficios\n\n"
-            "¿Listo para operar de forma profesional?\n"
-            "👇 Únete ahora",
+            "🏆 *TRADING PROFESIONAL — AL ALCANCE DE TODOS*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📊 *Lo que ofrecemos:*\n\n"
+            "🔵 Señales VIP con IA → entrada, TP y SL exactos\n"
+            "🤖 Copy Trading → tu cuenta opera sola en MT5\n"
+            "⚡ Ejecución en milisegundos\n"
+            "🌍 20+ pares: EUR/USD · GBP/JPY · NASDAQ · ORO\n"
+            "💼 Copy Trading sin mensualidad fija\n\n"
+            "❓ *¿Tienes dudas?* Escríbenos — te respondemos al instante",
             {"inline_keyboard": [[
-                {"text": "🚀 EMPEZAR AHORA", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+            ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 4 — Copy Trading detalle comisión
+        # 4 — Cómo funciona Copy Trading
         (
-            "💼 *COPY TRADING — SIN RIESGO INICIAL*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🔑 Así funciona nuestro Copy Trading:\n\n"
-            "1️⃣ Conectas tu cuenta MT5 a nuestra red\n"
-            "2️⃣ Nuestro bot replica cada operación en tu cuenta\n"
-            "3️⃣ Pagas solo cuando *tú* generas ganancias\n\n"
-            "✅ Sin mensualidad fija en Copy Trading\n"
-            "✅ Sin señales manuales que seguir\n"
-            "✅ Compatible con cuentas XM, IC Markets y más\n\n"
-            "📲 *Contacta al admin para activar tu Copy Trading*",
+            "⚙️ *¿CÓMO FUNCIONA EL COPY TRADING?*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "3 pasos. Así de simple:\n\n"
+            "1️⃣  Conectas tu cuenta MT5 a nuestra red\n"
+            "2️⃣  Nuestro bot replica cada operación al instante\n"
+            "3️⃣  Recibes ganancias — *pagas solo si ganas*\n\n"
+            "✅ Sin experiencia necesaria\n"
+            "✅ Compatible con XM, IC Markets y más\n"
+            "✅ Funciona 24/7 en piloto automático\n\n"
+            "🚀 *Empieza hoy — sin compromisos*",
             {"inline_keyboard": [[
-                {"text": "📲 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "🤖 QUIERO COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
         # 5 — Combo VIP + Copy Trading
         (
-            "🔥 *DOS SERVICIOS. UN SOLO OBJETIVO: GANAR*\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📡 *Canal VIP* — Señales con IA\n"
-            "  └ Entry, SL y TP exactos\n"
-            "  └ Análisis diario de mercados\n"
-            "  └ Alertas de precio en tiempo real\n\n"
-            "🤖 *Copy Trading* — sin mensualidad\n"
-            "  └ Bot replica operaciones en tu MT5\n"
-            "  └ Comisión solo sobre ganancias reales\n"
-            "  └ Funciona 24/7 sin que hagas nada\n\n"
-            "👉 *Escribe /vip para contratar cualquiera de los dos*",
+            "🔥 *DOS SERVICIOS. UN OBJETIVO: GANAR*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💎 *Canal VIP — Señales con IA*\n"
+            "   ├ 📍 Entry · 🎯 TP · 🛡️ SL exactos\n"
+            "   ├ 📊 Análisis diario de mercados\n"
+            "   └ ⚡ Alertas en tiempo real\n\n"
+            "🤖 *Copy Trading — Sin mensualidad*\n"
+            "   ├ 🔄 Bot replica operaciones en tu MT5\n"
+            "   ├ 💰 Pagas solo sobre ganancias reales\n"
+            "   └ 🌍 Activo 24/7 — sin intervención\n\n"
+            "👇 *Elige tu plan y empieza ahora*",
             {"inline_keyboard": [[
-                {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
-                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+            ], [
+                {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
         ),
     ]
@@ -14246,6 +14253,7 @@ def loop_monitor_alta_frecuencia():
     """Hilo dedicado exclusivamente a la vigilancia de operaciones cada N segundos."""
     print("🛰️ Monitor de Alta Frecuencia (HFR) iniciado...")
     _ultimo_check_noticias = 0
+    _ultimo_capital_update = 0
     while True:
         try:
             revisar_niveles_operaciones()
@@ -14254,6 +14262,10 @@ def loop_monitor_alta_frecuencia():
             if _ahora - _ultimo_check_noticias >= 60:
                 proteger_operaciones_por_noticias()
                 _ultimo_check_noticias = _ahora
+            # Actualizar capital MT5 cada 30 segundos (en tiempo real para el dashboard)
+            if _ahora - _ultimo_capital_update >= 30:
+                _actualizar_capital_desde_mt5()
+                _ultimo_capital_update = _ahora
         except Exception as e:
             logger.error(f"⚠️ Error en monitor HFR: {e}")
         time.sleep(INTERVALO_MONITOR)
@@ -14267,13 +14279,15 @@ def _actualizar_capital_desde_mt5():
         return
     try:
         equity = _obtener_capital_real_mt5()
-        if equity > 0 and equity != CAPITAL_USUARIO:
+        if equity > 0 and abs(equity - CAPITAL_USUARIO) >= 0.01:
             _old = CAPITAL_USUARIO
             CAPITAL_USUARIO = equity
+            # Guardar en estado.json para que el launcher lo lea en tiempo real
+            guardar_estado()
             # Log solo cada 10 min o si cambio > $5
             _now = time.time()
             if abs(equity - _old) > 5 or (_now - _ultimo_log_capital) > 600:
-                print(f"💰 CAPITAL ACTUALIZADO: ${_old:.0f} → ${equity:.0f} (balance MT5)")
+                print(f"💰 CAPITAL ACTUALIZADO: ${_old:.2f} → ${equity:.2f} (balance MT5)")
                 _ultimo_log_capital = _now
     except Exception as e:
         logger.warning(f"⚠️ Error actualizando capital: {e}")
@@ -16675,6 +16689,7 @@ def _arrancar_interno():
             _acc_info = mt5.account_info()
             if _acc_info and _acc_info.balance > 0:
                 CAPITAL_USUARIO = round(_acc_info.balance, 2)
+                guardar_estado()   # sincronizar estado.json inmediatamente
                 print(f"💰 Capital inicializado desde MT5: ${CAPITAL_USUARIO:.2f} (balance real)")
             else:
                 print(f"⚠️ No se pudo leer balance MT5, usando capital guardado: ${CAPITAL_USUARIO:.0f}")
