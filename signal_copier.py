@@ -145,7 +145,8 @@ def parse_signal(text, chat_title=""):
     if not direction:
         _buy_words  = ["BUY", "COMPRA", "LONG", "COMPRE", "COMPRA DE", "COMPRA INSTANTANEA",
                        "VENTA DE ORO AHORA" ]  # "Venta de Oro Ahora" puede ser SELL
-        _sell_words = ["SELL", "VENTA", "SHORT", "VENTA INSTANTANEA", "VENTA DE ORO"]
+        _sell_words = ["SELL", "VENTA", "SHORT", "VENTA INSTANTANEA", "VENTA DE ORO",
+                       "LIMITE DE VENTA", "VENTA LIMITE"]  # AnabelSignals: "Límite de venta de oro"
         # Verificar VENTA antes que COMPRA para evitar falsos positivos
         if any(w in upper_noslash for w in _sell_words):
             direction = "SELL"
@@ -176,18 +177,23 @@ def parse_signal(text, chat_title=""):
     upper_clean = re.sub(r'[$€£]', '', upper)
 
     # ── EXTRAER SL ──
-    # Formatos: "SL: 4499.60" | "SL 4499" | "❗️ SL 45370" | "Stop Loss → 1.3801"
-    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→]+(\d+\.?\d*)', upper_clean)
+    # Formatos: "SL: 4499.60" | "SL 4499" | "❗️ SL 45370" | "Stop Loss → 1.3801" | "SL4415" (sin espacio)
+    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→]*(\d{3,6}\.?\d*)', upper_clean)
 
     # ── EXTRAER TP1 (solo el primero) ──
     # Formatos: "TP1: 4513" | "TP: 4513" | "Tp 4540" | "🥇 TP 45530" | "Toma de Ganancias 1 : 4513"
+    # Ignora líneas con "TP: abierto" / "TP: ABIERTO" (sin número fijo)
+    _upper_clean_no_abierto = re.sub(r'TP\s*[:\s]*ABIERTO', '', upper_clean)
     tp_match = re.search(
         r'(?:TOMA\s*DE\s*GANANCIAS\s*1\s*[:\s]+|TP\s*1\s*[:\s]+|TP\s*[:\s]+|TP\s+)(\d+\.?\d*)',
-        upper_clean
+        _upper_clean_no_abierto
     )
     # Fallback: "Tp 4540" (capital T lowercase p)
     if not tp_match:
-        tp_match = re.search(r'\bTP\s+(\d{3,6}\.?\d*)', upper_clean)
+        tp_match = re.search(r'\bTP\s+(\d{3,6}\.?\d*)', _upper_clean_no_abierto)
+    # Fallback AnabelSignals: "TP4430" (sin espacio entre TP y número)
+    if not tp_match:
+        tp_match = re.search(r'\bTP(\d{3,6}\.?\d*)', _upper_clean_no_abierto)
 
     # ── EXTRAER ENTRADA ──
     # Formatos: "Entrada: 4509/4504" | "Entrada 4545" | "Venta de Oro Ahora: 4416 - 4419"
@@ -199,6 +205,12 @@ def parse_signal(text, chat_title=""):
     # FXPremiere: "Venta de Oro Ahora: 4416 - 4419" → tomar primer número después del ":"
     if not entry_match:
         entry_match = re.search(r'(?:AHORA|NOW)\s*[:\s]+(\d+\.?\d*)', upper_clean)
+    # AnabelSignals: "ORO COMPRA Ahora 4416_4413" | "XAUUSD COMPRA 4425" → número tras activo+dirección
+    if not entry_match:
+        entry_match = re.search(r'(?:ORO|XAUUSD|GOLD)\s+(?:COMPRA|VENTA|BUY|SELL)[^\d]*(\d{3,6}\.?\d*)', upper_clean)
+    # AnabelSignals: "Límite de venta de oro 4442" | "Venta de oro 4467" → número tras dirección+activo
+    if not entry_match:
+        entry_match = re.search(r'(?:VENTA|COMPRA|LIMITE)\s+(?:DE\s+)?(?:ORO|XAUUSD|GOLD)[^\d]*(\d{3,6}\.?\d*)', upper_clean)
     # Formato inline: "GBP/CAD H1 Buy 1.8412" → número después de BUY/SELL
     if not entry_match:
         entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+[\w/]+\s+(?:H\d+\s+)?(\d+\.?\d*)', upper_clean)
@@ -596,10 +608,12 @@ async def main():
     # Canales públicos por username (se resuelven al arrancar)
     PUBLIC_CHANNELS_USERNAMES = [
         "forexsignalstrialgroup_00",  # FXPremiere Free Trial — Gold + Forex
+        "Anabelsignals08",            # AnabelSignals — XAUUSD/Gold only (94k subs)
     ]
     # Filtro por activo: si el canal está en esta lista, solo se aceptan esas señales
     CHANNEL_ASSET_FILTER = {
         "forexsignalstrialgroup_00": ["XAUUSD", "GOLD"],  # Solo oro
+        "Anabelsignals08": ["XAUUSD", "GOLD", "ORO"],    # Solo oro
     }
 
     # Resolver usernames → IDs numéricos y agregarlos al set
