@@ -961,11 +961,6 @@ class ManagementConsole:
         qctrl_row = tk.Frame(qctrl_frame, bg=BG_PANEL)
         qctrl_row.pack(fill="x", pady=3)
 
-        self._btn_scalper_toggle = _make_button(
-            qctrl_row, "\u23F8 Pausar Scalper", self._cmd_toggle_scalper,
-            bg="#6e40c9", fg="#ffffff")
-        self._btn_scalper_toggle.pack(side="left", padx=5, pady=3)
-
         _make_button(qctrl_row, "\u26A0 Cerrar Todo", self._cmd_cerrar_todo,
                      bg="#b91c1c", fg="#ffffff").pack(side="left", padx=5, pady=3)
 
@@ -1496,43 +1491,28 @@ class ManagementConsole:
     #  MT5 CAPITAL REFRESH (every 30s)
     # --------------------------------------------------------
     def _refresh_mt5_capital_loop(self):
-        """Read MT5 account balance in background, update label."""
-        def _fetch():
+        """Lee el capital de la cuenta real desde estado.json (actualizado por el bot)."""
+        def _update():
             try:
-                import MetaTrader5 as mt5
-                if not mt5.initialize():
-                    return None
-                info = mt5.account_info()
-                if info:
-                    return {"balance": info.balance, "equity": info.equity,
-                            "profit": info.profit}
-                return None
+                estado = load_estado()
+                bal = estado.get("capital_usuario", None)
+                if bal is not None and bal > 0:
+                    color = ACCENT_BRIGHT
+                    login = estado.get("mt5_login", "")
+                    login_txt = f" #{login}" if login else ""
+                    self._dash_mt5_capital_lbl.config(
+                        text=f"MT5 Real{login_txt}: ${bal:,.2f}", fg=color)
+                    self._mt5_balance_real = bal
+                    self._equity_history.append((time.time(), bal))
+                    if len(self._equity_history) > 200:
+                        self._equity_history = self._equity_history[-200:]
+                else:
+                    self._dash_mt5_capital_lbl.config(text="MT5: sin datos", fg=TEXT_SEC)
             except Exception:
-                return None
+                self._dash_mt5_capital_lbl.config(text="MT5: sin datos", fg=TEXT_SEC)
 
-        def _update(result):
-            if result:
-                bal = result["balance"]
-                eq = result["equity"]
-                profit = result["profit"]
-                color = WIN_COLOR if profit >= 0 else LOSS_COLOR
-                self._dash_mt5_capital_lbl.config(
-                    text=f"MT5: ${bal:,.2f} (P&L: ${profit:+,.2f})", fg=color)
-                self._mt5_balance_real = bal  # Guardar para título
-                # Track balance history for curve
-                self._equity_history.append((time.time(), bal))
-                # Keep last 200 data points
-                if len(self._equity_history) > 200:
-                    self._equity_history = self._equity_history[-200:]
-            else:
-                self._dash_mt5_capital_lbl.config(text="MT5 Capital: sin conexion", fg=TEXT_SEC)
-
-        def _bg():
-            result = _fetch()
-            self.root.after(0, lambda: _update(result))
-
-        threading.Thread(target=_bg, daemon=True).start()
-        self.root.after(30000, self._refresh_mt5_capital_loop)
+        _update()
+        self.root.after(15000, self._refresh_mt5_capital_loop)
 
     # --------------------------------------------------------
     #  P&L CHART DRAWING
@@ -1805,9 +1785,7 @@ class ManagementConsole:
     def _update_tab_flash(self, estado):
         """Flash tab text color when there are active positions."""
         ops_activas = estado.get("operaciones_activas", {})
-        scalper_state = estado.get("scalper_estado", {})
         has_main_ops = len(ops_activas) > 0
-        has_scalper_ops = scalper_state.get("posiciones_abiertas", 0) > 0
 
         # Flash senales tab
         tick_even = (self._tick_count % 2 == 0)
@@ -1819,15 +1797,6 @@ class ManagementConsole:
                 self.notebook.tab(self._tab_senales, text=f" \U0001F534 Se\u00f1ales ({count}) ")
         else:
             self.notebook.tab(self._tab_senales, text=" \U0001F4E1 Se\u00f1ales ")
-
-        # Flash scalper tab
-        if has_scalper_ops:
-            if tick_even:
-                self.notebook.tab(self._tab_scalper, text=" \U0001FA92 Scalper \u25CF ")
-            else:
-                self.notebook.tab(self._tab_scalper, text=" \U0001FA92 Scalper \u26A1 ")
-        else:
-            self.notebook.tab(self._tab_scalper, text=" \U0001FA92 Scalper ")
 
     # ============================================================
     #  TAB 2: SENALES
