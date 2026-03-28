@@ -289,14 +289,14 @@ INTERVAL_DATA = "15m"           # Velas de 15 minutos
 
 app = Flask(__name__)
 
-# H-05 FIX: Redirigir HTTP→HTTPS (excepto webhooks de TradingView en puerto 80)
+# H-05 FIX: Redirigir HTTP→HTTPS (excepto webhooks en puerto 80)
 @app.before_request
 def _redirect_http_to_https():
     """Redirige navegadores de HTTP a HTTPS. Webhooks POST a /webhook se mantienen en HTTP."""
     # En modo local (puertos alternativos), no redirigir — SSL auto-firmado causa problemas
     _is_local = os.getenv("HTTP_PORT", "80") != "80"
     if not _is_local and not request.is_secure and request.method == "GET":
-        # Solo redirigir GETs del navegador — los POSTs de TradingView se quedan en HTTP
+        # Solo redirigir GETs del navegador — los POSTs de webhooks se quedan en HTTP
         try:
             url = request.url.replace("http://", "https://", 1)
             from flask import redirect
@@ -382,7 +382,8 @@ MODO_RIESGO = "normal"
 alertas_precio = []  # [{"ticker", "nombre", "precio", "tipo": ">="|"<="}]
 
 # Activos desactivados por suscripción
-activos_desactivados = set()
+# ORO bloqueado por decisión del operador hasta nuevo aviso
+activos_desactivados = {"ORO", "GC=F", "GOLD"}
 
 # Briefing matutino y notificaciones de sesión
 ultimo_briefing = time.time()  # Esperar desde arranque antes del primer briefing
@@ -559,36 +560,6 @@ def _reenable_autotrading():
 
 # Dashboard URL: configurable via .env para modo local vs VPS
 DASHBOARD_URL  = os.getenv("DASHBOARD_URL", "https://buysell365.pro/dashboard").strip()
-
-# ── MAPA TRADINGVIEW SCANNER — FUENTES EN TIEMPO REAL ──────────────────────
-# PROBADO en PythonAnywhere con test_tv_symbols.py (2 Mar 2026):
-#   ORO:    cfd/OANDA:XAUUSD ✅, cfd/FOREXCOM:XAUUSD ✅, cfd/PEPPERSTONE:XAUUSD ✅
-#   NASDAQ: america/NASDAQ:NDX ✅  (forex/cfd → totalCount=0 para todos)
-#   S&P:    america/SP:SPX ✅      (forex/cfd → totalCount=0 para todos)
-#   EUR/USD: forex/OANDA:EURUSD ✅
-#   USD/JPY: forex/OANDA:USDJPY ✅
-TV_TICKER_MAP = {
-    # FOREX — OANDA probado y funciona en PythonAnywhere
-    'EURUSD=X': ('forex',   'OANDA',        'EURUSD'),
-    'USDJPY=X': ('forex',   'OANDA',        'USDJPY'),
-    'GBPJPY=X': ('forex',   'OANDA',        'GBPJPY'),
-    # ORO — XAUUSD spot via OANDA en screener 'cfd' (PROBADO: funciona en PA)
-    'GC=F':     ('cfd',     'OANDA',        'XAUUSD'),
-    # ÍNDICES — screener 'america' con índices reales (PROBADO: funciona en PA)
-    # NOTA: NDX = NASDAQ-100 index, SPX = S&P 500 index (no CFDs)
-    'NQ=F':     ('america', 'NASDAQ',       'NDX'),
-    'ES=F':     ('america', 'SP',           'SPX'),
-}
-
-TV_TICKER_FALLBACK = {
-    'EURUSD=X': ('forex',   'FX',           'EURUSD'),
-    'USDJPY=X': ('forex',   'FX',           'USDJPY'),
-    'GBPJPY=X': ('forex',   'FX',           'GBPJPY'),
-    # ORO fallback: FOREXCOM y PEPPERSTONE también funcionaron en test
-    'GC=F':     ('cfd',     'FOREXCOM',     'XAUUSD'),
-    # Índices: no hay fallback conocido que funcione (forex/cfd = 0 datos)
-    # Se omiten NQ=F y ES=F — irán directo a TV_EXTRA o Twelve Data
-}
 
 # ── TWELVE DATA API — FUENTE ALTERNATIVA DE PRECIOS EN TIEMPO REAL ────────
 # Plan Basic 8: 800 créditos/día, 8 req/min. Con cache 10s → ~100 créditos/hora max.
@@ -1187,53 +1158,11 @@ def descargar_ohlcv(ticker, period="60d", interval="1h"):
     return pd.DataFrame()
 
 
-_TV_HEADERS = {
-    'Content-Type': 'application/json',
-    'Referer': 'https://www.tradingview.com/',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-}
-
-def _tv_scan(screener, exch, sym):
-    """
-    Consulta TradingView Scanner API — fuente de precio en tiempo real.
-    Retorna (precio, apertura) o (None, None).
-    El campo 'close' en el scanner es el ÚLTIMO precio en tiempo real (no cierre diario).
-
-    IMPORTANTE: Esta es la fuente más precisa para coincidir con TradingView web.
-    Los precios devueltos son idénticos a lo que muestra tradingview.com.
-    """
-    try:
-        url     = f'https://scanner.tradingview.com/{screener}/scan'
-        payload = {
-            'symbols': {'tickers': [f'{exch}:{sym}'], 'query': {'types': []}},
-            'columns': ['close', 'open', 'change', 'high', 'low']
-        }
-        r = requests.post(url, json=payload, headers=_TV_HEADERS, timeout=8)
-        if r.status_code != 200:
-            logger.debug(f"TV Scanner {exch}:{sym} — HTTP {r.status_code}")
-            return None, None
-        data = r.json()
-        if data.get('data') and len(data['data']) > 0 and data['data'][0].get('d'):
-            d = data['data'][0]['d']
-            precio   = float(d[0]) if d[0] is not None else None
-            apertura = float(d[1]) if d[1] is not None else None
-            if precio and precio > 0:
-                logger.debug(f"✅ TV Scanner {exch}:{sym} = {precio}")
-                return precio, apertura
-    except requests.exceptions.Timeout:
-        logger.debug(f"⏱️ TV Scanner timeout: {exch}:{sym}")
-    except requests.exceptions.ConnectionError:
-        logger.debug(f"🔌 TV Scanner conexión fallida: {exch}:{sym}")
-    except Exception as e:
-        logger.debug(f"❌ TV Scanner error {exch}:{sym}: {e}")
-    return None, None
-
-
 def _twelve_data_price(ticker):
     """
     Twelve Data API — precio en tiempo real.
     Plan Basic 8: 800 créditos/día, 8 req/min.
-    Da precios SPOT (XAU/USD, no futuros COMEX) → coincide con XM/TradingView.
+    Da precios SPOT (XAU/USD, no futuros COMEX) → coincide con XM.
     Retorna (precio, apertura) o (None, None).
     """
     td_sym = TWELVE_DATA_MAP.get(ticker)
@@ -1336,22 +1265,15 @@ def _yf_precio_rapido(ticker):
     return None, None, None
 
 
-def obtener_cotizacion_tv(ticker):
+def obtener_cotizacion(ticker):
     """
-    Cascada de fuentes de precio — PRIORIDAD: TradingView (precios exactos).
-
-    OBJETIVO: Que el precio mostrado sea IDÉNTICO al de TradingView web.
-    TradingView Scanner usa XAUUSD spot (no GC=F futuros), US100/US500 CFD,
-    y EURUSD/USDJPY forex — exactamente lo que muestra la web de TradingView.
+    Cascada de fuentes de precio en tiempo real.
 
     Orden de cascada:
       1. MT5 bid/ask              — exacto, solo Windows local
-      2. TradingView Scanner      — PRIORITARIO: precio idéntico a TV web
-      3. TradingView Fallback     — fuentes alternativas en TV
-      4. TradingView Extra Sources— múltiples exchanges redundantes
-      5. Twelve Data API          — precio spot real (XAU/USD, SPX, IXIC)
-      6. Yahoo Finance Chart v8   — API rápida pero puede diferir en futuros
-      7. yfinance fast_info       — ÚLTIMO recurso (GC=F futuros ≠ XAUUSD spot)
+      2. Twelve Data API          — precio spot real (XAU/USD, SPX, IXIC)
+      3. Yahoo Finance Chart v8   — API rápida pero puede diferir en futuros
+      4. yfinance fast_info       — ÚLTIMO recurso (GC=F futuros ≠ XAUUSD spot)
     Cache: 10 segundos
     """
     global _FUENTES_PRECIO
@@ -1380,50 +1302,7 @@ def obtener_cotizacion_tv(ticker):
         except Exception:
             pass
 
-    # === 2. TradingView Scanner — PRIORITARIO (precio = TV web) ===
-    # XAUUSD spot, US100/US500 índices, EURUSD/USDJPY/GBPJPY forex
-    tv = TV_TICKER_MAP.get(ticker)
-    if tv:
-        p, a = _tv_scan(*tv)
-        if p:
-            sym_real = tv[2]
-            result   = {'precio': p, 'apertura': a or p,
-                        'ts': time.time(), 'fuente': f'TradingView ({sym_real})'}
-            _FUENTES_PRECIO[ticker] = result
-            return result
-
-    # === 3. TradingView Fallback (fuentes alternativas TV) ===
-    tv_fb = TV_TICKER_FALLBACK.get(ticker)
-    if tv_fb:
-        p, a = _tv_scan(*tv_fb)
-        if p:
-            sym_fb = tv_fb[2]
-            result = {'precio': p, 'apertura': a or p,
-                      'ts': time.time(), 'fuente': f'TradingView ({sym_fb})'}
-            _FUENTES_PRECIO[ticker] = result
-            return result
-
-    # === 4. TradingView Scanner — Exchanges adicionales (PROBADOS en PythonAnywhere) ===
-    _TV_EXTRA_SOURCES = {
-        # ORO: 3 fuentes CFD probadas que funcionan + TVC:GOLD
-        'GC=F':     [('cfd', 'PEPPERSTONE', 'XAUUSD'), ('cfd', 'TVC', 'GOLD'), ('cfd', 'FOREXCOM', 'XAUUSD')],
-        # NASDAQ/S&P: solo 'america' funciona en PythonAnywhere
-        'NQ=F':     [('america', 'SP', 'NDX')],
-        'ES=F':     [('america', 'NASDAQ', 'SPX')],
-        'EURUSD=X': [('forex', 'FX', 'EURUSD'), ('forex', 'FXOPEN', 'EURUSD')],
-        'USDJPY=X': [('forex', 'FX', 'USDJPY'), ('forex', 'FXOPEN', 'USDJPY')],
-        'GBPJPY=X': [('forex', 'FX', 'GBPJPY'), ('forex', 'FXOPEN', 'GBPJPY')],
-    }
-    extras = _TV_EXTRA_SOURCES.get(ticker, [])
-    for tv_extra in extras:
-        p, a = _tv_scan(*tv_extra)
-        if p:
-            result = {'precio': p, 'apertura': a or p,
-                      'ts': time.time(), 'fuente': f'TradingView ({tv_extra[1]}:{tv_extra[2]})'}
-            _FUENTES_PRECIO[ticker] = result
-            return result
-
-    # === 5. Twelve Data API — precio spot en tiempo real ===
+    # === 2. Twelve Data API — precio spot en tiempo real ===
     # Twelve Data da XAUUSD spot (coincide con XM), SPX, IXIC reales.
     # 800 créditos/día, 8 req/min. Suficiente con cache de 10s.
     p, a = _twelve_data_price(ticker)
@@ -1434,7 +1313,7 @@ def obtener_cotizacion_tv(ticker):
         _FUENTES_PRECIO[ticker] = result
         return result
 
-    # === 6. Yahoo Finance Chart API v8 ===
+    # === 3. Yahoo Finance Chart API v8 ===
     p, a = _yf_chart_api(ticker)
     if p:
         result = {'precio': p, 'apertura': a or p,
@@ -1442,7 +1321,7 @@ def obtener_cotizacion_tv(ticker):
         _FUENTES_PRECIO[ticker] = result
         return result
 
-    # === 7. yfinance fast_info — ÚLTIMO RECURSO ===
+    # === 4. yfinance fast_info — ÚLTIMO RECURSO ===
     # ADVERTENCIA: Para ORO usa GC=F (futuros COMEX) que difiere $5-30 de XAUUSD spot
     precio, apertura, fuente_yf = _yf_precio_rapido(ticker)
     if precio:
@@ -1457,7 +1336,7 @@ def obtener_cotizacion_tv(ticker):
 
 def obtener_precio_actual(ticker, df_fallback=None):
     """Orquestador maestro de precios — cascada completa"""
-    cotizacion = obtener_cotizacion_tv(ticker)
+    cotizacion = obtener_cotizacion(ticker)
     if cotizacion:
         return cotizacion['precio']
 
@@ -1519,7 +1398,7 @@ def fmt_val(valor, ticker=""):
     return f"{valor:.2f}"
 
 def fmt(v: float, ticker: str) -> str:
-    """Formato de precio según tipo de activo para máxima coincidencia con TradingView"""
+    """Formato de precio según tipo de activo para máxima coincidencia con XM broker"""
     if v is None: return "N/A"
     
     # Forex: 5 decimales (Standard) o 3 para JPY
@@ -1528,7 +1407,7 @@ def fmt(v: float, ticker: str) -> str:
             return f"{v:.3f}"
         return f"{v:.5f}"
     
-    # Futuros / Índices: 2 decimales es el estándar en TradingView para Gold, NQ, ES
+    # Futuros / Índices: 2 decimales es el estándar para Gold, NQ, ES
     if ticker in ("GC=F", "ES=F", "NQ=F"):
         return f"{v:,.2f}"
     
@@ -3559,7 +3438,7 @@ def _ejecutar_senal_manual(senal: dict, chat_id: str, nombre_admin: str = "Admin
 
     # Si entrada es 0, usar precio de mercado
     if entrada == 0 or entrada is None:
-        cot = obtener_cotizacion_tv(ticker)
+        cot = obtener_cotizacion(ticker)
         if cot:
             entrada = cot['precio']
         else:
@@ -4536,7 +4415,7 @@ def hay_correlacion_peligrosa(ticker_nuevo, tipo_nuevo):
 #  MENSAJE DE NUEVA SEÑAL - PROFESIONAL
 # ============================================================
 
-def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente="TradingView", premium=False, skip_mt5_razon="", nivel_senal="PREMIUM"):
+def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente="BuySell365", premium=False, skip_mt5_razon="", nivel_senal="PREMIUM"):
     cat  = get_categoria(ticker)
     f_   = lambda v: fmt(v, ticker)
     hora = ahora().strftime("%H:%M:%S")
@@ -4925,11 +4804,11 @@ def cmd_precio(activo_raw: str):
     ticker = ACTIVOS[nombre]
 
     try:
-        cotizacion = obtener_cotizacion_tv(ticker)
+        cotizacion = obtener_cotizacion(ticker)
         if cotizacion:
             precio   = cotizacion['precio']
             apertura = cotizacion['apertura']
-            fuente   = cotizacion.get('fuente', 'TradingView')
+            fuente   = cotizacion.get('fuente', 'BuySell365')
         else:
             # Intentar MT5 primero, luego yfinance como fallback
             df = descargar_ohlcv(ticker, period="5d", interval="15m")
@@ -4976,7 +4855,7 @@ def cmd_precio(activo_raw: str):
         # Nota de instrumento
         nota_instrumento = ""
         if ticker == "GC=F" and "XAUUSD" in fuente:
-            nota_instrumento = "\n📌 _XAUUSD spot (igual a XM/TradingView)_"
+            nota_instrumento = "\n📌 _XAUUSD spot (XAUUSD spot)_"
         elif ticker in ("NQ=F", "ES=F") and ("US100" in fuente or "US500" in fuente):
             nota_instrumento = "\n📌 _CFD (igual a XM)_"
         elif "Yahoo" in fuente and ticker in ("GC=F", "NQ=F", "ES=F"):
@@ -5037,10 +4916,10 @@ def cmd_analisis(activo_raw: str):
             return f"⚠️ No pude obtener datos de {nombre} ahora mismo. yFinance está tardando — prueba en 1-2 minutos."
 
         # Precio en vivo (cascada de fuentes)
-        cot = obtener_cotizacion_tv(ticker)
+        cot = obtener_cotizacion(ticker)
         if cot:
             precio = cot['precio']
-            fuente = cot.get('fuente', 'TradingView')
+            fuente = cot.get('fuente', 'BuySell365')
         else:
             precio = float(df['Close'].iloc[-1])
             fuente = "yfinance (velas)"
@@ -5235,7 +5114,7 @@ def cmd_precios_tv():
     _es_weekend_p = datetime.now(pytz.UTC).weekday() >= 5
 
     def _fetch(nombre, tk):
-        res = obtener_cotizacion_tv(tk)
+        res = obtener_cotizacion(tk)
         resultados[nombre] = (tk, res)
 
     with ThreadPoolExecutor(max_workers=len(ACTIVOS)) as executor:
@@ -5322,7 +5201,7 @@ def cmd_fuentes():
     lineas = [
         "🔍 *DIAGNÓSTICO DE FUENTES DE PRECIO*\n"
         "━━━━━━━━━━\n"
-        "Verificando cada activo contra TradingView...\n"
+        "Verificando cada activo...\n"
     ]
 
     # Forzar refresh (limpiar caché)
@@ -5331,17 +5210,14 @@ def cmd_fuentes():
 
     for nombre, ticker in ACTIVOS.items():
         try:
-            cot = obtener_cotizacion_tv(ticker)
+            cot = obtener_cotizacion(ticker)
             if cot:
                 precio = cot['precio']
                 fuente = cot.get('fuente', '?')
                 f_ = lambda v, tk=ticker: fmt(v, tk)
 
-                # Verificar si la fuente es TradingView (exacta) o fallback
-                if 'TradingView' in fuente:
+                if 'MT5' in fuente or 'TwelveData' in fuente:
                     estado = "✅ EXACTO"
-                elif 'MT5' in fuente:
-                    estado = "✅ XM DIRECTO"
                 else:
                     estado = "⚠️ FALLBACK"
 
@@ -5357,11 +5233,9 @@ def cmd_fuentes():
 
     lineas.append(
         "━━━━━━━━━━\n"
-        "✅ = Precio idéntico a TradingView\n"
+        "✅ = Precio de MT5 o Twelve Data (exacto)\n"
         "⚠️ = Precio de Yahoo Finance (puede diferir $5-30 en Oro/Índices)\n"
-        "❌ = Sin datos\n\n"
-        "💡 Si ves ⚠️, el servidor no puede acceder a TradingView Scanner.\n"
-        "Esto es normal en PythonAnywhere (proxy bloqueado)."
+        "❌ = Sin datos"
     )
     return "\n".join(lineas)
 
@@ -9307,7 +9181,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
 def index_web():
     """Landing page profesional (GET) o procesar webhook (POST)."""
     if request.method == "POST":
-        return route_tv_signal()
+        return jsonify({"status": "error", "msg": "Endpoint no disponible"}), 404
 
     # --- Estadísticas en vivo para la landing ---
     try:
@@ -12023,80 +11897,8 @@ def _parsear_texto_gainzalgo(raw_body: str) -> dict:
     logger.info(f"🧠 GainzAlgo Parser: {resultado} | Raw: {texto[:200]}")
     return resultado
 
-@app.route("/tv_signal", methods=["POST"])
-@app.route("/webhook", methods=["POST"])
-@app.route("/signal", methods=["POST"])
-@app.route("/tradingview", methods=["POST"])
-def route_tv_signal():
-    """📡 RECEPTOR DE SEÑALES UNIVERSAL (JSON y Texto Plano)"""
-    try:
-        # 1. Obtener datos (Soportar JSON y Texto Plano de GainzAlgo)
-        data = {}
-        raw_body = request.get_data(as_text=True)
-        logger.info(f"📡 Webhook recibido: {raw_body[:500]}")
-
-        try:
-            data = request.get_json(force=True) or {}
-        except Exception:
-            data = {}
-
-        # Si no hay JSON válido o el JSON es pobre, parsear el texto con el parser inteligente
-        if not data or (not data.get("action") and not data.get("signal")):
-            parsed = _parsear_texto_gainzalgo(raw_body)
-            # Merge: parsed llena los huecos, JSON tiene prioridad
-            for k, v in parsed.items():
-                if k not in data or not data.get(k):
-                    data[k] = v
-
-        source = data.get("source", "TradingView_AI")
-        ticker_raw = data.get("ticker", data.get("market", "DESCONOCIDO"))
-
-        # Limpiar ticker (ej: OANDA:EURUSD -> EURUSD)
-        ticker = ticker_raw.split(":")[-1] if ":" in ticker_raw else ticker_raw
-
-        # ── AUTENTICACIÓN WEBHOOK ──
-        tv_secret_received = str(data.get("secret", data.get("passphrase", "")))
-        tv_secret_stored = os.getenv("TV_SECRET", "").strip()
-        if not tv_secret_stored:
-            log_op("⚠️ TV_SECRET no configurado en .env — webhook rechazado", "warning")
-            return jsonify({"status": "error", "msg": "TV_SECRET no configurado"}), 403
-
-        # Fuentes internas de BuySell365 (indicadores propios en TradingView)
-        _source_raw = data.get("source", "")
-        _es_fuente_interna = str(_source_raw).startswith("BuySell365_")
-
-        if tv_secret_received != tv_secret_stored:
-            logger.warning(f"⛔ Webhook NO AUTORIZADO desde {request.remote_addr} (secret inválido): {raw_body[:100]}")
-            return jsonify({"error": "No autorizado"}), 401
-
-        # ── VALIDAR TICKER ──
-        tickers_validos = {"XAUUSD", "EURUSD", "USDJPY", "GBPJPY", "NQ=F", "ES=F",
-                           "GOLD", "NAS100", "SP500", "US100", "US500",
-                           "GC=F", "SPX500USD", "SPX", "NQ",
-                           "NASDAQ", "US100Cash", "US500Cash"}
-        if ticker.upper() in ("DESCONOCIDO", "") or ticker.upper() not in tickers_validos:
-            logger.warning(f"⚠️ Webhook: ticker no reconocido '{ticker}' — descartado. Raw: {raw_body[:200]}")
-            return jsonify({"status": "rejected", "msg": f"Ticker no reconocido: {ticker}"}), 400
-
-        # ═══ RESPONDER INMEDIATO A TRADINGVIEW (evitar timeout 10s) ═══
-        # C-05 FIX: Usar pool limitado en vez de threads ilimitados (previene DoS)
-        _wh_data = data.copy()
-        try:
-            _pool_webhook.submit(_procesar_webhook_bg, _wh_data, str(ticker), str(source), str(raw_body))
-        except Exception:
-            # Pool lleno — procesar en thread nuevo como fallback
-            import threading as _thr
-            _thr.Thread(target=_procesar_webhook_bg, args=(_wh_data, str(ticker), str(source), str(raw_body)), daemon=True).start()
-        logger.info(f"📡 Webhook {ticker} aceptado — procesando en background")
-        return jsonify({"status": "received", "ticker": ticker}), 200
-
-    except Exception as e:
-        logger.error(f"[tv_signal] Error: {e}")
-        return jsonify({"status": "error", "msg": "Error procesando webhook"}), 500
-
-
 def _procesar_webhook_bg(data, ticker, source, raw_body):
-    """Procesa webhook en background thread para evitar timeout de TradingView."""
+    """Procesa webhook en background thread."""
     try:
         # ── OBTENER PRECIO ──
         price = float(data.get("price", 0))
@@ -12947,7 +12749,7 @@ def revisar_niveles_operaciones():
 
     precios_rt = {}
     for tk in tickers_interes:
-        cot = obtener_cotizacion_tv(tk)
+        cot = obtener_cotizacion(tk)
         if cot:
             precios_rt[tk] = cot
         else:
@@ -13411,10 +13213,10 @@ def analizar_activo(nombre, ticker):
                 continue
                 
             precio_yf = float(df['Close'].iloc[-1])
-            cot = obtener_cotizacion_tv(ticker)
+            cot = obtener_cotizacion(ticker)
             if cot:
                 precio_mon = cot['precio']
-                fuente_precio = cot.get('fuente', 'TradingView')
+                fuente_precio = cot.get('fuente', 'BuySell365')
             else:
                 precio_mon = obtener_precio_actual(ticker, df)
                 fuente_precio = "yfinance (fallback)"
@@ -15968,7 +15770,7 @@ PAR_PROFILES = {
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
         "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": True, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
     "US100Cash": {
@@ -16232,7 +16034,7 @@ def _confirmar_inter_mercado(ticker, tipo):
 
     try:
         # Intentar obtener precio del activo correlacionado
-        cot = obtener_cotizacion_tv(corr_ticker)
+        cot = obtener_cotizacion(corr_ticker)
         if not cot:
             return False
         precio_corr = cot.get('precio')
@@ -16862,9 +16664,9 @@ def _arrancar_interno():
             print(f"📊 Total cuentas MT5 configuradas: {len(MT5_ACCOUNTS)}")
 
         if not conectado:
-            print("❌ No se pudo conectar a MT5 tras 3 intentos. El bot seguirá en modo lectura/TV.")
+            print("❌ No se pudo conectar a MT5 tras 3 intentos. El bot seguirá en modo lectura.")
     else:
-        print("🔗 MT5 no detectado o corriendo en Linux/Nube. Usando WebScraping TradingView/YFinance como backend...")
+        print("🔗 MT5 no detectado o corriendo en Linux/Nube. Usando Twelve Data/YFinance como backend de precios...")
 
     cargar_estado()
 
@@ -17162,11 +16964,11 @@ if __name__ == "__main__":
         _http_port = int(os.getenv("HTTP_PORT", "80").strip())
         _https_port = int(os.getenv("HTTPS_PORT", "443").strip())
 
-        # --- Servidor HTTP — Waitress producción (webhooks TradingView) ---
+        # --- Servidor HTTP — Waitress producción ---
         try:
             srv_http = create_server(app, host="0.0.0.0", port=_http_port, threads=4)
             threading.Thread(target=srv_http.run, daemon=True).start()
-            print(f"📡 HTTP :{_http_port} activo (Waitress — webhooks TradingView)")
+            print(f"📡 HTTP :{_http_port} activo (Waitress)")
         except Exception as e_http:
             logger.warning(f"⚠️ No se pudo abrir puerto HTTP {_http_port}: {e_http}")
             if _http_port < 1024:
