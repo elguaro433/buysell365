@@ -274,6 +274,7 @@ WISE_API_TOKEN       = os.getenv("WISE_API_TOKEN", "").strip()  # Token solo lec
 WISE_IBAN            = os.getenv("WISE_IBAN", "BE09 9673 1557 9257").strip()
 WISE_BIC             = os.getenv("WISE_BIC", "TRWIBEB1XXX").strip()
 WISE_NOMBRE          = os.getenv("WISE_NOMBRE", "Emmanuel Diaz Sánchez").strip()
+WISE_PAY_LINK        = os.getenv("WISE_PAY_LINK", "").strip()  # Link de pago con tarjeta Wise
 
 # ✅ FILTRO DE COSTES (Spread máximo permitido en puntos)
 # Si el spread es mayor a esto, el bot no entrará para proteger el capital.
@@ -6563,6 +6564,8 @@ def cmd_vip(user_id: str = None):
     botones = []
     botones.append([{"text": "📊 VER RESULTADOS EN VIVO", "url": "https://buysell365.pro"}])
     botones.append([{"text": btn_pago + " (USDT/Binance)", "callback_data": "vip_pagar_usdt"}])
+    if WISE_PAY_LINK:
+        botones.append([{"text": "💳 PAGAR CON TARJETA (Visa/Mastercard)", "callback_data": "vip_pagar_tarjeta"}])
     botones.append([{"text": "🏦 PAGAR CON WISE / BANCO (EUR)", "callback_data": "vip_pagar_wise"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
@@ -15308,6 +15311,39 @@ def loop_polling():
                                 )
                             else:
                                 enviar_telegram("ℹ️ No tienes pago pendiente.\n\nEscribe /vip para ver opciones.", user_id)
+                            continue
+
+                        # ── Callback VIP: pago con tarjeta (Wise Pay Link) ──
+                        if texto == "vip_pagar_tarjeta":
+                            nombre_cb  = from_user.get("first_name", "Trader")
+                            username_cb = from_user.get("username", "")
+                            precio_t   = _vip_precio_info()["precio"]
+                            enviar_telegram(
+                                "💳 *PAGO VIP — TARJETA BANCARIA*\n\n"
+                                f"💶 Importe: *{precio_t:.2f} EUR*\n\n"
+                                "👇 Pulsa el botón para pagar con Visa o Mastercard:\n\n"
+                                "⚠️ *IMPORTANTE:* En el campo _Referencia_ o _Nota_\n"
+                                f"escribe tu usuario de Telegram: *@{username_cb or nombre_cb}*\n\n"
+                                "✅ _Una vez recibido el pago, el admin te activa el VIP en minutos._\n"
+                                f"_Ayuda: {ADMIN_USER}_",
+                                user_id,
+                                teclado={"inline_keyboard": [
+                                    [{"text": "💳 PAGAR CON TARJETA AHORA", "url": WISE_PAY_LINK}],
+                                    [{"text": f"❓ CONTACTAR ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
+                                ]}
+                            )
+                            # Notificar al admin
+                            admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
+                            if admin_id:
+                                enviar_telegram(
+                                    "💳 *INTENTO PAGO TARJETA*\n"
+                                    f"👤 {nombre_cb} (@{username_cb})\n"
+                                    f"🆔 ID: `{user_id}`\n"
+                                    f"💶 {precio_t:.2f} EUR\n"
+                                    f"⏰ {ahora().strftime('%H:%M %d/%m')}\n\n"
+                                    f"_Verifica en Wise y activa con /otorgarvip {user_id}_",
+                                    admin_id
+                                )
                             continue
 
                         # ── Callback VIP: pago con Wise ──
