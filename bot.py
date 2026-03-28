@@ -8556,9 +8556,9 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         cmd_briefing()
         return None
     if t in ("💰 mi cuenta", "/cuenta", "mi cuenta", "cuenta"):
-        return cmd_mi_cuenta(user_id), crear_teclado_principal()
+        return cmd_mi_cuenta(remitente), crear_teclado_principal()
     if t in ("💎 vip", "/vip", "vip"):
-        return cmd_vip(user_id, nombre_user, username_user), crear_teclado_principal()
+        return cmd_vip(user_id=remitente), crear_teclado_principal()
     if t in ("🚀 análisis oro"):
         return cmd_analisis("ORO"), crear_teclado_principal()
     if t in ("🔍 análisis nasdaq"):
@@ -14443,59 +14443,78 @@ def loop_escaneo():
 _cooldown_bienvenida: dict = {}  # {user_id: timestamp} — evitar spam de bienvenida
 
 def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
-    """Gestiona usuarios que no están en la lista blanca con autonomía y marketing VIP.
-    Si grupo_chat_id se proporciona, envía la bienvenida EN el grupo (y programa su borrado)
-    en lugar de al chat privado del usuario (que falla si no ha hecho /start)."""
+    """Redirige al usuario al chat privado con menú completo de ayuda.
+    En el grupo solo muestra un aviso breve que se auto-borra."""
     user_id = str(user_info.get("id", ""))
-    nombre = escapar_markdown(user_info.get("first_name", "Usuario"))  # H-11 FIX
+    nombre = escapar_markdown(user_info.get("first_name", "Usuario"))
+    username = f"@{user_info.get('username')}" if user_info.get('username') else "Sin @alias"
 
     # Cooldown: máximo 1 bienvenida por usuario cada 10 minutos
     _ahora = time.time()
     if user_id in _cooldown_bienvenida and (_ahora - _cooldown_bienvenida[user_id]) < 600:
-        return  # Ya se le envió bienvenida recientemente
+        return
     _cooldown_bienvenida[user_id] = _ahora
-    username = f"@{user_info.get('username')}" if user_info.get('username') else "Sin @alias"
 
-    # 1. Bienvenida con info de pago VIP
-    pi = _vip_precio_info()
-    p = pi["precio"]
-    desc_label = f" (50% OFF)" if pi["en_descuento"] else ""
-
-    bienvenida = f"👋 *Hola {nombre}!* Bienvenido a *BuySell365.pro*\n\n"
-
-    bienvenida += (
-        "Canal VIP con senales de alta precision:\n"
-        "✅ Oro, Forex, NASDAQ, S&P 500\n"
-        "✅ Entry, SL, TP exactos\n"
-        "✅ Copy Trading automatico 24/7\n\n"
-        f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
+    # ── Menú completo para el chat PRIVADO ──
+    menu_privado = (
+        f"👋 *Hola {nombre}!* Bienvenido a *BuySell365.pro*\n"
+        f"━━━━━━━━━━━━━━\n\n"
+        f"🤖 Soy tu asistente de trading con IA. ¿En qué te puedo ayudar?\n\n"
+        f"📌 *¿Qué quieres hacer?*\n\n"
+        f"💎 *Canal VIP* — Señales con Entry, SL y TP exactos\n"
+        f"   Forex, Índices — análisis IA 24/5\n\n"
+        f"🤖 *Copy Trading* — Tu cuenta opera sola\n"
+        f"   Sin pantallas. Sin estrés. Comisión solo sobre ganancias.\n\n"
+        f"📊 *Herramientas gratuitas:*\n"
+        f"   /precios — Precios en vivo\n"
+        f"   /noticias — Calendario económico\n"
+        f"   /horarios — Horarios de mercado\n"
+        f"   /web — Dashboard en vivo\n\n"
+        f"👉 *Escribe /vip para ver planes y contratar*\n"
+        f"💬 *O escríbeme aquí cualquier duda, te respondo ahora*"
     )
-
-    markup = {
+    markup_privado = {
         "inline_keyboard": [
-            [{"text": f"💰 SUSCRIBIRSE AL VIP ({p}{VIP_MONEDA}{desc_label})", "callback_data": "vip_pagar_usdt"}],
-            [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+            [{"text": "💎 CANAL VIP — Ver Planes", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "🤖 COPY TRADING — Más Info", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
+            [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
         ]
     }
 
-    # Enviar al grupo (visible para el usuario) o al chat privado
-    destino = grupo_chat_id or user_id
-    msg_id = enviar_telegram(bienvenida, destino, teclado=markup)
-    # Si se envió al grupo, programar borrado tras 5 min (tiempo suficiente para leer y pulsar botón)
-    if grupo_chat_id and msg_id:
-        programar_borrado(grupo_chat_id, msg_id, 300)
+    # Intentar enviar menú al DM del usuario
+    dm_ok = enviar_telegram(menu_privado, user_id, teclado=markup_privado)
 
-    # 2. Reenvío al Administrador (Tú)
+    if grupo_chat_id:
+        if dm_ok:
+            # ✅ DM enviado — aviso breve en el grupo
+            aviso = (
+                f"💬 *{nombre}*, te acabo de escribir por privado con toda la información 📩\n"
+                f"👉 Revisa tus mensajes directos con el bot."
+            )
+        else:
+            # ❌ DM falló — el usuario no ha hecho /start → indicar cómo hacerlo
+            aviso = (
+                f"👋 *{nombre}*, para atenderte mejor necesito que primero\n"
+                f"me escribas por privado:\n\n"
+                f"👉 Abre @BUYSELL365_PRO_BOT y pulsa *Start*\n"
+                f"Luego te envío toda la información aquí 📩"
+            )
+        aviso_id = enviar_telegram(aviso, grupo_chat_id)
+        if aviso_id:
+            programar_borrado(grupo_chat_id, aviso_id, 120)
+
+    # Notificar al admin
     admin_id = USERS_AUTORIZADOS[0] if USERS_AUTORIZADOS else None
     if admin_id:
         aviso_admin = (
-            "👤 *NUEVO INTERESADO EN VIP*\n"
+            "👤 *NUEVO INTERESADO*\n"
             "━━━━━━━━━━\n"
             f"👤 Nombre: {nombre}\n"
             f"🆔 ID: `{user_id}`\n"
             f"🔗 Alias: {username}\n"
-            f"💬 Mensaje: _{texto}_\n\n"
-            f"💡 _Pulsa en el alias para responderle directamente._"
+            f"💬 Escribió: _{texto[:100]}_\n"
+            f"{'✅ DM enviado' if dm_ok else '⚠️ No ha hecho /start aún'}"
         )
         enviar_telegram(aviso_admin, admin_id)
 
@@ -14757,7 +14776,7 @@ def loop_polling():
                                             f"📊 *{n_ops} operacion{_pl} activa{_pl}*"
                                             f" · 🟢{n_buy} 🔴{n_sell}\n\n"
                                             f"🔒 _Entry, SL y TP disponibles en el canal VIP._\n"
-                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                            f"💎 *Escribe /vip para más información*"
                                         )
                                     else:
                                         cb_respuesta = "📭 *Sin operaciones abiertas.* Te aviso cuando haya señal. 📡"
@@ -14775,7 +14794,7 @@ def loop_polling():
                                         f"⚙️ *Bot activo* ✅ · {n_ops} operaciones abiertas\n"
                                         f"📊 Win Rate hoy: *{_wr_e:.0f}%* ({_total_e} señales)\n\n"
                                         f"🔒 _Panel completo en el canal VIP._\n"
-                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                        f"💎 *Escribe /vip para más información*"
                                     )
                                 else:
                                     cb_respuesta = cmd_estado()
@@ -14789,7 +14808,7 @@ def loop_polling():
                                         f"Señales: {_total_r} · Win Rate: *{_wr_r:.0f}%*\n"
                                         f"Pips netos: *{_pips_r:+.1f}*\n\n"
                                         f"🔒 _Historial completo en el canal VIP._\n"
-                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                        f"💎 *Escribe /vip para más información*"
                                     )
                                 else:
                                     cb_respuesta = cmd_resumen()
@@ -14801,7 +14820,7 @@ def loop_polling():
                                     cb_respuesta = (
                                         f"🔍 *Análisis {activo}* — contenido VIP\n\n"
                                         f"🔒 _Disponible en el canal VIP._\n"
-                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                        f"💎 *Escribe /vip para más información*"
                                     )
                                 else:
                                     activo = texto.replace("/analisis_", "").upper()
@@ -14831,7 +14850,7 @@ def loop_polling():
                                         f"📈 *Resumen semanal* — contenido VIP\n"
                                         f"Señales hoy: {_total_r} · WR: *{_wr_r:.0f}%*\n\n"
                                         f"🔒 _Detalles completos en el canal VIP._\n"
-                                        f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                        f"💎 *Escribe /vip para más información*"
                                     )
                                 else:
                                     cb_respuesta = cmd_semana()
@@ -15011,12 +15030,8 @@ def loop_polling():
                             usuario_no_autorizado = False
 
                         if usuario_no_autorizado:
-                            if (es_grupo or es_canal) and es_tema_publico:
-                                # ✅ En grupos/canal: responder con info básica + CTA al canal
-                                pass
-                            elif es_grupo or es_canal:
-                                # 📢 Grupo + tema no reconocido: bienvenida VIP EN EL GRUPO
-                                # (no en privado, porque el usuario puede no haber hecho /start)
+                            if es_grupo or es_canal:
+                                # 📢 TODO mensaje de usuario en grupo → redirigir al chat privado
                                 manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
                                 continue
                             else:
@@ -15094,7 +15109,7 @@ def loop_polling():
                                             f"👑 *CANAL VIP*\n"
                                             f"   Señales IA · Analisis · Entry/SL/TP\n"
                                             f"   Monitoreo 24/7 · Win Rate en vivo\n\n"
-                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes* 🚀"
+                                            f"💎 *Escribe /vip para más información* 🚀"
                                         )
                                     elif _es_cmd_analisis:
                                         # Extraer nombre del activo del texto
@@ -15104,7 +15119,7 @@ def loop_polling():
                                             f"📊 _Auditoria completa: IA, patrones, metricas,\n"
                                             f"pronostico y lectura del mercado._\n\n"
                                             f"🔒 _Disponible en el canal VIP._\n"
-                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                            f"💎 *Escribe /vip para más información*"
                                         )
                                     elif _es_cmd_trades:
                                         with _lock_ops:
@@ -15118,7 +15133,7 @@ def loop_polling():
                                                 f"📊 *{n_ops} operacion{_pl} activa{_pl}*"
                                                 f" · 🟢{n_buy} 🔴{n_sell}\n\n"
                                                 f"🔒 _Entry, SL y TP disponibles en el canal VIP._\n"
-                                                f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                                f"💎 *Escribe /vip para más información*"
                                             )
                                         else:
                                             teaser = "📭 *Sin operaciones abiertas.* Te aviso cuando haya señal. 📡"
@@ -15132,7 +15147,7 @@ def loop_polling():
                                             f"📊 Win Rate hoy: *{_wr_e:.0f}%* ({_total_e} señales)\n\n"
                                             f"🔒 _Panel completo en el canal VIP y la web._\n"
                                             f"🌐 buysell365.pro/dashboard\n"
-                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                            f"💎 *Escribe /vip para más información*"
                                         )
                                     else:  # _es_cmd_resumen
                                         _total_r = estadisticas_diarias["ganadas"] + estadisticas_diarias["perdidas"]
@@ -15143,7 +15158,7 @@ def loop_polling():
                                             f"Señales: {_total_r} · Win Rate: *{_wr_r:.0f}%*\n"
                                             f"Pips netos: *{_pips_r:+.1f}*\n\n"
                                             f"🔒 _Historial completo en el canal VIP._\n"
-                                            f"💎 *Escribe /vip — Canal VIP $149 USDT/mes*"
+                                            f"💎 *Escribe /vip para más información*"
                                         )
                                     msg_id = enviar_telegram(teaser, _chat_id)
                                     if msg_id and (_es_grupo or _es_canal):
@@ -15189,21 +15204,21 @@ def loop_polling():
                                             f"\n\n━━━━━━━━━━\n"
                                             f"💎 *¿Te interesa recibir senales completas?*\n"
                                             f"Canal VIP con entrada, SL y TP exactos.\n"
-                                            f"💎 *Canal VIP — $149 USDT/mes — Copy Trading incluido*\n"
+                                            f"💎 *Canal VIP — señales con IA*\n"
                                             f"👉 Escribe /vip"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
                                             f"📊 *Senales IA de alta precision*\n"
                                             f"Oro, Forex, NASDAQ, S&P 500 — Entry, SL, TP.\n"
-                                            f"💎 *Canal VIP — $149 USDT/mes — Copy Trading incluido*\n"
+                                            f"💎 *Canal VIP — señales con IA*\n"
                                             f"👉 Escribe /vip"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
                                             f"📊 *SENALES PREMIUM CON IA*\n"
                                             f"Recibe todas las senales en tiempo real.\n"
-                                            f"👉 Escribe /vip — Canal VIP $149 USDT/mes"
+                                            f"👉 Escribe /vip para más información"
                                         ),
                                         (
                                             f"\n\n━━━━━━━━━━\n"
