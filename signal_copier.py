@@ -657,17 +657,20 @@ async def main():
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
             if signal["type"] == "new_signal":
-                # IA filter + commentary
-                aprobar, ia_comment = _ia_evaluar_senal(signal)
-                signal["ia_comment"] = ia_comment
-                if ia_comment:
-                    log.info(f"🤖 IA: {ia_comment}")
+                # ── MT5 EXECUTION DESACTIVADO — solo reenvío al canal ──
+                # Para reactivar: cambiar MT5_EXECUTION_ENABLED = True
+                MT5_EXECUTION_ENABLED = False
 
-                # Execute in MT5
-                executed, detail = execute_in_mt5(signal)
-                log.info(f"📡 MT5: {'✅' if executed else '❌'} {detail}")
+                executed, detail = False, "Ejecución MT5 desactivada"
+                if MT5_EXECUTION_ENABLED:
+                    aprobar, ia_comment = _ia_evaluar_senal(signal)
+                    signal["ia_comment"] = ia_comment
+                    if ia_comment:
+                        log.info(f"🤖 IA: {ia_comment}")
+                    executed, detail = execute_in_mt5(signal)
+                    log.info(f"📡 MT5: {'✅' if executed else '❌'} {detail}")
 
-                # Send to BuySell365 channel
+                # Send to BuySell365 channel (siempre activo)
                 send_to_channel(signal, executed, detail)
 
             elif signal["type"] == "update":
