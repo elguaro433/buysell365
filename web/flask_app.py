@@ -1037,11 +1037,12 @@ if('serviceWorker' in navigator){{
         <div class="countdown-item"><div class="countdown-val" id="cdSecs">--</div><div class="countdown-lbl" data-i18n="countdown.secs">Seg</div></div>
       </div>
       <ul class="price-list" style="margin-top:20px">
-        <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP/SL</li>
+        <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP y SL exactos</li>
         <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
-        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas en tiempo real</li>
-        <li style="color:#ffd740">&#128161; Soporte prioritario</li>
-        <li style="color:#ffd740">&#129302; An\u00e1lisis multi-IA exclusivo</li>
+        <li style="color:#ffd740">&#129302; <strong>Acceso total al bot de trading y asistencia 24/7</strong></li>
+        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas — nunca pierdas una se\u00f1al</li>
+        <li style="color:#ffd740">&#128161; Soporte prioritario directo</li>
+        <li style="color:#ffd740">&#128202; An\u00e1lisis IA exclusivo por activo</li>
         <li style="color:#ffd740">&#128200; Briefing matutino + Cierre nocturno</li>
       </ul>
       <a href="https://t.me/BUYSELL365_PRO_BOT?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s">\U0001f451 Suscribirme al VIP</a>
@@ -1074,8 +1075,8 @@ if('serviceWorker' in navigator){{
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,255,200,.05),rgba(0,100,255,.05));border:1px solid rgba(0,212,170,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00ffc8,#00d4aa);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">1</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4f2</div>
-      <h3 style="color:#00ffc8;font-size:1.1rem;margin-bottom:8px">Unete al Canal</h3>
-      <p style="color:var(--text2);font-size:.9rem">Unete a nuestro grupo de Telegram gratis o activa el canal VIP para se\u00f1ales premium.</p>
+      <h3 style="color:#00ffc8;font-size:1.1rem;margin-bottom:8px">Únete al Canal VIP</h3>
+      <p style="color:var(--text2);font-size:.9rem">Activa el canal VIP y obtén acceso completo al bot de trading y asistencia personal 24/7.</p>
     </div>
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(255,200,0,.05),rgba(255,150,0,.05));border:1px solid rgba(255,200,0,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ffd700,#f0b90b);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">2</div>
