@@ -116,7 +116,7 @@ def _log(msg):
 # ============================================================
 def load_config() -> dict:
     defaults = {
-        "autostart_bot": False,
+        "autostart_bot": True,
         "minimize_to_tray": True,
         "auto_restart": True,
         "first_run": True,
@@ -719,9 +719,12 @@ class ManagementConsole:
         self.root.bind_all("<Button-4>", self._on_mousewheel_linux)
         self.root.bind_all("<Button-5>", self._on_mousewheel_linux)
 
-        # Auto-start bot if configured
-        if self.config.get("autostart_bot", False):
-            self.root.after(1000, self._auto_start_bot)
+        # Abrir MT5 siempre al arrancar el launcher (en background, no bloquea)
+        threading.Thread(target=_ensure_mt5_running, daemon=True).start()
+
+        # Auto-start bot si está configurado
+        if self.config.get("autostart_bot", True):
+            self.root.after(2000, self._auto_start_bot)
 
         # Status bar
         _status_frame = tk.Frame(self.root, bg="#0a0e14")
@@ -939,6 +942,14 @@ class ManagementConsole:
 
         _make_button(btn_row2, "⚠ Cerrar Todo", self._cmd_cerrar_todo,
                      bg="#b91c1c", fg="#ffffff").pack(side="left", padx=6, pady=2)
+
+        # Auto-start toggle (compacto, misma fila derecha)
+        self._autostart_var = tk.BooleanVar(value=self.config.get("autostart_bot", True))
+        tk.Checkbutton(btn_row2, text="Auto-iniciar al abrir",
+                       variable=self._autostart_var, command=self._toggle_autostart,
+                       bg=BG_PANEL, fg=TEXT_SEC, selectcolor=BG_INPUT,
+                       activebackground=BG_PANEL, activeforeground=TEXT,
+                       font=("Segoe UI", 9)).pack(side="right", padx=10)
 
         # ── Sección 2: Estadísticas en Vivo ──
         stats_frame = _make_section_frame(scroll_frame, "Estadísticas en Vivo")
