@@ -561,6 +561,8 @@ def send_to_channel(signal, executed, detail):
         f"📍 Entrada: `{entry_display}`",
         f"🎯 TP: `{fmt(tp)}`",
         f"🛡️ SL: `{fmt(sl)}`",
+        f"",
+        f"_BuySell365.pro_",
     ]
 
     msg = "\n".join(lines)
