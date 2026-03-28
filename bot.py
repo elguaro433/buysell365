@@ -6544,8 +6544,7 @@ def cmd_vip(user_id: str = None):
         "📜 _Al suscribirte aceptas nuestros Términos y_\n"
         "_Condiciones: servicio educativo de señales,_\n"
         "_no asesoría financiera. Sin reembolsos._\n\n"
-        "💳 _Pago con tarjeta: contacta al admin y te enviamos_\n"
-        "_un enlace de pago seguro personalizado._"
+        "💰 _Pago único mensual vía USDT/Binance — activación inmediata._"
     )
 
     # Info pago pendiente (si existe)
@@ -6561,7 +6560,6 @@ def cmd_vip(user_id: str = None):
     # Métodos de pago en la misma fila si es posible
     fila_pago = [{"text": btn_pago + " — USDT/Binance", "callback_data": "vip_pagar_usdt"}]
     botones.append(fila_pago)
-    botones.append([{"text": "💳 PAGAR CON TARJETA — Visa/Mastercard", "callback_data": "vip_pagar_tarjeta"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
         if pend_info.get("monto_unico"):
@@ -15132,17 +15130,13 @@ def loop_polling():
                                 [{"text": "💰 PAGAR CON BINANCE (USDT/Crypto)", "callback_data": "vip_pagar_confirmar"}],
                             ]}
                             _botones_metodo["inline_keyboard"].append(
-                                [{"text": "💳 PAGAR CON TARJETA (contactar admin)", "callback_data": "vip_pagar_tarjeta"}]
-                            )
-                            _botones_metodo["inline_keyboard"].append(
                                 [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}]
                             )
                             enviar_telegram(
                                 f"✅ *Términos aceptados*\n\n"
                                 f"💰 Precio: *{pi_p['precio']}{VIP_MONEDA}/mes*\n\n"
-                                f"Elige tu método de pago:\n\n"
-                                f"• 💰 *Binance* — USDT crypto (TRC20)\n"
-                                f"• 💳 *Tarjeta* — Visa/Mastercard _(el admin te envía el enlace)_",
+                                f"Pulsa el botón para recibir las instrucciones de pago\n"
+                                f"vía *USDT/Binance* — activación inmediata ⚡",
                                 user_id,
                                 teclado=_botones_metodo
                             )
