@@ -466,13 +466,12 @@ async def main():
 
     client = TelegramClient(SESSION_FILE, API_ID, API_HASH)
 
-    # Known signal channel keywords (to filter noise)
-    # Solo estos 3 canales VIP de SureShotFX (IDs exactos)
+    # Canales VIP monitoreados — IDs verificados con Telethon
     ALLOWED_CHANNEL_IDS = {
         -1001422000261,   # Sureshot FX VIP
         -1001661400724,   # SureShot GOLD (VIP)
         -1001700795303,   # Sureshot INDICES (VIP)
-        -1001442994799,   # Learn 2 Trade Crypto VIP
+        -1001389726384,   # Learn 2 Trade VIP (verificado 2026-03-28)
     }
     # Auto-discover: buscar canales Learn2Trade VIP y agregarlos
     L2T_KEYWORDS = ["learn 2 trade", "learn2trade", "l2t"]
