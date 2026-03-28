@@ -1081,7 +1081,7 @@ if('serviceWorker' in navigator){{
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ffd700,#f0b90b);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">2</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4ca</div>
       <h3 style="color:#ffd700;font-size:1.1rem;margin-bottom:8px">Recibe Se\u00f1ales</h3>
-      <p style="color:var(--text2);font-size:.9rem">Nuestra IA analiza +20 activos cada 3 minutos y te envia se\u00f1ales con Entry, SL y 3 TPs exactos.</p>
+      <p style="color:var(--text2);font-size:.9rem">Nuestra IA analiza +20 activos cada 3 minutos y te env\u00eda se\u00f1ales con Entry, TP y SL exactos.</p>
     </div>
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,230,118,.05),rgba(0,180,90,.05));border:1px solid rgba(0,230,118,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00e676,#00c853);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">3</div>
@@ -1257,7 +1257,7 @@ if('serviceWorker' in navigator){{
   <div class="faq-list">
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q1">¿Cómo funciona el grupo de comunidad?</div>
-      <div class="faq-a" data-i18n="faq.a1">El grupo público de Telegram te da acceso a resúmenes diarios de mercado, educación y análisis general. Para recibir señales VIP en tiempo real con Entry, SL y 3 TPs exactos, necesitas el plan VIP Pro. El Copy Trading funciona sin cuota fija — solo pagas un pequeño % si ganas.</div>
+      <div class="faq-a" data-i18n="faq.a1">El grupo público de Telegram te da acceso a resúmenes diarios de mercado, educación y análisis general. Para recibir señales VIP en tiempo real con Entry, TP y SL exactos, necesitas el plan VIP Pro. El Copy Trading funciona sin cuota fija — solo pagas un pequeño % si ganas.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q2">\u00bfC\u00f3mo recibo las se\u00f1ales?</div>
