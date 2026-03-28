@@ -6563,10 +6563,9 @@ def cmd_vip(user_id: str = None):
     btn_pago = f"💰 SUSCRIBIRME (50% OFF)" if pi["en_descuento"] else f"💰 SUSCRIBIRME"
     botones = []
     botones.append([{"text": "📊 VER RESULTADOS EN VIVO", "url": "https://buysell365.pro"}])
-    botones.append([{"text": btn_pago + " (USDT/Binance)", "callback_data": "vip_pagar_usdt"}])
+    botones.append([{"text": btn_pago + " 💰 USDT/Binance", "callback_data": "vip_pagar_usdt"}])
     if WISE_PAY_LINK:
         botones.append([{"text": "💳 PAGAR CON TARJETA (Visa/Mastercard)", "callback_data": "vip_pagar_tarjeta"}])
-    botones.append([{"text": "🏦 PAGAR CON WISE / BANCO (EUR)", "callback_data": "vip_pagar_wise"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
         if pend_info.get("ref_wise"):
