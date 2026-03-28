@@ -14102,15 +14102,16 @@ def _verificar_entradas_pendientes():
 def loop_publicidad_grupo():
     """
     Hilo de publicidad automática en el grupo:
-    - Publica un anuncio rotativo cada PUBLICIDAD_INTERVALO segundos
+    - 1 anuncio por hora, de 06:00 a 23:00
+    - Rota los 5 modelos en orden, sin repetir el mismo seguido
+    - El índice se calcula por hora del día para que los reinicios no repitan
     - Borra el anuncio anterior antes de publicar el nuevo
-    - Promueve Copy Trading y el Canal VIP
     """
-    PUBLICIDAD_INTERVALO = 30 * 60   # 30 minutos entre anuncios
-    PUBLICIDAD_PRIMERA_ESPERA = 5 * 60  # Esperar 5 min al arrancar
+    PUBLICIDAD_INTERVALO = 60 * 60   # 1 hora entre anuncios
+    PUBLICIDAD_PRIMERA_ESPERA = 3 * 60  # Esperar 3 min al arrancar
 
     _ultimo_anuncio_id = None   # Message ID del último anuncio enviado
-    _indice_anuncio = 0
+    _ultima_hora_enviada = -1   # Hora (int) del último envío para evitar duplicados
     _dia_borrado_grupo = ""     # Para el borrado nocturno del grupo
 
     # ── Anuncios rotativos del GRUPO (cada 30 min) ──
@@ -14220,10 +14221,11 @@ def loop_publicidad_grupo():
                 continue
 
             _ahora_g = ahora()
+            _hora_g   = _ahora_g.hour
             _clave_dia_g = _ahora_g.strftime("%Y-%m-%d")
 
-            # Borrado nocturno del grupo: 23:50 — borra último anuncio y deja limpio
-            if _ahora_g.hour == 23 and _ahora_g.minute >= 50 and _dia_borrado_grupo != _clave_dia_g:
+            # Borrado nocturno del grupo: 23:00 — borra último anuncio y deja limpio
+            if _hora_g == 23 and _ahora_g.minute < 5 and _dia_borrado_grupo != _clave_dia_g:
                 if _ultimo_anuncio_id:
                     try:
                         borrar_mensaje_telegram(GROUP_ID, _ultimo_anuncio_id)
@@ -14231,12 +14233,24 @@ def loop_publicidad_grupo():
                         pass
                     _ultimo_anuncio_id = None
                 _dia_borrado_grupo = _clave_dia_g
-                logger.info("🗑️ Publicidad del grupo borrada al cierre del día")
+                logger.info("🗑️ Publicidad del grupo borrada al cierre del día (23:00)")
                 time.sleep(PUBLICIDAD_INTERVALO)
                 continue
 
-            texto, teclado = ANUNCIOS[_indice_anuncio % len(ANUNCIOS)]
-            _indice_anuncio += 1
+            # ── Solo enviar entre 06:00 y 22:59 ──
+            if not (6 <= _hora_g < 23):
+                time.sleep(60)   # Revisar cada minuto fuera de horario
+                continue
+
+            # ── Evitar enviar dos veces en la misma hora ──
+            if _hora_g == _ultima_hora_enviada:
+                time.sleep(60)
+                continue
+
+            # Índice basado en la hora del día para que los reinicios no repitan
+            # (hora 6=idx0, hora 7=idx1 … hora 22=idx16, cicla entre los 5 modelos)
+            _indice = (_hora_g - 6) % len(ANUNCIOS)
+            texto, teclado = ANUNCIOS[_indice]
 
             # Borrar anuncio anterior antes de publicar el nuevo
             if _ultimo_anuncio_id:
@@ -14250,12 +14264,13 @@ def loop_publicidad_grupo():
             nuevo_id = enviar_telegram(texto, destino=GROUP_ID, teclado=teclado)
             if nuevo_id:
                 _ultimo_anuncio_id = nuevo_id
-                logger.info(f"📢 Publicidad enviada al grupo (msg_id={nuevo_id}, anuncio={(_indice_anuncio-1) % len(ANUNCIOS) + 1}/{len(ANUNCIOS)})")
+                _ultima_hora_enviada = _hora_g
+                logger.info(f"📢 Publicidad grupo — modelo {_indice+1}/{len(ANUNCIOS)} (hora {_hora_g}:00)")
 
         except Exception as e:
             logger.error(f"⚠️ Error en loop_publicidad_grupo: {e}")
 
-        time.sleep(PUBLICIDAD_INTERVALO)
+        time.sleep(60)   # Revisar cada minuto (el control de hora evita duplicados)
 
 
 def loop_publicidad_canal():
