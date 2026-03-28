@@ -3125,9 +3125,9 @@ class ManagementConsole:
         # === Sección: ¿Qué es? ===
         info_frame = _make_section_frame(scroll_frame, "\u00bfQu\u00e9 es el Copy Trading?")
         _make_label(info_frame,
-            "Copia autom\u00e1ticamente las operaciones de nuestros analistas directamente\n"
-            "en tu cuenta MT5 \u2014 sin que hagas nada. Entry, SL y TP autom\u00e1ticos.",
-            fg=TEXT, font=("Segoe UI", 10), justify="left").pack(anchor="w", padx=8, pady=4)
+            "Copia automaticamente las operaciones de nuestros analistas directamente\n"
+            "en tu cuenta MT5 — sin que hagas nada. Entry, SL y TP automaticos.",
+            fg=TEXT, font=("Segoe UI", 10)).pack(anchor="w", padx=8, pady=4)
 
         # === Sección: Cómo funciona ===
         como_frame = _make_section_frame(scroll_frame, "C\u00f3mo funciona")
@@ -3157,17 +3157,15 @@ class ManagementConsole:
         btn_frame.pack(padx=8, pady=4)
 
         import webbrowser as _wb
-        _make_button(btn_frame, "\U0001F916 ACTIVAR COPY TRADING",
+        _make_button(btn_frame, "🤖 ACTIVAR COPY TRADING",
                      lambda: _wb.open("https://social.tp-redirect.com/s/WRE0V7jm"),
-                     bg="#00d4aa", fg="#000000", font=("Segoe UI", 11, "bold"),
-                     padx=20, pady=10).pack(side="left", padx=6)
-        _make_button(btn_frame, "\U0001F48E VIP Canal",
+                     bg="#00d4aa", fg="#000000").pack(side="left", padx=6, pady=6)
+        _make_button(btn_frame, "💎 Canal VIP",
                      lambda: _wb.open("https://t.me/BUYSELL365_PRO_BOT?start=vip"),
-                     bg="#6e40c9", fg="#ffffff", font=("Segoe UI", 10, "bold"),
-                     padx=12, pady=10).pack(side="left", padx=6)
-        _make_button(btn_frame, "\U0001F310 BuySell365.pro",
+                     bg="#6e40c9", fg="#ffffff").pack(side="left", padx=6, pady=6)
+        _make_button(btn_frame, "🌐 BuySell365.pro",
                      lambda: _wb.open("https://buysell365.pro"),
-                     bg=BG_INPUT, fg=ACCENT, padx=12, pady=10).pack(side="left", padx=6)
+                     bg=BG_INPUT, fg=ACCENT).pack(side="left", padx=6, pady=6)
 
         # === QR Link ===
         _make_label(act_frame,
