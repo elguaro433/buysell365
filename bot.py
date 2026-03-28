@@ -13638,14 +13638,17 @@ def analizar_activo(nombre, ticker):
         min_score = get_min_score_efectivo()
 
         if tipo is None:
-            logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
-            return
+            return  # Sin señal, silencioso para no saturar log
 
-        # 🔴 FILTRO DURO VOLUMEN: vol < 0.2x = mercado muerto, no operar
+        # LOG DIAGNÓSTICO: ver qué señales se generan y con qué score
+        logger.info(f"📊 SEÑAL DETECTADA: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — evaluando filtros...")
+
+        # 🔴 FILTRO VOLUMEN: Yahoo Finance devuelve vol=0 para muchos pares Forex/futuros
+        # FIX 2026-03-28: No bloquear por volumen — usar como penalización de score
         _vol_r = ind.get('vol_ratio', 1.0)
         if _vol_r < 0.2:
-            logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.5x) — señal descartada")
-            return
+            logger.info(f"⚠️ VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x — penalización score (-1) en vez de bloqueo")
+            score = max(1, score - 1)  # Penalizar pero NO descartar
 
         # [4] CONFIRMACIÓN INTER-MERCADO: +1 al score si el activo correlacionado confirma
         try:
@@ -13784,13 +13787,15 @@ def analizar_activo(nombre, ticker):
             return
         if hay_correlacion_peligrosa(ticker, tipo):
             return
-        # 🔻 FILTRO MULTI-TIMEFRAME 4H — Soft: penaliza en confianza pero NO bloquea
-        # Reversiones de alta calidad (score 5) pueden ir contra 4H
+        # 🔻 FILTRO MULTI-TIMEFRAME 4H — SOFT: penaliza score pero NO bloquea
+        # FIX 2026-03-28: MTF 4H bloqueaba todas las señales → 0 señales al canal
+        # Ahora: penaliza score -1 si va contra 4H (excepto reversiones y RSI extremo)
         _mtf_4h_ok = filtro_multi_timeframe(ticker, tipo)
         _rsi_extremo = ind.get('rsi', 50) < 25 or ind.get('rsi', 50) > 75
         if not _mtf_4h_ok and not _es_reversion and not _rsi_extremo:
-            log_op(f"⛔ MTF 4H BLOQUEADO: {nombre} {tipo} va contra tendencia 4H — señal descartada")
-            return
+            score = max(1, score - 1)
+            confianza_total = max(20, confianza_total - 10)
+            logger.info(f"⚠️ MTF 4H contra señal: {nombre} {tipo} — penalización score={score}, conf={confianza_total}% (NO bloqueado)")
         if not _mtf_4h_ok and _rsi_extremo:
             print(f"✅ MTF 4H contra señal pero RSI EXTREMO ({ind.get('rsi', 50):.0f}) PERMITIDO: {nombre} {tipo}")
         if not _mtf_4h_ok and _es_reversion:
@@ -13917,17 +13922,18 @@ def analizar_activo(nombre, ticker):
             return
 
         # ⭐ CLASIFICACIÓN DE SEÑALES — Premium vs Standard
-        # FIX 2026-03-27: 70%→50% confianza premium, permitir STANDARD (score≥3, conf≥40%)
-        # Con ML bypass=0, 70% era casi imposible de alcanzar → 0 señales en 2 días
-        _es_premium = (score >= 4 and confianza_total >= 50)
-        _es_standard = (score >= 3 and confianza_total >= 40)
+        # FIX 2026-03-28: Relajar filtros — score>=3 y conf>=30% para STANDARD
+        # Problema: con filtros estrictos, 0 señales llegan al canal en días enteros
+        # Mejor enviar señales de menor calidad al canal que no enviar NADA
+        _es_premium = (score >= 4 and confianza_total >= 45)
+        _es_standard = (score >= 2 and confianza_total >= 25)
 
         if _es_premium:
             _nivel_senal = "PREMIUM"
         elif _es_standard:
             _nivel_senal = "STANDARD"
         else:
-            print(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
+            logger.info(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
             return
 
         # ═══ C-03 FIX: RESERVA ATÓMICA — Todos los checks + reserva en UN lock ═══
