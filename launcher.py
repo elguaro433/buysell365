@@ -636,7 +636,6 @@ class ManagementConsole:
         self._last_active_ops_keys = set()  # for trade alert detection
         self._pnl_history = []  # list of (timestamp, pnl_value) for chart
         self._equity_history = []  # list of (timestamp, capital) for equity curve
-        self._scalper_paused = False
         self._tab_flash_state = {}  # tab_name -> bool for flashing
         self._update_loop_active = True
         self._closing = False
@@ -675,12 +674,12 @@ class ManagementConsole:
         self._tab_vip = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_logs = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_web = tk.Frame(self.notebook, bg=BG_MAIN)
-        self._tab_scalper = tk.Frame(self.notebook, bg=BG_MAIN)
+        self._tab_copy = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_noticias = tk.Frame(self.notebook, bg=BG_MAIN)
 
         self.notebook.add(self._tab_dashboard, text=" \U0001F4CA Dashboard ")
         self.notebook.add(self._tab_senales, text=" \U0001F4E1 Se\u00f1ales ")
-        self.notebook.add(self._tab_scalper, text=" \U0001FA92 Scalper ")
+        self.notebook.add(self._tab_copy, text=" \U0001F916 Copy Trading ")
         self.notebook.add(self._tab_noticias, text=" \U0001F4F0 Noticias ")
         self.notebook.add(self._tab_analisis, text=" \U0001F50D Analisis ")
         self.notebook.add(self._tab_trading, text=" \u2699 Trading Config ")
@@ -700,7 +699,7 @@ class ManagementConsole:
         self._build_vip()
         self._build_logs()
         self._build_web()
-        self._build_scalper()
+        self._build_copy_trading()
         self._build_noticias()
 
         # Mousewheel binding
@@ -1130,19 +1129,6 @@ class ManagementConsole:
     # --------------------------------------------------------
     #  QUICK CONTROLS (improvement 5)
     # --------------------------------------------------------
-    def _cmd_toggle_scalper(self):
-        """Toggle scalper pause state via .bot.cmd."""
-        if not self._scalper_paused:
-            _send_bot_cmd("scalper_pause")
-            self._scalper_paused = True
-            self._btn_scalper_toggle.config(text="\u25B6 Play Scalper", bg="#238636")
-            _log("Scalper PAUSADO por usuario")
-        else:
-            _send_bot_cmd("scalper_resume")
-            self._scalper_paused = False
-            self._btn_scalper_toggle.config(text="\u23F8 Pausar Scalper", bg="#6e40c9")
-            _log("Scalper REANUDADO por usuario")
-
     def _cmd_cerrar_todo(self):
         """Emergency close all positions via MT5 in background."""
         if not messagebox.askyesno("Cerrar Todo",
@@ -3139,310 +3125,70 @@ class ManagementConsole:
         self._web_stats_text.pack(fill="both", expand=True, pady=(0, 5))
 
     # ============================================================
-    #  TAB: SCALPER SILENCIOSO
+    #  TAB: COPY TRADING
     # ============================================================
-    def _build_scalper(self):
-        canvas, scroll_frame = _make_scrollable(self._tab_scalper)
-        self._scroll_canvases[str(self._tab_scalper)] = canvas
+    def _build_copy_trading(self):
+        canvas, scroll_frame = _make_scrollable(self._tab_copy)
+        self._scroll_canvases[str(self._tab_copy)] = canvas
 
-        # Header
-        header = tk.Frame(scroll_frame, bg=BG_MAIN)
-        header.pack(fill="x", padx=10, pady=(10, 5))
-        _make_button(header, "Actualizar", self._refresh_scalper,
-                     bg=BG_INPUT, fg=TEXT).pack(side="left", padx=(0, 10))
-        self._scalper_status_lbl = _make_label(header, "Estado: --", fg=TEXT_SEC,
-                                                font=("Segoe UI", 9))
-        self._scalper_status_lbl.pack(side="left", padx=10)
+        # === Header ===
+        header = tk.Frame(scroll_frame, bg=BG_PANEL)
+        header.pack(fill="x", padx=12, pady=(8, 4))
+        _make_label(header, "\U0001F916 COPY TRADING \u2014 PILOTO AUTOM\u00c1TICO", fg=ACCENT_BRIGHT,
+                    font=("Segoe UI", 13, "bold")).pack(side="left", padx=8, pady=8)
 
-        # Scalper P&L separate display
-        self._sc_pnl_header = _make_label(header, "Scalper P&L: --", fg=ACCENT_BRIGHT,
-                                           font=("Segoe UI", 10, "bold"))
-        self._sc_pnl_header.pack(side="right", padx=10)
+        # === Sección: ¿Qué es? ===
+        info_frame = _make_section_frame(scroll_frame, "\u00bfQu\u00e9 es el Copy Trading?")
+        _make_label(info_frame,
+            "Copia autom\u00e1ticamente las operaciones de nuestros analistas directamente\n"
+            "en tu cuenta MT5 \u2014 sin que hagas nada. Entry, SL y TP autom\u00e1ticos.",
+            fg=TEXT, font=("Segoe UI", 10), justify="left").pack(anchor="w", padx=8, pady=4)
 
-        # === Seccion 1: Estado del Scalper ===
-        estado_frame = _make_section_frame(scroll_frame, "Scalper Silencioso - BB+RSI Mean Reversion M5")
-        estado_frame.pack(fill="x", padx=10, pady=5)
-
-        estado_grid = tk.Frame(estado_frame, bg=BG_PANEL)
-        estado_grid.pack(fill="x")
-        estado_grid.columnconfigure(1, weight=1)
-        estado_grid.columnconfigure(3, weight=1)
-
-        scalper_left = [
-            ("Estado:", "_sc_estado"),
-            ("Estrategia:", "_sc_estrategia"),
-            ("Trades Hoy:", "_sc_trades_hoy"),
-            ("Posiciones Abiertas:", "_sc_posiciones"),
+        # === Sección: Cómo funciona ===
+        como_frame = _make_section_frame(scroll_frame, "C\u00f3mo funciona")
+        pasos = [
+            "1\ufe0f\u20e3  Conectas tu cuenta MT5 (XM, IC Markets, etc.)",
+            "2\ufe0f\u20e3  Nuestro bot replica cada operaci\u00f3n en tiempo real",
+            "3\ufe0f\u20e3  Pagas comisi\u00f3n SOLO sobre las ganancias reales",
+            "\u2705  Sin mensualidad fija \u2014 sin riesgo inicial",
         ]
-        scalper_right = [
-            ("P&L Scalper Hoy:", "_sc_pnl_hoy"),
-            ("Perdidas Seguidas:", "_sc_racha"),
-            ("Riesgo/Trade:", "_sc_riesgo"),
-            ("Max Loss Diario:", "_sc_max_loss"),
-        ]
-        for i, (lbl_text, attr) in enumerate(scalper_left):
-            _make_label(estado_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
-                row=i, column=0, sticky="w", padx=(0, 8), pady=2)
-            val = _make_label(estado_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
-            val.grid(row=i, column=1, sticky="w", pady=2)
-            setattr(self, attr, val)
-        for i, (lbl_text, attr) in enumerate(scalper_right):
-            _make_label(estado_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
-                row=i, column=2, sticky="w", padx=(30, 8), pady=2)
-            val = _make_label(estado_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
-            val.grid(row=i, column=3, sticky="w", pady=2)
-            setattr(self, attr, val)
+        for paso in pasos:
+            _make_label(como_frame, paso, fg=TEXT_PRI,
+                        font=("Segoe UI", 10)).pack(anchor="w", padx=12, pady=2)
 
-        # === Seccion 2: Activos del Scalper (all 7) ===
-        activos_frame = _make_section_frame(scroll_frame, "Activos Scalping (7 pares)")
-        activos_frame.pack(fill="x", padx=10, pady=5)
+        # === Sección: Mercados ===
+        mkt_frame = _make_section_frame(scroll_frame, "Mercados cubiertos")
+        mercados = ["\U0001F947 Oro (XAU/USD)", "\U0001F4B6 EUR/USD", "\U0001F4B7 GBP/JPY", "\U0001F4CA NASDAQ (US100)", "\U0001F4C8 S&P 500"]
+        for m in mercados:
+            _make_label(mkt_frame, m, fg=ACCENT, font=("Segoe UI", 10)).pack(anchor="w", padx=12, pady=1)
 
-        cols_sc = ("activo", "mt5", "horario", "spread_max", "estado")
-        self._sc_tree_activos = ttk.Treeview(activos_frame, columns=cols_sc, show="headings", height=7)
-        self._sc_tree_activos.heading("activo", text="Activo")
-        self._sc_tree_activos.heading("mt5", text="Simbolo MT5")
-        self._sc_tree_activos.heading("horario", text="Horario (Andorra)")
-        self._sc_tree_activos.heading("spread_max", text="Spread Max")
-        self._sc_tree_activos.heading("estado", text="Estado")
+        # === Sección: Activar ===
+        act_frame = _make_section_frame(scroll_frame, "Activar Copy Trading")
+        _make_label(act_frame,
+            "Para activar el Copy Trading en tu cuenta, haz clic en el bot\u00f3n de abajo:",
+            fg=TEXT, font=("Segoe UI", 10)).pack(anchor="w", padx=8, pady=(4, 8))
 
-        self._sc_tree_activos.column("activo", width=140, anchor="w")
-        self._sc_tree_activos.column("mt5", width=120, anchor="center")
-        self._sc_tree_activos.column("horario", width=140, anchor="center")
-        self._sc_tree_activos.column("spread_max", width=100, anchor="center")
-        self._sc_tree_activos.column("estado", width=120, anchor="center")
+        btn_frame = tk.Frame(act_frame, bg=BG_PANEL)
+        btn_frame.pack(padx=8, pady=4)
 
-        self._sc_tree_activos.tag_configure("activo", foreground=WIN_COLOR)
-        self._sc_tree_activos.tag_configure("inactivo", foreground=TEXT_SEC)
-        self._sc_tree_activos.tag_configure("alt_activo", foreground=WIN_COLOR, background=BG_ROW_ALT)
-        self._sc_tree_activos.tag_configure("alt_inactivo", foreground=TEXT_SEC, background=BG_ROW_ALT)
+        import webbrowser as _wb
+        _make_button(btn_frame, "\U0001F916 ACTIVAR COPY TRADING",
+                     lambda: _wb.open("https://social.tp-redirect.com/s/WRE0V7jm"),
+                     bg="#00d4aa", fg="#000000", font=("Segoe UI", 11, "bold"),
+                     padx=20, pady=10).pack(side="left", padx=6)
+        _make_button(btn_frame, "\U0001F48E VIP Canal",
+                     lambda: _wb.open("https://t.me/BUYSELL365_PRO_BOT?start=vip"),
+                     bg="#6e40c9", fg="#ffffff", font=("Segoe UI", 10, "bold"),
+                     padx=12, pady=10).pack(side="left", padx=6)
+        _make_button(btn_frame, "\U0001F310 BuySell365.pro",
+                     lambda: _wb.open("https://buysell365.pro"),
+                     bg=BG_INPUT, fg=ACCENT, padx=12, pady=10).pack(side="left", padx=6)
 
-        # FIX 2026-03-21: 6 scalper activos optimizados con backtest 60d
-        activos_data = [
-            ("EUR/USD", "EURUSD", "09:00 - 18:00", "20", "BB+RSI (BUY+SELL)"),
-            ("NASDAQ (US100)", "US100Cash", "15:30 - 22:00", "500", "BB+RSI (BUY only)"),
-            ("ORO (XAUUSD)", "GOLD", "09:00 - 19:00", "45", "BB+RSI (SELL only)"),
-            ("AUD/CAD", "AUDCAD", "09:00 - 18:00", "25", "Fibonacci (SELL only)"),
-            ("EUR/CHF", "EURCHF", "09:00 - 18:00", "20", "Fibonacci (SELL only)"),
-            ("USD/CAD", "USDCAD", "15:00 - 22:00", "22", "Fibonacci (SELL only)"),
-        ]
-        for idx, row in enumerate(activos_data):
-            tag_prefix = "alt_" if idx % 2 == 1 else ""
-            self._sc_tree_activos.insert("", "end", values=row, tags=(f"{tag_prefix}inactivo",))
+        # === QR Link ===
+        _make_label(act_frame,
+            "\U0001F517 Link directo: https://social.tp-redirect.com/s/WRE0V7jm",
+            fg=TEXT_SEC, font=("Segoe UI", 9)).pack(anchor="w", padx=8, pady=(0, 8))
 
-        self._sc_tree_activos.pack(fill="x", pady=(0, 5))
-
-        # === Seccion 3: Posiciones Abiertas del Scalper ===
-        pos_frame = _make_section_frame(scroll_frame, "Posiciones Scalper Abiertas")
-        pos_frame.pack(fill="x", padx=10, pady=5)
-
-        cols_pos = ("ticket", "simbolo", "tipo", "entrada", "sl", "tp", "profit", "tiempo")
-        self._sc_tree_pos = ttk.Treeview(pos_frame, columns=cols_pos, show="headings", height=5)
-        self._sc_tree_pos.heading("ticket", text="Ticket")
-        self._sc_tree_pos.heading("simbolo", text="Simbolo")
-        self._sc_tree_pos.heading("tipo", text="Tipo")
-        self._sc_tree_pos.heading("entrada", text="Entrada")
-        self._sc_tree_pos.heading("sl", text="SL")
-        self._sc_tree_pos.heading("tp", text="TP")
-        self._sc_tree_pos.heading("profit", text="Profit")
-        self._sc_tree_pos.heading("tiempo", text="Tiempo")
-
-        self._sc_tree_pos.column("ticket", width=80, anchor="center")
-        self._sc_tree_pos.column("simbolo", width=100, anchor="center")
-        self._sc_tree_pos.column("tipo", width=60, anchor="center")
-        self._sc_tree_pos.column("entrada", width=100, anchor="center")
-        self._sc_tree_pos.column("sl", width=90, anchor="center")
-        self._sc_tree_pos.column("tp", width=90, anchor="center")
-        self._sc_tree_pos.column("profit", width=80, anchor="center")
-        self._sc_tree_pos.column("tiempo", width=100, anchor="center")
-
-        self._sc_tree_pos.tag_configure("profit_pos", foreground=WIN_COLOR)
-        self._sc_tree_pos.tag_configure("profit_neg", foreground=LOSS_COLOR)
-
-        self._sc_tree_pos.pack(fill="x", pady=(0, 5))
-
-        # === Seccion 4: Historial Scalper Hoy (color-coded) ===
-        hist_frame = _make_section_frame(scroll_frame, "Historial Scalper (Hoy)")
-        hist_frame.pack(fill="x", padx=10, pady=(5, 15))
-
-        self._sc_log_text = tk.Text(
-            hist_frame, bg=BG_INPUT, fg=TEXT, font=("Consolas", 9),
-            wrap="word", height=12, state="disabled", insertbackground=TEXT,
-            highlightthickness=0,
-        )
-        self._sc_log_text.tag_configure("win", foreground=WIN_COLOR)
-        self._sc_log_text.tag_configure("loss", foreground=LOSS_COLOR)
-        self._sc_log_text.tag_configure("header", foreground=ACCENT_BRIGHT, font=("Consolas", 9, "bold"))
-        self._sc_log_text.pack(fill="both", expand=True, pady=(0, 5))
-
-        # Refresh inicial
-        self._refresh_scalper()
-
-    def _refresh_scalper(self):
-        """Actualiza la pestana Scalper. MT5 I/O en background thread."""
-        self._sc_estrategia.config(text="BB(20,2) + RSI(7) Mean Rev. M5")
-        self._sc_riesgo.config(text="0.5% por trade")
-        self._sc_max_loss.config(text="3% diario")
-
-        # Check if scalper is paused (bot saves 'scalper_activo' in estado.json)
-        estado = self._get_estado()
-        _scalper_on = estado.get("scalper_activo", True)
-        if not _scalper_on:
-            self._scalper_paused = True
-            self._btn_scalper_toggle.config(text="\u25B6 Play Scalper", bg="#238636")
-        else:
-            self._scalper_paused = False
-            self._btn_scalper_toggle.config(text="\u23F8 Pausar Scalper", bg="#6e40c9")
-
-        _bot_running = self.bot.is_running if hasattr(self, 'bot') else False
-        if not _bot_running:
-            self._sc_estado.config(text="Bot detenido", fg=ERR)
-            for lbl in (self._sc_trades_hoy, self._sc_posiciones, self._sc_pnl_hoy, self._sc_racha):
-                lbl.config(text="--")
-            self._sc_pnl_header.config(text="Scalper P&L: Bot OFF", fg=TEXT_SEC)
-            return
-
-        if self._scalper_paused:
-            self._sc_estado.config(text="PAUSADO", fg=WARN)
-        else:
-            self._sc_estado.config(text="Activo", fg=WIN_COLOR)
-
-        def _mt5_fetch():
-            """Lee datos de MT5 en background y devuelve resultados."""
-            try:
-                import MetaTrader5 as mt5
-                if not mt5.initialize():
-                    return None
-                positions = mt5.positions_get()
-                scalper_pos = [p for p in (positions or []) if p.magic == 20260318]
-                now = datetime.now()
-                from_dt = datetime(now.year, now.month, now.day)
-                to_dt = now + timedelta(hours=1)
-                deals = mt5.history_deals_get(from_dt, to_dt)
-                sc_deals = [d for d in (deals or []) if d.magic == 20260318 and d.entry == 1]
-                # Preparar datos serializados (no objetos MT5 crudos)
-                pos_data = []
-                total_profit = 0
-                for p in scalper_pos:
-                    profit = p.profit
-                    total_profit += profit
-                    mins = int((now - datetime.fromtimestamp(p.time)).total_seconds() / 60)
-                    pos_data.append({
-                        'ticket': p.ticket, 'symbol': p.symbol,
-                        'tipo': "BUY" if p.type == 0 else "SELL",
-                        'open': f"{p.price_open:.5g}", 'sl': f"{p.sl:.5g}", 'tp': f"{p.tp:.5g}",
-                        'profit': profit, 'mins': mins
-                    })
-                deal_data = []
-                deal_profit_total = 0
-                wins = 0
-                losses = 0
-                for d in sc_deals[-30:]:
-                    deal_data.append({
-                        'time': datetime.fromtimestamp(d.time).strftime("%H:%M"),
-                        'symbol': d.symbol,
-                        'tipo': "BUY" if d.type == 0 else "SELL",
-                        'volume': d.volume, 'profit': d.profit
-                    })
-                    deal_profit_total += d.profit
-                    if d.profit >= 0:
-                        wins += 1
-                    else:
-                        losses += 1
-                return {'pos': pos_data, 'deals': deal_data,
-                        'total_profit': total_profit, 'deal_profit': deal_profit_total,
-                        'n_pos': len(scalper_pos),
-                        'n_deals': len(sc_deals), 'now': now,
-                        'wins': wins, 'losses': losses}
-            except ImportError:
-                return 'no_mt5'
-            except Exception as e:
-                return f'error:{e}'
-
-        def _update_gui(result):
-            """Actualiza widgets en el main thread."""
-            try:
-                if result == 'no_mt5':
-                    self._sc_posiciones.config(text="MT5 no disponible")
-                    self._sc_pnl_header.config(text="Scalper P&L: MT5 N/A", fg=TEXT_SEC)
-                    return
-                if isinstance(result, str) and result.startswith('error:'):
-                    self._sc_posiciones.config(text=result)
-                    return
-                if result is None:
-                    self._sc_posiciones.config(text="MT5 sin conexion")
-                    self._sc_pnl_header.config(text="Scalper P&L: sin conexion", fg=TEXT_SEC)
-                    return
-
-                now = result['now']
-                hora = now.hour
-                self._scalper_status_lbl.config(text=f"Actualizado: {now.strftime('%H:%M:%S')}")
-                self._sc_posiciones.config(text=str(result['n_pos']))
-                self._sc_trades_hoy.config(text=f"{result['n_deals']} ({result['wins']}W / {result['losses']}L)")
-
-                # Tabla posiciones
-                for item in self._sc_tree_pos.get_children():
-                    self._sc_tree_pos.delete(item)
-                for p in result['pos']:
-                    tag = "profit_pos" if p['profit'] >= 0 else "profit_neg"
-                    self._sc_tree_pos.insert("", "end", values=(
-                        p['ticket'], p['symbol'], p['tipo'],
-                        p['open'], p['sl'], p['tp'],
-                        f"${p['profit']:.2f}", f"{p['mins']}m"
-                    ), tags=(tag,))
-
-                # P&L (separated from main bot)
-                tp = result['total_profit']
-                dp = result['deal_profit']
-                total_sc_pnl = tp + dp
-                self._sc_pnl_hoy.config(text=f"${total_sc_pnl:.2f}",
-                                         fg=WIN_COLOR if total_sc_pnl >= 0 else LOSS_COLOR)
-                pnl_color = WIN_COLOR if total_sc_pnl >= 0 else LOSS_COLOR
-                self._sc_pnl_header.config(
-                    text=f"Scalper P&L: ${total_sc_pnl:+,.2f} ({result['wins']}W/{result['losses']}L)",
-                    fg=pnl_color)
-
-                # Color-coded historial
-                self._sc_log_text.config(state="normal")
-                self._sc_log_text.delete("1.0", "end")
-                if result['deals']:
-                    self._sc_log_text.insert("end",
-                        f"{'Hora':<8} {'Simbolo':<12} {'Tipo':<6} {'Vol':<6} {'Profit':>10}\n", "header")
-                    self._sc_log_text.insert("end", "-" * 50 + "\n", "header")
-                for d in result['deals']:
-                    ps = f"${d['profit']:+.2f}"
-                    tag = "win" if d['profit'] >= 0 else "loss"
-                    self._sc_log_text.insert("end",
-                        f"[{d['time']}] {d['symbol']:<12} {d['tipo']:<6} {d['volume']:<6.2f} {ps:>10}\n", tag)
-                self._sc_log_text.config(state="disabled")
-
-                # Estado activos por hora (update all 7)
-                items = self._sc_tree_activos.get_children()
-                for idx, item in enumerate(items):
-                    vals = list(self._sc_tree_activos.item(item, "values"))
-                    horario = vals[2]
-                    tag_prefix = "alt_" if idx % 2 == 1 else ""
-                    try:
-                        h_s = int(horario.split("-")[0].strip().split(":")[0])
-                        h_e = int(horario.split("-")[1].strip().split(":")[0])
-                        if h_s <= hora < h_e and now.weekday() < 5:
-                            vals[4] = "ACTIVO"
-                            self._sc_tree_activos.item(item, values=vals,
-                                                        tags=(f"{tag_prefix}activo",))
-                        else:
-                            vals[4] = "Fuera horario"
-                            self._sc_tree_activos.item(item, values=vals,
-                                                        tags=(f"{tag_prefix}inactivo",))
-                    except Exception:
-                        pass
-                self._sc_racha.config(text="0")
-            except Exception as e:
-                self._scalper_status_lbl.config(text=f"Error: {e}")
-
-        def _bg_worker():
-            result = _mt5_fetch()
-            self.root.after(0, lambda: _update_gui(result))
-
-        threading.Thread(target=_bg_worker, daemon=True).start()
 
     def _open_dashboard(self):
         env = load_env()
@@ -3636,13 +3382,6 @@ class ManagementConsole:
             if _bot_on and self._tick_count % 5 == 0:
                 try:
                     self._refresh_analisis()
-                except Exception:
-                    pass
-
-            # Scalper (every 10s) — solo si bot activo
-            if _bot_on and self._tick_count % 5 == 0:
-                try:
-                    self._refresh_scalper()
                 except Exception:
                     pass
 
