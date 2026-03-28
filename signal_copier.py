@@ -3,7 +3,7 @@ BuySell365 Signal Copier — Userbot que escucha canales VIP de Telegram
 Lee señales de SureShotFX, Learn2Trade, etc. y las ejecuta en MT5 + reenvía al canal BuySell365.
 Usa Telethon (cuenta personal de Telegram).
 """
-import os, re, asyncio, logging, time, json
+import os, re, asyncio, logging, time, json, threading, io
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -64,6 +64,211 @@ SYMBOL_MAP = {
 }
 
 MAGIC_COPIER = 20260325
+TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
+
+# === TP TRACKER ===
+# _open_signals: { sig_id → {"signal": signal_dict, "sent_at": float} }
+_open_signals: dict = {}
+_signals_lock = threading.Lock()
+
+
+def _get_current_price(pair: str) -> float | None:
+    """Fetch current price via Twelve Data API. Returns float or None."""
+    if not TWELVE_KEY:
+        return None
+    # Twelve Data usa "XAU/USD" para gold — normalizar
+    symbol = pair
+    if pair in ("GOLD", "XAUUSD"):
+        symbol = "XAU/USD"
+    try:
+        import requests
+        resp = requests.get(
+            "https://api.twelvedata.com/price",
+            params={"symbol": symbol, "apikey": TWELVE_KEY},
+            timeout=8,
+        )
+        data = resp.json()
+        val = float(data.get("price", 0) or 0)
+        return val if val > 0 else None
+    except Exception:
+        return None
+
+
+def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> bytes | None:
+    """Generate mini-chart using Twelve Data + matplotlib. Returns PNG bytes or None."""
+    if not TWELVE_KEY:
+        return None
+    symbol = "XAU/USD" if pair in ("GOLD", "XAUUSD") else pair
+    try:
+        import requests
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        resp = requests.get(
+            "https://api.twelvedata.com/time_series",
+            params={"symbol": symbol, "interval": "15min", "outputsize": 40, "apikey": TWELVE_KEY},
+            timeout=15,
+        )
+        data = resp.json()
+        if "values" not in data:
+            return None
+        values = data["values"][::-1]  # oldest → newest
+        closes = [float(v["close"]) for v in values]
+
+        fig, ax = plt.subplots(figsize=(8, 4), facecolor="#0d1117")
+        ax.set_facecolor("#0d1117")
+        color_line = "#00ff88" if direction == "BUY" else "#ff4466"
+        ax.plot(closes, color=color_line, linewidth=2)
+        ax.axhline(y=tp, color="#00ff00", linestyle="--", linewidth=1.5, label=f"TP {tp:.2f}")
+        if entry > 0:
+            ax.axhline(y=entry, color="#aaaaaa", linestyle=":", linewidth=1, label=f"Entrada {entry:.2f}")
+        dir_es = "COMPRA" if direction == "BUY" else "VENTA"
+        ax.set_title(f"🎯 TP ALCANZADO — {dir_es} {pair}", color="white",
+                     fontsize=12, fontweight="bold", pad=10)
+        ax.tick_params(colors="#888888")
+        for spine in ax.spines.values():
+            spine.set_color("#333333")
+        ax.legend(facecolor="#1a1a2e", labelcolor="white", fontsize=9, framealpha=0.7)
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=120, facecolor="#0d1117")
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()
+    except Exception as e:
+        log.warning(f"Chart generation error: {e}")
+        return None
+
+
+def _send_tp_celebration(signal: dict) -> None:
+    """Send TP celebration to channel with chart image and rockets."""
+    import requests
+
+    direction = signal["direction"]
+    pair = signal["pair"]
+    entry = signal["entry"]
+    tp = signal["tp"]
+
+    def fmt(v):
+        return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
+
+    dir_es = "COMPRA" if direction == "BUY" else "VENTA"
+    dir_emoji = "🟢" if direction == "BUY" else "🔴"
+
+    # Calcular ganancia en puntos/pips
+    pts = round(abs(tp - entry), 2)
+    puntos_texto = f"+{pts:.1f} pts" if pair in ("GOLD", "XAUUSD") else f"+{pts:.5f}".rstrip("0").rstrip(".")
+
+    msg = (
+        f"🎯🚀🚀🚀 *¡¡TP ALCANZADO!!*\n\n"
+        f"{dir_emoji} *{dir_es} {pair}*\n"
+        f"📍 Entrada: {fmt(entry)}\n"
+        f"🎯 TP: {fmt(tp)} ✅\n"
+        f"💰 Ganancia: *{puntos_texto}*\n\n"
+        f"*¡¡SEÑAL GANADORA!! 🏆*\n"
+        f"🎉🎉🎉🎉🎉"
+    )
+
+    chart_bytes = _fetch_chart_image(pair, direction, entry, tp)
+
+    try:
+        if chart_bytes:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+            resp = requests.post(
+                url,
+                data={"chat_id": CHANNEL_ID, "caption": msg, "parse_mode": "Markdown"},
+                files={"photo": ("chart.png", chart_bytes, "image/png")},
+                timeout=20,
+            )
+        else:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            resp = requests.post(
+                url,
+                json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"},
+                timeout=10,
+            )
+        if resp.status_code == 200:
+            log.info(f"🎉 TP CELEBRATION enviada: {dir_es} {pair}")
+        else:
+            log.warning(f"Celebration send error: {resp.status_code} {resp.text[:80]}")
+    except Exception as e:
+        log.warning(f"Celebration send error: {e}")
+
+
+def _send_sl_notification(signal: dict) -> None:
+    """Notify channel that SL was hit."""
+    import requests
+
+    direction = signal["direction"]
+    pair = signal["pair"]
+    entry = signal["entry"]
+    sl = signal["sl"]
+    dir_es = "COMPRA" if direction == "BUY" else "VENTA"
+    dir_emoji = "🟢" if direction == "BUY" else "🔴"
+
+    def fmt(v):
+        return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
+
+    msg = (
+        f"🛡️ *SL ALCANZADO*\n\n"
+        f"{dir_emoji} {dir_es} {pair}\n"
+        f"📍 Entrada: {fmt(entry)}\n"
+        f"🛡️ SL: {fmt(sl)}\n\n"
+        f"_Señal cerrada con protección de capital._"
+    )
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+    except Exception as e:
+        log.warning(f"SL notification error: {e}")
+
+
+async def _monitor_tp_loop() -> None:
+    """Async background loop — checks every 60s if any tracked signal hit TP or SL."""
+    log.info("🎯 Monitor TP/SL loop iniciado")
+    while True:
+        await asyncio.sleep(60)
+        with _signals_lock:
+            signals_copy = dict(_open_signals)
+
+        to_resolve = []
+        for sig_id, sdata in signals_copy.items():
+            signal = sdata["signal"]
+            direction = signal["direction"]
+            tp = signal["tp"]
+            sl = signal["sl"]
+            pair = signal["pair"]
+            age_hours = (time.time() - sdata["sent_at"]) / 3600
+
+            # Auto-expire after 48h to avoid zombie tracking
+            if age_hours > 48:
+                to_resolve.append((sig_id, signal, "expired"))
+                continue
+
+            price = _get_current_price(pair)
+            if price is None:
+                continue
+
+            tp_hit = (direction == "BUY" and price >= tp) or (direction == "SELL" and price <= tp)
+            sl_hit = (direction == "BUY" and price <= sl) or (direction == "SELL" and price >= sl)
+
+            if tp_hit:
+                to_resolve.append((sig_id, signal, "tp"))
+            elif sl_hit:
+                to_resolve.append((sig_id, signal, "sl"))
+
+        for sig_id, signal, result in to_resolve:
+            with _signals_lock:
+                _open_signals.pop(sig_id, None)
+            if result == "tp":
+                log.info(f"🎯 TP ALCANZADO: {signal['direction']} {signal['pair']}")
+                _send_tp_celebration(signal)
+            elif result == "sl":
+                log.info(f"🛡️ SL alcanzado: {signal['direction']} {signal['pair']}")
+                _send_sl_notification(signal)
+
 
 # === PARSER ===
 def parse_signal(text, chat_title=""):
@@ -585,6 +790,12 @@ def send_to_channel(signal, executed, detail):
         }, timeout=10)
         if resp.status_code == 200:
             log.info(f"📡 ENVIADO AL CANAL: {dir_es} {pair_display} ({source})")
+            # Registrar señal para seguimiento TP/SL (solo si tiene precios válidos)
+            if signal["tp"] > 0 and signal["sl"] > 0:
+                sig_id = f"{pair}_{int(time.time())}"
+                with _signals_lock:
+                    _open_signals[sig_id] = {"signal": signal, "sent_at": time.time()}
+                log.info(f"🎯 Señal registrada para seguimiento: {sig_id}")
         else:
             log.warning(f"📡 Error canal: {resp.status_code} {resp.text[:100]}")
     except Exception as e:
@@ -719,6 +930,9 @@ async def main():
     # Update event handler with new channels
     client.remove_event_handler(handler)
     client.add_event_handler(handler, events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
+
+    # Iniciar monitor TP/SL en background
+    asyncio.ensure_future(_monitor_tp_loop())
 
     log.info("📡 Signal Copier ACTIVO — escuchando todos los canales VIP...")
     await client.run_until_disconnected()

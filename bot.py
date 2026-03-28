@@ -15506,7 +15506,8 @@ def loop_polling():
                         # (señales/TP/SL llegan por enviar_canal, no por polling)
                         # IMPORTANTE: se hace ANTES del check de autorización para que
                         # mensajes de usuarios no autorizados también se borren
-                        if (es_grupo or es_canal) and msg.get("message_id"):
+                        # EXCEPTO mensajes del ADMIN — solo él puede borrar los suyos
+                        if (es_grupo or es_canal) and msg.get("message_id") and user_id not in ADMIN_IDS:
                             programar_borrado(chat_id, msg.get("message_id"))
 
                         # 🎟️ DETECCIÓN DE CÓDIGO DE INVITACIÓN — cualquier usuario, grupo o privado
