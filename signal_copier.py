@@ -529,7 +529,7 @@ def send_to_channel(signal, executed, detail):
         f"",
         f"📍 Entrada: `{entry_display}`",
         f"🎯 TP: `{fmt(tp)}`",
-        f"🛡️ Stop Loss: `{fmt(sl)}`",
+        f"🛡️ SL: `{fmt(sl)}`",
     ]
 
     msg = "\n".join(lines)
