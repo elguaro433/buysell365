@@ -111,6 +111,8 @@ def parse_signal(text, chat_title=""):
         source = "SureShotFX"
     elif "learn" in chat_lower or "l2t" in text_lower:
         source = "Learn2Trade"
+    elif "fxpremiere" in chat_lower or "fxpremiere" in text_lower or "goldSignals" in chat_title:
+        source = "FXPremiere"
 
     # ── DETECTAR DIRECCIÓN ──
     # Learn2Trade usa ▲▲▲=BUY y ▼▼▼=SELL
@@ -139,12 +141,16 @@ def parse_signal(text, chat_title=""):
         else:
             order_type = "Market"
 
-    # Fallback: BUY/SELL en el texto
+    # Fallback: BUY/SELL en el texto (incluyendo formatos FXPremiere en español)
     if not direction:
-        if any(w in upper_noslash for w in ["BUY", "COMPRA", "LONG"]):
-            direction = "BUY"
-        elif any(w in upper_noslash for w in ["SELL", "VENTA", "SHORT"]):
+        _buy_words  = ["BUY", "COMPRA", "LONG", "COMPRE", "COMPRA DE", "COMPRA INSTANTANEA",
+                       "VENTA DE ORO AHORA" ]  # "Venta de Oro Ahora" puede ser SELL
+        _sell_words = ["SELL", "VENTA", "SHORT", "VENTA INSTANTANEA", "VENTA DE ORO"]
+        # Verificar VENTA antes que COMPRA para evitar falsos positivos
+        if any(w in upper_noslash for w in _sell_words):
             direction = "SELL"
+        elif any(w in upper_noslash for w in _buy_words):
+            direction = "BUY"
     if not direction:
         return None
 
@@ -169,10 +175,35 @@ def parse_signal(text, chat_title=""):
     # Eliminar símbolos de moneda para parsear números
     upper_clean = re.sub(r'[$€£]', '', upper)
 
-    sl_match  = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s]+(\d+\.?\d*)', upper_clean)
-    tp_match  = re.search(r'(?:TP\d?|TAKE\s*PROFIT|TARGET)\s*[:\s]+(\d+\.?\d*)', upper_clean)
-    entry_match = re.search(r'(?:ENTRY\s*(?:PRICE)?|ENTRADA)\s*[:\s]+(\d+\.?\d*)', upper_clean)
+    # ── EXTRAER SL ──
+    # Formatos: "SL: 4499.60" | "SL 4499" | "❗️ SL 45370" | "Stop Loss → 1.3801"
+    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→]+(\d+\.?\d*)', upper_clean)
 
+    # ── EXTRAER TP1 (solo el primero) ──
+    # Formatos: "TP1: 4513" | "TP: 4513" | "Tp 4540" | "🥇 TP 45530" | "Toma de Ganancias 1 : 4513"
+    tp_match = re.search(
+        r'(?:TOMA\s*DE\s*GANANCIAS\s*1\s*[:\s]+|TP\s*1\s*[:\s]+|TP\s*[:\s]+|TP\s+)(\d+\.?\d*)',
+        upper_clean
+    )
+    # Fallback: "Tp 4540" (capital T lowercase p)
+    if not tp_match:
+        tp_match = re.search(r'\bTP\s+(\d{3,6}\.?\d*)', upper_clean)
+
+    # ── EXTRAER ENTRADA ──
+    # Formatos: "Entrada: 4509/4504" | "Entrada 4545" | "Venta de Oro Ahora: 4416 - 4419"
+    # | "ENTRY 1.3741" | "Buy 1.8412"
+    entry_match = re.search(
+        r'(?:ENTRY\s*(?:PRICE)?|ENTRADA)\s*[:\s]+(\d+\.?\d*)',
+        upper_clean
+    )
+    # FXPremiere: "Venta de Oro Ahora: 4416 - 4419" → tomar primer número después del ":"
+    if not entry_match:
+        entry_match = re.search(r'(?:AHORA|NOW)\s*[:\s]+(\d+\.?\d*)', upper_clean)
+    # Formato inline: "GBP/CAD H1 Buy 1.8412" → número después de BUY/SELL
+    if not entry_match:
+        entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+[\w/]+\s+(?:H\d+\s+)?(\d+\.?\d*)', upper_clean)
+
+    # SL es obligatorio — si no hay SL ignorar la señal (demasiado arriesgado)
     if not sl_match or not tp_match:
         return None
 
@@ -562,6 +593,30 @@ async def main():
         -1001700795303,   # Sureshot INDICES (VIP)
         -1001389726384,   # Learn 2 Trade VIP (verificado 2026-03-28)
     }
+
+    # Canales públicos por username (se resuelven al arrancar)
+    PUBLIC_CHANNELS_USERNAMES = [
+        "forexsignalstrialgroup_00",  # FXPremiere Free Trial — Gold + Forex
+    ]
+    # Filtro por activo: si el canal está en esta lista, solo se aceptan esas señales
+    CHANNEL_ASSET_FILTER = {
+        "forexsignalstrialgroup_00": ["XAUUSD", "GOLD"],  # Solo oro
+    }
+
+    # Resolver usernames → IDs numéricos y agregarlos al set
+    _username_to_id = {}
+    for _uname in PUBLIC_CHANNELS_USERNAMES:
+        try:
+            _entity = await client.get_entity(_uname)
+            _cid = _entity.id
+            # Telethon usa IDs negativos para canales: -100XXXXXXXXXX
+            _cid_neg = int(f"-100{_cid}") if _cid > 0 else _cid
+            ALLOWED_CHANNEL_IDS.add(_cid_neg)
+            _username_to_id[_cid_neg] = _uname
+            log.info(f"✅ Canal público registrado: @{_uname} → {_cid_neg}")
+        except Exception as _e:
+            log.warning(f"⚠️ No se pudo resolver @{_uname}: {_e}")
+
     # Auto-discover: buscar canales Learn2Trade VIP y agregarlos
     L2T_KEYWORDS = ["learn 2 trade", "learn2trade", "l2t"]
     SIGNAL_KEYWORDS = ["sureshot", "learn"]  # Para el log de monitoreo
@@ -585,8 +640,18 @@ async def main():
             if chat_id not in ALLOWED_CHANNEL_IDS and -chat_id not in ALLOWED_CHANNEL_IDS:
                 return
 
+            # Detectar username del canal para filtros
+            _chan_uname = _username_to_id.get(chat_id, _username_to_id.get(-chat_id, ""))
+
             # Parse the signal
             signal = parse_signal(text, chat_title=chat_title)
+
+            # Aplicar filtro de activo por canal (ej: forexsignalstrialgroup_00 solo XAUUSD)
+            if signal and _chan_uname in CHANNEL_ASSET_FILTER:
+                _allowed_assets = CHANNEL_ASSET_FILTER[_chan_uname]
+                if signal.get("pair") not in _allowed_assets and signal.get("mt5_symbol") not in _allowed_assets:
+                    log.info(f"⏭️ Señal ignorada ({signal['pair']}) — canal {_chan_uname} solo acepta {_allowed_assets}")
+                    return
             if not signal:
                 return
 
