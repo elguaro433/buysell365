@@ -270,6 +270,7 @@ VIP_AVISO_DIAS       = 7           # FIX 2026-03-19: Secuencia 7d→3d→1d (ant
 VIP_CHECK_INTERVALO  = 300         # Revisar depósitos cada 5 minutos (segundos)
 BINANCE_API_KEY      = os.getenv("BINANCE_API_KEY", "").strip()
 BINANCE_API_SECRET   = os.getenv("BINANCE_API_SECRET", "").strip()
+WISE_API_TOKEN       = os.getenv("WISE_API_TOKEN", "").strip()  # Token solo lectura Wise API
 
 # ✅ FILTRO DE COSTES (Spread máximo permitido en puntos)
 # Si el spread es mayor a esto, el bot no entrará para proteger el capital.
@@ -402,6 +403,9 @@ _trial_intentos: dict = {}                   # {user_id: int} — intentos de tr
 _cache_miembros: dict = {}                   # {user_id: (timestamp, bool)} — caché getChatMember TTL 300s
 _ultima_auditoria: float = 0.0              # Timestamp última auditoría de membresías
 _codigos_invitacion: dict = {}              # {code: {creado_por, dias, creado, max_usos, usos, usado_por}}
+_wise_profile_id: str = ""                  # ProfileId Wise (se obtiene automáticamente al iniciar)
+_wise_iban: str = ""                        # IBAN Wise (se obtiene automáticamente)
+_wise_referencias_pendientes: dict = {}     # {referencia_BS: user_id} — para matchear pagos Wise
 _ultimo_reporte_diario: str = ""            # "YYYY-MM-DD" — evita enviar doble
 _fecha_stats_diarias: str = ""              # "YYYY-MM-DD" — auto-reset si cambia el día
 REPORTE_HORA = 6                            # Hora local (Andorra) para enviar reporte diario (6:30)
@@ -6555,10 +6559,15 @@ def cmd_vip(user_id: str = None):
     btn_pago = f"💰 SUSCRIBIRME (50% OFF)" if pi["en_descuento"] else f"💰 SUSCRIBIRME"
     botones = []
     botones.append([{"text": "📊 VER RESULTADOS EN VIVO", "url": "https://buysell365.pro"}])
-    botones.append([{"text": btn_pago, "callback_data": "vip_pagar_usdt"}])
+    botones.append([{"text": btn_pago + " (USDT/Binance)", "callback_data": "vip_pagar_usdt"}])
+    botones.append([{"text": "🏦 PAGAR CON WISE / BANCO (EUR)", "callback_data": "vip_pagar_wise"}])
     if _tiene_pago_pendiente:
-        monto_pend = pagos_pendientes_vip[user_id].get("monto_unico", 0)
-        botones.append([{"text": f"⏳ VER PAGO PENDIENTE ({monto_pend:.3f} USDT)", "callback_data": "vip_ver_pago_pendiente"}])
+        pend_info = pagos_pendientes_vip[user_id]
+        if pend_info.get("ref_wise"):
+            botones.append([{"text": f"⏳ VER PAGO WISE PENDIENTE ({pend_info['ref_wise']})", "callback_data": "vip_ver_pago_wise"}])
+        elif pend_info.get("monto_unico"):
+            monto_pend = pend_info.get("monto_unico", 0)
+            botones.append([{"text": f"⏳ VER PAGO PENDIENTE ({monto_pend:.3f} USDT)", "callback_data": "vip_ver_pago_pendiente"}])
     botones.append([{"text": f"❓ CONTACTAR ADMIN", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}])
     return texto, {"inline_keyboard": botones}
 
@@ -6776,6 +6785,168 @@ def _verificar_depositos_binance():
         logger.error("❌ Faltan módulos hmac/hashlib para Binance API")
     except Exception as e:
         logger.error(f"⚠️ Error verificando depósitos Binance: {e}")
+
+
+def _wise_init():
+    """Obtiene el profileId e IBAN de Wise mediante la API. Se llama una vez al iniciar."""
+    global _wise_profile_id, _wise_iban
+    if not WISE_API_TOKEN:
+        return
+    try:
+        headers = {"Authorization": f"Bearer {WISE_API_TOKEN}"}
+        # 1. Obtener profile ID
+        r = requests.get("https://api.wise.com/v1/profiles", headers=headers, timeout=10)
+        if r.status_code != 200:
+            logger.warning(f"⚠️ Wise profiles: {r.status_code}")
+            return
+        profiles = r.json()
+        # Preferir perfil PERSONAL
+        pid = None
+        for p in profiles:
+            if p.get("type") == "PERSONAL":
+                pid = str(p["id"])
+                break
+        if not pid and profiles:
+            pid = str(profiles[0]["id"])
+        if not pid:
+            return
+        _wise_profile_id = pid
+        # 2. Obtener detalles de cuenta (IBAN)
+        r2 = requests.get(
+            f"https://api.wise.com/v1/profiles/{pid}/account-details",
+            headers=headers, timeout=10
+        )
+        if r2.status_code == 200:
+            details = r2.json()
+            if isinstance(details, list):
+                for d in details:
+                    for field in d.get("accountDetails", []):
+                        if field.get("title", "").upper() in ("IBAN", "ACCOUNT NUMBER"):
+                            _wise_iban = field.get("value", "")
+                            break
+                    if _wise_iban:
+                        break
+        logger.info(f"✅ Wise iniciado: profile={_wise_profile_id} IBAN={_wise_iban or 'N/A'}")
+    except Exception as e:
+        logger.warning(f"⚠️ Wise init error: {e}")
+
+
+def _verificar_depositos_wise():
+    """Consulta transacciones entrantes en Wise y matchea con pagos pendientes por referencia."""
+    global pagos_pendientes_vip, _depositos_procesados_vip, _wise_referencias_pendientes
+
+    if not WISE_API_TOKEN or not _wise_profile_id:
+        return
+    # Solo procesar pendientes que sean de Wise (tienen campo 'ref_wise')
+    pendientes_wise = {uid: p for uid, p in pagos_pendientes_vip.items() if p.get("ref_wise")}
+    if not pendientes_wise:
+        return
+
+    try:
+        headers = {"Authorization": f"Bearer {WISE_API_TOKEN}"}
+        from datetime import timezone
+        ahora_utc = datetime.utcnow()
+        start = (ahora_utc - timedelta(hours=25)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        end   = (ahora_utc + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        r = requests.get(
+            f"https://api.wise.com/v1/profiles/{_wise_profile_id}/account-statements",
+            headers=headers,
+            params={"currency": "EUR", "intervalStart": start, "intervalEnd": end, "type": "COMPACT"},
+            timeout=15
+        )
+        if r.status_code != 200:
+            logger.warning(f"⚠️ Wise statement: {r.status_code} {r.text[:100]}")
+            return
+
+        data = r.json()
+        transactions = data.get("transactions", [])
+
+        for tx in transactions:
+            if tx.get("type") != "CREDIT":
+                continue
+            ref_numero = tx.get("referenceNumber", "")
+            if ref_numero in _depositos_procesados_vip:
+                continue
+            ref_pago = (tx.get("details", {}).get("paymentReference") or "").upper()
+            monto_tx = float(tx.get("amount", {}).get("value", 0))
+
+            # Buscar match por referencia BS365-XXXX
+            for uid, pend in list(pendientes_wise.items()):
+                ref_esperada = pend.get("ref_wise", "").upper()
+                if ref_esperada and ref_esperada in ref_pago:
+                    nombre   = pend.get("nombre", "VIP")
+                    username = pend.get("username", "")
+                    logger.info(f"💰 MATCH WISE: {uid} ref={ref_esperada} monto={monto_tx}€ tx={ref_numero}")
+                    log_pago(f"💰 PAGO WISE: {nombre} (@{username}) ID:{uid} | {monto_tx:.2f}€ | Ref:{ref_esperada}")
+                    try:
+                        _otorgar_acceso_vip(uid, nombre, username, monto_tx, ref_numero)
+                        with _lock_ops:
+                            _depositos_procesados_vip.add(ref_numero)
+                            pagos_pendientes_vip.pop(uid, None)
+                    except Exception as e:
+                        log_pago(f"❌ Error otorgando VIP Wise: {uid} | {e}", "error")
+                    break
+
+    except Exception as e:
+        logger.error(f"⚠️ Error verificando depósitos Wise: {e}")
+
+
+def _mostrar_instrucciones_pago_wise(chat_id: str, user_id: str, nombre: str, username: str = ""):
+    """Muestra instrucciones de pago por Wise (transferencia bancaria)."""
+    global pagos_pendientes_vip
+
+    # Generar referencia única
+    import random, string
+    with _lock_ops:
+        if user_id in pagos_pendientes_vip and pagos_pendientes_vip[user_id].get("ref_wise"):
+            ref = pagos_pendientes_vip[user_id]["ref_wise"]
+        else:
+            ref = "BS365-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            pagos_pendientes_vip[user_id] = {
+                "ref_wise": ref,
+                "nombre": nombre,
+                "username": username,
+                "timestamp": ahora().strftime("%Y-%m-%dT%H:%M:%S"),
+                "metodo": "wise",
+            }
+    guardar_estado()
+
+    precio = _vip_precio_info()["precio"]
+    iban_show = _wise_iban or "Solicítalo a " + ADMIN_USER
+    teclado = {"inline_keyboard": [
+        [{"text": "❓ AYUDA — " + ADMIN_USER, "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
+    ]}
+    enviar_telegram(
+        "🏦 *PAGO VIP — WISE / TRANSFERENCIA BANCARIA*\n\n"
+        f"💶 Precio: *{precio}€/mes*\n\n"
+        f"📋 *Datos de transferencia:*\n"
+        f"• Nombre: *Emmanuel Diaz*\n"
+        f"• IBAN: `{iban_show}`\n"
+        f"• Importe: *{precio:.2f} EUR*\n\n"
+        f"📝 *IMPORTANTE — Referencia de pago:*\n"
+        f"`{ref}`\n\n"
+        f"⚠️ Debes escribir exactamente `{ref}` en el campo\n"
+        f"_Referencia_ o _Concepto_ de tu transferencia.\n\n"
+        "✅ _Verificación automática en ~5 min._\n"
+        "🌍 _Acepta EUR desde cualquier país (SEPA)_\n"
+        f"_Ayuda: {ADMIN_USER}_",
+        chat_id,
+        teclado=teclado
+    )
+
+    # Notificar al admin
+    admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
+    if admin_id:
+        enviar_telegram(
+            "🏦 *PAGO WISE PENDIENTE*\n"
+            f"👤 {nombre} (@{username})\n"
+            f"🆔 ID: `{user_id}`\n"
+            f"💶 Importe: {precio:.2f} EUR\n"
+            f"📝 Ref: `{ref}`\n"
+            f"⏰ {ahora().strftime('%H:%M %d/%m')}",
+            admin_id
+        )
 
 
 def _otorgar_acceso_vip(user_id: str, nombre: str, username: str = "", monto: float = 0, tx_id: str = "", dias: int = None):
@@ -14401,6 +14572,7 @@ def loop_vip_check():
             # 1. Verificar depósitos en Binance (matchear pagos pendientes)
             if pagos_pendientes_vip and BINANCE_API_KEY and BINANCE_API_SECRET:
                 _verificar_depositos_binance()
+                _verificar_depositos_wise()
 
             # 2. Limpiar pagos pendientes expirados (>24h sin completar)
             for uid in list(pagos_pendientes_vip.keys()):
@@ -15132,6 +15304,34 @@ def loop_polling():
                                 )
                             else:
                                 enviar_telegram("ℹ️ No tienes pago pendiente.\n\nEscribe /vip para ver opciones.", user_id)
+                            continue
+
+                        # ── Callback VIP: pago con Wise ──
+                        if texto == "vip_pagar_wise":
+                            nombre_cb = from_user.get("first_name", "Trader")
+                            username_cb = from_user.get("username", "")
+                            _mostrar_instrucciones_pago_wise(user_id, user_id, nombre_cb, username_cb)
+                            continue
+
+                        # ── Callback VIP: ver pago Wise pendiente ──
+                        if texto == "vip_ver_pago_wise":
+                            if user_id in pagos_pendientes_vip and pagos_pendientes_vip[user_id].get("ref_wise"):
+                                _ref_w = pagos_pendientes_vip[user_id]["ref_wise"]
+                                _precio_w = _vip_precio_info()["precio"]
+                                enviar_telegram(
+                                    "🏦 *PAGO WISE PENDIENTE*\n"
+                                    f"💶 Importe: *{_precio_w:.2f} EUR*\n"
+                                    f"📝 Referencia: `{_ref_w}`\n\n"
+                                    "⚠️ Escribe exactamente la referencia en el campo _Concepto_ de tu transferencia.\n"
+                                    "✅ _Verificación automática en ~5 min._",
+                                    user_id,
+                                    teclado={"inline_keyboard": [
+                                        [{"text": "❌ CANCELAR PAGO", "callback_data": "vip_cancelar_pago"}],
+                                        [{"text": f"❓ AYUDA", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
+                                    ]}
+                                )
+                            else:
+                                enviar_telegram("ℹ️ No tienes pago Wise pendiente.\n\nEscribe /vip para ver opciones.", user_id)
                             continue
 
                         # ── Callback VIP: cancelar pago pendiente ──
@@ -17127,6 +17327,13 @@ def _arrancar_interno():
         print("🔗 MT5 no detectado o corriendo en Linux/Nube. Usando Twelve Data/YFinance como backend de precios...")
 
     cargar_estado()
+
+    # 💳 INICIALIZAR WISE API (obtener profileId e IBAN)
+    if WISE_API_TOKEN:
+        try:
+            _wise_init()
+        except Exception as _e_wise:
+            logger.warning(f"⚠️ Wise init falló al arrancar: {_e_wise}")
 
     # 💰 INICIALIZAR CAPITAL DESDE MT5 (balance real al arrancar)
     if MT5_AVAILABLE:
