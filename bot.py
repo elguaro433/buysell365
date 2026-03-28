@@ -13981,49 +13981,28 @@ def loop_publicidad_grupo():
 
     _ultimo_anuncio_id = None   # Message ID del último anuncio enviado
     _indice_anuncio = 0
+    _dia_borrado_grupo = ""     # Para el borrado nocturno del grupo
 
-    # ── Anuncios rotativos ──
+    # ── Anuncios rotativos del GRUPO (cada 30 min) ──
     ANUNCIOS = [
-        # 1 — Cómo funciona: flujo real XM + BuySell365Pro
+        # 1 — Copy Trading: piloto automático
         (
-            "🤖 *COPY TRADING — 3 PASOS Y LISTO*\n"
+            "🚀 *¿Y SI TU DINERO TRABAJARA SOLO?*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📲 *Entra al enlace* → llegarás a *XM Copy Trading*\n"
-            "   🏦 Broker regulado · 15 años en el mercado\n"
-            "   🔒 Fondos seguros · plataforma oficial\n\n"
-            "1️⃣  *Regístrate* en XM _(gratis, 2 minutos)_\n"
-            "2️⃣  *Busca* BuySell365Pro y pulsa *Copiar*\n"
-            "3️⃣  ¡Listo! Tu cuenta opera *sola* 24/7\n\n"
-            "💰 *Sin mensualidad — pagas solo si ganas*\n"
-            "🔥 *Sin pantallas. Sin estrés. 100% automático.*",
+            "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
+            "⚡ Nuestro bot opera *por ti* en tiempo real\n"
+            "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
+            "🌍 Forex · Índices · Oro — 24/7\n"
+            "💰 Pagas *solo si ganas* — sin mensualidad fija\n\n"
+            "🔥 *Sin pantallas. Sin estrés. Sin perder señales.*",
             {"inline_keyboard": [[
-                {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "🤖 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 2 — Seguridad y regulación XM
-        (
-            "🏦 *OPERA EN LA PLATAFORMA MÁS SEGURA*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Nuestro Copy Trading funciona sobre *XM*,\n"
-            "uno de los brokers más regulados del mundo:\n\n"
-            "🛡️ Regulado por CySEC, ASIC, FSC y más\n"
-            "🔒 Fondos segregados — tu dinero protegido\n"
-            "📊 Plataforma 100% transparente y auditada\n"
-            "🌍 +5 millones de clientes en 196 países\n\n"
-            "✅ *Tú ves cada operación en tiempo real*\n"
-            "✅ *Retiras tus fondos cuando quieras*\n\n"
-            "👇 *Accede ahora y copia nuestra estrategia*",
-            {"inline_keyboard": [[
-                {"text": "🏦 IR A XM COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
-            ], [
-                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
-                {"text": "🌐 Web", "url": "https://buysell365.pro"}
-            ]]}
-        ),
-        # 3 — Señales VIP con ejemplo real
+        # 2 — Señales VIP con ejemplo real de señal
         (
             "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -14038,47 +14017,64 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "💎 UNIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
             ], [
-                {"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 4 — Transparencia total: qué ve el inversor
+        # 3 — Copy Trading XM: 3 pasos (broker regulado)
         (
-            "👁️ *TRANSPARENCIA TOTAL — VES TODO EN TIEMPO REAL*\n"
+            "🤖 *COPY TRADING — 3 PASOS Y EMPIEZA A GANAR*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Con XM Copy Trading *no hay letra pequeña*:\n\n"
-            "📊 Ves cada operación abierta al instante\n"
-            "💼 Ves el historial completo de la estrategia\n"
-            "📈 Ves el rendimiento real de BuySell365Pro\n"
-            "🔓 Retiras tus fondos *cuando quieras*\n"
-            "💰 Comisión *solo sobre ganancias reales*\n\n"
-            "🎯 *Sin sorpresas. Sin trucos. 100% regulado.*\n\n"
-            "👇 *Entra y copia la estrategia gratis*",
+            "🏦 Operamos sobre *XM* — broker regulado (CySEC, ASIC)\n"
+            "🔒 +5M clientes · fondos segregados · 100% transparente\n\n"
+            "1️⃣  *Regístrate* en XM _(gratis, 2 min)_\n"
+            "2️⃣  *Copia* la estrategia BuySell365Pro\n"
+            "3️⃣  Tu cuenta opera *sola* 24/7 🚀\n\n"
+            "✅ Ves cada operación en tiempo real\n"
+            "💰 *Sin mensualidad — pagas solo si ganas*",
             {"inline_keyboard": [[
-                {"text": "📊 VER ESTRATEGIA EN XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+                {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
                 {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 5 — Combo completo VIP + Copy Trading
+        # 4 — Combo VIP + Copy Trading
         (
             "🔥 *DOS SERVICIOS. UN OBJETIVO: GANAR*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🤖 *Copy Trading en XM* — piloto automático\n"
-            "   ├ 🏦 Broker regulado · fondos seguros\n"
-            "   ├ 🔄 Copia BuySell365Pro con 1 clic\n"
-            "   └ 💰 Pagas solo si ganas — sin cuota fija\n\n"
-            "💎 *Canal VIP* — señales con IA\n"
+            "💎 *Canal VIP — Señales con IA*\n"
             "   ├ 📍 Entry · 🎯 TP · 🛡️ SL exactos\n"
-            "   ├ 📊 20+ pares en tiempo real\n"
-            "   └ ⚡ Alertas al instante en Telegram\n\n"
+            "   ├ 📊 Análisis diario de mercados\n"
+            "   └ ⚡ Alertas en tiempo real\n\n"
+            "🤖 *Copy Trading — Sin mensualidad*\n"
+            "   ├ 🔄 Bot replica operaciones en tu MT5\n"
+            "   ├ 💰 Pagas solo sobre ganancias reales\n"
+            "   └ 🌍 Activo 24/7 — sin intervención\n\n"
             "👇 *Elige tu plan y empieza ahora*",
             {"inline_keyboard": [[
-                {"text": "🤖 COPY TRADING XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
             ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
+            ]]}
+        ),
+        # 5 — Transparencia XM: ves todo en tiempo real
+        (
+            "👁️ *TRANSPARENCIA TOTAL — SIN LETRA PEQUEÑA*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Con *XM Copy Trading* tú tienes el control:\n\n"
+            "📊 Ves cada operación abierta al instante\n"
+            "📈 Ves el rendimiento real de BuySell365Pro\n"
+            "🔓 Retiras tus fondos *cuando quieras*\n"
+            "💰 Comisión *solo sobre ganancias reales*\n\n"
+            "🎯 *Sin sorpresas. Sin trucos. 100% regulado.*\n\n"
+            "👇 *Entra y copia la estrategia ahora*",
+            {"inline_keyboard": [[
+                {"text": "📊 VER ESTRATEGIA EN XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+            ], [
+                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
     ]
@@ -14091,10 +14087,26 @@ def loop_publicidad_grupo():
                 time.sleep(PUBLICIDAD_INTERVALO)
                 continue
 
+            _ahora_g = ahora()
+            _clave_dia_g = _ahora_g.strftime("%Y-%m-%d")
+
+            # Borrado nocturno del grupo: 23:50 — borra último anuncio y deja limpio
+            if _ahora_g.hour == 23 and _ahora_g.minute >= 50 and _dia_borrado_grupo != _clave_dia_g:
+                if _ultimo_anuncio_id:
+                    try:
+                        borrar_mensaje_telegram(GROUP_ID, _ultimo_anuncio_id)
+                    except Exception:
+                        pass
+                    _ultimo_anuncio_id = None
+                _dia_borrado_grupo = _clave_dia_g
+                logger.info("🗑️ Publicidad del grupo borrada al cierre del día")
+                time.sleep(PUBLICIDAD_INTERVALO)
+                continue
+
             texto, teclado = ANUNCIOS[_indice_anuncio % len(ANUNCIOS)]
             _indice_anuncio += 1
 
-            # Borrar anuncio anterior
+            # Borrar anuncio anterior antes de publicar el nuevo
             if _ultimo_anuncio_id:
                 try:
                     borrar_mensaje_telegram(GROUP_ID, _ultimo_anuncio_id)
@@ -14102,7 +14114,7 @@ def loop_publicidad_grupo():
                     pass
                 _ultimo_anuncio_id = None
 
-            # Publicar nuevo anuncio (sin auto-borrado — lo borra el propio loop)
+            # Publicar nuevo anuncio
             nuevo_id = enviar_telegram(texto, destino=GROUP_ID, teclado=teclado)
             if nuevo_id:
                 _ultimo_anuncio_id = nuevo_id
@@ -14112,6 +14124,109 @@ def loop_publicidad_grupo():
             logger.error(f"⚠️ Error en loop_publicidad_grupo: {e}")
 
         time.sleep(PUBLICIDAD_INTERVALO)
+
+
+def loop_publicidad_canal():
+    """
+    Publica 2 anuncios de Copy Trading en el CANAL VIP/señales:
+    - Media mañana: ~10:00 hora Andorra
+    - Media tarde:  ~16:00 hora Andorra
+    Solo se envía una vez por franja horaria cada día.
+    """
+    ANUNCIOS_CANAL = [
+        # Mañana — copy trading piloto automático
+        (
+            "🚀 *¿TU DINERO PUEDE TRABAJAR SOLO?*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
+            "⚡ Nuestro bot opera *por ti* 24/7 en tiempo real\n"
+            "📍 Entry · 🎯 TP · 🛡️ SL — completamente automático\n"
+            "🏦 Sobre *XM* — broker regulado (CySEC, ASIC)\n"
+            "💰 Sin mensualidad — *pagas solo si ganas*\n\n"
+            "🔥 *Sin pantallas. Sin estrés. 100% automático.*\n\n"
+            "👇 *Entra, regístrate en XM y copia BuySell365Pro*",
+            {"inline_keyboard": [[
+                {"text": "🤖 ACTIVAR COPY TRADING AHORA", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+            ], [
+                {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
+            ]]}
+        ),
+        # Tarde — 3 pasos + seguridad XM
+        (
+            "💼 *COPY TRADING — 3 PASOS Y EMPIEZA A GANAR*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏦 Operamos sobre *XM* — broker regulado, 15 años en el mercado\n"
+            "🔒 +5M clientes · fondos segregados · 100% transparente\n\n"
+            "1️⃣  *Regístrate* en XM _(gratis, 2 min)_\n"
+            "2️⃣  *Copia* la estrategia *BuySell365Pro*\n"
+            "3️⃣  Tu cuenta opera *sola* — tú solo cobras 🚀\n\n"
+            "✅ Ves cada operación en tiempo real\n"
+            "✅ Retiras tus fondos cuando quieras\n"
+            "💰 *Comisión solo sobre ganancias reales*",
+            {"inline_keyboard": [[
+                {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+            ], [
+                {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
+            ]]}
+        ),
+    ]
+
+    _publicado_hoy = set()   # "manana" o "tarde" para no repetir en el mismo día
+    _ids_canal_dia = []      # IDs de mensajes publicados hoy en el canal (para borrarlos)
+    _dia_borrado = ""        # Día en que ya se hizo el borrado nocturno
+
+    time.sleep(60)  # Esperar 1 min al arrancar
+
+    while True:
+        try:
+            if not CHANNEL_ID:
+                time.sleep(300)
+                continue
+
+            _ahora = ahora()
+            _clave_dia = _ahora.strftime("%Y-%m-%d")
+            _hora = _ahora.hour
+
+            # Franja media mañana: 10:00 - 10:59
+            _clave_manana = f"{_clave_dia}_manana"
+            if 10 <= _hora < 11 and _clave_manana not in _publicado_hoy:
+                texto, teclado = ANUNCIOS_CANAL[0]
+                _id = enviar_telegram(texto, destino=CHANNEL_ID, teclado=teclado)
+                if _id:
+                    _publicado_hoy.add(_clave_manana)
+                    _ids_canal_dia.append(_id)
+                    logger.info(f"📢 Publicidad canal MAÑANA enviada (msg_id={_id})")
+
+            # Franja media tarde: 16:00 - 16:59
+            _clave_tarde = f"{_clave_dia}_tarde"
+            if 16 <= _hora < 17 and _clave_tarde not in _publicado_hoy:
+                texto, teclado = ANUNCIOS_CANAL[1]
+                _id = enviar_telegram(texto, destino=CHANNEL_ID, teclado=teclado)
+                if _id:
+                    _publicado_hoy.add(_clave_tarde)
+                    _ids_canal_dia.append(_id)
+                    logger.info(f"📢 Publicidad canal TARDE enviada (msg_id={_id})")
+
+            # Borrado automático al final del día: 23:50 - 23:59
+            if _hora == 23 and _ahora.minute >= 50 and _dia_borrado != _clave_dia:
+                for _mid in _ids_canal_dia:
+                    try:
+                        borrar_mensaje_telegram(CHANNEL_ID, _mid)
+                    except Exception:
+                        pass
+                _borrados = len(_ids_canal_dia)
+                _ids_canal_dia.clear()
+                _dia_borrado = _clave_dia
+                logger.info(f"🗑️ Publicidades del canal borradas al cierre del día ({_borrados} mensajes)")
+
+            # Limpiar claves viejas (> 2 días)
+            if len(_publicado_hoy) > 20:
+                _publicado_hoy = {k for k in _publicado_hoy if k.startswith(_clave_dia)}
+
+        except Exception as e:
+            logger.error(f"⚠️ Error en loop_publicidad_canal: {e}")
+
+        time.sleep(300)  # Revisar cada 5 minutos
 
 
 def loop_vip_check():
@@ -16560,6 +16675,7 @@ def _watchdog():
         "health":     loop_health_check,
         "vip":        loop_vip_check,
         "publicidad": loop_publicidad_grupo,
+        "publicidad_canal": loop_publicidad_canal,
         "delete_sched": _hilo_borrado_scheduler,
     }
     while True:
@@ -16717,6 +16833,7 @@ def _arrancar_interno():
     _iniciar_hilo("health",     loop_health_check)
     _iniciar_hilo("vip",        loop_vip_check)
     _iniciar_hilo("publicidad", loop_publicidad_grupo)
+    _iniciar_hilo("publicidad_canal", loop_publicidad_canal)
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
     # Signal Copier como subprocess independiente (Telethon necesita su propio event loop limpio)
     _copier_process = None
