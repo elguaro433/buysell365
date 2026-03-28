@@ -5168,10 +5168,12 @@ def cmd_url_dashboard():
 
 def cmd_mercados():
     lineas = [
-        "*6 ACTIVOS*\n",
+        "*+20 ACTIVOS*\n",
         "━━━━━━━━━━\n",
         "ORO · EUR/USD · USD/JPY · GBP/JPY\n",
+        "AUD/CAD · EUR/CHF · USD/CAD\n",
         "NASDAQ · S&P 500\n",
+        "+ Canales VIP aliados con +10 pares más\n",
         "━━━━━━━━━━\n",
         "Horario: 8:00 - 18:00 (L-V)\n",
         "`/precios` — Precios en vivo",
@@ -8855,8 +8857,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     if any(p in t for p in ["eres", "quien eres", "quién eres", "que eres", "presentate", "quien te creo", "vienes de", "quien es emmanuel", "quien es el creador"]):
         return (
             "🤖 *BuySell365.pro* — Bot de senales de trading\n\n"
-            "📡 Escaneo 6 activos (Oro, Forex, Índices)\n"
-            "🎯 Señales con Entry, SL, TP1-TP3\n"
+            "📡 +20 activos: Oro, Forex, Índices y canales VIP aliados\n"
+            "🎯 Señales con Entry, TP y SL exactos\n"
             "🛡️ Gestión de riesgo profesional\n"
             "📊 Trading en Vivo: /web\n\n"
             "💡 Escribe *ayuda* para ver los comandos."
@@ -9556,7 +9558,7 @@ section{{padding:50px 20px}}
 <!-- ASSETS -->
 <section id="assets" class="fade-in">
   <div class="section-title">
-    <h2>\U0001f30d <span data-i18n="assets.title">6 Activos de Clase Mundial</span></h2>
+    <h2>\U0001f30d <span data-i18n="assets.title">+20 Activos de Clase Mundial</span></h2>
     <p data-i18n="assets.subtitle">Cada activo tiene par\u00e1metros de detecci\u00f3n calibrados individualmente para m\u00e1xima precisi\u00f3n.</p>
   </div>
   <div class="assets-grid">
