@@ -1621,11 +1621,11 @@ def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 30
     # 📢 Marca de agua publicitaria para el grupo
     if incluir_promo and ADMIN_USER:
         promos = [
-            f"\n\n💎 *¿QUIERES ESTAS SEÑALES EN VIVO?*\nRecibe entradas con alta precision.\n👉 *Escribe /vip — Acceso VIP por solo $149 USDT/mes* 🔥",
-            f"\n\n🚀 *SEÑALES DE TRADING EN TIEMPO REAL*\nAnalisis tecnico automatizado con IA.\n👉 *Escribe /vip — Canal VIP $149 USDT/mes* 🚀",
-            f"\n\n🔥 *UNETE AL CANAL VIP*\nSenales diarias de Oro, Forex e Indices.\n👉 *Escribe /vip — Solo $149 USDT/mes* 💎",
+            f"\n\n💎 *¿QUIERES ESTAS SEÑALES EN VIVO?*\nRecibe entradas con alta precision.\n👉 *Escribe /vip para más información* 🔥",
+            f"\n\n🚀 *SEÑALES DE TRADING EN TIEMPO REAL*\nAnalisis tecnico automatizado con IA.\n👉 *Escribe /vip — Canal VIP exclusivo* 🚀",
+            f"\n\n🔥 *UNETE AL CANAL VIP*\nSenales diarias de Forex e Indices.\n👉 *Escribe /vip para unirte* 💎",
             f"\n\n📈 *COPY TRADING DISPONIBLE*\nCopia nuestras operaciones automaticamente.\n👉 *Escribe /vip para mas informacion* 🤖",
-            f"\n\n🤖 *COPY TRADING AUTOMATICO 24/7*\nNuestro bot opera por ti sin que hagas nada.\n👉 *Escribe /vip — $149 USDT/mes* 📊",
+            f"\n\n🤖 *COPY TRADING AUTOMATICO 24/7*\nNuestro bot opera por ti sin que hagas nada.\n👉 *Escribe /vip para activarlo* 📊",
         ]
         mensaje += random.choice(promos)
         
@@ -1644,7 +1644,7 @@ def notificar_fomo_grupo(nombre: str, tipo: str):
          f"\U0001f4e2 Escribe /vip para recibir todas las se\u00f1ales"),
         (f"*{nombre}* — Operaci\u00f3n en curso\n"
          f"[Dashboard en vivo]({DASHBOARD_URL})\n"
-         f"\U0001f525 Escribe /vip — $149 USDT/mes"),
+         f"\U0001f525 Escribe /vip para más información"),
         (f"*{nombre}* — Se\u00f1al detectada\n"
          f"[Rendimiento en vivo]({DASHBOARD_URL})\n"
          f"\U0001f4b0 Escribe /vip — Se\u00f1ales Premium con IA"),
@@ -4439,17 +4439,10 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
         tp3_total = dist(precio, niveles['tp3'])
         is_premium = tp3_total >= 100
 
-    # Cabecera limpia con nivel de señal
-    if nivel_senal == "PREMIUM":
-        _nivel_tag = "⭐ PREMIUM\n"
-    elif nivel_senal == "STANDARD":
-        _nivel_tag = "📊 STANDARD\n"
-    else:
-        _nivel_tag = ""
     if tipo == "COMPRA":
-        cabecera = f"{_nivel_tag}🟢 *COMPRA* — {nombre}"
+        cabecera = f"🟢 *COMPRA — {nombre}*"
     else:
-        cabecera = f"{_nivel_tag}🔴 *VENTA* — {nombre}"
+        cabecera = f"🔴 *VENTA — {nombre}*"
 
     sl_dist  = dist(precio, niveles['sl'])
     tp1_dist = dist(precio, niveles['tp1'])
@@ -4475,15 +4468,10 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 
     return (
         f"{cabecera}\n"
-        f"━━━━━━━━━━━━━━\n"
+        f"\n"
         f"📍 Entrada: `{f_(precio)}`\n"
-        f"🛑 SL: `{f_(niveles['sl'])}` ({fmt_dist(sl_dist)})\n"
-        f"🎯 TP1: `{f_(niveles['tp1'])}` ({fmt_dist(tp1_dist)})\n"
-        f"🎯 TP2: `{f_(niveles['tp2'])}` ({fmt_dist(tp2_dist)})\n"
-        f"🏁 TP3: `{f_(niveles['tp3'])}` ({fmt_dist(tp3_dist)})\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"📊 R:R *{rr_ratio}* | Score *{score_display}/5*"
-        + (f" | {_estr_txt}" if _estr_txt else "")
+        f"🎯 TP: `{f_(niveles['tp1'])}`\n"
+        f"🛡️ SL: `{f_(niveles['sl'])}`"
     )
 
 
@@ -8493,7 +8481,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 # Enviar al canal VIP
                 _dir_txt = "COMPRA" if tipo == "COMPRA" else "VENTA"
                 _emoji = "🟢" if tipo == "COMPRA" else "🔴"
-                _msg_canal = f"{_emoji} {_dir_txt} {senal['nombre']}\nEntrada: {entrada}\nSL: {sl}\nTP: {tp}"
+                _msg_canal = f"{_emoji} *{_dir_txt} — {senal['nombre']}*\n\n📍 Entrada: `{entrada}`\n🎯 TP: `{tp}`\n🛡️ SL: `{sl}`"
                 enviar_canal(_msg_canal)
                 return f"✅ *SEÑAL EJECUTADA*\n{_emoji} {_dir_txt} {senal['nombre']} @ {entrada}\nSL: {sl}\nTP: {tp}"
             else:
@@ -12337,10 +12325,6 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                 _wh_skip_mt5 = True
                 _wh_skip_mt5_razon = f"Error MT5: {e}"
 
-        # Tag premium (sin tags de horario/error — solo lo esencial)
-        if _es_premium:
-            msg = f"💎 PREMIUM\n{msg}"
-
         # Enviar a Telegram (solo en horario)
         enviar_canal(msg)
 
@@ -13025,7 +13009,7 @@ def enviar_resumen_semanal():
         f"🏆 Mejor senal: *{mejor.get('nombre', '???')}* (+{mejor.get('pips', 0):.1f} pips)\n\n"
         f"━━━━━━━━━━\n"
         f"💎 *¿Quieres recibir estas senales?*\n"
-        f"💎 Escribe /vip — *Canal VIP $149 USDT/mes*\n\n"
+        f"💎 Escribe /vip — *Únete al Canal VIP*\n\n"
         f"⚠️ _No es asesoria financiera. Resultados pasados no garantizan resultados futuros._"
     )
     enviar_grupo(msg, incluir_promo=False)
@@ -14019,11 +14003,10 @@ def loop_publicidad_grupo():
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "Recibe señales profesionales generadas por IA con:\n\n"
             "📍 *Entry* — precio exacto de entrada\n"
-            "🛡️ *Stop Loss* — protección de capital\n"
-            "🎯 *Take Profit* — objetivo de ganancia\n"
-            "📈 Análisis técnico multi-timeframe\n\n"
-            "💰 Solo *$149 USDT/mes*\n"
-            "📊 Oro, Forex, Índices — 24 horas, 5 días.\n\n"
+            "🛡️ *SL* — protección de capital\n"
+            "🎯 *TP* — objetivo de ganancia\n"
+            "📈 Análisis técnico multi-timeframe\n"
+            "📊 Forex, Índices — 24 horas, 5 días.\n\n"
             "👉 *Escribe /vip para suscribirte*",
             {"inline_keyboard": [[
                 {"text": "💎 SUSCRIBIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
@@ -14039,7 +14022,6 @@ def loop_publicidad_grupo():
             "🤖 Copy Trading: operaciones automáticas en tu cuenta\n"
             "🌍 Mercados cubiertos: XAU/USD, EUR/USD, GBP/JPY, US100\n"
             "⚡ Velocidad de ejecución: milisegundos\n\n"
-            "📊 *Suscripción VIP: $149 USDT/mes*\n"
             "💼 Copy Trading: comisión solo sobre beneficios\n\n"
             "¿Listo para operar de forma profesional?\n"
             "👇 Únete ahora",
@@ -14070,8 +14052,8 @@ def loop_publicidad_grupo():
         (
             "🔥 *DOS SERVICIOS. UN SOLO OBJETIVO: GANAR*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📡 *Canal VIP* — $149 USDT/mes\n"
-            "  └ Señales IA con Entry, SL y TP exactos\n"
+            "📡 *Canal VIP* — Señales con IA\n"
+            "  └ Entry, SL y TP exactos\n"
             "  └ Análisis diario de mercados\n"
             "  └ Alertas de precio en tiempo real\n\n"
             "🤖 *Copy Trading* — sin mensualidad\n"
