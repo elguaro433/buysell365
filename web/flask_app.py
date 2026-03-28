@@ -1051,14 +1051,16 @@ if('serviceWorker' in navigator){{
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00ffcc);box-shadow:0 0 30px rgba(0,255,204,.7);animation:glowPulse 3s infinite;font-size:15px;padding:10px 32px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
       <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">Copy Trading</div>
       <div class="price-amount" style="font-size:2rem;color:#00ffcc;font-weight:900;text-shadow:0 0 30px rgba(0,255,204,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
-      <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Copia autom\u00e1tica todas nuestras operaciones en tu cuenta MT5</p>
+      <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Tu cuenta MT5 replica autom\u00e1ticamente nuestras operaciones con XM \u2014 el broker m\u00e1s usado del mundo</p>
       <ul class="price-list" style="color:#e0e0e0">
-        <li style="color:#00e676" data-i18n="pricing.cp1">&#9889; Operativa automatizada \u2014 Oro, Forex e \u00cdndices</li>
-        <li style="color:#00e676" data-i18n="pricing.cp2">&#128640; Copia autom\u00e1tica en tiempo real</li>
-        <li style="color:#00e676" data-i18n="pricing.cp3">&#127919; SL y TP colocados autom\u00e1ticamente</li>
-        <li style="color:#ffd740" data-i18n="pricing.cp4">&#128176; Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
-        <li style="color:#00e676" data-i18n="pricing.cp5">&#127970; Broker regulado XM (MT5)</li>
-        <li style="color:#00e676" data-i18n="pricing.cp6">&#129302; Sin intervenci\u00f3n manual requerida</li>
+        <li style="color:#00e676" data-i18n="pricing.cp1">&#128640; Copia autom\u00e1tica de todas nuestras operaciones</li>
+        <li style="color:#00e676" data-i18n="pricing.cp2">&#127919; Entry, SL y TP exactos \u2014 sin hacer nada t\u00fa</li>
+        <li style="color:#00e676" data-i18n="pricing.cp3">&#128202; +20 activos \u2014 Oro, Forex e \u00cdndices</li>
+        <li style="color:#00e676" data-i18n="pricing.cp4">&#127963; Broker XM regulado internacionalmente</li>
+        <li style="color:#ffd740" data-i18n="pricing.cp5">&#128176; Sin cuota mensual \u2014 pagas solo si ganas</li>
+        <li style="color:#00e676" data-i18n="pricing.cp6">&#128065; Ves cada operaci\u00f3n en tiempo real</li>
+        <li style="color:#00e676" data-i18n="pricing.cp7">&#128275; Retira tu capital cuando quieras</li>
+        <li style="color:#00e676" data-i18n="pricing.cp8">&#129302; Totalmente autom\u00e1tico \u2014 sin experiencia requerida</li>
       </ul>
       <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(0,230,118,0.5);transition:all 0.3s">&#128640; Empezar Copy Trading</a>
     </div>
@@ -1284,6 +1286,22 @@ if('serviceWorker' in navigator){{
       <div class="faq-q" data-i18n="faq.q6">\u00bfCu\u00e1ntas se\u00f1ales recibo al d\u00eda?</div>
       <div class="faq-a" data-i18n="faq.a6">En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los +20 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad.</div>
     </div>
+    <div class="faq-item" onclick="this.classList.toggle('open')">
+      <div class="faq-q" data-i18n="faq.q_copy">\u00bfC\u00f3mo funciona el Copy Trading con XM?</div>
+      <div class="faq-a" data-i18n="faq.a_copy">El Copy Trading replica autom\u00e1ticamente todas nuestras operaciones en tu cuenta MT5. Solo necesitas: 1) Abrir cuenta en XM (broker regulado internacionalmente), 2) Conectar tu cuenta a nuestro perfil de copy, 3) Elegir tu nivel de riesgo. A partir de ah\u00ed cada operaci\u00f3n se copia en tu cuenta con los mismos SL y TP \u2014 sin que tengas que hacer nada.</div>
+    </div>
+    <div class="faq-item" onclick="this.classList.toggle('open')">
+      <div class="faq-q" data-i18n="faq.q7">\u00bfCu\u00e1nto capital m\u00ednimo necesito?</div>
+      <div class="faq-a" data-i18n="faq.a7">Para el Copy Trading recomendamos un m\u00ednimo de $100 USD, aunque XM permite empezar con menos. Para seguir se\u00f1ales VIP manualmente puedes empezar con el capital que tengas, aplicando siempre una gesti\u00f3n de riesgo adecuada.</div>
+    </div>
+    <div class="faq-item" onclick="this.classList.toggle('open')">
+      <div class="faq-q" data-i18n="faq.q8">\u00bfPuedo retirar mi dinero cuando quiera?</div>
+      <div class="faq-a" data-i18n="faq.a8">S\u00ed. Tu capital est\u00e1 en tu propia cuenta del broker \u2014 nosotros nunca lo tocamos. Puedes retirar en cualquier momento directamente desde XM, sin restricciones ni penalizaciones de nuestra parte.</div>
+    </div>
+    <div class="faq-item" onclick="this.classList.toggle('open')">
+      <div class="faq-q" data-i18n="faq.q9">\u00bfQu\u00e9 pasa si una operaci\u00f3n tiene p\u00e9rdidas?</div>
+      <div class="faq-a" data-i18n="faq.a9">El trading siempre conlleva riesgo. Todas nuestras operaciones llevan Stop Loss autom\u00e1tico para limitar la exposici\u00f3n. En el Copy Trading, si una operaci\u00f3n cierra en negativo no pagas ninguna comisi\u00f3n \u2014 solo se cobra un peque\u00f1o % cuando hay ganancias reales.</div>
+    </div>
   </div>
 </section>
 
@@ -1303,7 +1321,7 @@ if('serviceWorker' in navigator){{
     <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4b0</div>
       <h4 style="color:#ffd700;margin-bottom:8px">Copy Trading Sin Cuota</h4>
-      <p style="color:var(--text2);font-size:.85rem">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias. Riesgo cero para ti.</p>
+      <p style="color:var(--text2);font-size:.85rem">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias reales.</p>
     </div>
     <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4ca</div>
@@ -1329,11 +1347,11 @@ if('serviceWorker' in navigator){{
             <div><div style="font-weight:700;font-size:14px;color:#fff">BuySell365 Pro</div><div style="font-size:10px;color:#5a6a7a">Canal de Se\u00f1ales</div></div>
         </div>
         <div style="font-size:14px;line-height:1.8;color:#e2e8f0">
-            <div style="color:#00d4aa;font-weight:700;font-size:15px">&#128200; USD/JPY &mdash; Se\u00f1al Detectada</div>
-            <div style="margin-top:6px">&#127919; Score: <strong>4/5</strong> | Confianza: <strong>67%</strong></div>
-            <div style="color:#00e676;margin-top:4px">&#128994; BUY @ 149.250</div>
-            <div style="margin-top:2px">&#128308; SL: 148.900 | &#127919; TP: 149.850</div>
-            <div style="margin-top:6px;font-size:12px;color:#5a6a7a">Rendimiento en vivo &bull; <a href="/dashboard" style="color:#00d4aa;text-decoration:none">Ver Dashboard &rarr;</a></div>
+            <div style="color:#ff3b30;font-weight:800;font-size:16px">&#128308; VENTA &mdash; AUD/JPY</div>
+            <div style="margin-top:8px;font-size:13px">&#128205; <strong>Entrada:</strong> 110.50</div>
+            <div style="color:#00e676;margin-top:2px;font-size:13px">&#127919; <strong>TP:</strong> 106.50</div>
+            <div style="color:#ff6b35;margin-top:2px;font-size:13px">&#128737; <strong>SL:</strong> 112.50</div>
+            <div style="margin-top:8px;font-size:12px;color:#5a6a7a">Rendimiento en vivo &bull; <a href="/dashboard" style="color:#00d4aa;text-decoration:none">Ver Dashboard &rarr;</a></div>
         </div>
     </div>
     <p style="color:#5a6a7a;font-size:13px;margin-bottom:12px">Recibe alertas como esta directamente en tu Telegram</p>
@@ -1369,7 +1387,7 @@ if('serviceWorker' in navigator){{
     <a href="mailto:soporte@buysell365.pro">\U0001f4e7 <span data-i18n="footer.email">soporte@buysell365.pro</span></a>
   </div>
   <p data-i18n="footer.rights">\u00a9 2026 BuySell365 Pro. Todos los derechos reservados.</p>
-  <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)">By Emmanuel Diaz</p>
+  <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)">Propiedad de Emmanuel Diaz</p>
   <p style="margin-top:8px;font-size:0.7rem;color:#4a5568">
     \u26a0\ufe0f <span data-i18n="footer.disclaimer">Trading con riesgo. Rendimientos pasados no garantizan resultados futuros. Opera bajo tu propia responsabilidad.</span>
   </p>
@@ -1969,10 +1987,10 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                     <span style="font-weight:700;font-size:13px;color:#fff">BuySell365 Pro</span>
                     <span style="font-size:10px;color:var(--muted);margin-left:auto">ahora</span>
                 </div>
-                <div style="font-size:13px;line-height:1.6">
-                    <div style="color:var(--primary);font-weight:700">&#128200; USD/JPY &mdash; Se\u00f1al detectada</div>
-                    <div style="color:var(--text);margin-top:4px">&#127919; Score: 4/5 | Confianza: 67%</div>
-                    <div style="color:#00e676;margin-top:2px">&#128994; BUY @ 149.250 | SL: 148.900 | TP: 149.850</div>
+                <div style="font-size:13px;line-height:1.8">
+                    <div style="color:#ff3b30;font-weight:800">&#128308; VENTA &mdash; AUD/JPY</div>
+                    <div style="margin-top:4px">&#128205; <strong>Entrada:</strong> 110.50</div>
+                    <div style="color:#00e676;margin-top:2px">&#127919; <strong>TP:</strong> 106.50 &nbsp;&#128737; <span style="color:#ff6b35"><strong>SL:</strong> 112.50</span></div>
                 </div>
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
