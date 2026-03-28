@@ -19,6 +19,7 @@ tzdata==2025.3
 packaging==26.0
 typing_extensions==4.15.0
 waitress==3.0.2
+groq>=0.12.0
 
 # === Paquetes solo Windows (bot local) ===
 astroid==4.0.4; sys_platform == "win32"
