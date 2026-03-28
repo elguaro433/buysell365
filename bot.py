@@ -6544,8 +6544,8 @@ def cmd_vip(user_id: str = None):
         "📜 _Al suscribirte aceptas nuestros Términos y_\n"
         "_Condiciones: servicio educativo de señales,_\n"
         "_no asesoría financiera. Sin reembolsos._\n\n"
-        "💳 _Pago con tarjeta procesado de forma segura_\n"
-        "_a través de Wise — plataforma regulada 100% segura._"
+        "💳 _Pago con tarjeta: contacta al admin y te enviamos_\n"
+        "_un enlace de pago seguro personalizado._"
     )
 
     # Info pago pendiente (si existe)
@@ -6561,8 +6561,7 @@ def cmd_vip(user_id: str = None):
     # Métodos de pago en la misma fila si es posible
     fila_pago = [{"text": btn_pago + " — USDT/Binance", "callback_data": "vip_pagar_usdt"}]
     botones.append(fila_pago)
-    if WISE_PAY_LINK:
-        botones.append([{"text": "💳 PAGAR CON TARJETA — Visa/Mastercard (Wise)", "callback_data": "vip_pagar_tarjeta"}])
+    botones.append([{"text": "💳 PAGAR CON TARJETA — Visa/Mastercard", "callback_data": "vip_pagar_tarjeta"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
         if pend_info.get("monto_unico"):
@@ -15132,10 +15131,9 @@ def loop_polling():
                             _botones_metodo = {"inline_keyboard": [
                                 [{"text": "💰 PAGAR CON BINANCE (USDT/Crypto)", "callback_data": "vip_pagar_confirmar"}],
                             ]}
-                            if WISE_PAY_LINK:
-                                _botones_metodo["inline_keyboard"].append(
-                                    [{"text": "💳 PAGAR CON TARJETA — Visa/Mastercard (Wise)", "callback_data": "vip_pagar_tarjeta"}]
-                                )
+                            _botones_metodo["inline_keyboard"].append(
+                                [{"text": "💳 PAGAR CON TARJETA (contactar admin)", "callback_data": "vip_pagar_tarjeta"}]
+                            )
                             _botones_metodo["inline_keyboard"].append(
                                 [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}]
                             )
@@ -15144,7 +15142,7 @@ def loop_polling():
                                 f"💰 Precio: *{pi_p['precio']}{VIP_MONEDA}/mes*\n\n"
                                 f"Elige tu método de pago:\n\n"
                                 f"• 💰 *Binance* — USDT crypto (TRC20)\n"
-                                f"• 💳 *Tarjeta* — Visa/Mastercard vía Wise",
+                                f"• 💳 *Tarjeta* — Visa/Mastercard _(el admin te envía el enlace)_",
                                 user_id,
                                 teclado=_botones_metodo
                             )
@@ -15196,28 +15194,29 @@ def loop_polling():
                                 enviar_telegram("ℹ️ No tienes pago pendiente.\n\nEscribe /vip para ver opciones.", user_id)
                             continue
 
-                        # ── Callback VIP: pago con tarjeta (Wise Pay Link) ──
+                        # ── Callback VIP: pago con tarjeta (contactar admin) ──
                         if texto == "vip_pagar_tarjeta":
-                            nombre_cb  = from_user.get("first_name", "Trader")
+                            nombre_cb   = from_user.get("first_name", "Trader")
                             username_cb = from_user.get("username", "")
-                            precio_t   = _vip_precio_info()["precio"]
+                            precio_t    = _vip_precio_info()["precio"]
+                            admin_user_clean = ADMIN_USER.replace("@", "")
                             enviar_telegram(
                                 "💳 *PAGO VIP — TARJETA BANCARIA*\n"
                                 "━━━━━━━━━━\n\n"
                                 f"💶 Importe: *{precio_t:.0f} EUR / mes*\n\n"
-                                "🔒 *Plataforma de pago: Wise*\n"
-                                "_Empresa regulada por la FCA (Reino Unido)._\n"
-                                "_+16 millones de clientes · 100% segura._\n\n"
-                                "👇 Pulsa el botón — te redirige a Wise\n"
-                                "Acepta Visa · Mastercard · débito\n\n"
-                                "⚠️ En el campo *Referencia/Nota* escribe:\n"
-                                f"`@{username_cb or nombre_cb}`\n\n"
-                                "✅ _El admin activa tu VIP en minutos._",
+                                "✅ Aceptamos Visa · Mastercard · débito\n\n"
+                                "📲 *Proceso rápido:*\n"
+                                "1️⃣ Pulsa el botón de abajo para contactar al admin\n"
+                                "2️⃣ Dile: *\"Quiero pagar VIP con tarjeta\"*\n"
+                                "3️⃣ El admin te envía un enlace de pago seguro\n"
+                                "4️⃣ Pagas y tu VIP se activa en minutos ⚡\n\n"
+                                "_El proceso es manual y 100% seguro._\n"
+                                "_Tiempo de activación: menos de 10 minutos._",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "💳 PAGAR CON TARJETA — Wise (100% Seguro)", "url": WISE_PAY_LINK}],
+                                    [{"text": f"📲 CONTACTAR ADMIN — Pagar con Tarjeta", "url": f"https://t.me/{admin_user_clean}?text=Hola%2C+quiero+pagar+el+VIP+con+tarjeta+%28{precio_t:.0f}+EUR%29"}],
+                                    [{"text": "💰 Pagar con USDT/Binance (instantáneo)", "callback_data": "vip_pagar_confirmar"}],
                                     [{"text": "📜 Términos y Condiciones", "url": "https://buysell365.pro/terminos"}],
-                                    [{"text": f"❓ Contactar Admin", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}],
                                     [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
                                 ]}
                             )
@@ -15225,12 +15224,13 @@ def loop_polling():
                             admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
                             if admin_id:
                                 enviar_telegram(
-                                    "💳 *INTENTO PAGO TARJETA*\n"
+                                    "💳 *SOLICITUD PAGO TARJETA*\n"
                                     f"👤 {nombre_cb} (@{username_cb})\n"
                                     f"🆔 ID: `{user_id}`\n"
                                     f"💶 {precio_t:.2f} EUR\n"
                                     f"⏰ {ahora().strftime('%H:%M %d/%m')}\n\n"
-                                    f"_Verifica en Wise y activa con /otorgarvip {user_id}_",
+                                    f"_El usuario quiere pagar con tarjeta._\n"
+                                    f"_Envíale enlace de pago y activa con /otorgarvip {user_id}_",
                                     admin_id
                                 )
                             continue
