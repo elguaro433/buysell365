@@ -4599,21 +4599,17 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     }
     _estr_txt = _estr_map.get(_estrategia, '')
 
-    # Score visual con estrellas
-    _stars = "⭐" * min(score_display, 5) + "☆" * max(0, 5 - score_display)
-
     return (
         f"{cabecera}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"📍 *Entrada:* `{f_(precio)}`\n\n"
-        f"🛑 *SL:* `{f_(niveles['sl'])}` \\({fmt_dist(sl_dist)}\\)\n"
-        f"🎯 *TP1:* `{f_(niveles['tp1'])}` \\({fmt_dist(tp1_dist)}\\)\n"
-        f"🎯 *TP2:* `{f_(niveles['tp2'])}` \\({fmt_dist(tp2_dist)}\\)\n"
-        f"🏁 *TP3:* `{f_(niveles['tp3'])}` \\({fmt_dist(tp3_dist)}\\)\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 *R:R {rr_ratio}* | {_stars}"
+        f"━━━━━━━━━━━━━━\n"
+        f"📍 Entrada: `{f_(precio)}`\n"
+        f"🛑 SL: `{f_(niveles['sl'])}` ({fmt_dist(sl_dist)})\n"
+        f"🎯 TP1: `{f_(niveles['tp1'])}` ({fmt_dist(tp1_dist)})\n"
+        f"🎯 TP2: `{f_(niveles['tp2'])}` ({fmt_dist(tp2_dist)})\n"
+        f"🏁 TP3: `{f_(niveles['tp3'])}` ({fmt_dist(tp3_dist)})\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📊 R:R *{rr_ratio}* | Score *{score_display}/5*"
         + (f" | {_estr_txt}" if _estr_txt else "")
-        + f"\n⏰ {hora} | 🌐 buysell365\\.pro"
     )
 
 
@@ -4696,49 +4692,27 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
 
 def cmd_ayuda():
     return (
-        "🤖 *BuySell365 Pro — Menu Principal*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📡 *SENALES Y TRADING*\n"
-        "   /senales — Operaciones abiertas\n"
-        "   /resumen — Resumen del dia\n"
-        "   /precios — Precios en tiempo real\n"
-        "   /winrate — Estadisticas de rendimiento\n\n"
-        "🔍 *ANALISIS DE MERCADO*\n"
-        "   /analisis \\[activo\\] — Analisis tecnico completo\n"
-        "   /tendencia — Tendencias del mercado\n"
-        "   /noticias — Calendario economico\n"
-        "   /sentimiento — Fear & Greed Index\n\n"
-        "🌍 *INFORMACION*\n"
-        "   /horarios — Sesiones de mercado\n"
-        "   /mercados — Activos que operamos\n"
-        "   /estado — Estado del sistema\n"
-        "   /web — Dashboard en vivo\n\n"
-        "👑 *SERVICIOS*\n"
-        "   /vip — Canal VIP con senales premium\n"
-        "   /copy — Copy Trading automatico\n\n"
-        "💬 _Tambien puedes preguntarme directamente:_\n"
-        "_\"Analiza el oro\" · \"Precio del nasdaq\" · \"Como va el mercado\"_"
-    )
-
-
-def cmd_copy():
-    """Información sobre Copy Trading"""
-    return (
-        "🚀 *COPY TRADING — BuySell365 Pro*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Copia automatica de todas nuestras operaciones\n"
-        "directamente en tu cuenta MT5\\.\n\n"
-        "✅ Oro, Forex e Indices\n"
-        "✅ SL y TP colocados automaticamente\n"
-        "✅ Sin cuota fija — solo pagas un pequeno % si ganas\n"
-        "✅ Broker regulado XM \\(MT5\\)\n"
-        "✅ Sin intervencion manual\n\n"
-        "📊 *Como funciona:*\n"
-        "1\\. Abres cuenta en XM con nuestro enlace\n"
-        "2\\. Conectas tu MT5 a nuestro servidor\n"
-        "3\\. Las operaciones se copian automaticamente\n"
-        "4\\. Tu solo ves las ganancias crecer\n\n"
-        "🌐 Mas info: buysell365\\.pro"
+        "🤖 *COMANDOS BuySell365.pro*\n\n"
+        "📈 *Senales*\n"
+        "   `/senales` — Operaciones abiertas\n"
+        "   `/resumen` — Resumen del dia\n"
+        "   `/winrate` — Estadisticas\n\n"
+        "🔍 *Analisis*\n"
+        "   `/analisis [activo]` — Analisis tecnico\n"
+        "   `/precio [activo]` — Precio en vivo\n"
+        "   `/precios` — Todos los precios\n\n"
+        "🌍 *Mercados*\n"
+        "   `/mercados` — Activos monitoreados\n"
+        "   `/horarios` — Sesiones de mercado\n"
+        "   `/noticias` — Calendario economico\n"
+        "   `/sentimiento` · `/tendencia` · `/pivots`\n\n"
+        "📊 *Herramientas*\n"
+        "   `/web` — Trading en Vivo\n"
+        "   `/estado` — Estado del sistema\n\n"
+        "👑 *VIP*\n"
+        f"   `/vip` — Canal VIP Premium\n"
+        "   `/copy` — Copy Trading (proximamente)\n\n"
+        "💡 _Preguntame: \"Analiza el oro\" o \"Precio del nasdaq\"_"
     )
 
 def cmd_senales():
@@ -7576,24 +7550,14 @@ def _generar_reporte_diario():
             ]}
         )
 
-        # Enviar resumen profesional al canal VIP
-        _wr_emoji = "🟢" if wr >= 60 else ("🟡" if wr >= 40 else "🔴")
-        _pips_emoji = "📈" if pips_net > 0 else "📉"
+        # Enviar resumen al canal VIP
         _canal_msg = (
-            f"📊 *RESUMEN DEL DÍA*\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"📅 {hoy_str}\n\n"
-            f"📡 Senales: *{total_senales}*\n"
-            f"{_wr_emoji} Win Rate: *{wr:.0f}%* ({ganadas}W/{perdidas}L)\n"
-            f"{_pips_emoji} Pips netos: *{pips_net:+.1f}*\n"
-            f"💰 Capital: *${CAPITAL_USUARIO:.0f}*\n"
+            f"📊 *RESUMEN DEL DÍA — {hoy_str}*\n"
+            f"Señales: {total_senales} | WR: {wr:.0f}% | Pips: {pips_net:+.1f}\n"
+            f"Capital: ${CAPITAL_USUARIO:.0f}"
         )
         if _ia_market:
-            _canal_msg += f"\n💡 *IA Market:*\n{_ia_market[:300]}\n"
-        _canal_msg += (
-            f"\n━━━━━━━━━━━━━━━━━━━━\n"
-            f"🌐 buysell365\\.pro | /menu"
-        )
+            _canal_msg += f"\n\n💡 {_ia_market[:200]}"
         try:
             enviar_canal(_canal_msg)
         except Exception:
@@ -8848,61 +8812,20 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             f"   /web — Dashboard en vivo\n"
             f"   /ayuda — Todos los comandos\n\n"
         )
-        if _puede_trial_start:
-            start_txt += f"🎁 *Prueba 5 dias habiles GRATIS* en el canal VIP → /vip 🚀"
-        else:
-            start_txt += f"👑 *Canal VIP* con señales completas → /vip"
+        start_txt += f"👑 *Canal VIP* con señales completas → /vip"
 
         start_botones = {
             "inline_keyboard": [
-                [{"text": f"🎁 5 DIAS HABILES GRATIS", "callback_data": "vip_trial_gratis"}] if _puede_trial_start else [{"text": "👑 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "👑 SUSCRIBIRSE AL VIP", "callback_data": "vip_pagar_usdt"}],
                 [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                 [{"text": "🌐 Web en Vivo", "url": "https://buysell365.pro/dashboard"}],
             ]
         }
         return start_txt, start_botones
 
-    if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "/menu", "❓ ayuda"):
-        res_ayuda = cmd_ayuda()
-        _menu_markup = {
-            "inline_keyboard": [
-                [{"text": "📊 Senales", "callback_data": "/senales"},
-                 {"text": "💰 Precios", "callback_data": "/precios"}],
-                [{"text": "📋 Resumen", "callback_data": "/resumen"},
-                 {"text": "📰 Noticias", "callback_data": "/noticias"}],
-                [{"text": "👑 VIP", "callback_data": "/vip"},
-                 {"text": "🚀 Copy Trading", "url": "https://buysell365.pro/#servicios"}],
-                [{"text": "🌐 Dashboard Web", "url": "https://buysell365.pro"},
-                 {"text": "⏰ Horarios", "callback_data": "/horarios"}]
-            ]
-        }
-        return res_ayuda, _menu_markup
-    if t in ("/copy", "copy", "copy trading", "copytrade", "copytrading"):
-        _copy_markup = {
-            "inline_keyboard": [
-                [{"text": "🚀 Empezar Copy Trading", "url": "https://buysell365.pro/#servicios"}],
-                [{"text": "📋 Menu", "callback_data": "/menu"}]
-            ]
-        }
-        return cmd_copy(), _copy_markup
-    # /ia [pregunta] — Análisis IA del mercado
-    if t.startswith("/ia ") or t.startswith("ia "):
-        _ia_pregunta = texto.strip()[3:].strip() if t.startswith("/ia") else texto.strip()[3:].strip()
-        if not _ia_pregunta:
-            return "💡 Escribe tu pregunta. Ejemplo:\n`/ia como va el oro hoy?`\n`/ia analiza el nasdaq`"
-        _ia_resp = _ia_responder(_ia_pregunta, nombre_user)
-        if _ia_resp:
-            return f"🤖 *BuySell365 IA*\n━━━━━━━━━━━━━━\n{_ia_resp}", crear_teclado_principal()
-        return "⚠️ IA no disponible ahora. La cuota se renueva diariamente. Intenta mas tarde.", crear_teclado_principal()
-    if t in ("/ia", "ia"):
-        return ("🤖 *BuySell365 IA*\n━━━━━━━━━━━━━━\n"
-                "Preguntame lo que quieras sobre el mercado:\n\n"
-                "💡 Ejemplos:\n"
-                "• `/ia como va el oro hoy?`\n"
-                "• `/ia analiza el nasdaq`\n"
-                "• `/ia que mercados estan abiertos?`\n"
-                "• `/ia resumen del dia`\n\n"
-                "📊 Tengo datos en vivo de +20 activos."), crear_teclado_principal()
+    if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "❓ ayuda"):
+        res_ayuda = f"👋 ¡Hola *{nombre_user}*! " + cmd_ayuda()
+        return res_ayuda, crear_teclado_principal()
     if t in ("/señales", "/senales", "/operaciones", "/abiertas", "/activas", "activas",
              "señales", "senales", "señales activas", "📊 señales activas"):
         return cmd_senales(), crear_teclado_principal()
@@ -9043,12 +8966,10 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     if t in ("/vip", "vip", "acceso", "premium", "pagar", "suscripcion", "suscribirse", "/suscripcion",
              "canal", "canal vip", "entrar al canal", "quiero entrar", "como entro",
              "unirme", "quiero unirme", "membresia", "membresía",
-             "prueba", "prueba gratis", "gratis", "trial", "probar", "dias gratis",
-             "quiero probar", "probar gratis", "prueba gratuita") or \
+             "suscribirme", "quiero suscribirme") or \
        any(p in t for p in ("canal vip", "entrar al canal", "quiero entrar", "quiero unirme",
                              "como entro al", "como me uno", "acceso al canal", "acceso vip",
-                             "quiero acceso", "me interesa el vip", "suscribirme al",
-                             "prueba gratis", "dias gratis", "quiero probar")):
+                             "quiero acceso", "me interesa el vip", "suscribirme al")):
         return cmd_vip(user_id=remitente)
 
     # ── COPY TRADING ──
@@ -13719,17 +13640,14 @@ def analizar_activo(nombre, ticker):
         min_score = get_min_score_efectivo()
 
         if tipo is None:
-            return  # Sin señal, silencioso para no saturar log
+            logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
+            return
 
-        # LOG DIAGNÓSTICO: ver qué señales se generan y con qué score
-        logger.info(f"📊 SEÑAL DETECTADA: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — evaluando filtros...")
-
-        # 🔴 FILTRO VOLUMEN: Yahoo Finance devuelve vol=0 para muchos pares Forex/futuros
-        # FIX 2026-03-28: No bloquear por volumen — usar como penalización de score
+        # 🔴 FILTRO DURO VOLUMEN: vol < 0.2x = mercado muerto, no operar
         _vol_r = ind.get('vol_ratio', 1.0)
         if _vol_r < 0.2:
-            logger.info(f"⚠️ VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x — penalización score (-1) en vez de bloqueo")
-            score = max(1, score - 1)  # Penalizar pero NO descartar
+            logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.5x) — señal descartada")
+            return
 
         # [4] CONFIRMACIÓN INTER-MERCADO: +1 al score si el activo correlacionado confirma
         try:
@@ -13868,15 +13786,13 @@ def analizar_activo(nombre, ticker):
             return
         if hay_correlacion_peligrosa(ticker, tipo):
             return
-        # 🔻 FILTRO MULTI-TIMEFRAME 4H — SOFT: penaliza score pero NO bloquea
-        # FIX 2026-03-28: MTF 4H bloqueaba todas las señales → 0 señales al canal
-        # Ahora: penaliza score -1 si va contra 4H (excepto reversiones y RSI extremo)
+        # 🔻 FILTRO MULTI-TIMEFRAME 4H — Soft: penaliza en confianza pero NO bloquea
+        # Reversiones de alta calidad (score 5) pueden ir contra 4H
         _mtf_4h_ok = filtro_multi_timeframe(ticker, tipo)
         _rsi_extremo = ind.get('rsi', 50) < 25 or ind.get('rsi', 50) > 75
         if not _mtf_4h_ok and not _es_reversion and not _rsi_extremo:
-            score = max(1, score - 1)
-            confianza_total = max(20, confianza_total - 10)
-            logger.info(f"⚠️ MTF 4H contra señal: {nombre} {tipo} — penalización score={score}, conf={confianza_total}% (NO bloqueado)")
+            log_op(f"⛔ MTF 4H BLOQUEADO: {nombre} {tipo} va contra tendencia 4H — señal descartada")
+            return
         if not _mtf_4h_ok and _rsi_extremo:
             print(f"✅ MTF 4H contra señal pero RSI EXTREMO ({ind.get('rsi', 50):.0f}) PERMITIDO: {nombre} {tipo}")
         if not _mtf_4h_ok and _es_reversion:
@@ -14003,18 +13919,17 @@ def analizar_activo(nombre, ticker):
             return
 
         # ⭐ CLASIFICACIÓN DE SEÑALES — Premium vs Standard
-        # FIX 2026-03-28: Relajar filtros — score>=3 y conf>=30% para STANDARD
-        # Problema: con filtros estrictos, 0 señales llegan al canal en días enteros
-        # Mejor enviar señales de menor calidad al canal que no enviar NADA
-        _es_premium = (score >= 4 and confianza_total >= 45)
-        _es_standard = (score >= 2 and confianza_total >= 25)
+        # FIX 2026-03-27: 70%→50% confianza premium, permitir STANDARD (score≥3, conf≥40%)
+        # Con ML bypass=0, 70% era casi imposible de alcanzar → 0 señales en 2 días
+        _es_premium = (score >= 4 and confianza_total >= 50)
+        _es_standard = (score >= 3 and confianza_total >= 40)
 
         if _es_premium:
             _nivel_senal = "PREMIUM"
         elif _es_standard:
             _nivel_senal = "STANDARD"
         else:
-            logger.info(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
+            print(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
             return
 
         # ═══ C-03 FIX: RESERVA ATÓMICA — Todos los checks + reserva en UN lock ═══
@@ -14372,16 +14287,15 @@ def _verificar_entradas_pendientes():
                 log_vip(f"✅ CÓDIGO CONFIRMADO: {uid} ({sub.get('nombre','?')}) entró al canal | Código:{codigo_txt} | Expira:{expira_real.strftime('%Y-%m-%d')} | {dias_acceso} dias activos")
             else:
                 enviar_telegram(
-                    f"🎉 *TRIAL ACTIVADA — 5 DIAS HABILES GRATIS*\n"
+                    f"👑 *VIP ACTIVADO*\n"
                     f"━━━━━━━━━━\n\n"
                     f"✅ Ya estas dentro del canal VIP\n"
-                    f"⏳ Te quedan *5 dias habiles* de acceso\n"
                     f"📅 Expira: *{expira_real.strftime('%Y-%m-%d')}*\n\n"
                     f"📊 _Recibiras senales IA con Entry, SL y TP exactos._\n"
-                    f"🚀 _Aprovecha al maximo tu prueba!_",
+                    f"🚀 _Bienvenido al canal premium!_",
                     uid
                 )
-                log_vip(f"✅ TRIAL CONFIRMADA: {uid} ({sub.get('nombre','?')}) entró al canal | Expira:{expira_real.strftime('%Y-%m-%d')} | {VIP_TRIAL_DIAS} dias activos")
+                log_vip(f"✅ ACCESO CONFIRMADO: {uid} ({sub.get('nombre','?')}) entró al canal | Expira:{expira_real.strftime('%Y-%m-%d')} | {VIP_TRIAL_DIAS} dias activos")
             time.sleep(0.5)
         else:
             # ¿Pasaron >24h sin entrar?
@@ -14805,61 +14719,31 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     p = pi["precio"]
     desc_label = f" (50% OFF)" if pi["en_descuento"] else ""
 
-    bienvenida = (
-        f"👋 *Hola {nombre}\\!* Bienvenido a *BuySell365 Pro*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🤖 *Trading con Inteligencia Artificial*\n\n"
-    )
+    bienvenida = f"👋 *Hola {nombre}!* Bienvenido a *BuySell365.pro*\n\n"
 
     if puede_trial:
         bienvenida += (
-            "🔥 *OFERTA DE BIENVENIDA:*\n\n"
-            "📡 *Canal VIP* — Senales en tiempo real\n"
-            "   • Oro, Forex, NASDAQ, S&P 500\n"
-            "   • Entry, SL y 3 TPs exactos\n"
-            "   • Analisis multi\\-IA exclusivo\n\n"
-            "🚀 *Copy Trading* — Sin cuota fija\n"
-            "   • Copia automatica en tu cuenta MT5\n"
-            "   • Solo pagas un pequeno % si ganas\n"
-            "   • Broker regulado XM\n\n"
-            f"💎 *VIP Pro:* {p}{VIP_MONEDA}/mes{desc_label}\n"
-            "🎁 *5 dias habiles GRATIS* para que lo pruebes\n\n"
-            "🌐 *Web:* buysell365\\.pro"
+            f"🎁 *5 DIAS HABILES GRATIS* en nuestro canal VIP:\n"
+            "✅ Senales IA: Oro, Forex, NASDAQ, S&P 500\n"
+            "✅ Entry, SL, TP exactos | Riesgo controlado\n\n"
+            "🚀 *Copy Trading* — copia nuestras operaciones en tu cuenta\n\n"
+            f"Despues: {p}{VIP_MONEDA}/mes{desc_label}. Sin compromiso."
         )
     else:
         bienvenida += (
-            "📡 *Canal VIP* — Senales en tiempo real\n"
-            "   • Oro, Forex, NASDAQ, S&P 500\n"
-            "   • Entry, SL y 3 TPs exactos\n"
-            "   • Analisis multi\\-IA exclusivo\n\n"
-            "🚀 *Copy Trading* — Sin cuota fija\n"
-            "   • Copia automatica en tu cuenta MT5\n"
-            "   • Solo pagas un pequeno % si ganas\n\n"
-            f"💎 *VIP Pro:* {p}{VIP_MONEDA}/mes{desc_label}\n\n"
-            "🌐 *Web:* buysell365\\.pro"
+            "Canal VIP con senales de alta precision:\n"
+            "✅ Oro, Forex, NASDAQ, S&P 500\n"
+            "✅ Entry, SL, TP exactos\n"
+            "✅ Notificaciones en tiempo real\n\n"
+            f"👑 *{p}{VIP_MONEDA}/mes{desc_label}* → /vip"
         )
 
-    if puede_trial:
-        markup = {
-            "inline_keyboard": [
-                [{"text": "🎁 PRUEBA GRATIS 5 DIAS", "callback_data": "vip_trial_gratis"}],
-                [{"text": f"💎 VIP PRO — {p}{VIP_MONEDA}/mes{desc_label}", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "🚀 Copy Trading", "url": "https://buysell365.pro/#servicios"},
-                 {"text": "📊 Dashboard", "url": "https://buysell365.pro"}],
-                [{"text": "📋 Menu Completo", "callback_data": "/menu"},
-                 {"text": "⏰ Horarios", "callback_data": "/horarios"}]
-            ]
-        }
-    else:
-        markup = {
-            "inline_keyboard": [
-                [{"text": f"💎 VIP PRO — {p}{VIP_MONEDA}/mes{desc_label}", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "🚀 Copy Trading", "url": "https://buysell365.pro/#servicios"},
-                 {"text": "📊 Dashboard", "url": "https://buysell365.pro"}],
-                [{"text": "📋 Menu Completo", "callback_data": "/menu"},
-                 {"text": "⏰ Horarios", "callback_data": "/horarios"}]
-            ]
-        }
+    markup = {
+        "inline_keyboard": [
+            [{"text": f"💰 SUSCRIBIRSE AL VIP ({p}{VIP_MONEDA}{desc_label})", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "📊 Dashboard", "url": "https://buysell365.pro"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+        ]
+    }
 
     # Enviar al grupo (visible para el usuario) o al chat privado
     destino = grupo_chat_id or user_id
@@ -14928,17 +14812,17 @@ def loop_polling():
     try:
         _cmds = [
             {"command": "start", "description": "Iniciar el bot"},
-            {"command": "menu", "description": "Menu principal con botones"},
-            {"command": "senales", "description": "Operaciones abiertas"},
-            {"command": "precios", "description": "Precios en tiempo real"},
-            {"command": "resumen", "description": "Resumen del dia"},
-            {"command": "analisis", "description": "Analisis tecnico de un activo"},
-            {"command": "noticias", "description": "Calendario economico"},
+            {"command": "senales", "description": "Ver señales activas"},
+            {"command": "estado", "description": "Estado del bot y mercado"},
+            {"command": "resumen", "description": "Resumen del día"},
+            {"command": "noticias", "description": "Calendario económico"},
             {"command": "tendencia", "description": "Tendencias del mercado"},
-            {"command": "vip", "description": "Canal VIP con senales premium"},
-            {"command": "copy", "description": "Copy Trading automatico"},
-            {"command": "web", "description": "Dashboard en vivo"},
-            {"command": "ayuda", "description": "Todos los comandos"},
+            {"command": "precios", "description": "Precios en tiempo real"},
+            {"command": "analisis", "description": "Análisis técnico de un activo"},
+            {"command": "sentimiento", "description": "Fear & Greed index"},
+            {"command": "vip", "description": "Acceso VIP / Trial gratis"},
+            {"command": "web", "description": "Dashboard web"},
+            {"command": "ayuda", "description": "Lista de comandos"},
         ]
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
@@ -14998,49 +14882,19 @@ def loop_polling():
                         if chat_id == CHANNEL_ID or tipo_chat == "channel":
                             _fallback_dest = GROUP_ID if GROUP_ID else chat_id
 
-                        # ── Callback VIP: trial gratis (paso 1 → mostrar términos) ──
-                        if texto == "vip_trial_gratis":
+                        # ── Callback VIP: trial eliminado — redirigir a pago ──
+                        if texto in ("vip_trial_gratis", "vip_trial_confirmar"):
                             pi_t = _vip_precio_info()
-                            _dm_trial = enviar_telegram(
-                                f"📋 *TERMINOS DEL TRIAL GRATUITO*\n"
+                            enviar_telegram(
+                                f"👑 *CANAL VIP — BuySell365.pro*\n"
                                 f"━━━━━━━━━━\n\n"
-                                f"🎁 Acceso al canal VIP por *5 dias habiles gratis*.\n"
-                                f"📅 Despues del trial: *{pi_t['precio']}{VIP_MONEDA}/mes*.\n"
-                                f"🚫 No se cobra nada durante el trial.\n\n"
-                                f"📜 *Condiciones:*\n"
-                                f"• Servicio de senales educativas.\n"
-                                f"  _No es asesoria financiera._\n"
-                                f"• El usuario es responsable de\n"
-                                f"  sus decisiones de trading.\n"
-                                f"• Una prueba gratuita por persona.\n"
-                                f"• Al finalizar el trial, el acceso\n"
-                                f"  se desactiva automaticamente.\n\n"
-                                f"👇 *Al pulsar ACEPTO confirmas estos terminos:*",
+                                f"💰 Suscripcion mensual: *{pi_t['precio']}{VIP_MONEDA}/mes*\n\n"
+                                f"Pulsa el boton para ver instrucciones de pago.",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "✅ ACEPTO — ACTIVAR TRIAL", "callback_data": "vip_trial_confirmar"}],
-                                    [{"text": "❌ CANCELAR", "callback_data": "vip_cancelar"}]
+                                    [{"text": f"💰 SUSCRIBIRME ({pi_t['precio']}{VIP_MONEDA})", "callback_data": "vip_pagar_usdt"}]
                                 ]}
                             )
-                            # 🆕 Si el DM falló y el botón se pulsó desde grupo → avisar en grupo
-                            if _dm_trial is None and tipo_chat in ("group", "supergroup"):
-                                _nombre_cb_trial = escapar_markdown(from_user.get("first_name", "Trader"))  # H-11 FIX
-                                _aviso_dm = enviar_telegram(
-                                    f"👋 *{_nombre_cb_trial}*, para activar tu trial necesito "
-                                    f"que primero me escribas por privado:\n\n"
-                                    f"👉 Abre @Andoperandobot y pulsa *Start*\n"
-                                    f"👉 Luego vuelve aqui y pulsa el boton de nuevo.",
-                                    chat_id
-                                )
-                                if _aviso_dm:
-                                    programar_borrado(chat_id, _aviso_dm, 120)
-                            continue
-
-                        # ── Callback VIP: trial confirmado (paso 2 → activar) ──
-                        if texto == "vip_trial_confirmar":
-                            nombre_cb = from_user.get("first_name", "Trader")
-                            username_cb = from_user.get("username", "")
-                            _otorgar_trial_vip(user_id, nombre_cb, username_cb)
                             continue
 
                         # ── Callback VIP: pago USDT (paso 1 → mostrar términos) ──
@@ -15818,27 +15672,6 @@ PREGUNTA: {pregunta}"""
         return response.choices[0].message.content[:1000]
     except Exception as e:
         logger.warning(f"🤖 Groq error: {e}")
-        # FALLBACK: respuesta basada en datos del bot cuando Groq falla
-        _lower = pregunta.lower()
-        if any(w in _lower for w in ["como va", "resumen", "estado", "hoy"]):
-            return (
-                f"📊 Resumen del dia:\n"
-                f"💰 Capital: {_capital}\n"
-                f"📈 Win Rate: {_wr}\n"
-                f"📉 Pips netos: {_pips_net:+.1f}\n"
-                f"📡 Ops activas: {_n_ops}\n"
-                f"🤖 Scanner: {'Activo' if not escaneo_pausado else 'Pausado'}"
-            )
-        elif any(w in _lower for w in ["oro", "gold", "xau"]):
-            _ind_oro = _cache_ind.get("GC=F", {})
-            if _ind_oro:
-                return f"🥇 ORO: RSI={_ind_oro.get('rsi',0):.0f} | ADX={_ind_oro.get('adx',0):.0f} | Precio: {_ind_oro.get('close',0):.2f}"
-            return "🥇 ORO: sin datos disponibles ahora."
-        elif any(w in _lower for w in ["nasdaq", "nq", "us100"]):
-            _ind_nq = _cache_ind.get("NQ=F", {})
-            if _ind_nq:
-                return f"📈 NASDAQ: RSI={_ind_nq.get('rsi',0):.0f} | ADX={_ind_nq.get('adx',0):.0f} | Precio: {_ind_nq.get('close',0):.2f}"
-            return "📈 NASDAQ: sin datos disponibles ahora."
         return None
 
 
