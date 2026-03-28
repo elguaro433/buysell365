@@ -903,7 +903,7 @@ def cargar_estado():
 # ============================================================
 
 ACTIVOS = {
-    # ORO — bloqueado en activos_desactivados (solo señales de canales aliados)
+    # ORO — bloqueado en activos_desactivados (señales manuales del admin)
     "ORO":          "GC=F",
     # FOREX — pares propios del scanner
     "EUR/USD":      "EURUSD=X",
@@ -5173,7 +5173,7 @@ def cmd_mercados():
         "ORO · EUR/USD · USD/JPY · GBP/JPY\n",
         "AUD/CAD · EUR/CHF · USD/CAD\n",
         "NASDAQ · S&P 500\n",
-        "+ Canales VIP aliados con +10 pares más\n",
+        "AUD/CAD · EUR/CHF · USD/CAD · y más\n",
         "━━━━━━━━━━\n",
         "Horario: 8:00 - 18:00 (L-V)\n",
         "`/precios` — Precios en vivo",
@@ -5242,7 +5242,7 @@ def cmd_como():
         "3️⃣ *Aprobación Multidimensional*\n"
         "   No lanzamos alertas al azar. Buscamos divergencias extremas, inyección de dinero en Volumen y rupturas limpias.\n\n"
         "4️⃣ *Gestión Estricta del Capital*\n"
-        "   Si la auditoría es EXITOSA, te entregamos una Entrada precisa, un Stop Loss corto para proteger tu dinero, y 3 niveles de ganancia (Take Profits) medidos por Volatilidad (ATR).\n\n"
+        "   Si la auditoría es EXITOSA, te entregamos una Entrada precisa, un Stop Loss para proteger tu dinero, y un objetivo de ganancia (TP) calculado por Volatilidad (ATR).\n\n"
         "💡 *Consejo:* Escribe el nombre de un activo (Ej: *Oro*) para que te dé el pronóstico inmediato de lo que sucederá."
     )
 
@@ -5255,7 +5255,7 @@ def cmd_riesgo():
         "🛑 *Stop Loss siempre activo*\n"
         "   El SL está calculado con ATR × multiplicador\n\n"
         "🎯 *Take Profits escalonados*\n"
-        "   TP1 → parcial · TP2 → parcial · TP3 → completo\n\n"
+        "   TP → objetivo de ganancia calculado por IA\n\n"
         "📊 *Ratio Riesgo:Beneficio*\n"
         "   Crypto:  1:1.5 / 1:2.5 / 1:4\n"
         "   Forex:   1:1.5 / 1:2.1 / 1:3.3\n"
@@ -5658,7 +5658,7 @@ GLOSARIO = {
         "   Riesgo = 20 pips, Beneficio = 40 pips\n"
         "   R:R = 1:2 ✅\n\n"
         "📌 *Ratios del bot:*\n"
-        "   TP1: 1:1.3-1.8  TP2: 1:2.0-3.0  TP3: 1:3.3-5.5\n\n"
+        "   TP: objetivo calculado según volatilidad del activo\n\n"
         "💡 Con R:R 1:2 y 50% de acierto ya eres rentable"
     ),
     "sl": (
@@ -5680,13 +5680,12 @@ GLOSARIO = {
         "🎯 *TAKE PROFIT (TP) — Objetivo de Beneficio*\n"
         "━━━━━━━━━━\n\n"
         "Orden automática que cierra tu posición al alcanzar el objetivo.\n\n"
-        "📌 *En este bot — 3 TPs escalonados:*\n"
-        "   TP1 → conservador (cierra parte de la posición)\n"
-        "   TP2 → intermedio  (cierra más parte)\n"
-        "   TP3 → ambicioso   (cierra el resto)\n\n"
-        "📌 *Estrategia recomendada:*\n"
-        "   TP1 alcanzado → mover SL a breakeven (entrada)\n"
-        "   TP2 alcanzado → dejar correr hasta TP3\n\n"
+        "📌 *En este bot — TP calculado por IA:*\n"
+        "   TP → objetivo de ganancia medido por volatilidad (ATR)\n"
+        "   SL → protección del capital si el mercado va en contra\n\n"
+        "📌 *Estrategia:*\n"
+        "   TP alcanzado → operación cerrada con ganancia ✅\n"
+        "   SL tocado → operación cerrada con pérdida controlada\n\n"
         "💡 No cierres manualmente antes del TP por pánico"
     ),
     "divergencia": (
@@ -5861,7 +5860,7 @@ GLOSARIO = {
         "1. *Contexto:* Mira la tendencia en Temporalidad Alta (4H).\n"
         "2. *Entrada:* Busca la señal en Temporalidad Operativa (15m).\n"
         "3. *Confirmación:* Verifica RSI, MACD y Volumen.\n"
-        "4. *Ejecución:* Lanza 3 Take Profits automáticos.\n\n"
+        "4. *Ejecución:* Lanza TP y SL automáticos.\n\n"
         "💡 Diseñada para ganar 3 veces lo que se arriesga (R:R 1:3)."
     ),
 }
@@ -8515,33 +8514,66 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         _total_s = estadisticas_diarias["ganadas"] + estadisticas_diarias["perdidas"]
         _wr_s = (estadisticas_diarias["ganadas"] / _total_s * 100) if _total_s > 0 else 0
 
-        start_txt = (
-            f"👋 *Hola {nombre_user}!* Bienvenido a *BuySell365.pro*\n"
-            f"━━━━━━━━━━\n\n"
-            f"🤖 Soy tu asistente de trading con IA.\n"
-            f"📡 Escaneo *{n_activos_s} activos* las 24 horas:\n"
-            f"   Oro, EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P 500\n\n"
-        )
-        if n_ops_s > 0:
-            start_txt += f"📊 Ahora mismo: *{n_ops_s} operaciones activas*\n"
-        if _total_s > 0:
-            start_txt += f"🎯 Win Rate hoy: *{_wr_s:.0f}%* ({_total_s} señales)\n"
-        start_txt += (
-            f"\n💡 *Comandos rapidos:*\n"
-            f"   /precios — Precios en vivo\n"
-            f"   /noticias — Calendario economico\n"
-            f"   /web — Dashboard en vivo\n"
-            f"   /ayuda — Todos los comandos\n\n"
-        )
-        start_txt += f"👑 *Canal VIP* con señales completas → /vip"
+        # Verificar si el usuario es VIP
+        _es_vip_start = remitente in suscripciones_vip and suscripciones_vip[remitente].get("activo", False)
 
-        start_botones = {
-            "inline_keyboard": [
-                [{"text": "👑 SUSCRIBIRSE AL VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
-                [{"text": "🌐 Web en Vivo", "url": "https://buysell365.pro/dashboard"}],
-            ]
-        }
+        if _es_vip_start:
+            start_txt = (
+                f"👋 *Hola {nombre_user}!* Bienvenido de nuevo a *BuySell365.pro* 💎\n"
+                f"━━━━━━━━━━━━━━━━\n\n"
+                f"🤖 *Soy tu asistente personal de trading con IA.*\n"
+                f"Estoy aquí para ayudarte con todo lo que necesites:\n\n"
+                f"📍 *Tus servicios activos:*\n"
+                f"   💎 Canal VIP — señales con Entry, TP y SL exactos\n"
+                f"   🤖 Copy Trading — disponible en XM\n\n"
+                f"🛠️ *Comandos disponibles:*\n"
+                f"   /precios — Precios en vivo de 20+ activos\n"
+                f"   /noticias — Calendario económico\n"
+                f"   /cuenta — Tu estado VIP\n"
+                f"   /web — Dashboard en vivo\n"
+                f"   /ayuda — Todos los comandos\n\n"
+                f"💬 *Escríbeme cualquier duda — te respondo al instante*"
+            )
+            start_botones = {
+                "inline_keyboard": [
+                    [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                    [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
+                    [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
+                ]
+            }
+        else:
+            start_txt = (
+                f"👋 *Hola {nombre_user}!* Bienvenido a *BuySell365.pro*\n"
+                f"━━━━━━━━━━━━━━━━\n\n"
+                f"🤖 *Soy tu asistente de trading con Inteligencia Artificial.*\n\n"
+                f"📡 Analizamos *20+ activos* en tiempo real:\n"
+                f"   Oro · EUR/USD · USD/JPY · GBP/JPY\n"
+                f"   AUD/CAD · EUR/CHF · USD/CAD\n"
+                f"   NASDAQ · S&P 500\n\n"
+            )
+            if n_ops_s > 0:
+                start_txt += f"📊 Ahora mismo: *{n_ops_s} operaciones activas*\n"
+            if _total_s > 0:
+                start_txt += f"🎯 Win Rate hoy: *{_wr_s:.0f}%* ({_total_s} señales)\n"
+            start_txt += (
+                f"\n🛠️ *Comandos gratuitos:*\n"
+                f"   /precios — Precios en vivo\n"
+                f"   /noticias — Calendario económico\n"
+                f"   /web — Dashboard en vivo\n"
+                f"   /ayuda — Todos los comandos\n\n"
+                f"💎 *Canal VIP* — señales con Entry, TP y SL exactos\n"
+                f"🤖 *Copy Trading* — tu cuenta opera sola en XM\n\n"
+                f"👇 *Elige un servicio o escríbeme tu duda*"
+            )
+            start_botones = {
+                "inline_keyboard": [
+                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "🤖 COPY TRADING XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                    [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
+                ]
+            }
         return start_txt, start_botones
 
     if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "❓ ayuda"):
@@ -8857,7 +8889,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     if any(p in t for p in ["eres", "quien eres", "quién eres", "que eres", "presentate", "quien te creo", "vienes de", "quien es emmanuel", "quien es el creador"]):
         return (
             "🤖 *BuySell365.pro* — Bot de senales de trading\n\n"
-            "📡 +20 activos: Oro, Forex, Índices y canales VIP aliados\n"
+            "📡 +20 activos analizados: Oro, Forex e Índices\n"
             "🎯 Señales con Entry, TP y SL exactos\n"
             "🛡️ Gestión de riesgo profesional\n"
             "📊 Trading en Vivo: /web\n\n"
@@ -9475,7 +9507,7 @@ section{{padding:50px 20px}}
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-ops="{_n_ops}">Bot activo \u2014 {_n_ops} operaciones en vivo</span></div>
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
-    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial y canales VIP aliados. Forex, Oro e \u00cdndices — m\u00e1s de 20 pares en tiempo real, 24/5.</p>
+    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial. Forex, Oro e \u00cdndices \u2014 m\u00e1s de 20 activos analizados en tiempo real, 24/5.</p>
     <div class="hero-buttons">
       <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-primary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Unirse a Telegram</span></a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
@@ -9518,7 +9550,7 @@ section{{padding:50px 20px}}
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\u26a1</div>
       <h3 data-i18n="features.mt5.title">Ejecuci\u00f3n Autom\u00e1tica</h3>
-      <p data-i18n="features.mt5.desc">Conexi\u00f3n directa a MetaTrader 5. Las \u00f3rdenes se ejecutan en menos de 1 segundo con Stop Loss y hasta 3 niveles de ganancia autom\u00e1ticos.</p>
+      <p data-i18n="features.mt5.desc">Conexi\u00f3n directa a MetaTrader 5. Las \u00f3rdenes se ejecutan en milisegundos con Stop Loss y TP autom\u00e1ticos.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon blue">\U0001f6e1\ufe0f</div>
@@ -9670,7 +9702,7 @@ section{{padding:50px 20px}}
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q2">\u00bfC\u00f3mo recibo las se\u00f1ales?</div>
-      <div class="faq-a" data-i18n="faq.a2">Las se\u00f1ales se env\u00edan directamente a tu Telegram en tiempo real. Cada se\u00f1al incluye: activo, direcci\u00f3n (compra/venta), precio de entrada, Stop Loss y hasta 3 Take Profits.</div>
+      <div class="faq-a" data-i18n="faq.a2">Las se\u00f1ales se env\u00edan directamente a tu Telegram en tiempo real. Cada se\u00f1al incluye: activo, direcci\u00f3n (compra/venta), precio de entrada, TP y Stop Loss exactos.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q3">\u00bfNecesito experiencia en trading?</div>
@@ -14011,8 +14043,9 @@ def loop_publicidad_grupo():
             "📍 Entrada: `1.0845`\n"
             "🎯 TP: `1.0910`  ·  🛡️ SL: `1.0800`\n\n"
             "✅ Análisis IA multi-timeframe\n"
-            "✅ 20+ pares: Forex, Índices y más\n"
-            "✅ Alertas 24h — nunca pierdas una señal\n\n"
+            "✅ 20+ activos: Forex, Índices y más\n"
+            "✅ Alertas 24h — nunca pierdas una señal\n"
+            "🤖 *Bot asistente personal incluido 24/7*\n\n"
             "👇 *Únete al canal VIP ahora*",
             {"inline_keyboard": [[
                 {"text": "💎 UNIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
@@ -14046,9 +14079,10 @@ def loop_publicidad_grupo():
             "💎 *Canal VIP — Señales con IA*\n"
             "   ├ 📍 Entry · 🎯 TP · 🛡️ SL exactos\n"
             "   ├ 📊 Análisis diario de mercados\n"
-            "   └ ⚡ Alertas en tiempo real\n\n"
+            "   ├ ⚡ Alertas en tiempo real\n"
+            "   └ 🤖 Bot asistente personal 24/7\n\n"
             "🤖 *Copy Trading — Sin mensualidad*\n"
-            "   ├ 🔄 Bot replica operaciones en tu MT5\n"
+            "   ├ 🔄 Opera automáticamente en XM\n"
             "   ├ 💰 Pagas solo sobre ganancias reales\n"
             "   └ 🌍 Activo 24/7 — sin intervención\n\n"
             "👇 *Elige tu plan y empieza ahora*",
@@ -15010,30 +15044,64 @@ def loop_polling():
                         if not msg:
                             continue
 
-                        # 🆕 DETECCIÓN DE NUEVOS MIEMBROS EN GRUPO — auto-bienvenida
+                        # 🆕 DETECCIÓN DE NUEVOS MIEMBROS EN GRUPO O CANAL — auto-bienvenida
                         _new_members = msg.get("new_chat_members", [])
                         if _new_members:
                             _grp_chat = msg.get("chat", {})
                             _grp_chat_id = str(_grp_chat.get("id", ""))
                             _grp_tipo = _grp_chat.get("type", "")
+                            _es_canal_vip = (_grp_chat_id == str(CHANNEL_ID).replace("@", ""))
                             if _grp_tipo in ("group", "supergroup"):
                                 for _nm in _new_members:
                                     if _nm.get("is_bot"):
-                                        continue  # Ignorar bots que se unen
+                                        continue
                                     _nm_id = str(_nm.get("id", ""))
                                     _nm_nombre = _nm.get("first_name", "Trader")
-                                    _nm_info = {
-                                        "id": _nm.get("id"),
-                                        "first_name": _nm_nombre,
-                                        "username": _nm.get("username", ""),
-                                    }
-                                    # Registrar en directorio
+                                    _nm_info = {"id": _nm.get("id"), "first_name": _nm_nombre, "username": _nm.get("username", "")}
                                     if _nm_id not in directorio_usuarios:
                                         directorio_usuarios[_nm_id] = {"nombre": _nm_nombre, "username": _nm.get("username", "")}
-                                    # Solo dar bienvenida si NO es usuario autorizado
                                     if _nm_id not in USERS_AUTORIZADOS:
                                         manejar_usuario_nuevo(msg, _nm_info, "(nuevo miembro)", grupo_chat_id=_grp_chat_id)
-                                        log_usuario(f"👤 NUEVO MIEMBRO: {_nm_nombre} ({_nm_id}) se unió al grupo")
+                                        log_usuario(f"👤 NUEVO MIEMBRO GRUPO: {_nm_nombre} ({_nm_id})")
+                            elif _grp_tipo == "channel" or _es_canal_vip:
+                                # Nuevo miembro en el canal VIP — bienvenida por DM
+                                for _nm in _new_members:
+                                    if _nm.get("is_bot"):
+                                        continue
+                                    _nm_id = str(_nm.get("id", ""))
+                                    _nm_nombre = escapar_markdown(_nm.get("first_name", "Trader"))
+                                    if _nm_id not in directorio_usuarios:
+                                        directorio_usuarios[_nm_id] = {"nombre": _nm_nombre, "username": _nm.get("username", "")}
+                                    _bienvenida_vip = (
+                                        f"👋 *¡Hola {_nm_nombre}!* Bienvenido al *Canal VIP BuySell365.pro* 💎\n"
+                                        f"━━━━━━━━━━━━━━━━\n\n"
+                                        f"🤖 *Soy tu asistente personal de trading con IA.*\n"
+                                        f"Estoy disponible 24/7 para ayudarte con todo:\n\n"
+                                        f"💎 *Tu acceso VIP incluye:*\n"
+                                        f"   📍 Señales con Entry, TP y SL exactos\n"
+                                        f"   📊 20+ activos analizados en tiempo real\n"
+                                        f"   🤖 Copy Trading disponible en XM\n"
+                                        f"   🛠️ Asistente personal — yo, aquí en privado\n\n"
+                                        f"🛠️ *Comandos disponibles:*\n"
+                                        f"   /precios — Precios en vivo\n"
+                                        f"   /noticias — Calendario económico\n"
+                                        f"   /cuenta — Tu estado VIP\n"
+                                        f"   /web — Dashboard en vivo\n\n"
+                                        f"💬 *Escríbeme cualquier duda aquí — te respondo al instante* ✅"
+                                    )
+                                    _botones_vip = {
+                                        "inline_keyboard": [
+                                            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                                            [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
+                                            [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                                            [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
+                                        ]
+                                    }
+                                    _dm_ok = enviar_telegram(_bienvenida_vip, _nm_id, teclado=_botones_vip)
+                                    if _dm_ok:
+                                        log_usuario(f"💎 NUEVO VIP: {_nm_nombre} ({_nm_id}) — bienvenida enviada por DM")
+                                    else:
+                                        log_usuario(f"💎 NUEVO VIP: {_nm_nombre} ({_nm_id}) — no pudo recibir DM (no ha iniciado el bot)")
                             continue  # No procesar el update como mensaje normal
 
                         # 📺 channel_posts: AHORA se procesan normalmente.
