@@ -14206,7 +14206,8 @@ def loop_publicidad_grupo():
             "💰 Comisión solo sobre ganancias reales.\n\n"
             "👉 *Escribe /vip para más información*",
             {"inline_keyboard": [[
-                {"text": "🤖 QUIERO COPY TRADING", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "🤖 QUIERO COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
+            ], [
                 {"text": "📲 Contactar Admin", "url": "https://t.me/BUYSELL365_PRO_BOT"}
             ]]}
         ),
@@ -14258,7 +14259,7 @@ def loop_publicidad_grupo():
             "✅ Compatible con cuentas XM, IC Markets y más\n\n"
             "📲 *Contacta al admin para activar tu Copy Trading*",
             {"inline_keyboard": [[
-                {"text": "📲 ACTIVAR COPY TRADING", "url": "https://t.me/BUYSELL365_PRO_BOT"}
+                {"text": "📲 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
                 {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
             ]]}
@@ -14278,7 +14279,7 @@ def loop_publicidad_grupo():
             "👉 *Escribe /vip para contratar cualquiera de los dos*",
             {"inline_keyboard": [[
                 {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
-                {"text": "🤖 COPY TRADING", "url": "https://t.me/BUYSELL365_PRO_BOT"}
+                {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ]]}
         ),
     ]
