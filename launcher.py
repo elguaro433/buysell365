@@ -888,87 +888,60 @@ class ManagementConsole:
         canvas, scroll_frame = _make_scrollable(self._tab_dashboard)
         self._scroll_canvases[str(self._tab_dashboard)] = canvas
 
-        # === Barra superior con boton Actualizar ===
+        # ── Header: estado + capital MT5 + última actualización ──
         dash_header = tk.Frame(scroll_frame, bg=BG_MAIN)
-        dash_header.pack(fill="x", padx=10, pady=(10, 0))
-        _make_button(dash_header, "Actualizar", lambda: self._update_dashboard(),
-                     bg=BG_INPUT, fg=TEXT).pack(side="left", padx=0, pady=3)
-        self._dash_last_update_lbl = _make_label(dash_header, "", fg=TEXT_SEC,
-                                                  font=("Segoe UI", 9))
-        self._dash_last_update_lbl.pack(side="left", padx=10)
+        dash_header.pack(fill="x", padx=10, pady=(10, 4))
 
-        # Real-time capital from MT5
-        self._dash_mt5_capital_lbl = _make_label(dash_header, "MT5 Capital: --", fg=ACCENT_BRIGHT,
-                                                  font=("Segoe UI", 10, "bold"))
+        self._dash_estado_lbl = _make_label(dash_header, "● Detenido",
+                                             fg=ERR, font=("Segoe UI", 11, "bold"))
+        self._dash_estado_lbl.pack(side="left")
+
+        self._dash_uptime_lbl = _make_label(dash_header, "", fg=TEXT_SEC,
+                                             font=("Segoe UI", 9))
+        self._dash_uptime_lbl.pack(side="left", padx=(12, 0))
+
+        self._dash_mt5_capital_lbl = _make_label(dash_header, "", fg=ACCENT_BRIGHT,
+                                                  font=("Segoe UI", 11, "bold"))
         self._dash_mt5_capital_lbl.pack(side="right", padx=10)
 
-        # === Section 1: Estado + Controles ===
-        top_frame = tk.Frame(scroll_frame, bg=BG_MAIN)
-        top_frame.pack(fill="x", padx=10, pady=(5, 5))
+        self._dash_last_update_lbl = _make_label(dash_header, "", fg=TEXT_SEC,
+                                                  font=("Segoe UI", 9))
+        self._dash_last_update_lbl.pack(side="right", padx=4)
 
-        # Estado del Bot
-        estado_frame = _make_section_frame(top_frame, "Estado del Bot")
-        estado_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        # ── Sección 1: Controles (todo en uno) ──
+        ctrl_frame = _make_section_frame(scroll_frame, "Controles")
+        ctrl_frame.pack(fill="x", padx=10, pady=5)
 
-        info_grid = tk.Frame(estado_frame, bg=BG_PANEL)
-        info_grid.pack(fill="x")
+        btn_row1 = tk.Frame(ctrl_frame, bg=BG_PANEL)
+        btn_row1.pack(fill="x", pady=(4, 2))
 
-        self._dash_estado_lbl = _make_label(info_grid, "Estado: --", fg=TEXT_SEC)
-        self._dash_estado_lbl.grid(row=0, column=0, sticky="w", pady=2)
-        self._dash_pid_lbl = _make_label(info_grid, "PID: --", fg=TEXT_SEC)
-        self._dash_pid_lbl.grid(row=1, column=0, sticky="w", pady=2)
-        self._dash_uptime_lbl = _make_label(info_grid, "Uptime: --", fg=TEXT_SEC)
-        self._dash_uptime_lbl.grid(row=2, column=0, sticky="w", pady=2)
-        self._dash_restart_lbl = _make_label(info_grid, "Reinicios: 0", fg=TEXT_SEC)
-        self._dash_restart_lbl.grid(row=3, column=0, sticky="w", pady=2)
-
-        # Controles
-        ctrl_frame = _make_section_frame(top_frame, "Controles")
-        ctrl_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
-
-        btn_row = tk.Frame(ctrl_frame, bg=BG_PANEL)
-        btn_row.pack(fill="x", pady=5)
-
-        self._btn_start = _make_button(btn_row, "Iniciar Bot", self._cmd_start_bot,
+        self._btn_start = _make_button(btn_row1, "▶  Iniciar Bot", self._cmd_start_bot,
                                        bg="#238636", fg="#ffffff")
-        self._btn_start.pack(side="left", padx=5, pady=3)
+        self._btn_start.pack(side="left", padx=(0, 6), pady=2)
 
-        self._btn_stop = _make_button(btn_row, "Detener Bot", self._cmd_stop_bot,
+        self._btn_stop = _make_button(btn_row1, "■  Detener Bot", self._cmd_stop_bot,
                                       bg=ERR, fg="#ffffff")
-        self._btn_stop.pack(side="left", padx=5, pady=3)
+        self._btn_stop.pack(side="left", padx=6, pady=2)
 
-        self._btn_restart = _make_button(btn_row, "Reiniciar", self._cmd_restart_bot,
+        self._btn_restart = _make_button(btn_row1, "↺  Reiniciar", self._cmd_restart_bot,
                                          bg=WARN, fg="#000000")
-        self._btn_restart.pack(side="left", padx=5, pady=3)
+        self._btn_restart.pack(side="left", padx=6, pady=2)
 
-        # Auto-start checkbox
-        self._autostart_var = tk.BooleanVar(value=self.config.get("autostart_bot", True))
-        chk = tk.Checkbutton(ctrl_frame, text="Auto-iniciar bot al abrir",
-                             variable=self._autostart_var, command=self._toggle_autostart,
-                             bg=BG_PANEL, fg=TEXT, selectcolor=BG_INPUT,
-                             activebackground=BG_PANEL, activeforeground=TEXT,
-                             font=("Segoe UI", 9))
-        chk.pack(anchor="w", pady=(5, 0))
+        btn_row2 = tk.Frame(ctrl_frame, bg=BG_PANEL)
+        btn_row2.pack(fill="x", pady=(2, 4))
 
-        # === Quick Controls (improvement 5) ===
-        qctrl_frame = _make_section_frame(scroll_frame, "Controles Rapidos")
-        qctrl_frame.pack(fill="x", padx=10, pady=5)
+        _make_button(btn_row2, "🔍 Escanear Ahora", self._cmd_escanear_ahora,
+                     bg="#1d4ed8", fg="#ffffff").pack(side="left", padx=(0, 6), pady=2)
 
-        qctrl_row = tk.Frame(qctrl_frame, bg=BG_PANEL)
-        qctrl_row.pack(fill="x", pady=3)
+        self._btn_pause_all = _make_button(btn_row2, "⏸ Pausar Todo", self._cmd_pause_all,
+                                           bg="#7c3aed", fg="#ffffff")
+        self._btn_pause_all.pack(side="left", padx=6, pady=2)
 
-        _make_button(qctrl_row, "\u26A0 Cerrar Todo", self._cmd_cerrar_todo,
-                     bg="#b91c1c", fg="#ffffff").pack(side="left", padx=5, pady=3)
+        _make_button(btn_row2, "⚠ Cerrar Todo", self._cmd_cerrar_todo,
+                     bg="#b91c1c", fg="#ffffff").pack(side="left", padx=6, pady=2)
 
-        _make_button(qctrl_row, "\U0001F50D Escanear Ahora", self._cmd_escanear_ahora,
-                     bg="#1d4ed8", fg="#ffffff").pack(side="left", padx=5, pady=3)
-
-        self._btn_pause_all = _make_button(qctrl_row, "\u23F8 Pausar Todo", self._cmd_pause_all,
-                                           bg="#b91c1c", fg="#ffffff")
-        self._btn_pause_all.pack(side="left", padx=5, pady=3)
-
-        # === Section 2: Estadisticas en Vivo ===
-        stats_frame = _make_section_frame(scroll_frame, "Estadisticas en Vivo")
+        # ── Sección 2: Estadísticas en Vivo ──
+        stats_frame = _make_section_frame(scroll_frame, "Estadísticas en Vivo")
         stats_frame.pack(fill="x", padx=10, pady=5)
 
         stats_grid = tk.Frame(stats_frame, bg=BG_PANEL)
@@ -977,135 +950,63 @@ class ManagementConsole:
         stats_grid.columnconfigure(3, weight=1)
 
         labels_left = [
-            ("Win Rate:", "_dash_winrate"),
-            ("Senales Hoy:", "_dash_senales_hoy"),
-            ("Capital:", "_dash_capital"),
-            ("Modo:", "_dash_modo"),
+            ("Win Rate:",       "_dash_winrate"),
+            ("Señales Hoy:",    "_dash_senales_hoy"),
+            ("Capital:",        "_dash_capital"),
+            ("Ganancia Hoy:",   "_dash_ganancia"),
         ]
         labels_right = [
-            ("Ganancia Hoy:", "_dash_ganancia"),
-            ("Drawdown:", "_dash_drawdown"),
-            ("Proximo Escaneo:", "_dash_escaneo"),
-            ("Auto-Trading:", "_dash_autotrading"),
+            ("Auto-Trading:",   "_dash_autotrading"),
+            ("Próx. Escaneo:",  "_dash_escaneo"),
+            ("Modo:",           "_dash_modo"),
+            ("Operac. Abiertas:", "_dash_ops_abiertas"),
         ]
 
         for i, (lbl_text, attr) in enumerate(labels_left):
-            _make_label(stats_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
-                row=i, column=0, sticky="w", padx=(0, 8), pady=2)
+            _make_label(stats_grid, lbl_text, fg=TEXT_SEC,
+                        font=("Segoe UI", 10)).grid(row=i, column=0, sticky="w", padx=(0, 8), pady=3)
             val_lbl = _make_label(stats_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
-            val_lbl.grid(row=i, column=1, sticky="w", pady=2)
+            val_lbl.grid(row=i, column=1, sticky="w", pady=3)
             setattr(self, attr, val_lbl)
 
         for i, (lbl_text, attr) in enumerate(labels_right):
-            _make_label(stats_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
-                row=i, column=2, sticky="w", padx=(30, 8), pady=2)
+            _make_label(stats_grid, lbl_text, fg=TEXT_SEC,
+                        font=("Segoe UI", 10)).grid(row=i, column=2, sticky="w", padx=(30, 8), pady=3)
             val_lbl = _make_label(stats_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
-            val_lbl.grid(row=i, column=3, sticky="w", pady=2)
+            val_lbl.grid(row=i, column=3, sticky="w", pady=3)
             setattr(self, attr, val_lbl)
 
-        # === Traffic Light Asset Status ===
+        # ── Sección 3: Estado de Activos ──
         traffic_frame = _make_section_frame(scroll_frame, "Estado de Activos")
         traffic_frame.pack(fill="x", padx=10, pady=5)
 
         self._traffic_lights = {}
         tl_row = tk.Frame(traffic_frame, bg=BG_PANEL)
-        tl_row.pack(fill="x", pady=3)
+        tl_row.pack(fill="x", pady=4)
 
-        all_assets = ["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]
+        all_assets = ["EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]
         for asset in all_assets:
             af = tk.Frame(tl_row, bg=BG_PANEL)
-            af.pack(side="left", padx=8, pady=2)
-            light_canvas = tk.Canvas(af, width=16, height=16, bg=BG_PANEL,
-                                     highlightthickness=0)
+            af.pack(side="left", padx=10, pady=2)
+            light_canvas = tk.Canvas(af, width=14, height=14, bg=BG_PANEL, highlightthickness=0)
             light_canvas.pack(side="left", padx=(0, 4))
-            oval_id = light_canvas.create_oval(2, 2, 14, 14, fill=TEXT_SEC, outline="")
+            oval_id = light_canvas.create_oval(1, 1, 13, 13, fill=TEXT_SEC, outline="")
             _make_label(af, asset, fg=TEXT, font=("Segoe UI", 9, "bold")).pack(side="left")
             self._traffic_lights[asset] = (light_canvas, oval_id)
 
-        # === Section 3: Conexiones ===
+        # ── Sección 4: Conexiones ──
         conn_frame = _make_section_frame(scroll_frame, "Conexiones")
-        conn_frame.pack(fill="x", padx=10, pady=5)
+        conn_frame.pack(fill="x", padx=10, pady=(5, 15))
 
         conn_row = tk.Frame(conn_frame, bg=BG_PANEL)
-        conn_row.pack(fill="x")
+        conn_row.pack(fill="x", pady=4)
 
-        self._conn_mt5 = _make_label(conn_row, "MT5  --", fg=TEXT_SEC, font=("Segoe UI", 11))
+        self._conn_mt5 = _make_label(conn_row, "MT5  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
         self._conn_mt5.pack(side="left", padx=20)
-        self._conn_telegram = _make_label(conn_row, "Telegram  --", fg=TEXT_SEC,
-                                          font=("Segoe UI", 11))
+        self._conn_telegram = _make_label(conn_row, "Telegram  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
         self._conn_telegram.pack(side="left", padx=20)
-        self._conn_web = _make_label(conn_row, "Web Sync  --", fg=TEXT_SEC,
-                                     font=("Segoe UI", 11))
+        self._conn_web = _make_label(conn_row, "Web Sync  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
         self._conn_web.pack(side="left", padx=20)
-
-        # === Section 4: Rendimiento por Activo ===
-        rend_frame = _make_section_frame(scroll_frame, "Rendimiento por Activo")
-        rend_frame.pack(fill="x", padx=10, pady=5)
-
-        columns = ("activo", "operaciones", "ganadas", "perdidas", "pips", "winpct")
-        self._dash_tree = ttk.Treeview(rend_frame, columns=columns, show="headings", height=7)
-        self._dash_tree.heading("activo", text="Activo")
-        self._dash_tree.heading("operaciones", text="Operaciones")
-        self._dash_tree.heading("ganadas", text="Ganadas")
-        self._dash_tree.heading("perdidas", text="Perdidas")
-        self._dash_tree.heading("pips", text="Pips")
-        self._dash_tree.heading("winpct", text="Win%")
-
-        self._dash_tree.column("activo", width=140, anchor="w")
-        self._dash_tree.column("operaciones", width=100, anchor="center")
-        self._dash_tree.column("ganadas", width=90, anchor="center")
-        self._dash_tree.column("perdidas", width=90, anchor="center")
-        self._dash_tree.column("pips", width=120, anchor="center")
-        self._dash_tree.column("winpct", width=90, anchor="center")
-
-        self._dash_tree.tag_configure("positive", foreground=WIN_COLOR)
-        self._dash_tree.tag_configure("negative", foreground=LOSS_COLOR)
-        self._dash_tree.tag_configure("neutral", foreground=TEXT)
-        self._dash_tree.tag_configure("alt_positive", foreground=WIN_COLOR, background=BG_ROW_ALT)
-        self._dash_tree.tag_configure("alt_negative", foreground=LOSS_COLOR, background=BG_ROW_ALT)
-        self._dash_tree.tag_configure("alt_neutral", foreground=TEXT, background=BG_ROW_ALT)
-
-        self._dash_tree.pack(fill="x", pady=(0, 5))
-
-        # === Performance Panel (improvement 4) ===
-        perf_frame = _make_section_frame(scroll_frame, "Rendimiento Detallado")
-        perf_frame.pack(fill="x", padx=10, pady=5)
-
-        perf_grid = tk.Frame(perf_frame, bg=BG_PANEL)
-        perf_grid.pack(fill="x")
-        perf_grid.columnconfigure(1, weight=1)
-        perf_grid.columnconfigure(3, weight=1)
-
-        perf_left = [
-            ("Win Rate Hoy:", "_perf_wr_today"),
-            ("Win Rate Semana:", "_perf_wr_week"),
-            ("Win Rate Mes:", "_perf_wr_month"),
-        ]
-        perf_right = [
-            ("Mejor Trade Hoy:", "_perf_best_trade"),
-            ("Peor Trade Hoy:", "_perf_worst_trade"),
-            ("Total Pips Hoy:", "_perf_total_pips"),
-        ]
-
-        for i, (lbl_text, attr) in enumerate(perf_left):
-            _make_label(perf_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
-                row=i, column=0, sticky="w", padx=(0, 8), pady=2)
-            val_lbl = _make_label(perf_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
-            val_lbl.grid(row=i, column=1, sticky="w", pady=2)
-            setattr(self, attr, val_lbl)
-
-        for i, (lbl_text, attr) in enumerate(perf_right):
-            _make_label(perf_grid, lbl_text, fg=TEXT_SEC, font=("Segoe UI", 10)).grid(
-                row=i, column=2, sticky="w", padx=(30, 8), pady=2)
-            val_lbl = _make_label(perf_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
-            val_lbl.grid(row=i, column=3, sticky="w", pady=2)
-            setattr(self, attr, val_lbl)
-
-        # Footer: Acerca de
-        footer = tk.Frame(scroll_frame, bg=BG_MAIN)
-        footer.pack(fill="x", padx=10, pady=(5, 15))
-        _make_button(footer, "Acerca de", self._show_about, bg=BG_INPUT, fg=TEXT).pack(
-            side="right")
 
         # Start MT5 capital refresh timer (every 30s)
         self.root.after(5000, self._refresh_mt5_capital_loop)
@@ -3409,15 +3310,11 @@ class ManagementConsole:
 
         # Bot status
         if self.bot.is_running:
-            self._dash_estado_lbl.config(text="Estado: Ejecutando", fg=WIN_COLOR)
-            self._dash_pid_lbl.config(text=f"PID: {self.bot.pid}")
+            self._dash_estado_lbl.config(text="● Ejecutando", fg=WIN_COLOR)
             self._dash_uptime_lbl.config(text=f"Uptime: {self.bot.uptime_str()}")
         else:
-            self._dash_estado_lbl.config(text="Estado: Detenido", fg=ERR)
-            self._dash_pid_lbl.config(text="PID: --")
-            self._dash_uptime_lbl.config(text="Uptime: --")
-
-        self._dash_restart_lbl.config(text=f"Reinicios: {self.bot.restart_count}")
+            self._dash_estado_lbl.config(text="● Detenido", fg=ERR)
+            self._dash_uptime_lbl.config(text="")
 
         # Stats
         historial = estado.get("historial_operaciones", [])
@@ -3453,60 +3350,33 @@ class ManagementConsole:
         else:
             self._dash_ganancia.config(text=f"{pips_today:.1f} pips", fg=ERR)
 
-        # Drawdown: worst peak-to-trough in pips today
-        pips_loss_today = sum(op.get("pips", 0) for op in today_ops
-                             if op.get("resultado") == "LOSS")
-        dd = abs(pips_loss_today) if pips_loss_today < 0 else 0
-        self._dash_drawdown.config(text=f"{dd:.1f} pips", fg=ERR)
-
         self._dash_escaneo.config(text=f"{self._scan_countdown}s")
 
-        # Auto-trading from estado or env
+        # Auto-trading
         auto_trading = estado.get("mt5_pausado", False)
         env = load_env()
         auto_t = env.get("AUTO_TRADING", "True")
         if auto_trading:
             self._dash_autotrading.config(text="PAUSADO", fg=WARN)
         elif auto_t.lower() == "true":
-            self._dash_autotrading.config(text="SI", fg=WIN_COLOR)
+            self._dash_autotrading.config(text="SÍ", fg=WIN_COLOR)
         else:
             self._dash_autotrading.config(text="NO", fg=ERR)
+
+        # Operaciones abiertas
+        active_count = len(estado.get("operaciones_activas", {}))
+        if hasattr(self, '_dash_ops_abiertas'):
+            self._dash_ops_abiertas.config(
+                text=f"{active_count}" if active_count == 0 else f"{active_count} activas",
+                fg=WIN_COLOR if active_count > 0 else TEXT
+            )
 
         # Connections
         self._update_connections(estado)
 
-        # Performance by asset
-        self._update_rendimiento(historial)
-
         # Traffic lights
         try:
             self._update_traffic_lights(estado)
-        except Exception:
-            pass
-
-        # Performance panel (win rate by period, best/worst trade)
-        try:
-            self._update_performance_panel(historial)
-        except Exception:
-            pass
-
-        # P&L chart - build cumulative pips from today's ops
-        try:
-            pnl_points = []
-            cumulative = 0.0
-            for op in today_ops:
-                cumulative += op.get("pips", 0)
-                label = op.get("hora_salida", op.get("hora", ""))
-                pnl_points.append((label, cumulative))
-            if not pnl_points:
-                pnl_points = [("inicio", 0)]
-            self._draw_pnl_chart(pnl_points)
-        except Exception:
-            pass
-
-        # Equity curve
-        try:
-            self._draw_equity_curve()
         except Exception:
             pass
 
