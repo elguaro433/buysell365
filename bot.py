@@ -8517,6 +8517,69 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         # Verificar si el usuario es VIP
         _es_vip_start = remitente in suscripciones_vip and suscripciones_vip[remitente].get("activo", False)
 
+        # ── PROPIETARIO / FUNDADOR (máxima prioridad) ─────────────────────────
+        _propietario_id = str(ADMIN_IDS[0]) if ADMIN_IDS else None
+        _es_propietario = _propietario_id and remitente == _propietario_id
+
+        if _es_propietario:
+            _scan_icon   = "🟢 ACTIVO" if not escaneo_pausado else "⏸️ PAUSADO"
+            _mt5_icon    = "🟢 CONECTADO" if MT5_AVAILABLE and not mt5_pausado else ("⏸️ PAUSADO" if mt5_pausado else "❌ NO DISPONIBLE")
+            _ops_icon    = f"{len(operaciones_activas)} ops abiertas"
+            _total_s_p   = estadisticas_diarias["ganadas"] + estadisticas_diarias["perdidas"]
+            _wr_p        = f"{estadisticas_diarias['ganadas']}/{estadisticas_diarias['perdidas']} ({(_wr_s):.0f}%)" if _total_s_p > 0 else "sin señales hoy"
+            _pips_p      = estadisticas_diarias.get("pips_ganados", 0) - estadisticas_diarias.get("pips_perdidos", 0)
+            _capital_p   = f"${CAPITAL_USUARIO:,.2f}"
+            start_txt = (
+                f"👑 *PANEL DE CONTROL — PROPIETARIO*\n"
+                f"━━━━━━━━━━━━━━━━\n\n"
+                f"👤 *Emmanuel Diaz* — Fundador & CEO de BuySell365.pro\n\n"
+                f"📊 *ESTADO DEL SISTEMA:*\n"
+                f"   🔍 Scanner: {_scan_icon}\n"
+                f"   💹 MT5: {_mt5_icon}\n"
+                f"   📂 Operaciones: {_ops_icon}\n"
+                f"   💰 Capital: {_capital_p}\n"
+                f"   🎯 Hoy: {_wr_p} | Pips: {_pips_p:+.1f}\n\n"
+                f"🛠️ *CONTROLES DISPONIBLES:*\n"
+                f"   /pausar — Pausar scanner de señales\n"
+                f"   /reanudar — Reanudar scanner\n"
+                f"   /pausarmt5 — Pausar ejecución MT5\n"
+                f"   /reanudarmt5 — Reanudar MT5\n"
+                f"   /reiniciar — Reiniciar proceso completo\n"
+                f"   /apagar — Apagar el bot\n\n"
+                f"📋 *GESTIÓN:*\n"
+                f"   /estado — Estado completo del sistema\n"
+                f"   /senales — Operaciones activas\n"
+                f"   /resumen — Historial del día\n"
+                f"   /capital X — Cambiar capital base\n"
+                f"   /vips — Lista de usuarios VIP\n"
+                f"   /logs — Ver logs del sistema\n\n"
+                f"💬 *Escribe cualquier comando o pregunta*"
+            )
+            start_botones = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⏸️ Pausar Scanner" if not escaneo_pausado else "▶️ Activar Scanner",
+                         "callback_data": "/pausar" if not escaneo_pausado else "/reanudar"},
+                        {"text": "⏸️ Pausar MT5" if not mt5_pausado else "▶️ Activar MT5",
+                         "callback_data": "/pausarmt5" if not mt5_pausado else "/reanudarmt5"},
+                    ],
+                    [
+                        {"text": "🔄 Reiniciar Bot", "callback_data": "/reiniciar"},
+                        {"text": "🔴 Apagar Bot", "callback_data": "/apagar"},
+                    ],
+                    [
+                        {"text": "📊 Estado Sistema", "callback_data": "/estado"},
+                        {"text": "📂 Señales Activas", "callback_data": "/senales"},
+                    ],
+                    [
+                        {"text": "💰 Capital & Stats", "callback_data": "/cuenta"},
+                        {"text": "📋 Resumen del Día", "callback_data": "/resumen"},
+                    ],
+                    [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
+                ]
+            }
+            return start_txt, start_botones
+
         if _es_vip_start:
             start_txt = (
                 f"👋 *Hola {nombre_user}!* Bienvenido de nuevo a *BuySell365.pro* 💎\n"
@@ -14845,7 +14908,24 @@ def loop_polling():
     except Exception as e:
         print(f"⚠️ Error eliminando webhook: {e}")
 
-    # FIX 2026-03-19: Registrar comandos en BotFather para menú de usuario
+    # Actualizar descripción del bot en BotFather (quitar "3 TPs")
+    try:
+        _desc_corta = "Trading con IA — Señales de Oro, Forex, NASDAQ y S&P 500 en tiempo real."
+        _desc_larga = (
+            "Trading con IA — Señales de Oro, Forex, NASDAQ y S&P 500 en tiempo real.\n\n"
+            "Entry, TP y SL exactos.\n"
+            "Copy Trading automático en MT5.\n"
+            "Dashboard en vivo: buysell365.pro"
+        )
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyShortDescription",
+                      json={"short_description": _desc_corta}, timeout=10)
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyDescription",
+                      json={"description": _desc_larga}, timeout=10)
+        print("✅ Descripción del bot actualizada en BotFather.")
+    except Exception as e:
+        print(f"⚠️ Error actualizando descripción: {e}")
+
+    # Registrar comandos en BotFather
     try:
         _cmds = [
             {"command": "start", "description": "Iniciar el bot"},
@@ -14857,8 +14937,8 @@ def loop_polling():
             {"command": "precios", "description": "Precios en tiempo real"},
             {"command": "analisis", "description": "Análisis técnico de un activo"},
             {"command": "sentimiento", "description": "Fear & Greed index"},
-            {"command": "vip", "description": "Acceso VIP premium / $149 USDT"},
-            {"command": "web", "description": "Dashboard web"},
+            {"command": "vip", "description": "Acceso VIP premium"},
+            {"command": "web", "description": "Dashboard web en vivo"},
             {"command": "ayuda", "description": "Lista de comandos"},
         ]
         requests.post(
