@@ -838,26 +838,7 @@ class ManagementConsole:
         if getattr(self, '_closing', False):
             return
         self._closing = True
-
-        # Detener el update loop inmediatamente
         self._update_loop_active = False
-
-        try:
-            if self.bot.is_running:
-                resp = messagebox.askyesnocancel(
-                    "Salir",
-                    "El bot esta ejecutandose.\n\n"
-                    "SI = Detener bot y salir\n"
-                    "NO = Salir sin detener (bot sigue en background)\n"
-                    "CANCELAR = No salir")
-                if resp is None:  # Cancelar
-                    self._closing = False
-                    self._update_loop_active = True
-                    return
-                if resp:  # Si = detener bot
-                    self.bot.stop()
-        except Exception:
-            pass
 
         try:
             if self._tray_icon:
@@ -869,6 +850,10 @@ class ManagementConsole:
             self.root.destroy()
         except Exception:
             pass
+
+        # Forzar salida inmediata — mata todos los hilos sin más diálogos
+        import os as _os
+        _os._exit(0)
 
     # --------------------------------------------------------
     #  ESTADO CACHE
@@ -3863,26 +3848,40 @@ class ManagementConsole:
 #  MAIN ENTRY POINT
 # ============================================================
 def _single_instance_check():
-    """Prevent multiple instances using Windows Mutex (atomic, no race condition)."""
+    """Previene múltiples instancias. Si la instancia anterior murió, libera el mutex y continúa."""
     import ctypes
-    import ctypes.wintypes
+    MUTEX_NAME = "BuySell365_Launcher_Mutex"
     kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-    _launcher_mutex = kernel32.CreateMutexW(None, True, "BuySell365_Launcher_Mutex")
+
+    # Intentar abrir mutex existente para ver si hay alguien vivo
+    SYNCHRONIZE = 0x00100000
+    existing = kernel32.OpenMutexW(SYNCHRONIZE, False, MUTEX_NAME)
+    if existing:
+        # Hay un mutex activo — comprobar si el proceso propietario sigue vivo
+        # buscando la ventana de la consola (si existe, está vivo)
+        import ctypes.wintypes
+        FindWindow = ctypes.windll.user32.FindWindowW
+        hwnd = FindWindow(None, "BuySell365 Pro")
+        kernel32.CloseHandle(existing)
+        if hwnd:
+            # Ventana encontrada → traerla al frente y salir
+            SW_RESTORE = 9
+            ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+            return False
+        # No hay ventana → el proceso anterior murió sin liberar mutex
+        # Forzar creación de nuevo mutex ignorando el existente
+        _log("Mutex huérfano detectado — forzando nueva instancia")
+
+    # Crear mutex como propietario
+    _launcher_mutex = kernel32.CreateMutexW(None, True, MUTEX_NAME)
     last_err = ctypes.get_last_error()
-    if last_err == 183:  # ERROR_ALREADY_EXISTS
+    if last_err == 183:  # ERROR_ALREADY_EXISTS pero no encontramos ventana
         kernel32.CloseHandle(_launcher_mutex)
-        import tkinter as tk
-        from tkinter import messagebox
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showwarning(
-            "BuySell365 Pro",
-            "BuySell365 Pro ya esta ejecutandose.\n\n"
-            "Cierra la instancia actual antes de abrir otra."
-        )
-        root.destroy()
-        return False
-    # Store mutex handle globally so it persists for the process lifetime
+        # Último recurso: continuar de todas formas
+        _log("WARN: mutex existente sin ventana — arrancando de todas formas")
+        _launcher_mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+
     _single_instance_check._mutex_handle = _launcher_mutex
     return True
 
