@@ -485,7 +485,7 @@ _TICKER_TO_YFINANCE = {
     'NQ=F': 'NQ=F', 'ES=F': 'ES=F', 'EURUSD=X': 'EURUSD=X', 'USDJPY=X': 'USDJPY=X', 'GBPJPY=X': 'GBPJPY=X',
 }
 
-# ── CONFIGURACIÓN DE AUTO-TRADING (XM Demo) ─────────────
+# ── CONFIGURACIÓN DE AUTO-TRADING (cuenta real — solo lectura) ────────
 AUTO_TRADING   = os.getenv("AUTO_TRADING", "True").strip().lower() in ("true", "1", "yes")  # Controlado desde .env
 MAX_SL_PIPS    = 500   # Filtro de seguridad: no abrir si el SL es demasiado grande
 
@@ -9937,7 +9937,7 @@ section{{padding:50px 20px}}
         <li data-i18n="pricing.v6">An\u00e1lisis multi-IA exclusivo</li>
         <li data-i18n="pricing.v7">Gr\u00e1ficos de entrada y salida</li>
       </ul>
-      <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Empezar Prueba Gratis</a>
+      <a href="https://t.me/BUYSELL365_PRO_BOT?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
     </div>
     <div class="price-card" style="position:relative;opacity:0.7">
       <div class="price-badge" style="background:linear-gradient(135deg,#ff9800,#f57c00);box-shadow:0 0 16px rgba(255,152,0,.4)">⏳ <span data-i18n="pricing.copy_badge">PROXIMAMENTE</span></div>
@@ -10000,7 +10000,7 @@ section{{padding:50px 20px}}
   <h2>\U0001f680 <span data-i18n="cta.title">Empieza Hoy \u2014 Sin Riesgo</span></h2>
   <p data-i18n="cta.subtitle" data-i18n-days="5">5 d\u00edas h\u00e1biles de prueba gratuita. Sin tarjeta de cr\u00e9dito. Cancela cuando quieras.</p>
   <div class="hero-buttons">
-    <a href="https://t.me/BuySell365_bot?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Activar Trial VIP Gratis</span></a>
+    <a href="https://t.me/BUYSELL365_PRO_BOT?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Suscribirme al VIP</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4ac <span data-i18n="cta.btn_community">Unirse a la Comunidad</span></a>
   </div>
 </section>
