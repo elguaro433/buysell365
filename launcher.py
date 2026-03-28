@@ -647,16 +647,28 @@ class ManagementConsole:
         self.root.minsize(1100, 700)
         self.root.configure(bg=BG_MAIN)
 
-        # Try to set icon (.ico for taskbar, .png for window)
-        try:
-            if os.path.exists(ICO_PATH):
-                self.root.iconbitmap(ICO_PATH)
-            elif os.path.exists(ICON_PATH):
-                icon_img = tk.PhotoImage(file=ICON_PATH)
-                self.root.iconphoto(True, icon_img)
-                self._icon_img = icon_img  # prevent GC
-        except Exception:
-            pass
+        # Icono de ventana y barra de tareas
+        def _set_icon():
+            try:
+                if os.path.exists(ICO_PATH):
+                    self.root.iconbitmap(default=ICO_PATH)
+            except Exception:
+                pass
+            try:
+                if os.path.exists(ICON_PATH):
+                    from PIL import Image, ImageTk
+                    img = Image.open(ICON_PATH).resize((64, 64), Image.LANCZOS)
+                    self._icon_img = ImageTk.PhotoImage(img)
+                    self.root.iconphoto(True, self._icon_img)
+            except Exception:
+                try:
+                    if os.path.exists(ICON_PATH):
+                        tk_img = tk.PhotoImage(file=ICON_PATH)
+                        self.root.iconphoto(True, tk_img)
+                        self._icon_img = tk_img
+                except Exception:
+                    pass
+        self.root.after(100, _set_icon)
 
         # Style
         self._setup_style()
@@ -3885,6 +3897,13 @@ def _single_instance_check():
 
 
 def main():
+    # ── Fijar icono en la barra de tareas de Windows (evita que muestre Python) ──
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("BuySell365.Pro.Launcher")
+    except Exception:
+        pass
+
     if not _single_instance_check():
         return
     _log("=== BuySell365 Pro Launcher iniciando ===")
