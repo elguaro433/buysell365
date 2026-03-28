@@ -8704,7 +8704,6 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     # 🛑 /pausar — Pausa TOTAL: detiene señales y ejecuciones MT5
     if t in ("/pausar", "/pause", "pausar", "pausar todo", "stop trading"):
         if not es_admin: return "⛔ Solo administradores pueden pausar el bot."
-        global mt5_pausado, escaneo_pausado
         mt5_pausado = True
         escaneo_pausado = True
         guardar_estado()
@@ -8730,7 +8729,6 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     # ⏸️ /pausarmt5 — Solo pausa ejecuciones MT5 (scanner sigue activo)
     if t in ("/pausarmt5", "pausarmt5", "pausar mt5", "pausa mt5"):
         if not es_admin: return "⛔ Solo administradores."
-        global mt5_pausado
         mt5_pausado = True
         guardar_estado()
         log_sistema("⏸️ MT5 PAUSADO desde Telegram")
@@ -8758,7 +8756,17 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             if not os.path.isfile(_exe) or not _script or not os.path.isfile(_script):
                 logger.error(f"❌ Reinicio abortado: executable={_exe} script={_script}")
                 return "❌ Reinicio abortado — ruta inválida."
-            os.execv(_exe, [_exe, _script])
+            # Borrar PID file antes de lanzar nuevo proceso (evita bloqueo por instancia doble en Windows)
+            _pid_f = os.path.join(os.path.dirname(_script), ".bot.pid")
+            try:
+                if os.path.exists(_pid_f):
+                    os.remove(_pid_f)
+            except Exception:
+                pass
+            import subprocess
+            subprocess.Popen([_exe, _script], creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0))
+            time.sleep(1)
+            os._exit(0)
         except Exception as e_restart:
             logger.error(f"❌ Error al reiniciar: {e_restart}")
             return f"❌ Error al reiniciar: {e_restart}"

@@ -2354,10 +2354,14 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       html += '<td style="padding:8px;color:var(--muted)">' + (t.fecha || '-') + '</td>';
       html += '<td style="padding:8px;font-weight:600">' + normName(t.nombre || t.ticker || '-') + '</td>';
       html += '<td style="padding:8px">' + tipoIcon + ' ' + (t.tipo || '-') + '</td>';
-      html += '<td style="padding:8px;font-family:monospace">' + (t.entrada ? Number(t.entrada).toFixed(dec) : '-') + '</td>';
-      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_entrada || '-') + '</td>';
-      html += '<td style="padding:8px;font-family:monospace">' + (t.salida ? Number(t.salida).toFixed(dec) : '-') + '</td>';
-      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_salida || '-') + '</td>';
+      const _entrada = t.entrada || t.precio_entrada;
+      const _salida = t.salida || t.precio_salida;
+      const _hora_e = t.hora_entrada || t.hora_entrada || '';
+      const _hora_s = t.hora_salida || t.hora || '';
+      html += '<td style="padding:8px;font-family:monospace">' + (_entrada ? Number(_entrada).toFixed(dec) : '-') + '</td>';
+      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (_hora_e || '-') + '</td>';
+      html += '<td style="padding:8px;font-family:monospace">' + (_salida ? Number(_salida).toFixed(dec) : '-') + '</td>';
+      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (_hora_s || '-') + '</td>';
       // FIX 2026-03-19: Mostrar wins en verde y losses en rojo + score real /5
       const pipsColor = pips >= 0 ? '#00e676' : '#ff3b30';
       const pipsSign = pips >= 0 ? '+' : '';
