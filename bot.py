@@ -17161,10 +17161,21 @@ def _arrancar_interno():
     if _WEB_SYNC_AVAILABLE:
         def _get_web_state():
             """Collect current state for web sync."""
+            # Leer historial_real.json (trades reales MT5) para sincronizar a Render
+            _hist_real_sync = []
+            try:
+                _hr_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
+                if os.path.exists(_hr_path):
+                    import json as _jr
+                    with open(_hr_path, "r", encoding="utf-8") as _hrf:
+                        _hist_real_sync = _jr.load(_hrf)
+            except Exception:
+                pass
             with _lock_ops:
                 return {
                     "operaciones_activas": {k: {kk: vv for kk, vv in v.items() if kk != 'df'} for k, v in operaciones_activas.items() if isinstance(v, dict)},
                     "historial_operaciones": historial_operaciones[-200:],  # Last 200
+                    "historial_real": _hist_real_sync,  # Trades reales MT5 para landing page
                     "estadisticas_diarias": dict(estadisticas_diarias),
                     "winning_trades": _cargar_winning_trades()[-100:],  # Last 100
                     "bot_active": True,

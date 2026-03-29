@@ -366,6 +366,12 @@ def api_sync():
                         "mt5_status", "active_ops_detail"):
                 if key in data:
                     _store[key] = data[key]
+            # historial_real: trades reales MT5 — actualizar si el bot envía datos frescos
+            if "historial_real" in data:
+                global _historial_real
+                incoming_real = data["historial_real"]
+                if isinstance(incoming_real, list) and incoming_real:
+                    _historial_real = incoming_real
             # historial_operaciones: merge (dedupe by id or ticker+fecha+hora)
             if "historial_operaciones" in data:
                 incoming = data["historial_operaciones"]
@@ -660,23 +666,13 @@ def index_web():
         return route_tv_signal()
 
     _track_visitor()
+    # Usar historial_real (trades reales MT5) para stats de landing — NO historial_operaciones
     with _lock:
-        hist = _store.get("historial_operaciones", [])
-    wins = sum(1 for h in hist if h.get('pips', 0) > 0)
+        hist = list(_historial_real) if _historial_real else []
+    wins = sum(1 for h in hist if float(h.get('pips', 0)) > 0)
     total = len(hist)
-    # Win rate real — mínimo 30 señales para mostrar dato fiable
-    # Si hay pocas señales, mostrar tasa histórica del scanner (64.1%)
-    if total >= 30:
-        wr = round(wins / total * 100, 1)
-    elif total > 0:
-        # Combinar datos reales con base histórica para evitar outliers
-        wr = round((wins + 19) / (total + 30) * 100, 1)  # suavizado bayesiano
-    else:
-        wr = 64.1  # tasa base del scanner sin datos
-    pips = round(sum(h.get('pips', 0) for h in hist), 1)
-    # Pips mínimos realistas si el historial es nuevo
-    if pips < 100 and total < 30:
-        pips = max(pips, 0)  # no inflar, pero tampoco negativo
+    wr = round(wins / total * 100, 1) if total > 0 else 0
+    pips = round(sum(float(h.get('pips', 0)) for h in hist), 1)
     n_ops = sum(1 for op in _store.get("operaciones_activas", {}).values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
     activos = _store.get("assets_count", 6)
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
@@ -688,10 +684,10 @@ def index_web():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con Inteligencia Artificial</title>
-<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en +20 activos con IA avanzada y datos institucionales.">
+<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos. An\u00e1lisis con IA avanzada y datos institucionales.">
 <meta name="keywords" content="trading signals, se\u00f1ales trading, inteligencia artificial trading, forex signals, oro trading, NASDAQ signals, copy trading, bot trading, XAU USD, BuySell365">
 <meta property="og:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. Oro, EUR/USD, USD/JPY, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD.">
+<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 + se\u00f1ales de canales afiliados.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -700,7 +696,7 @@ def index_web():
 <meta property="og:site_name" content="BuySell365 Pro">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta name="twitter:description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial. Oro, Forex e \u00cdndices.">
+<meta name="twitter:description" content="Se\u00f1ales de trading con IA. EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos en tiempo real.">
 <meta name="twitter:image" content="https://buysell365.pro/img/og_image.png">
 <meta name="twitter:site" content="@buysell365pro">
 <link rel="canonical" href="https://buysell365.pro">
@@ -1002,7 +998,7 @@ if('serviceWorker' in navigator){{
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-vars='{{"ops":"{n_ops}"}}'>{'Bot activo' if is_alive else 'Dashboard Online'} \u2014 {n_ops} operaciones en vivo</span></div>
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
-    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial. Forex, Oro e \u00cdndices \u2014 m\u00e1s de 20 activos analizados en tiempo real, 24/5.</p>
+    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos \u2014 an\u00e1lisis profesional en tiempo real, 24/5.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f451 Ver Planes y Servicios</a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
@@ -1012,7 +1008,7 @@ if('serviceWorker' in navigator){{
       <div class="stat-item"><div class="stat-value">{wr}%</div><div class="stat-label" data-i18n="stats.winrate">WIN RATE</div></div>
       <div class="stat-item"><div class="stat-value blue">{total}+</div><div class="stat-label" data-i18n="stats.signals">SE\u00d1ALES GENERADAS</div></div>
       <div class="stat-item"><div class="stat-value gold">{pips:+,.0f}</div><div class="stat-label" data-i18n="stats.pips">PIPS ACUMULADOS</div></div>
-      <div class="stat-item"><div class="stat-value purple">24/7</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
+      <div class="stat-item"><div class="stat-value purple">24/5</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
     </div>
   </div>
 </section>
