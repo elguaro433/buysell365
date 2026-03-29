@@ -684,6 +684,8 @@ def index_web():
     total = len(hist)
     wr = round(wins / total * 100, 1) if total > 0 else 0
     pips = round(sum(float(h.get('pips', 0)) for h in hist), 1)
+    _raw_profit = round(sum(float(h.get('profit_mt5', 0) or 0) for h in hist), 2)
+    profit_str = ("+$" if _raw_profit >= 0 else "-$") + f"{abs(_raw_profit):,.2f}"
     n_ops = sum(1 for op in _store.get("operaciones_activas", {}).values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
     activos = _store.get("assets_count", 6)
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
@@ -1105,7 +1107,7 @@ if('serviceWorker' in navigator){{
           <div style="font-size:10px;color:#8b9fc4;margin-top:2px">SE&#209;ALES</div>
         </div>
         <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:800;color:#fbbf24">+$841</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#fbbf24">{profit_str}</div>
           <div style="font-size:10px;color:#8b9fc4;margin-top:2px">BENEFICIO</div>
         </div>
         <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:10px;text-align:center">
@@ -2455,38 +2457,57 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       if(container) container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px;font-size:12px">' + window._t('dash.no_data','Sin datos a\u00fan') + '</p>';
       return;
     }}
+    // Ordenar cronológicamente (más antiguo primero) para el gráfico
+    const chron = trades.slice().sort(function(a,b){{
+      var da = (a.fecha||'').split('/').reverse().join('') + (a.hora||'');
+      var db = (b.fecha||'').split('/').reverse().join('') + (b.hora||'');
+      return da.localeCompare(db);
+    }});
+    // Usar profit_mt5 en USD si disponible, sino pips como fallback
+    const useUSD = chron.some(function(t){{ return t.profit_mt5 && t.profit_mt5 !== 0; }});
     const W = container.clientWidth || 600;
     const H = 160;
-    const pad = {{t:20,r:20,b:30,l:55}};
+    const pad = {{t:20,r:24,b:30,l:62}};
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
     let cumul = [0];
-    trades.forEach(function(t){{ cumul.push(cumul[cumul.length-1] + (t.pips || 0)); }});
+    chron.forEach(function(t){{
+      const val = useUSD ? (parseFloat(t.profit_mt5) || 0) : (t.pips || 0);
+      cumul.push(cumul[cumul.length-1] + val);
+    }});
     const maxY = Math.max.apply(null, cumul);
     const minY = Math.min.apply(null, cumul);
     const rangeY = maxY - minY || 1;
+    const lineColor = cumul[cumul.length-1] >= 0 ? '#00d4aa' : '#ff3b30';
+    const areaColor = cumul[cumul.length-1] >= 0 ? 'rgba(0,212,170,.28)' : 'rgba(255,59,48,.18)';
     function x(i){{ return pad.l + (i / (cumul.length - 1)) * pw; }}
     function y(v){{ return pad.t + ph - ((v - minY) / rangeY) * ph; }}
     let pathD = 'M' + x(0) + ',' + y(cumul[0]);
     for(let i = 1; i < cumul.length; i++) pathD += ' L' + x(i) + ',' + y(cumul[i]);
-    let areaD = pathD + ' L' + x(cumul.length-1) + ',' + (pad.t + ph) + ' L' + x(0) + ',' + (pad.t + ph) + ' Z';
+    let areaD = pathD + ' L' + x(cumul.length-1) + ',' + (pad.t+ph) + ' L' + x(0) + ',' + (pad.t+ph) + ' Z';
     let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:100%">';
+    // Grid lines con etiquetas en USD o pips
     for(let i = 0; i <= 4; i++){{
       const yy = pad.t + (ph / 4) * i;
-      const val = (maxY - (rangeY / 4) * i).toFixed(1);
-      svg += '<line x1="' + pad.l + '" y1="' + yy + '" x2="' + (W - pad.r) + '" y2="' + yy + '" stroke="rgba(30,42,58,.5)" stroke-width="1"/>';
-      svg += '<text x="' + (pad.l - 8) + '" y="' + (yy + 4) + '" fill="#5a6a7a" font-size="10" text-anchor="end" font-family="Inter">' + val + '</text>';
+      const val = maxY - (rangeY / 4) * i;
+      const lbl = useUSD ? (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(0) : val.toFixed(0);
+      svg += '<line x1="' + pad.l + '" y1="' + yy + '" x2="' + (W-pad.r) + '" y2="' + yy + '" stroke="rgba(30,42,58,.5)" stroke-width="1"/>';
+      svg += '<text x="' + (pad.l-6) + '" y="' + (yy+4) + '" fill="#5a6a7a" font-size="9" text-anchor="end" font-family="Inter">' + lbl + '</text>';
     }}
-    svg += '<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,212,170,.3)"/><stop offset="100%" stop-color="rgba(0,212,170,0)"/></linearGradient></defs>';
-    svg += '<path d="' + areaD + '" fill="url(#cg)"/>';
-    svg += '<path d="' + pathD + '" fill="none" stroke="#00d4aa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
-    svg += '<circle cx="' + x(cumul.length-1) + '" cy="' + y(cumul[cumul.length-1]) + '" r="4" fill="#00d4aa" stroke="#080b0f" stroke-width="2"/>';
-    const step = Math.max(1, Math.floor(trades.length / 6));
-    for(let i = 0; i < trades.length; i += step){{
-      const label = trades[i].fecha || (i + 1);
-      svg += '<text x="' + x(i + 1) + '" y="' + (H - 6) + '" fill="#5a6a7a" font-size="9" text-anchor="middle" font-family="Inter">' + label + '</text>';
+    svg += '<defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + areaColor + '"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient></defs>';
+    svg += '<path d="' + areaD + '" fill="url(#cg2)"/>';
+    svg += '<path d="' + pathD + '" fill="none" stroke="' + lineColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    svg += '<circle cx="' + x(cumul.length-1) + '" cy="' + y(cumul[cumul.length-1]) + '" r="4" fill="' + lineColor + '" stroke="#080b0f" stroke-width="2"/>';
+    // Etiquetas de fecha en eje X
+    const step = Math.max(1, Math.floor(chron.length / 6));
+    for(let i = 0; i < chron.length; i += step){{
+      const lbl = (chron[i].fecha||'').substring(0,5);
+      svg += '<text x="' + x(i+1) + '" y="' + (H-6) + '" fill="#5a6a7a" font-size="9" text-anchor="middle" font-family="Inter">' + lbl + '</text>';
     }}
-    svg += '<text x="' + x(cumul.length-1) + '" y="' + (y(cumul[cumul.length-1]) - 8) + '" fill="#00e676" font-size="12" font-weight="700" text-anchor="middle" font-family="Inter">+' + cumul[cumul.length-1].toFixed(1) + '</text>';
+    // Valor final
+    const finalVal = cumul[cumul.length-1];
+    const finalLbl = useUSD ? ((finalVal>=0?'+$':'-$') + Math.abs(finalVal).toFixed(2)) : ((finalVal>=0?'+':'')+finalVal.toFixed(1)+' pips');
+    svg += '<text x="' + x(cumul.length-1) + '" y="' + (y(finalVal)-10) + '" fill="' + lineColor + '" font-size="12" font-weight="700" text-anchor="middle" font-family="Inter">' + finalLbl + '</text>';
     svg += '</svg>';
     container.innerHTML = svg;
   }}
@@ -2639,30 +2660,33 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
   function renderWinRatePeriods(trades){{
     const container = document.getElementById('wr-period-container');
-    if(!container) return;
-    const now = new Date();
-    const todayStr = String(now.getDate()).padStart(2,'0') + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
-    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1); weekStart.setHours(0,0,0,0);
-    if(now.getDay() === 0) weekStart.setDate(weekStart.getDate() - 7);
-    let todayTotal=0,todayWins=0,weekTotal=0,weekWins=0,monthTotal=0,monthWins=0;
+    if(!container || !trades || !trades.length) return;
+    // Usar la última fecha del historial como referencia (no "hoy" del navegador)
+    // para que las tarjetas muestren datos reales aunque el historial no sea de hoy
+    var lastFecha = '';
+    (trades||[]).forEach(function(t){{ if((t.fecha||'') > lastFecha) lastFecha = t.fecha||''; }});
+    var refParts = lastFecha ? lastFecha.split('/') : [];
+    var ref = refParts.length===3 ? new Date(parseInt(refParts[2]),parseInt(refParts[1])-1,parseInt(refParts[0])) : new Date();
+    var todayStr = lastFecha; // última sesión de trading = "hoy"
+    var weekStart = new Date(ref); weekStart.setDate(ref.getDate() - ref.getDay() + 1); weekStart.setHours(0,0,0,0);
+    if(ref.getDay()===0) weekStart.setDate(weekStart.getDate()-7);
+    var refMonth = ref.getMonth()+1; var refYear = ref.getFullYear();
+    var todayLabel = 'Últ. Sesión'; // más honesto que "Hoy"
+    var todayTotal=0,todayWins=0,weekTotal=0,weekWins=0,monthTotal=0,monthWins=0;
     (trades||[]).forEach(function(t){{
-      const f = t.fecha || '';
-      const parts = f.split('/');
-      if(parts.length !== 3) return;
-      const dd=parseInt(parts[0],10),mm=parseInt(parts[1],10),yy=parseInt(parts[2],10);
-      const dt = new Date(yy, mm-1, dd);
-      const isWin = (t.pips||0) > 0;
-      if(f === todayStr){{ todayTotal++; if(isWin) todayWins++; }}
-      if(dt >= weekStart){{ weekTotal++; if(isWin) weekWins++; }}
-      if(mm === (now.getMonth()+1) && yy === now.getFullYear()){{ monthTotal++; if(isWin) monthWins++; }}
+      var f = t.fecha||''; var parts = f.split('/');
+      if(parts.length!==3) return;
+      var dd=parseInt(parts[0],10),mm=parseInt(parts[1],10),yy=parseInt(parts[2],10);
+      var dt = new Date(yy,mm-1,dd);
+      var isWin = (t.pips||0)>0;
+      if(f===todayStr){{ todayTotal++; if(isWin) todayWins++; }}
+      if(dt>=weekStart){{ weekTotal++; if(isWin) weekWins++; }}
+      if(mm===refMonth && yy===refYear){{ monthTotal++; if(isWin) monthWins++; }}
     }});
-    const todayWR = todayTotal > 0 ? Math.round(todayWins/todayTotal*100) : 0;
-    const weekWR = weekTotal > 0 ? Math.round(weekWins/weekTotal*100) : 0;
-    const monthWR = monthTotal > 0 ? Math.round(monthWins/monthTotal*100) : 0;
-    function getColor(wr,total){{ return wr >= 60 ? '#00d4aa' : (wr >= 45 ? '#f0b90b' : (total > 0 ? '#ff3b30' : '#5a6a7a')); }}
-    const todayColor = getColor(todayWR,todayTotal);
-    const weekColor = getColor(weekWR,weekTotal);
-    const monthColor = getColor(monthWR,monthTotal);
+    var todayWR = todayTotal>0 ? Math.round(todayWins/todayTotal*100) : 0;
+    var weekWR  = weekTotal>0  ? Math.round(weekWins/weekTotal*100)   : 0;
+    var monthWR = monthTotal>0 ? Math.round(monthWins/monthTotal*100) : 0;
+    function getColor(wr,total){{ return wr>=60?'#00d4aa':(wr>=45?'#f0b90b':(total>0?'#ff3b30':'#5a6a7a')); }}
     function card(label,wr,wins,total,color){{
       return '<div class="wr-period-card" style="border-top:2px solid '+color+'">' +
         '<div class="wr-period-label">'+label+'</div>' +
@@ -2670,9 +2694,10 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         '<div class="wr-period-detail">'+wins+'W / '+(total-wins)+'L de '+total+'</div>' +
         '<div class="wr-period-bar"><div class="wr-period-fill" style="width:'+wr+'%;background:'+color+'"></div></div></div>';
     }}
-    container.innerHTML = card(window._t('dash.today','Hoy'),todayWR,todayWins,todayTotal,todayColor) +
-      card(window._t('dash.this_week','Esta Semana'),weekWR,weekWins,weekTotal,weekColor) +
-      card(window._t('dash.this_month','Este Mes'),monthWR,monthWins,monthTotal,monthColor);
+    container.innerHTML =
+      card(todayLabel, todayWR, todayWins, todayTotal, getColor(todayWR,todayTotal)) +
+      card(window._t('dash.this_week','Esta Semana'), weekWR, weekWins, weekTotal, getColor(weekWR,weekTotal)) +
+      card(window._t('dash.this_month','Este Mes'), monthWR, monthWins, monthTotal, getColor(monthWR,monthTotal));
   }}
 
   window._goToPage = function(page){{
