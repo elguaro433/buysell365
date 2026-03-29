@@ -680,7 +680,33 @@ def index_web():
     _html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
-<!-- Google Analytics --><script async src="https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','G-L514BL7E83');</script>
+<!-- Cookie Consent + Conditional Analytics -->
+<script>
+(function(){{
+  var c=localStorage.getItem('bs365_consent');
+  function _loadGA(){{
+    if(window._ga_loaded) return; window._ga_loaded=true;
+    var s=document.createElement('script'); s.async=true;
+    s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';
+    document.head.appendChild(s);
+    window.dataLayer=window.dataLayer||[];
+    window.gtag=function(){{dataLayer.push(arguments);}};
+    gtag('js',new Date()); gtag('config','G-L514BL7E83');
+  }}
+  if(c==='accepted') _loadGA();
+  window._acceptCookies=function(){{
+    localStorage.setItem('bs365_consent','accepted');
+    var b=document.getElementById('bs365-cb'); if(b) b.remove(); _loadGA();
+  }};
+  window._declineCookies=function(){{
+    localStorage.setItem('bs365_consent','declined');
+    var b=document.getElementById('bs365-cb'); if(b) b.remove();
+  }};
+  if(!c) document.addEventListener('DOMContentLoaded',function(){{
+    var el=document.getElementById('bs365-cb'); if(el) el.style.display='flex';
+  }});
+}})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con Inteligencia Artificial</title>
@@ -1136,6 +1162,7 @@ if('serviceWorker' in navigator){{
     &#128640; Abrir Cuenta Real &mdash; Gratis
   </a>
   <div class="xm-section-note">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
+  <div style="font-size:11px;color:rgba(139,159,180,.45);margin-top:8px">&#128276; Divulgación de afiliado: BuySell365 Pro es afiliado de XM y puede recibir comisión si abres una cuenta a través de nuestros enlaces. Esto no afecta el coste para ti ni nuestra opinión sobre el broker.</div>
 </section>
 
 <!-- HOW IT WORKS -->
@@ -1702,6 +1729,17 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){{
 }})();
 </script>
 
+<!-- GDPR Cookie Consent Banner -->
+<div id="bs365-cb" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#0d1117;border-top:2px solid #00e5c5;padding:16px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 30px rgba(0,0,0,.8)">
+  <div style="flex:1;min-width:240px">
+    <p style="margin:0 0 4px;font-weight:700;color:#f0f6ff;font-size:.95rem">🍪 Usamos cookies</p>
+    <p style="margin:0;color:#8b9fc4;font-size:.82rem">Usamos Google Analytics para mejorar la experiencia. No vendemos datos personales. <a href="/privacidad" style="color:#00e5c5;text-decoration:underline">Política de privacidad</a></p>
+  </div>
+  <div style="display:flex;gap:10px;flex-shrink:0;margin-top:4px">
+    <button onclick="_declineCookies()" style="padding:10px 18px;border-radius:8px;border:1px solid #2a3045;background:transparent;color:#8b9fc4;cursor:pointer;font-size:.85rem;font-family:inherit">Solo esenciales</button>
+    <button onclick="_acceptCookies()" style="padding:10px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5c5,#00a89d);color:#000;font-weight:800;cursor:pointer;font-size:.85rem;font-family:inherit">✓ Aceptar todo</button>
+  </div>
+</div>
 </body>
 </html>"""
     _resp = make_response(_html)
@@ -1807,7 +1845,33 @@ def dashboard_visual():
     _dash_html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
-<!-- Google Analytics --><script async src="https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','G-L514BL7E83');</script>
+<!-- Cookie Consent + Conditional Analytics -->
+<script>
+(function(){{
+  var c=localStorage.getItem('bs365_consent');
+  function _loadGA(){{
+    if(window._ga_loaded) return; window._ga_loaded=true;
+    var s=document.createElement('script'); s.async=true;
+    s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';
+    document.head.appendChild(s);
+    window.dataLayer=window.dataLayer||[];
+    window.gtag=function(){{dataLayer.push(arguments);}};
+    gtag('js',new Date()); gtag('config','G-L514BL7E83');
+  }}
+  if(c==='accepted') _loadGA();
+  window._acceptCookies=function(){{
+    localStorage.setItem('bs365_consent','accepted');
+    var b=document.getElementById('bs365-cb'); if(b) b.remove(); _loadGA();
+  }};
+  window._declineCookies=function(){{
+    localStorage.setItem('bs365_consent','declined');
+    var b=document.getElementById('bs365-cb'); if(b) b.remove();
+  }};
+  if(!c) document.addEventListener('DOMContentLoaded',function(){{
+    var el=document.getElementById('bs365-cb'); if(el) el.style.display='flex';
+  }});
+}})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro | Rendimiento en Vivo</title>
@@ -2424,7 +2488,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     html += '<thead><tr style="border-bottom:2px solid var(--border);color:var(--primary);text-align:left">';
     html += '<th style="padding:10px 8px">Fecha</th><th style="padding:10px 8px">Activo</th><th style="padding:10px 8px">Tipo</th>';
     html += '<th style="padding:10px 8px">Entrada</th><th style="padding:10px 6px">Hora</th><th style="padding:10px 8px">Salida</th>';
-    html += '<th style="padding:10px 6px">Hora</th><th style="padding:10px 8px">Pips/Pts</th><th style="padding:10px 8px">Score</th>';
+    html += '<th style="padding:10px 6px">Hora</th><th style="padding:10px 8px">Pips/Pts</th>';
     html += '</tr></thead><tbody>';
     pageData.forEach(function(t, i){{
       // FIX 2026-03-19: Fondo rojo sutil para losses
@@ -2451,7 +2515,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       const pipsColor = pips >= 0 ? '#00e676' : '#ff3b30';
       const pipsSign = pips >= 0 ? '+' : '';
       html += '<td style="padding:8px;color:' + pipsColor + ';font-weight:700">' + pipsSign + pips.toFixed(1) + ' ' + unit + '</td>';
-      html += '<td style="padding:8px;color:var(--primary)">' + (t.score != null ? t.score : '-') + '/5</td>';
       html += '</tr>';
     }});
     html += '</tbody></table>';
@@ -2551,7 +2614,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     const visibleCSV = datFilteredCSV.filter(function(t){{ return !_hiddenCSV[normName(t.nombre || t.ticker || '?')]; }});
     const filteredCSV = currentFilter === 'ALL' ? visibleCSV : visibleCSV.filter(function(t){{ return normName(t.nombre || t.ticker) === currentFilter; }});
     if(!filteredCSV.length){{ alert('No hay operaciones para exportar.'); return; }}
-    const csvHeaders = ['Fecha','Activo','Tipo','Entrada','Hora Entrada','Salida','Hora Salida','Pips/Pts','Score'];
+    const csvHeaders = ['Fecha','Activo','Tipo','Entrada','Hora Entrada','Salida','Hora Salida','Pips/Pts'];
     const csvRows = filteredCSV.slice().reverse().map(function(t){{
       const tkrCSV = (t.ticker || '').toUpperCase();
       const decCSV = getDec(tkrCSV);
@@ -2563,8 +2626,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         t.hora_entrada || '',
         t.salida ? Number(t.salida).toFixed(decCSV) : '',
         t.hora_salida || '',
-        (t.pips || 0).toFixed(1),
-        t.score != null ? Math.min(t.score * 2, 10) : ''
+        (t.pips || 0).toFixed(1)
       ];
       return rowArr.map(function(v){{ return '"' + String(v).replace(/"/g,'""') + '"'; }}).join(',');
     }});
@@ -2667,8 +2729,46 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         &#128640; Abrir Cuenta Real &mdash; Gratis
     </a>
     <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px">Trading implica riesgo. Capital en riesgo.</div>
+    <div style="font-size:10px;color:rgba(139,148,158,.35);margin-top:6px">&#128276; Enlace de afiliado: podemos recibir comisión si abres una cuenta en XM a través de este enlace.</div>
 </div>
 
+<!-- GDPR Cookie Consent Banner -->
+<div id="bs365-cb" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#0d1117;border-top:2px solid #00e5c5;padding:16px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 30px rgba(0,0,0,.8)">
+  <div style="flex:1;min-width:240px">
+    <p style="margin:0 0 4px;font-weight:700;color:#f0f6ff;font-size:.95rem">🍪 Usamos cookies</p>
+    <p style="margin:0;color:#8b9fc4;font-size:.82rem">Usamos Google Analytics para mejorar la experiencia. No vendemos datos personales. <a href="/privacidad" style="color:#00e5c5;text-decoration:underline">Política de privacidad</a></p>
+  </div>
+  <div style="display:flex;gap:10px;flex-shrink:0;margin-top:4px">
+    <button onclick="_declineCookies()" style="padding:10px 18px;border-radius:8px;border:1px solid #2a3045;background:transparent;color:#8b9fc4;cursor:pointer;font-size:.85rem;font-family:inherit">Solo esenciales</button>
+    <button onclick="_acceptCookies()" style="padding:10px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5c5,#00a89d);color:#000;font-weight:800;cursor:pointer;font-size:.85rem;font-family:inherit">✓ Aceptar todo</button>
+  </div>
+</div>
+<script>
+(function(){{
+  var c=localStorage.getItem('bs365_consent');
+  function _loadGA(){{
+    if(window._ga_loaded) return; window._ga_loaded=true;
+    var s=document.createElement('script'); s.async=true;
+    s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';
+    document.head.appendChild(s);
+    window.dataLayer=window.dataLayer||[];
+    window.gtag=function(){{dataLayer.push(arguments);}};
+    gtag('js',new Date()); gtag('config','G-L514BL7E83');
+  }}
+  if(c==='accepted') _loadGA();
+  window._acceptCookies=function(){{
+    localStorage.setItem('bs365_consent','accepted');
+    var b=document.getElementById('bs365-cb'); if(b) b.remove(); _loadGA();
+  }};
+  window._declineCookies=function(){{
+    localStorage.setItem('bs365_consent','declined');
+    var b=document.getElementById('bs365-cb'); if(b) b.remove();
+  }};
+  if(!c) document.addEventListener('DOMContentLoaded',function(){{
+    var el=document.getElementById('bs365-cb'); if(el) el.style.display='flex';
+  }});
+}})();
+</script>
 </body>
 </html>"""
     _dash_resp = make_response(_dash_html)
@@ -2682,7 +2782,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 @app.route("/terminos")
 def pagina_terminos():
     return f"""<!DOCTYPE html>
-<html lang="es"><head><!-- Google Analytics --><script async src="https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','G-L514BL7E83');</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="es"><head><script>(function(){{var c=localStorage.getItem('bs365_consent');function _loadGA(){{if(window._ga_loaded)return;window._ga_loaded=true;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){{dataLayer.push(arguments);}};gtag('js',new Date());gtag('config','G-L514BL7E83');}}if(c==='accepted')_loadGA();}})();</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>T&eacute;rminos y Condiciones — BuySell365 Pro</title>
 <style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:'Inter',sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.7;padding:20px}}.container{{max-width:800px;margin:0 auto}}h1{{color:#f0b90b;font-size:1.8rem;margin-bottom:10px}}h2{{color:#58a6ff;font-size:1.2rem;margin-top:25px;margin-bottom:8px}}p,li{{font-size:0.95rem;margin-bottom:8px}}ul{{padding-left:20px}}.date{{color:#8b949e;font-size:0.85rem;margin-bottom:20px}}a{{color:#58a6ff}}.back{{display:inline-block;margin-top:30px;padding:10px 20px;background:#f0b90b;color:#000;border-radius:8px;text-decoration:none;font-weight:bold}}</style></head>
 <body><div class="container">
@@ -2701,7 +2801,7 @@ def pagina_terminos():
 @app.route("/privacidad")
 def pagina_privacidad():
     return """<!DOCTYPE html>
-<html lang="es"><head><!-- Google Analytics --><script async src="https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-L514BL7E83');</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="es"><head><script>(function(){var c=localStorage.getItem('bs365_consent');function _loadGA(){if(window._ga_loaded)return;window._ga_loaded=true;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){dataLayer.push(arguments);};gtag('js',new Date());gtag('config','G-L514BL7E83');}if(c==='accepted')_loadGA();})();</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pol&iacute;tica de Privacidad — BuySell365 Pro</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.7;padding:20px}.container{max-width:800px;margin:0 auto}h1{color:#f0b90b;font-size:1.8rem;margin-bottom:10px}h2{color:#58a6ff;font-size:1.2rem;margin-top:25px;margin-bottom:8px}p,li{font-size:0.95rem;margin-bottom:8px}ul{padding-left:20px}.date{color:#8b949e;font-size:0.85rem;margin-bottom:20px}a{color:#58a6ff}.back{display:inline-block;margin-top:30px;padding:10px 20px;background:#f0b90b;color:#000;border-radius:8px;text-decoration:none;font-weight:bold}</style></head>
 <body><div class="container">
