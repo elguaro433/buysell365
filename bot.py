@@ -8540,6 +8540,35 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return ("▶️ *MT5 REACTIVADO*\n\n"
                 "Las ejecuciones automáticas en MT5 están activas nuevamente.")
 
+    if t in ("/panel_grupo", "panel grupo", "publicar panel grupo"):
+        if not es_admin: return "⛔ Solo administradores."
+        panel_txt = (
+            "🤖 *BuySell365 Pro — Señales de Trading con IA*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "📡 *Activos disponibles:*\n"
+            "EUR/USD · GBP/USD · GBP/JPY · USD/JPY\n"
+            "NASDAQ · S&P 500 · DOW JONES · DAX\n"
+            "ORO (XAU/USD) · PETROLEO · BTC · ETH y muchos mas...\n\n"
+            "✅ Señales con Entry, Stop Loss y Take Profit exactos.\n"
+            "🔒 Este grupo es solo lectura.\n"
+            "💬 Para analisis, señales y soporte escribe al bot:"
+        )
+        panel_botones = {
+            "inline_keyboard": [
+                [{"text": "💬 Hablar con el Bot", "url": "https://t.me/Andoperandobot?start=grupo"}],
+                [{"text": "🔍 Análisis de Mercado", "callback_data": "/analisis_eurusd"},
+                 {"text": "💎 Ver Planes VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                 {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
+            ]
+        }
+        mid = enviar_telegram(panel_txt, GROUP_ID, teclado=panel_botones)
+        if mid:
+            pin_message(GROUP_ID, mid)
+            return "✅ Panel publicado y fijado en el grupo."
+        return "❌ Error al publicar. ¿Está el bot en el grupo?"
+
     if t in ("/reiniciar", "reiniciar bot", "reiniciar proceso", "restart", "reboot"):
         if not es_admin: return "⛔ Solo administradores pueden reiniciar el proceso del bot."
         enviar_telegram("🔄 *Reiniciando proceso del bot...*", remitente)
