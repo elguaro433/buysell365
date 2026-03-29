@@ -290,7 +290,7 @@ def _check_api_auth():
     return hmac.compare_digest(str(key), str(API_SECRET_KEY))
 
 def _ahora():
-    """Current time in Andorra timezone."""
+    """Current time in CET timezone."""
     import pytz
     return datetime.now(pytz.timezone('Europe/Andorra'))
 
