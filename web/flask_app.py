@@ -2169,6 +2169,25 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         <div class="asset-grid">{asset_cards_html}</div>
     </div>
 
+    <!-- XM BROKER SECTION -->
+    <div class="xm-broker-strip" style="margin-bottom:24px">
+        <div class="xm-logo">XM</div>
+        <div style="font-size:14px;color:#e6edf3;font-weight:600;margin-bottom:4px" data-i18n="xm.title">Broker Recomendado</div>
+        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="xm.sub">El broker que usa BuySell365 Pro</div>
+        <div class="xm-pills">
+            <span class="xm-pill">&#10003; Regulado CySEC &middot; ASIC</span>
+            <span class="xm-pill">&#128176; Dep&oacute;sito desde $5</span>
+            <span class="xm-pill">&#9889; Sin re-quotes</span>
+            <span class="xm-pill">&#128241; App iOS &amp; Android</span>
+        </div>
+        <div class="xm-code" data-i18n="xm.code">Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b></div><br>
+        <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-cta">
+            &#128640; Abrir Cuenta Real &mdash; Gratis
+        </a>
+        <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px">Trading implica riesgo. Capital en riesgo.</div>
+        <div style="font-size:10px;color:rgba(139,148,158,.35);margin-top:6px">&#128276; Enlace de afiliado: podemos recibir comisi&oacute;n si abres una cuenta en XM a trav&eacute;s de este enlace.</div>
+    </div>
+
     <!-- FOOTER -->
     <div class="footer">
         <p>&#169; 2026 BuySell365 Pro &mdash; <span data-i18n="dash.footer_created">Creado por</span> <strong>Emmanuel D&iacute;az</strong> | <span data-i18n="dash.footer_refresh">Auto-refresh cada 30s</span></p>
@@ -2712,25 +2731,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
   setInterval(pollActiveOpsNotif, 15000);
 }})();
 </script>
-
-<!-- XM BROKER SECTION -->
-<div class="xm-broker-strip">
-    <div class="xm-logo">XM</div>
-    <div style="font-size:14px;color:#e6edf3;font-weight:600;margin-bottom:4px" data-i18n="xm.title">Broker Recomendado</div>
-    <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="xm.sub">El broker que usa BuySell365 Pro</div>
-    <div class="xm-pills">
-        <span class="xm-pill">&#10003; Regulado CySEC &middot; ASIC</span>
-        <span class="xm-pill">&#128176; Dep&oacute;sito desde $5</span>
-        <span class="xm-pill">&#9889; Sin re-quotes</span>
-        <span class="xm-pill">&#128241; App iOS &amp; Android</span>
-    </div>
-    <div class="xm-code" data-i18n="xm.code">Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b></div><br>
-    <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-cta">
-        &#128640; Abrir Cuenta Real &mdash; Gratis
-    </a>
-    <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px">Trading implica riesgo. Capital en riesgo.</div>
-    <div style="font-size:10px;color:rgba(139,148,158,.35);margin-top:6px">&#128276; Enlace de afiliado: podemos recibir comisión si abres una cuenta en XM a través de este enlace.</div>
-</div>
 
 <!-- GDPR Cookie Consent Banner -->
 <div id="bs365-cb" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#0d1117;border-top:2px solid #00e5c5;padding:16px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 30px rgba(0,0,0,.8)">
