@@ -16445,15 +16445,15 @@ _SIGNAL_SOURCE_IDS: set = set()
 # ============================================================
 
 PAR_PROFILES = {
-    # ━━━━ EURUSD — Multi-TF mean reversion scalp + premium breakout ━━━━
+    # ━━━━ EURUSD — London + NY session (07:00-21:00 UTC), tendencia ambas direcciones ━━━━
     "EURUSD": {
         "identity": {"mt5": "EURUSD", "yf": "EURUSD=X", "display": "EUR/USD", "category": "forex", "currencies": ["EUR", "USD"], "pip_size": 0.0001},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.0002, "vol_breakout": 1.0, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.0002, "vol_breakout": 0.8, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 50},
         "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.5, "tp2_mult": 3.2, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 0.00150},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
-        "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+        "time_filter": {"best_hours_utc": [(7, 21)], "peak_hours_utc": [(8, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
     # ━━━━ GOLD — Momentum breakout, London open ━━━━
     "GOLD": {
@@ -16476,25 +16476,25 @@ PAR_PROFILES = {
         "news": {"currencies": ["USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
-    # ━━━━ US500 (S&P 500) — Mean reversion + momentum, solo premium ━━━━
+    # ━━━━ US500 (S&P 500) — NYSE session 13:00-21:00 UTC, tendencia ambas direcciones ━━━━
     "US500Cash": {
         "identity": {"mt5": "US500Cash", "yf": "ES=F", "display": "S&P 500", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 40, "rsi_ob": 60, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.5, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.7, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 300},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 8.0},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
-        "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+        "time_filter": {"best_hours_utc": [(13, 21)], "peak_hours_utc": [(13, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "news": {"currencies": ["USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
-    # ━━━━ USDJPY — Carry trade + trend following, Tokyo + NY ━━━━
+    # ━━━━ USDJPY — DESACTIVADO (WR 46% en 50 ops — no rentable) ━━━━
     "USDJPY": {
         "identity": {"mt5": "USDJPY", "yf": "USDJPY=X", "display": "USD/JPY", "category": "forex", "currencies": ["USD", "JPY"], "pip_size": 0.01},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 13, "bb_squeeze": 0.006, "min_atr": 0.003, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": 60, "rsi_gate_sell": 40, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": False},
         "risk": {"risk_pct": 0.01, "max_sl_pips": 80},
         "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
         "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": True, "max_positions": 0, "cooldown_minutes": 60},
     },
     # ━━━━ GBPJPY — "The Beast", London breakout, alta volatilidad ━━━━
     "GBPJPY": {
