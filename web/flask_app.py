@@ -987,31 +987,54 @@ section{{padding:60px 20px}}
   .nav-logo img{{width:48px;height:48px;min-width:48px;min-height:48px;display:block!important;visibility:visible!important}}
   .nav-links{{display:none}}
   .hamburger{{display:block}}
-  .stats-bar{{gap:20px;flex-wrap:wrap;justify-content:center}}
+  .xm-nav-btn{{display:none}}
+  .stats-bar{{gap:16px;flex-wrap:wrap;justify-content:center;padding:18px 14px}}
   .stat-value{{font-size:1.5rem}}
-  .hero h1{{font-size:2.2rem}}
-  .hero p{{font-size:.9rem;padding:0 10px}}
+  .hero{{padding:80px 12px 30px}}
+  .hero h1{{font-size:2rem}}
+  .hero p{{font-size:.9rem;padding:0 8px}}
   .hero-buttons{{flex-direction:column;gap:10px;align-items:center}}
+  .hero-buttons .btn{{width:100%;max-width:320px;justify-content:center}}
   .section-title h2{{font-size:1.5rem}}
   .features-grid{{grid-template-columns:1fr!important}}
   .about-grid{{grid-template-columns:1fr}}
-  .assets-grid .asset-card{{width:140px}}
-  .pricing-cards{{grid-template-columns:1fr!important}}
+  .assets-grid{{gap:10px}}
+  .assets-grid .asset-card{{width:calc(50% - 8px);min-width:0}}
+  .pricing-cards{{grid-template-columns:1fr!important;gap:20px}}
+  .price-card.featured{{transform:none!important}}
+  .price-card{{padding:36px 24px}}
+  .price-amount{{font-size:2.8rem}}
   .cta h2{{font-size:1.5rem}}
   .cta .hero-buttons{{flex-direction:column;gap:10px}}
   .footer-links{{gap:12px}}
   .float-telegram{{bottom:16px;right:16px;width:50px;height:50px}}
   .back-to-top{{bottom:76px;right:20px;width:38px;height:38px}}
+  .xm-section{{padding:40px 16px}}
+  .xm-section-logo{{font-size:36px;letter-spacing:4px}}
+  .xm-bonus-badge{{padding:12px 16px;margin:0 8px 20px}}
+  .xm-bonus-text{{font-size:20px}}
+  .xm-section-cta{{padding:14px 24px;font-size:14px}}
+  section{{padding:40px 12px}}
+  .pricing{{padding:50px 12px!important}}
+  /* Hero mockup: ocultar tabla en móvil, mostrar solo stats grid */
+  .hero-mockup-table{{display:none!important}}
+  .hero-mockup-grid{{grid-template-columns:repeat(2,1fr)!important}}
 }}
 @media(max-width:480px){{
   .hero h1{{font-size:1.6rem}}
-  .stats-bar .stat{{min-width:auto}}
+  .hero p{{font-size:.85rem}}
+  .stats-bar{{gap:10px;padding:14px 10px}}
   .stat-value{{font-size:1.2rem}}
-  .stat-label{{font-size:.6rem}}
-  .assets-grid .asset-card{{width:120px;padding:16px 10px}}
-  .asset-icon svg{{width:44px;height:44px}}
+  .stat-label{{font-size:.6rem;letter-spacing:.8px}}
+  .assets-grid .asset-card{{width:calc(50% - 6px);padding:14px 8px}}
+  .asset-icon svg{{width:28px;height:28px}}
   .asset-name{{font-size:.8rem}}
   .asset-tag{{font-size:.65rem}}
+  .faq-q{{padding:16px 18px;font-size:.88rem}}
+  .price-card{{padding:28px 18px}}
+  .xm-section-pills{{gap:6px}}
+  .xm-section-pill{{font-size:10px;padding:4px 10px}}
+  .promo-features{{gap:8px}}
 }}
 </style>
 <script>
@@ -1094,10 +1117,10 @@ if('serviceWorker' in navigator){{
         <div style="width:10px;height:10px;border-radius:50%;background:#ff5f57"></div>
         <div style="width:10px;height:10px;border-radius:50%;background:#febc2e"></div>
         <div style="width:10px;height:10px;border-radius:50%;background:#28c840"></div>
-        <span style="margin-left:8px;font-size:11px;color:#8b9fc4;font-family:monospace">buysell365.pro/dashboard — Trading en Vivo</span>
+        <span style="margin-left:8px;font-size:11px;color:#8b9fc4;font-family:monospace">buysell365.pro/dashboard</span>
         <span style="margin-left:auto;font-size:11px;color:#00ffc8">&#9679; BOT ACTIVO</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+      <div class="hero-mockup-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
         <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);border-radius:10px;padding:10px;text-align:center">
           <div style="font-size:1.4rem;font-weight:800;color:#00ffc8">{wr}%</div>
           <div style="font-size:10px;color:#8b9fc4;margin-top:2px">WIN RATE</div>
@@ -1115,7 +1138,7 @@ if('serviceWorker' in navigator){{
           <div style="font-size:10px;color:#8b9fc4;margin-top:2px">ACTIVO</div>
         </div>
       </div>
-      <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <table class="hero-mockup-table" style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="color:#8b9fc4;border-bottom:1px solid rgba(255,255,255,.05)">
           <td style="padding:5px 8px">Fecha</td><td style="padding:5px 8px">Activo</td>
           <td style="padding:5px 8px">Tipo</td><td style="padding:5px 8px">Entrada</td>
@@ -2039,19 +2062,47 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     .asset-grid{{grid-template-columns:repeat(4,1fr)}}
 }}
 @media(max-width:768px){{
+    .wrap{{padding:14px}}
     .stats-row{{grid-template-columns:repeat(2,1fr)}}
     .two-col{{grid-template-columns:1fr}}
     .asset-grid{{grid-template-columns:repeat(3,1fr)}}
-    .hdr{{flex-direction:column;gap:12px;text-align:center}}
-    .promo-features{{flex-direction:column;align-items:center;gap:10px}}
+    .hdr{{flex-direction:column;gap:10px;text-align:center;padding:14px 0 16px}}
+    .hdr-left a{{justify-content:center}}
+    .hdr > div:last-child{{flex-wrap:wrap;justify-content:center;gap:8px}}
+    .live-badge{{font-size:11px;padding:5px 10px}}
+    .promo-features{{flex-direction:column;align-items:center;gap:8px}}
     .stat-value{{font-size:24px}}
+    .wr-period-row{{grid-template-columns:repeat(3,1fr);gap:8px}}
+    .wr-period-val{{font-size:22px}}
+    .streak-banner{{gap:10px;padding:12px 14px}}
+    .streak-number{{font-size:28px}}
+    .filter-bar{{gap:4px}}
+    .filter-btn{{padding:4px 10px;font-size:11px}}
+    .date-filter-btn{{padding:4px 10px;font-size:11px}}
+    .xm-broker-strip{{padding:20px 14px}}
+    .card{{padding:16px}}
+    #winning-trades-container table{{min-width:560px}}
 }}
 @media(max-width:480px){{
-    .wrap{{padding:12px}}
+    .wrap{{padding:10px}}
     .stats-row{{grid-template-columns:1fr 1fr}}
+    .stat-card{{padding:14px}}
+    .stat-value{{font-size:20px}}
     .asset-grid{{grid-template-columns:repeat(2,1fr)}}
-    .card{{padding:16px}}
-    .hdr-logo{{width:56px;height:56px}}
+    .card{{padding:12px}}
+    .hdr-logo{{width:44px;height:44px}}
+    .brand{{font-size:18px}}
+    .wr-period-row{{grid-template-columns:1fr;gap:8px}}
+    .wr-period-val{{font-size:28px}}
+    .cumul-chart-wrap{{height:130px}}
+    .promo{{padding:20px 14px}}
+    .promo h2{{font-size:16px}}
+    .promo p{{font-size:12px}}
+    .xm-logo{{font-size:22px}}
+    .xm-pills{{gap:4px}}
+    .xm-pill{{font-size:10px;padding:3px 8px}}
+    .streak-number{{font-size:24px}}
+    .bell-btn{{padding:4px 8px;font-size:16px}}
 }}
 .date-filter-bar{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}}
 .date-filter-btn{{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid var(--border);background:var(--panel2);color:var(--muted)}}
@@ -2954,12 +3005,34 @@ a{{color:var(--green);text-decoration:none}}
 /* FOOTER */
 .foot{{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:.8rem;color:var(--muted);margin-top:20px}}
 .foot a{{color:var(--green);margin:0 8px}}
-@media(max-width:600px){{
+/* ABOUT HAMBURGER */
+.about-ham{{display:none;background:none;border:none;cursor:pointer;padding:6px;flex-direction:column;gap:5px}}
+.about-ham span{{display:block;width:22px;height:2px;background:#fff;border-radius:2px;transition:all .3s}}
+.about-mobile-menu{{display:none;position:fixed;inset:0;background:rgba(7,9,31,.97);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:20px;backdrop-filter:blur(16px)}}
+.about-mobile-menu.open{{display:flex}}
+.about-mobile-menu a{{color:#fff;font-size:1.3rem;font-weight:600;padding:10px 28px;border-radius:10px;text-decoration:none;transition:all .2s}}
+.about-mobile-menu a:hover{{background:rgba(0,212,170,.15);color:var(--green)}}
+.about-mobile-close{{position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;padding:8px;line-height:1}}
+@media(max-width:640px){{
   .nav{{padding:12px 16px}}
+  .nav-links{{display:none}}
+  .about-ham{{display:flex}}
   .about-hero{{padding:60px 16px 40px}}
-  .astat{{min-width:130px;padding:16px 20px}}
+  .about-hero h1{{font-size:1.8rem}}
+  .about-hero p{{font-size:.95rem}}
+  .about-stats{{gap:12px;padding:0 12px}}
+  .astat{{min-width:calc(50% - 8px);padding:16px 14px}}
   .astat-val{{font-size:1.5rem}}
-  .about-cta{{padding:32px 20px}}
+  .about-section{{padding:28px 16px}}
+  .about-section h2{{font-size:1.3rem}}
+  .about-cta{{padding:28px 16px;margin:0 12px 40px}}
+  .about-cta h2{{font-size:1.4rem}}
+  .btn-row{{flex-direction:column;align-items:center}}
+  .btn-p,.btn-s{{width:100%;max-width:300px;text-align:center}}
+  .timeline{{padding-left:20px}}
+  .tl-dot{{left:-29px;width:14px;height:14px}}
+  .value-cards{{grid-template-columns:1fr 1fr;gap:12px}}
+  .vcard{{padding:18px}}
 }}
 </style>
 </head>
@@ -2975,7 +3048,17 @@ a{{color:var(--green);text-decoration:none}}
     <a href="/about" style="color:var(--green)">Qui\u00e9nes Somos</a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank">Telegram</a>
   </div>
+  <button class="about-ham" id="aboutHam" onclick="document.getElementById('aboutMobileMenu').classList.toggle('open');this.style.display='none'" aria-label="Men\u00fa">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="about-mobile-menu" id="aboutMobileMenu">
+  <button class="about-mobile-close" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''">&times;</button>
+  <a href="/" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''">&#127968; Inicio</a>
+  <a href="/dashboard" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')">&#128200; Dashboard</a>
+  <a href="/about" style="color:var(--green)" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')">&#128101; Qui\u00e9nes Somos</a>
+  <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="background:linear-gradient(135deg,#00d4aa,#00b894);color:#0a0e17;font-weight:700">&#128172; Telegram</a>
+</div>
 
 <section class="about-hero">
   <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px">&#9989; CUENTA REAL MT5 XM &mdash; RESULTADOS VERIFICADOS</div>
