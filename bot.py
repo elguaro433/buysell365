@@ -16465,15 +16465,16 @@ PAR_PROFILES = {
         "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": True, "max_positions": 1, "cooldown_minutes": 30},
     },
-    # ━━━━ US100 (NASDAQ) — NY open breakout, kill zone 13-16 UTC ━━━━
+    # ━━━━ US100 (NASDAQ) — NY session 13:30-20:30 UTC (09:30-16:30 ET) ━━━━
+    # Tendencia alcista → COMPRA | Tendencia bajista → VENTA | Neutral → bloqueado
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 38, "rsi_ob": 62, "adx_min": 15, "bb_squeeze": 0.006, "min_atr": 1.0, "vol_breakout": 0.8, "ml_umbral": 55.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.7, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
-        "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 25.0},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
-        "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
+        "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 20.0},
+        "time_filter": {"best_hours_utc": [(13, 21)], "peak_hours_utc": [(13, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "news": {"currencies": ["USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
     # ━━━━ US500 (S&P 500) — Mean reversion + momentum, solo premium ━━━━
     "US500Cash": {

@@ -812,15 +812,13 @@ async def main():
     }
 
     # Canales públicos por username (se resuelven al arrancar)
+    # TODAS las señales pasan — sin filtro por activo
     PUBLIC_CHANNELS_USERNAMES = [
-        "forexsignalstrialgroup_00",  # FXPremiere Free Trial — Gold + Forex
-        "Anabelsignals08",            # AnabelSignals — XAUUSD/Gold only (94k subs)
+        "forexsignalstrialgroup_00",  # FXPremiere Free Trial — Forex + Gold + Crypto
+        "Anabelsignals08",            # AnabelSignals — XAUUSD/Gold
     ]
-    # Filtro por activo: si el canal está en esta lista, solo se aceptan esas señales
-    CHANNEL_ASSET_FILTER = {
-        "forexsignalstrialgroup_00": ["XAUUSD", "GOLD"],  # Solo oro
-        "Anabelsignals08": ["XAUUSD", "GOLD", "ORO"],    # Solo oro
-    }
+    # Sin filtros — todas las señales de todos los activos se reenvían al canal VIP
+    CHANNEL_ASSET_FILTER = {}  # Vacío = sin restricción por activo
 
     # Resolver usernames → IDs numéricos y agregarlos al set
     _username_to_id = {}
