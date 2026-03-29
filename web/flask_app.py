@@ -578,10 +578,34 @@ def api_stats():
 def api_all_trades():
     try:
         with _lock:
-            # Priorizar historial completo; fallback a winning_trades para compatibilidad
-            trades = _store.get("historial_operaciones", []) or _store.get("winning_trades", [])
-        return app.response_class(response=json.dumps(trades, ensure_ascii=False), status=200, mimetype="application/json")
-    except Exception:
+            trades = list(_store.get("historial_operaciones", []) or _store.get("winning_trades", []))
+            real_by_ticket = {str(r.get("ticket_mt5")): r for r in _historial_real if r.get("ticket_mt5")}
+
+        # Enriquecer registros del bot con campos MT5 reales (hora_salida, profit_mt5, etc.)
+        enriched = []
+        for t in trades:
+            ticket_key = str(t.get("ticket_mt5", ""))
+            if ticket_key and ticket_key in real_by_ticket:
+                real = real_by_ticket[ticket_key]
+                merged = dict(t)
+                # Copiar campos que el bot no tiene pero el registro real sí
+                for field in ("hora_salida", "profit_mt5", "volumen_mt5", "duracion_min",
+                              "fecha_cierre", "hora", "entrada", "salida"):
+                    if not merged.get(field) and real.get(field):
+                        merged[field] = real[field]
+                # hora y entrada/salida: preferir campo real (más preciso)
+                if real.get("hora"):
+                    merged["hora"] = real["hora"]
+                if real.get("entrada"):
+                    merged["entrada"] = real["entrada"]
+                if real.get("salida"):
+                    merged["salida"] = real["salida"]
+                enriched.append(merged)
+            else:
+                enriched.append(t)
+        return app.response_class(response=json.dumps(enriched, ensure_ascii=False), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"api_all_trades error: {e}")
         return "[]", 200, {"Content-Type": "application/json"}
 
 @app.route("/api/active_ops")
