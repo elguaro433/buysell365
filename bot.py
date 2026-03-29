@@ -3205,7 +3205,10 @@ def _ejecutar_senal_manual(senal: dict, chat_id: str, nombre_admin: str = "Admin
     # Enviar al canal VIP con formato profesional
     ind_mock = {'estrategia': 'manual', 'confianza_total': 100}
     msg_canal = mensaje_nueva_senal(nombre, ticker, tipo, entrada, niveles, ind_mock, 5, [], fuente="Manual", premium=True, nivel_senal="PREMIUM")
-    enviar_canal(msg_canal)
+    enviar_canal(msg_canal, teclado={"inline_keyboard": [
+        [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+         {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+    ]})
 
     # Confirmar resultado
     enviar_telegram(
@@ -8182,12 +8185,16 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             f"🎯 TP: {fmt(tp)}\n"
             f"🛡️ SL: {fmt(sl)}"
         )
+        _xm_teclado = {"inline_keyboard": [
+            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+             {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+        ]}
 
         # Ejecutar en MT5 si está activo
         if MT5_AVAILABLE and AUTO_TRADING:
             exito = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, RIESGO_POR_TRADE, entrada, sl, tp)
             if exito:
-                enviar_canal(_msg_canal)
+                enviar_canal(_msg_canal, teclado=_xm_teclado)
                 return f"✅ *SEÑAL EJECUTADA y enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre} @ {_entry_d}\nSL: {fmt(sl)} | TP: {fmt(tp)}"
             else:
                 admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
@@ -8198,11 +8205,11 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                         admin_id
                     )
                 # Aunque MT5 falle, enviar la señal al canal VIP
-                enviar_canal(_msg_canal)
+                enviar_canal(_msg_canal, teclado=_xm_teclado)
                 return f"⚠️ MT5 falló pero la señal fue enviada al canal VIP."
         else:
             # MT5 desactivado — enviar señal al canal VIP de todas formas
-            enviar_canal(_msg_canal)
+            enviar_canal(_msg_canal, teclado=_xm_teclado)
             return f"✅ *Señal enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre}\n📍 {_entry_d} | 🎯 {fmt(tp)} | 🛡️ {fmt(sl)}"
 
     # ── 1. COMANDOS EXACTOS CON SLASH (máxima prioridad) ─────
@@ -8361,7 +8368,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             start_botones = {
                 "inline_keyboard": [
                     [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                    [{"text": "🤖 COPY TRADING XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                     {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
                 ]
@@ -12390,7 +12398,10 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                 _wh_skip_mt5_razon = f"Error MT5: {e}"
 
         # Enviar a Telegram (solo en horario)
-        enviar_canal(msg)
+        enviar_canal(msg, teclado={"inline_keyboard": [
+            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+             {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+        ]})
 
         # Actualizar la reserva con datos finales (MT5 result, etc.)
         with _lock_ops:
@@ -13727,7 +13738,11 @@ def analizar_activo(nombre, ticker):
 
             guardar_estado()
             _skip_razon_display = _skip_mt5_razon if _skip_mt5 else ""
-            enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal))
+            _xm_btn_senal = {"inline_keyboard": [
+                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                 {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+            ]}
+            enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_xm_btn_senal)
 
             # 🚨 NOTIFICACIÓN FOMO AL GRUPO
             notificar_fomo_grupo(nombre, tipo)
