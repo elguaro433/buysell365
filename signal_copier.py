@@ -767,53 +767,13 @@ def send_to_channel(signal, executed, detail):
 
     entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
-    # Calcular R:R y pips estimados
-    _rr_str = ""
-    _tp_pts = ""
-    _sl_pts = ""
-    if entry > 0 and tp > 0 and sl > 0:
-        _risk   = abs(entry - sl)
-        _reward = abs(tp - entry)
-        if _risk > 0:
-            _rr_val = _reward / _risk
-            _rr_str = f"📊 R:R: *{_rr_val:.1f}:1*"
-        _tp_pts = f"+{_reward:.1f}" if _reward > 1 else f"+{_reward:.5f}".rstrip('0')
-        _sl_pts = f"-{_risk:.1f}"  if _risk  > 1 else f"-{_risk:.5f}".rstrip('0')
-
-    # Fuente limpia
-    _src_map = {
-        "SureShotFX": "SureShot FX",
-        "Learn2Trade": "Learn 2 Trade",
-        "FxPremiere": "FxPremiere",
-        "AnabelSignals": "AnabelSignals",
-    }
-    src_clean = _src_map.get(source, source)
-
-    # Timeframe del signal si está disponible
-    _tf = signal.get("timeframe", "")
-    _tf_str = f" · {_tf}" if _tf else ""
-
     lines = [
         f"{dir_emoji} *SEÑAL {dir_es} — {pair_display}*",
         f"━━━━━━━━━━━━━━━━━━━━",
         f"",
-        f"📍 *Entrada:* `{entry_display}`",
-        f"🎯 *TP:* `{fmt(tp)}`" + (f"  _{_tp_pts} pts_" if _tp_pts else ""),
-        f"🛡️ *SL:* `{fmt(sl)}`" + (f"  _{_sl_pts} pts_" if _sl_pts else ""),
-    ]
-    if _rr_str:
-        lines.append(f"")
-        lines.append(_rr_str)
-
-    # Comentario IA si existe
-    _ia_c = signal.get("ia_comment", "")
-    if _ia_c:
-        lines.append(f"🤖 _{_ia_c}_")
-
-    lines += [
-        f"",
-        f"📡 *Fuente:* {src_clean}{_tf_str}",
-        f"⚡ _BuySell365 Pro · buysell365.pro_",
+        f"📍 Entrada: {entry_display}",
+        f"🎯 TP: {fmt(tp)}",
+        f"🛡️ SL: {fmt(sl)}",
     ]
 
     msg = "\n".join(lines)
