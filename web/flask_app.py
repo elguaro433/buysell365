@@ -578,32 +578,19 @@ def api_stats():
 def api_all_trades():
     try:
         with _lock:
-            trades = list(_store.get("historial_operaciones", []) or _store.get("winning_trades", []))
-            real_by_ticket = {str(r.get("ticket_mt5")): r for r in _historial_real if r.get("ticket_mt5")}
-
-        # Enriquecer registros del bot con campos MT5 reales (hora_salida, profit_mt5, etc.)
-        enriched = []
-        for t in trades:
-            ticket_key = str(t.get("ticket_mt5", ""))
-            if ticket_key and ticket_key in real_by_ticket:
-                real = real_by_ticket[ticket_key]
-                merged = dict(t)
-                # Copiar campos que el bot no tiene pero el registro real sí
-                for field in ("hora_salida", "profit_mt5", "volumen_mt5", "duracion_min",
-                              "fecha_cierre", "hora", "entrada", "salida"):
-                    if not merged.get(field) and real.get(field):
-                        merged[field] = real[field]
-                # hora y entrada/salida: preferir campo real (más preciso)
-                if real.get("hora"):
-                    merged["hora"] = real["hora"]
-                if real.get("entrada"):
-                    merged["entrada"] = real["entrada"]
-                if real.get("salida"):
-                    merged["salida"] = real["salida"]
-                enriched.append(merged)
+            # Usar siempre historial_real (trades XM verificados con hora_salida completa).
+            # Si el bot envía trades nuevos posteriores a la última fecha de historial_real,
+            # los añadimos al final para mantener el dashboard actualizado.
+            if _historial_real:
+                real_tickets = {str(r.get("ticket_mt5")) for r in _historial_real if r.get("ticket_mt5")}
+                last_real_fecha = max((r.get("fecha_apertura") or r.get("open_date") or r.get("fecha","") for r in _historial_real), default="")
+                bot_trades = _store.get("historial_operaciones", [])
+                # Solo añadir trades del bot que sean genuinamente nuevos (ticket no en historial_real)
+                nuevos = [t for t in bot_trades if str(t.get("ticket_mt5","")) not in real_tickets and t.get("ticket_mt5")]
+                trades = list(_historial_real) + nuevos
             else:
-                enriched.append(t)
-        return app.response_class(response=json.dumps(enriched, ensure_ascii=False), status=200, mimetype="application/json")
+                trades = list(_store.get("historial_operaciones", []) or _store.get("winning_trades", []))
+        return app.response_class(response=json.dumps(trades, ensure_ascii=False), status=200, mimetype="application/json")
     except Exception as e:
         logger.error(f"api_all_trades error: {e}")
         return "[]", 200, {"Content-Type": "application/json"}
