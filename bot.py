@@ -3863,7 +3863,7 @@ def activos_disponibles_hoy() -> tuple:
         nombres = []  # Mercados cerrados
         return nombres, True, motivo
     else:
-        nombres = ["oro", "eurusd", "usdjpy", "gbpjpy", "nasdaq", "sp500"]
+        nombres = ["eurusd", "nasdaq", "sp500"]
         return nombres, False, ""
 
 
@@ -8651,7 +8651,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return (
             f"{saludo}\n\n"
             f"📡 Escaneando {len(nombres_hoy)} activos: {activos_txt}...\n"
-            "💡 Pregúntame: _\"Analiza el oro\"_ o escribe *ayuda*"
+            "💡 Pregúntame: _\"Analiza NASDAQ\"_ o escribe *ayuda*"
         )
 
     # 3.4. DETECCIÓN DIRECTA DE ACTIVO (Si el usuario solo escribe "ORO" o "NASDAQ")
@@ -9477,7 +9477,7 @@ section{{padding:50px 20px}}
         <li data-i18n="pricing.v6">An\u00e1lisis multi-IA exclusivo</li>
         <li data-i18n="pricing.v7">Gr\u00e1ficos de entrada y salida</li>
       </ul>
-      <a href="https://t.me/BUYSELL365_PRO_BOT?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
+      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
     </div>
     <div class="price-card" style="position:relative;">
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#1b5e20);box-shadow:0 0 16px rgba(0,200,83,.4)">🟢 ACTIVO</div>
@@ -9540,7 +9540,7 @@ section{{padding:50px 20px}}
   <h2>\U0001f680 <span data-i18n="cta.title">Empieza Hoy \u2014 Sin Riesgo</span></h2>
   <p data-i18n="cta.subtitle" data-i18n-days="5">5 d\u00edas h\u00e1biles de prueba gratuita. Sin tarjeta de cr\u00e9dito. Cancela cuando quieras.</p>
   <div class="hero-buttons">
-    <a href="https://t.me/BUYSELL365_PRO_BOT?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Suscribirme al VIP</span></a>
+    <a href="https://t.me/Andoperandobot?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Suscribirme al VIP</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4ac <span data-i18n="cta.btn_community">Unirse a la Comunidad</span></a>
   </div>
 </section>
@@ -13892,7 +13892,7 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "🤖 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Ver Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "💎 Ver Canal VIP", "url": "https://t.me/Andoperandobot?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -13910,7 +13910,7 @@ def loop_publicidad_grupo():
             "🤖 *Bot asistente personal incluido*\n\n"
             "👇 *Únete al canal VIP ahora*",
             {"inline_keyboard": [[
-                {"text": "💎 UNIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+                {"text": "💎 UNIRME AL VIP", "url": "https://t.me/Andoperandobot?start=vip"}
             ], [
                 {"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
@@ -13930,7 +13930,7 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "💎 Canal VIP", "url": "https://t.me/Andoperandobot?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -13950,7 +13950,7 @@ def loop_publicidad_grupo():
             "👇 *Elige tu plan y empieza ahora*",
             {"inline_keyboard": [[
                 {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-                {"text": "💎 CANAL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
+                {"text": "💎 CANAL VIP", "url": "https://t.me/Andoperandobot?start=vip"}
             ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
@@ -13969,7 +13969,7 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "📊 VER ESTRATEGIA EN XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Canal VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"},
+                {"text": "💎 Canal VIP", "url": "https://t.me/Andoperandobot?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -14658,7 +14658,7 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
             aviso = (
                 f"👋 *{nombre}*, para atenderte mejor necesito que primero\n"
                 f"me escribas por privado:\n\n"
-                f"👉 Abre @BUYSELL365_PRO_BOT y pulsa *Start*\n"
+                f"👉 Abre @Andoperandobot y pulsa *Start*\n"
                 f"Luego te envío toda la información aquí 📩"
             )
         aviso_id = enviar_telegram(aviso, grupo_chat_id)
