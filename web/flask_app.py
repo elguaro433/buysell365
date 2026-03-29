@@ -746,6 +746,19 @@ def index_web():
   }}
 }}
 </script>
+<script type="application/ld+json">
+{{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {{"@type":"Question","name":"\u00bfC\u00f3mo funciona el Copy Trading con XM?","acceptedAnswer":{{"@type":"Answer","text":"El Copy Trading replica autom\u00e1ticamente todas nuestras operaciones en tu cuenta MT5. Solo necesitas abrir cuenta en XM (broker regulado), conectar tu cuenta a nuestro perfil de copy y elegir tu nivel de riesgo. Cada operaci\u00f3n se copia con los mismos SL y TP \u2014 sin que tengas que hacer nada."}}}},
+    {{"@type":"Question","name":"\u00bfNecesito experiencia en trading?","acceptedAnswer":{{"@type":"Answer","text":"No. Las se\u00f1ales son claras y f\u00e1ciles de seguir. Te decimos exactamente d\u00f3nde entrar, d\u00f3nde colocar el Stop Loss y los Take Profits. Adem\u00e1s, nuestra comunidad te ayudar\u00e1 a aprender."}}}},
+    {{"@type":"Question","name":"\u00bfCu\u00e1nto capital m\u00ednimo necesito?","acceptedAnswer":{{"@type":"Answer","text":"Para el Copy Trading recomendamos un m\u00ednimo de $100 USD. XM permite empezar con menos. Para seguir se\u00f1ales VIP manualmente puedes empezar con el capital que tengas."}}}},
+    {{"@type":"Question","name":"\u00bfPuedo retirar mi dinero cuando quiera?","acceptedAnswer":{{"@type":"Answer","text":"S\u00ed. Tu capital est\u00e1 en tu propia cuenta del broker \u2014 nosotros nunca lo tocamos. Puedes retirar en cualquier momento directamente desde XM, sin restricciones ni penalizaciones."}}}},
+    {{"@type":"Question","name":"\u00bfCu\u00e1ntas se\u00f1ales recibo al d\u00eda?","acceptedAnswer":{{"@type":"Answer","text":"En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los +20 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad."}}}}
+  ]
+}}
+</script>
 <script defer data-domain="buysell365.pro" src="https://plausible.io/js/script.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -1011,6 +1024,7 @@ if('serviceWorker' in navigator){{
     <a href="#assets" data-i18n="nav.assets">Activos</a>
     <a href="#pricing" data-i18n="nav.pricing">Servicios</a>
     <a href="/dashboard" data-i18n="nav.dashboard">Trading en Vivo</a>
+    <a href="/about">Qui\u00e9nes Somos</a>
     <div class="lang-selector" id="langSelector" style="position:relative">
       <button class="lang-btn" onclick="toggleLangMenu()"><span id="currentFlag">\U0001f1ea\U0001f1f8</span><span style="font-size:12px;color:#00d4aa;font-weight:700">\u25bc</span></button>
       <div class="lang-menu" id="langMenu">
@@ -1030,7 +1044,7 @@ if('serviceWorker' in navigator){{
 <!-- MOBILE MENU OVERLAY -->
 <div class="mobile-overlay" id="mobileMenu">
   <a href="#features" onclick="closeMobileMenu()" data-i18n="nav.technology">Tecnolog\u00eda</a>
-  <a href="#about" onclick="closeMobileMenu()">Qui\u00e9nes Somos</a>
+  <a href="/about" onclick="closeMobileMenu()">Qui\u00e9nes Somos</a>
   <a href="#assets" onclick="closeMobileMenu()" data-i18n="nav.assets">Activos</a>
   <a href="#pricing" onclick="closeMobileMenu()" data-i18n="nav.pricing">Precios</a>
   <a href="/dashboard" data-i18n="nav.dashboard">Trading en Vivo</a>
@@ -1595,6 +1609,7 @@ function _submitEmail(e){{
 <footer class="footer">
   <div class="footer-links">
     <a href="/dashboard">\U0001f4ca <span data-i18n="footer.dashboard">Trading en Vivo</span></a>
+    <a href="/about">\U0001f465 Qui\u00e9nes Somos</a>
     <a href="/terminos">\U0001f4dc <span data-i18n="footer.terms">T\u00e9rminos</span></a>
     <a href="/privacidad">\U0001f512 <span data-i18n="footer.privacy">Privacidad</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank">\U0001f4e2 <span data-i18n="footer.telegram">Telegram</span></a>
@@ -1869,6 +1884,15 @@ def dashboard_visual():
             _loss_streak = 0
     max_drawdown = round(_max_dd, 1)
     dd_color = '#00d4aa' if max_drawdown < 50 else ('#f0b90b' if max_drawdown < 150 else '#ff3b30')
+
+    # P&L en dólares (de profit_mt5 si existe)
+    total_profit = round(sum(float(h.get('profit_mt5', 0) or 0) for h in hist), 2)
+    profit_color = '#00e676' if total_profit >= 0 else '#ff3b30'
+    profit_str = f"+${total_profit:,.2f}" if total_profit >= 0 else f"-${abs(total_profit):,.2f}"
+    # Profit Factor con dólares (más preciso que pips)
+    _gross_profit = sum(float(h.get('profit_mt5', 0) or 0) for h in hist if float(h.get('profit_mt5', 0) or 0) > 0)
+    _gross_loss = abs(sum(float(h.get('profit_mt5', 0) or 0) for h in hist if float(h.get('profit_mt5', 0) or 0) < 0))
+    profit_factor_usd = round(_gross_profit / _gross_loss, 2) if _gross_loss > 0 else round(sum(h.get('pips',0) for h in hist if h.get('pips',0)>0) / max(abs(sum(h.get('pips',0) for h in hist if h.get('pips',0)<=0)), 0.1), 2)
 
     # --- Asset performance ---
     asset_perf = {}
@@ -2172,9 +2196,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <div class="stat-sub" data-i18n="dash.winrate_sub">Porcentaje de acierto global</div>
         </div>
         <div class="stat-card accent-blue">
-            <div class="stat-label">&#128176; <span data-i18n="dash.net_pips">Resultado Neto</span></div>
-            <div class="stat-value" style="color:{pips_color}">{pips_total:+.1f}</div>
-            <div class="stat-sub"><span data-i18n="dash.avg_win">Promedio ganancia</span>: {avg_win}</div>
+            <div class="stat-label">&#128176; Beneficio Real MT5</div>
+            <div class="stat-value" style="color:{profit_color}">{profit_str}</div>
+            <div class="stat-sub">Pips netos: {pips_total:+.1f} &bull; Avg ganancia: {avg_win}</div>
         </div>
         <div class="stat-card accent-purple">
             <div class="stat-label">&#9878; <span data-i18n="dash.rr">Risk : Reward</span></div>
@@ -2201,8 +2225,8 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         </div>
         <div class="stat-card" style="border-left:3px solid var(--primary)">
             <div class="stat-label">&#128176; Profit Factor</div>
-            <div class="stat-value" style="color:var(--primary)">{round(sum(h.get('pips',0) for h in hist if h.get('pips',0)>0) / max(abs(sum(h.get('pips',0) for h in hist if h.get('pips',0)<=0)), 0.1), 2)}</div>
-            <div class="stat-sub">Ganancia total / P&eacute;rdida total</div>
+            <div class="stat-value" style="color:{'#00d4aa' if profit_factor_usd>=1.5 else ('#f0b90b' if profit_factor_usd>=1 else '#ff3b30')}">{profit_factor_usd}</div>
+            <div class="stat-sub">Ganancia bruta / P&eacute;rdida bruta (USD)</div>
         </div>
     </div>
 
@@ -2893,6 +2917,203 @@ def suscribir_email():
 # ============================================================
 #  LEGAL PAGES
 # ============================================================
+@app.route("/about")
+def pagina_about():
+    with _lock:
+        hist = list(_historial_real) if _historial_real else []
+    total_ops = len(hist)
+    wins = sum(1 for h in hist if float(h.get('pips', 0)) > 0)
+    wr = round(wins / total_ops * 100, 1) if total_ops > 0 else 0
+    profit = round(sum(float(h.get('profit_mt5', 0) or 0) for h in hist), 2)
+    profit_str = f"+${profit:,.2f}" if profit >= 0 else f"-${abs(profit):,.2f}"
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qui\u00e9nes Somos \u2014 BuySell365 Pro</title>
+<meta name="description" content="Conoce la historia de BuySell365 Pro: c\u00f3mo un trader retail de Andorra construy\u00f3 un bot de IA que opera forex y \u00edndices en MT5 con resultados reales y verificados.">
+<meta property="og:title" content="Qui\u00e9nes Somos \u2014 BuySell365 Pro">
+<meta property="og:description" content="La historia real de BuySell365: de trader manual a bot aut\u00f3nomo de IA en MT5. {wr}% Win Rate, {total_ops} operaciones reales verificadas.">
+<meta property="og:url" content="https://buysell365.pro/about">
+<meta property="og:image" content="https://buysell365.pro/img/og_image.png">
+<link rel="icon" href="/img/bull_bear.png" type="image/png">
+<link rel="canonical" href="https://buysell365.pro/about">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;line-height:1.7;overflow-x:hidden}}
+:root{{--green:#00ffcc;--blue:#4d9fff;--gold:#fbbf24;--muted:#8b9fc4;--border:rgba(255,255,255,.1)}}
+a{{color:var(--green);text-decoration:none}}
+/* NAV */
+.nav{{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--border);background:rgba(7,9,31,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}}
+.nav-logo{{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;text-decoration:none;color:#fff}}
+.nav-logo img{{width:36px;height:36px;border-radius:50%}}
+.nav-links{{display:flex;gap:24px;font-size:.9rem}}
+.nav-links a{{color:#b0bdd0;text-decoration:none;transition:color .2s}}
+.nav-links a:hover{{color:var(--green)}}
+/* HERO */
+.about-hero{{padding:80px 24px 60px;text-align:center;background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(0,212,170,.1),transparent)}}
+.about-hero h1{{font-size:clamp(2rem,5vw,3.2rem);font-weight:900;line-height:1.2;margin-bottom:16px}}
+.about-hero h1 span{{background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
+.about-hero p{{font-size:1.1rem;color:var(--muted);max-width:640px;margin:0 auto 32px}}
+/* STATS ROW */
+.about-stats{{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin:0 auto 60px;max-width:800px}}
+.astat{{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:16px;padding:24px 32px;text-align:center;min-width:160px}}
+.astat-val{{font-size:2rem;font-weight:900;color:var(--green)}}
+.astat-val.gold{{color:var(--gold)}}
+.astat-val.blue{{color:var(--blue)}}
+.astat-label{{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}}
+/* SECTIONS */
+.about-section{{max-width:820px;margin:0 auto;padding:40px 24px}}
+.about-section h2{{font-size:1.6rem;font-weight:800;margin-bottom:20px;color:#fff}}
+.about-section h2 .emoji{{margin-right:8px}}
+.about-section p{{color:#c0cfe0;margin-bottom:16px;font-size:.98rem}}
+/* TIMELINE */
+.timeline{{position:relative;padding-left:28px;border-left:2px solid rgba(0,255,204,.25);margin-bottom:40px}}
+.tl-item{{position:relative;margin-bottom:28px}}
+.tl-dot{{position:absolute;left:-36px;width:16px;height:16px;border-radius:50%;background:var(--green);border:3px solid #07091f;box-shadow:0 0 12px rgba(0,255,204,.5)}}
+.tl-date{{font-size:.8rem;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}}
+.tl-title{{font-size:1rem;font-weight:700;color:#fff;margin-bottom:4px}}
+.tl-text{{font-size:.9rem;color:var(--muted)}}
+/* CARDS */
+.value-cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px;margin-bottom:40px}}
+.vcard{{background:linear-gradient(145deg,rgba(22,32,53,.95),rgba(14,22,40,.9));border:1px solid var(--border);border-radius:16px;padding:24px}}
+.vcard-icon{{font-size:2rem;margin-bottom:10px}}
+.vcard h4{{color:#fff;font-size:1rem;margin-bottom:8px}}
+.vcard p{{color:var(--muted);font-size:.85rem;line-height:1.6}}
+/* CTA */
+.about-cta{{background:linear-gradient(135deg,rgba(0,212,170,.08),rgba(77,159,255,.06));border:1px solid rgba(0,212,170,.2);border-radius:20px;padding:48px 32px;text-align:center;max-width:820px;margin:0 auto 60px}}
+.about-cta h2{{font-size:1.8rem;font-weight:900;margin-bottom:12px}}
+.about-cta p{{color:var(--muted);margin-bottom:28px}}
+.btn-row{{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}}
+.btn-p{{padding:14px 28px;background:linear-gradient(135deg,#00ffc8,#00a89d);border-radius:12px;color:#000;font-weight:800;font-size:1rem;text-decoration:none;transition:all .3s}}
+.btn-p:hover{{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,255,204,.3)}}
+.btn-s{{padding:14px 28px;background:rgba(255,255,255,.06);border:1px solid rgba(0,255,204,.3);border-radius:12px;color:#00ffc8;font-weight:700;font-size:1rem;text-decoration:none;transition:all .3s}}
+.btn-s:hover{{background:rgba(0,255,204,.1)}}
+/* FOOTER */
+.foot{{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:.8rem;color:var(--muted);margin-top:20px}}
+.foot a{{color:var(--green);margin:0 8px}}
+@media(max-width:600px){{
+  .nav{{padding:12px 16px}}
+  .about-hero{{padding:60px 16px 40px}}
+  .astat{{min-width:130px;padding:16px 20px}}
+  .astat-val{{font-size:1.5rem}}
+  .about-cta{{padding:32px 20px}}
+}}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/img/bull_bear.png" alt="BS365">
+    <span>BuySell365 <span style="color:var(--green)">Pro</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Inicio</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/about" style="color:var(--green)">Qui\u00e9nes Somos</a>
+    <a href="https://t.me/BUYSELL_365_24_7" target="_blank">Telegram</a>
+  </div>
+</nav>
+
+<section class="about-hero">
+  <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px">&#128205; ANDORRA &mdash; CUENTA REAL MT5 XM</div>
+  <h1>La historia detr\u00e1s del<br><span>bot que trabaja mientras duermes</span></h1>
+  <p>Somos traders reales, no actores. Construimos BuySell365 porque necesit\u00e1bamos una soluci\u00f3n que realmente funcionara. Estos son nuestros resultados reales verificados en XM MT5.</p>
+</section>
+
+<div class="about-stats">
+  <div class="astat"><div class="astat-val">{wr}%</div><div class="astat-label">Win Rate Real</div></div>
+  <div class="astat"><div class="astat-val blue">{total_ops}</div><div class="astat-label">Operaciones Reales</div></div>
+  <div class="astat"><div class="astat-val gold">{profit_str}</div><div class="astat-label">Beneficio MT5</div></div>
+  <div class="astat"><div class="astat-val" style="color:#a855f7">17</div><div class="astat-label">D\u00edas operando</div></div>
+</div>
+
+<section class="about-section">
+  <h2><span class="emoji">&#128065;</span>Nu\u00e9stra Historia Real</h2>
+  <p>Emmanuel Diaz lleva a\u00f1os operando forex y \u00edndices como trader retail desde Andorra. Como la mayor\u00eda de traders, empez\u00f3 cometiendo los mismos errores: dejar correr las p\u00e9rdidas, cortarlas ganancias, y operar por emoci\u00f3n.</p>
+  <p>La soluci\u00f3n no fue un curso ni un gurú. Fue la <strong>automatizaci\u00f3n</strong>. Con experiencia en programaci\u00f3n, dise\u00f1\u00f3 un bot de IA que analiza el mercado cada 3 minutos \u2014 sin emociones, sin fatiga, sin sesgos.</p>
+  <p>BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>nosotros mismos usamos</strong> para operar una cuenta real en XM con $530 de capital inicial.</p>
+
+  <h2 style="margin-top:40px"><span class="emoji">&#128336;</span>Cronolog\u00eda del Proyecto</h2>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-date">Inicio 2026</div>
+      <div class="tl-title">Primeras versiones del bot</div>
+      <div class="tl-text">Desarrollo del motor de se\u00f1ales con indicadores t\u00e9cnicos e integraci\u00f3n con MT5 v\u00eda MetaTrader5 Python API.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-date">Marzo 2026</div>
+      <div class="tl-title">Cuenta real XM #88849791 — Capital $530</div>
+      <div class="tl-text">Primer mes con cuenta real: {total_ops} operaciones, {wr}% win rate, {profit_str} de beneficio neto. Sin ocultar ni una sola operaci\u00f3n.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-date">Marzo 2026</div>
+      <div class="tl-title">Lanzamiento BuySell365 Pro</div>
+      <div class="tl-text">Apertura del canal VIP en Telegram, Copy Trading activo, y este dashboard p\u00fablico donde cualquiera puede ver los resultados en tiempo real.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot" style="background:var(--gold)"></div>
+      <div class="tl-date" style="color:var(--gold)">Pr\u00f3ximo</div>
+      <div class="tl-title">Verificaci\u00f3n Myfxbook + Expansi\u00f3n</div>
+      <div class="tl-text">Integraci\u00f3n con Myfxbook para verificaci\u00f3n independiente de resultados. Escalado a m\u00e1s activos y m\u00e1s capital.</div>
+    </div>
+  </div>
+</section>
+
+<section class="about-section" style="padding-top:0">
+  <h2><span class="emoji">&#127775;</span>Nuestros Valores</h2>
+  <div class="value-cards">
+    <div class="vcard">
+      <div class="vcard-icon">&#128202;</div>
+      <h4>Transparencia Total</h4>
+      <p>Todos los resultados son p\u00fablicos y en tiempo real. No editamos ni ocultamos operaciones perdedoras.</p>
+    </div>
+    <div class="vcard">
+      <div class="vcard-icon">&#129302;</div>
+      <h4>IA Real, No Marketing</h4>
+      <p>El bot analiza datos de mercado cada 3 minutos con algoritmos propios. Sin se\u00f1ales manuales ni opiniones.</p>
+    </div>
+    <div class="vcard">
+      <div class="vcard-icon">&#128176;</div>
+      <h4>Tu Capital es Tuyo</h4>
+      <p>Tu dinero est\u00e1 siempre en tu propia cuenta del broker. Nosotros nunca tocamos tu capital.</p>
+    </div>
+    <div class="vcard">
+      <div class="vcard-icon">&#128101;</div>
+      <h4>Comunidad Primero</h4>
+      <p>Crecemos con nuestros usuarios. Su \u00e9xito es nuestro \u00e9xito. Sin contratos ni letras peque\u00f1as.</p>
+    </div>
+  </div>
+</section>
+
+<section style="padding:0 24px 60px">
+  <div class="about-cta">
+    <div style="font-size:2.5rem;margin-bottom:12px">&#128640;</div>
+    <h2>&#218;nete a BuySell365 Pro</h2>
+    <p>Accede al Copy Trading o a las se\u00f1ales VIP. Sin contratos, cancela cuando quieras.</p>
+    <div class="btn-row">
+      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="btn-p">&#129302; Empezar Copy Trading</a>
+      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" rel="noopener" class="btn-s">&#128081; Canal VIP Pro</a>
+      <a href="/dashboard" class="btn-s">&#128202; Ver Resultados</a>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <a href="/">Inicio</a>
+  <a href="/dashboard">Dashboard</a>
+  <a href="/terminos">T\u00e9rminos</a>
+  <a href="/privacidad">Privacidad</a>
+  <a href="mailto:soporte@buysell365.pro">soporte@buysell365.pro</a>
+  <p style="margin-top:12px">\u00a9 2026 BuySell365 Pro &mdash; Emmanuel Diaz &mdash; Andorra</p>
+</footer>
+</body>
+</html>"""
+
 @app.route("/terminos")
 def pagina_terminos():
     return f"""<!DOCTYPE html>
@@ -2941,6 +3162,7 @@ def sitemap():
     urls = [
         {"loc": f"{base}/", "changefreq": "daily", "priority": "1.0"},
         {"loc": f"{base}/dashboard", "changefreq": "always", "priority": "0.9"},
+        {"loc": f"{base}/about", "changefreq": "weekly", "priority": "0.7"},
         {"loc": f"{base}/terminos", "changefreq": "monthly", "priority": "0.4"},
         {"loc": f"{base}/privacidad", "changefreq": "monthly", "priority": "0.4"},
     ]
