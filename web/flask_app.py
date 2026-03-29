@@ -1888,6 +1888,18 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 .bell-btn.notif-on{{border-color:rgba(240,185,11,.6);background:rgba(240,185,11,.12)}}
 .bell-dot{{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ff3b30;border:1px solid var(--bg);display:none}}
 .bell-dot.show{{display:block}}
+.xm-hdr-btn{{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,#b8960a 0%,#FFD700 50%,#b8960a 100%);color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;white-space:nowrap;box-shadow:0 2px 8px rgba(255,215,0,.25)}}
+.xm-hdr-btn:hover{{box-shadow:0 4px 16px rgba(255,215,0,.5);transform:translateY(-1px)}}
+.xm-broker-strip{{background:linear-gradient(135deg,rgba(22,27,34,.95),rgba(28,26,8,.95));border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:24px 20px;margin:24px 0;text-align:center;position:relative;overflow:hidden}}
+.xm-broker-strip::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#FFD700,transparent)}}
+.xm-logo{{font-size:28px;font-weight:900;color:#FFD700;letter-spacing:3px;margin-bottom:4px}}
+.xm-pills{{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0 16px}}
+.xm-pill{{background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);border-radius:20px;padding:4px 11px;font-size:11px;color:#FFD700}}
+.xm-code{{background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.4);border-radius:8px;padding:7px 14px;font-size:13px;color:#FFD700;display:inline-block;margin-bottom:14px}}
+.xm-code b{{font-size:15px;letter-spacing:2px}}
+.xm-cta{{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#b8960a 0%,#FFD700 50%,#b8960a 100%);color:#000;text-decoration:none;padding:11px 26px;border-radius:10px;font-weight:700;font-size:14px;transition:all .3s;box-shadow:0 4px 16px rgba(255,215,0,.25)}}
+.xm-cta:hover{{box-shadow:0 6px 24px rgba(255,215,0,.5);transform:translateY(-2px)}}
+@media(max-width:480px){{.xm-btn-text{{display:none}}}}
 </style>
 <script>setTimeout(()=>location.reload(),30000);</script>
 </head>
@@ -1914,6 +1926,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                     <a onclick="setLang('fr')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1eb\U0001f1f7 Fran\u00e7ais</a>
                 </div>
             </div>
+            <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-hdr-btn" title="Abre tu cuenta en XM — broker recomendado">
+                &#127974; <span class="xm-btn-text">XM Broker</span>
+            </a>
             <div class="live-badge"><div class="pulse"></div><span data-i18n="dash.live">{'EN VIVO' if is_alive else 'OFFLINE'}</span> &mdash; {now_str}</div>
         </div>
     </div>
@@ -2581,6 +2596,24 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
   setInterval(pollActiveOpsNotif, 15000);
 }})();
 </script>
+
+<!-- XM BROKER SECTION -->
+<div class="xm-broker-strip">
+    <div class="xm-logo">XM</div>
+    <div style="font-size:14px;color:#e6edf3;font-weight:600;margin-bottom:4px" data-i18n="xm.title">Broker Recomendado</div>
+    <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="xm.sub">El broker que usa BuySell365 Pro</div>
+    <div class="xm-pills">
+        <span class="xm-pill">&#10003; Regulado CySEC &middot; ASIC</span>
+        <span class="xm-pill">&#128176; Dep&oacute;sito desde $5</span>
+        <span class="xm-pill">&#9889; Sin re-quotes</span>
+        <span class="xm-pill">&#128241; App iOS &amp; Android</span>
+    </div>
+    <div class="xm-code" data-i18n="xm.code">Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b></div><br>
+    <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-cta">
+        &#128640; Abrir Cuenta Real &mdash; Gratis
+    </a>
+    <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px">Trading implica riesgo. Capital en riesgo.</div>
+</div>
 
 </body>
 </html>"""
