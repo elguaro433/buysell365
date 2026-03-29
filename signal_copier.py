@@ -899,12 +899,16 @@ async def main():
 
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
-            if signal["type"] == "new_signal":
-                # ── MT5 EXECUTION DESACTIVADO — solo reenvío al canal ──
-                # Para reactivar: cambiar MT5_EXECUTION_ENABLED = True
-                MT5_EXECUTION_ENABLED = False
+            # ══════════════════════════════════════════════════════════════
+            # 🔒 KILL-SWITCH GLOBAL — MT5 EXECUTION COMPLETAMENTE DESACTIVADO
+            # Para reactivar cuando el usuario autorice:
+            #   1. Cambiar MT5_EXECUTION_ENABLED = True aquí abajo
+            #   2. Y asegurarse de que AUTO_TRADING=True en el .env del bot
+            # ══════════════════════════════════════════════════════════════
+            MT5_EXECUTION_ENABLED = False  # ← NUNCA cambiar sin autorización explícita del usuario
 
-                executed, detail = False, "Ejecución MT5 desactivada"
+            if signal["type"] == "new_signal":
+                executed, detail = False, "Ejecución MT5 desactivada (kill-switch activo)"
                 if MT5_EXECUTION_ENABLED:
                     aprobar, ia_comment = _ia_evaluar_senal(signal)
                     signal["ia_comment"] = ia_comment
@@ -917,9 +921,14 @@ async def main():
                 send_to_channel(signal, executed, detail)
 
             elif signal["type"] == "update":
-                # Handle updates (close half, move SL, etc.)
-                executed, detail = handle_update_mt5(signal)
-                log.info(f"📡 UPDATE: {'✅' if executed else '❌'} {detail}")
+                # ── Updates de posiciones (cerrar, mover SL) ──
+                # Solo ejecutar si el kill-switch está activo
+                if MT5_EXECUTION_ENABLED:
+                    executed, detail = handle_update_mt5(signal)
+                    log.info(f"📡 UPDATE MT5: {'✅' if executed else '❌'} {detail}")
+                else:
+                    executed, detail = False, "Update MT5 omitido (kill-switch activo)"
+                    log.info(f"📡 UPDATE ignorado (kill-switch): {signal.get('action','?')} {signal['pair']}")
                 send_to_channel(signal, executed, detail)
 
         except Exception as e:

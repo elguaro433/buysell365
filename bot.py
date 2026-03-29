@@ -477,7 +477,7 @@ _TICKER_TO_YFINANCE = {
 }
 
 # ── CONFIGURACIÓN DE AUTO-TRADING (cuenta real — solo lectura) ────────
-AUTO_TRADING   = os.getenv("AUTO_TRADING", "True").strip().lower() in ("true", "1", "yes")  # Controlado desde .env
+AUTO_TRADING   = os.getenv("AUTO_TRADING", "False").strip().lower() in ("true", "1", "yes")  # DESACTIVADO por defecto — activar explícitamente en .env: AUTO_TRADING=True
 MAX_SL_PIPS    = 500   # Filtro de seguridad: no abrir si el SL es demasiado grande
 
 # ── CUENTAS MT5 PARALELAS ─────────────────────────────────
