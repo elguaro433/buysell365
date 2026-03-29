@@ -946,11 +946,7 @@ section{{padding:60px 20px}}
 .back-to-top.show{{opacity:1;pointer-events:auto}}
 .back-to-top:hover{{background:rgba(0,212,170,.15);border-color:var(--green)}}
 
-/* ═══ COUNTDOWN ═══ */
-.countdown{{display:flex;gap:8px;justify-content:center;margin-top:12px}}
-.countdown-item{{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.2);border-radius:8px;padding:6px 10px;text-align:center;min-width:50px}}
-.countdown-val{{font-size:1.2rem;font-weight:800;color:var(--green)}}
-.countdown-lbl{{font-size:.55rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px}}
+/* countdown removed */
 
 
 /* ═══ FADE-IN ANIMATIONS ═══ */
@@ -1064,8 +1060,121 @@ if('serviceWorker' in navigator){{
       <div class="stat-item"><div class="stat-value gold">{pips:+,.0f}</div><div class="stat-label" data-i18n="stats.pips">PIPS ACUMULADOS</div></div>
       <div class="stat-item"><div class="stat-value purple">24/5</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
     </div>
+
+    <!-- DASHBOARD MOCKUP PREVIEW -->
+    <div style="margin:40px auto 0;max-width:780px;background:rgba(10,15,30,.9);border:1px solid rgba(0,212,170,.25);border-radius:18px;padding:16px 20px;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 60px rgba(0,212,170,.06);backdrop-filter:blur(12px);text-align:left">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)">
+        <div style="width:10px;height:10px;border-radius:50%;background:#ff5f57"></div>
+        <div style="width:10px;height:10px;border-radius:50%;background:#febc2e"></div>
+        <div style="width:10px;height:10px;border-radius:50%;background:#28c840"></div>
+        <span style="margin-left:8px;font-size:11px;color:#8b9fc4;font-family:monospace">buysell365.pro/dashboard — Trading en Vivo</span>
+        <span style="margin-left:auto;font-size:11px;color:#00ffc8">&#9679; BOT ACTIVO</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:800;color:#00ffc8">{wr}%</div>
+          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">WIN RATE</div>
+        </div>
+        <div style="background:rgba(77,159,255,.08);border:1px solid rgba(77,159,255,.2);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:800;color:#4d9fff">{total}</div>
+          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">SE&#209;ALES</div>
+        </div>
+        <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:800;color:#fbbf24">+$841</div>
+          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">BENEFICIO</div>
+        </div>
+        <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:1.4rem;font-weight:800;color:#a78bfa">24/5</div>
+          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">ACTIVO</div>
+        </div>
+      </div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <tr style="color:#8b9fc4;border-bottom:1px solid rgba(255,255,255,.05)">
+          <td style="padding:5px 8px">Fecha</td><td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px">Tipo</td><td style="padding:5px 8px">Entrada</td>
+          <td style="padding:5px 8px;text-align:right">P&amp;L</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+          <td style="padding:6px 8px;color:#8b9fc4">27/03/2026</td>
+          <td style="padding:6px 8px;font-weight:700;color:#fff">ORO</td>
+          <td style="padding:6px 8px"><span style="color:#00ffc8">&#9679;</span> COMPRA</td>
+          <td style="padding:6px 8px;font-family:monospace">4,456.61</td>
+          <td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+$222.50</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+          <td style="padding:6px 8px;color:#8b9fc4">26/03/2026</td>
+          <td style="padding:6px 8px;font-weight:700;color:#fff">NASDAQ 100</td>
+          <td style="padding:6px 8px"><span style="color:#00ffc8">&#9679;</span> COMPRA</td>
+          <td style="padding:6px 8px;font-family:monospace">19,847.30</td>
+          <td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+$38.20</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;color:#8b9fc4">26/03/2026</td>
+          <td style="padding:6px 8px;font-weight:700;color:#fff">EUR/USD</td>
+          <td style="padding:6px 8px"><span style="color:#ff3b30">&#9679;</span> VENTA</td>
+          <td style="padding:6px 8px;font-family:monospace">1.07843</td>
+          <td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+$12.40</td>
+        </tr>
+      </table>
+      <div style="text-align:center;margin-top:12px">
+        <a href="/dashboard" style="font-size:11px;color:#00ffc8;text-decoration:none">&#128202; Ver dashboard completo en vivo &rarr;</a>
+      </div>
+    </div>
   </div>
 </section>
+
+<!-- EMAIL CAPTURE -->
+<section class="fade-in" id="email-capture" style="padding:50px 20px;background:linear-gradient(135deg,rgba(0,212,170,.05),rgba(77,159,255,.05));border-top:1px solid rgba(0,212,170,.1);border-bottom:1px solid rgba(0,212,170,.1)">
+  <div style="max-width:560px;margin:0 auto;text-align:center">
+    <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600">&#127381; GRATIS — SIN TARJETA</div>
+    <h2 style="font-size:clamp(1.5rem,4vw,2.2rem);font-weight:900;color:#f0f6ff;margin-bottom:10px">Recibe 3 se&#241;ales de ejemplo <span style="color:#00ffc8">gratis</span></h2>
+    <p style="color:#8b9fc4;font-size:1rem;margin-bottom:28px;line-height:1.6">Ve c&#243;mo funciona BuySell365 Pro antes de suscribirte. Entry, TP y SL exactos — directamente en tu email.</p>
+    <form id="emailCaptureForm" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:480px;margin:0 auto" onsubmit="return _submitEmail(event)">
+      <input type="email" id="emailInput" placeholder="tu@email.com" required
+        style="flex:1;min-width:220px;padding:14px 18px;background:rgba(255,255,255,.06);border:1px solid rgba(0,212,170,.3);border-radius:12px;color:#f0f6ff;font-size:1rem;font-family:inherit;outline:none">
+      <button type="submit" id="emailBtn"
+        style="padding:14px 24px;background:linear-gradient(135deg,#00ffc8,#00a89d);border:none;border-radius:12px;color:#000;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .3s">
+        &#128640; Enviar se&#241;ales
+      </button>
+    </form>
+    <div id="emailMsg" style="margin-top:14px;font-size:14px;display:none"></div>
+    <p style="margin-top:14px;font-size:11px;color:rgba(139,159,196,.5)">Sin spam. Puedes darte de baja en cualquier momento. &bull; <a href="/privacidad" style="color:rgba(0,255,200,.4);text-decoration:none">Privacidad</a></p>
+  </div>
+</section>
+<script>
+function _submitEmail(e){{
+  e.preventDefault();
+  var email = document.getElementById('emailInput').value;
+  var btn = document.getElementById('emailBtn');
+  var msg = document.getElementById('emailMsg');
+  btn.textContent = 'Enviando...';
+  btn.disabled = true;
+  fetch('/suscribir', {{
+    method:'POST',
+    headers:{{'Content-Type':'application/json'}},
+    body: JSON.stringify({{email: email}})
+  }}).then(function(r){{ return r.json(); }}).then(function(d){{
+    if(d.ok){{
+      msg.innerHTML = '&#9989; &#161;Listo! Revisa tu email en los pr&#243;ximos minutos.';
+      msg.style.color = '#00ffc8';
+      document.getElementById('emailCaptureForm').style.display = 'none';
+    }} else {{
+      msg.innerHTML = '&#9888;&#65039; ' + (d.error || 'Error. Intenta de nuevo.');
+      msg.style.color = '#ff6b6b';
+      btn.textContent = '&#128640; Enviar se&#241;ales';
+      btn.disabled = false;
+    }}
+    msg.style.display = 'block';
+  }}).catch(function(){{
+    msg.innerHTML = '&#9888;&#65039; Error de conexi&#243;n. Intenta de nuevo.';
+    msg.style.color = '#ff6b6b';
+    msg.style.display = 'block';
+    btn.textContent = '&#128640; Enviar se&#241;ales';
+    btn.disabled = false;
+  }});
+  return false;
+}}
+</script>
 
 <!-- PRICING — Visible inmediatamente después del Hero -->
 <section class="pricing fade-in" id="pricing">
@@ -1093,12 +1202,7 @@ if('serviceWorker' in navigator){{
         <span class="old">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
       </div>
-      <div class="countdown" id="offerCountdown">
-        <div class="countdown-item"><div class="countdown-val" id="cdDays">--</div><div class="countdown-lbl" data-i18n="countdown.days">D\u00edas</div></div>
-        <div class="countdown-item"><div class="countdown-val" id="cdHours">--</div><div class="countdown-lbl" data-i18n="countdown.hours">Horas</div></div>
-        <div class="countdown-item"><div class="countdown-val" id="cdMins">--</div><div class="countdown-lbl" data-i18n="countdown.mins">Min</div></div>
-        <div class="countdown-item"><div class="countdown-val" id="cdSecs">--</div><div class="countdown-lbl" data-i18n="countdown.secs">Seg</div></div>
-      </div>
+      <div style="margin:12px 0 4px;font-size:12px;color:rgba(255,215,0,.7);letter-spacing:1px">&#9733; PRECIO ESPECIAL FUNDADORES &#9733;</div>
       <ul class="price-list" style="margin-top:20px">
         <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP y SL exactos</li>
         <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
@@ -1696,37 +1800,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){{
   }});
 }})();
 
-// ═══════════════════════════════════════════════
-//  COUNTDOWN TIMER (50% OFF offer expires 2026-07-30)
-// ═══════════════════════════════════════════════
-(function(){{
-  const endDate = new Date('2026-07-30T23:59:59').getTime();
-  function update(){{
-    const now = Date.now();
-    const diff = endDate - now;
-    if(diff <= 0){{
-      document.getElementById('cdDays').textContent = '0';
-      document.getElementById('cdHours').textContent = '0';
-      document.getElementById('cdMins').textContent = '0';
-      document.getElementById('cdSecs').textContent = '0';
-      return;
-    }}
-    const d = Math.floor(diff / 86400000);
-    const h = Math.floor((diff % 86400000) / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    const de = document.getElementById('cdDays');
-    const he = document.getElementById('cdHours');
-    const me = document.getElementById('cdMins');
-    const se = document.getElementById('cdSecs');
-    if(de) de.textContent = d;
-    if(he) he.textContent = h < 10 ? '0'+h : h;
-    if(me) me.textContent = m < 10 ? '0'+m : m;
-    if(se) se.textContent = s < 10 ? '0'+s : s;
-  }}
-  update();
-  setInterval(update, 1000);
-}})();
+// countdown removed
 </script>
 
 <!-- GDPR Cookie Consent Banner -->
@@ -2437,11 +2511,24 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
   function normName(raw){{
     if(!raw) return '?';
-    const map = {{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY','AUDCAD':'AUD/CAD','EURCHF':'EUR/CHF','USDCAD':'USD/CAD','BTC-USD':'BITCOIN','ETH-USD':'ETHEREUM','XAUUSD':'ORO','BTCUSD':'BITCOIN','ETHUSD':'ETHEREUM','US100Cash':'NASDAQ','US500Cash':'S&P 500'}};
+    const map = {{
+      'GC=F':'ORO','XAUUSD':'ORO','XAUUSD=X':'ORO','GOLD':'ORO','gold':'ORO',
+      'NQ=F':'NASDAQ 100','US100Cash':'NASDAQ 100','US100':'NASDAQ 100','NASDAQ':'NASDAQ 100',
+      'ES=F':'S&P 500','US500Cash':'S&P 500','US500':'S&P 500',
+      'EURUSD=X':'EUR/USD','EURUSD':'EUR/USD',
+      'USDJPY=X':'USD/JPY','USDJPY':'USD/JPY',
+      'GBPJPY=X':'GBP/JPY','GBPJPY':'GBP/JPY',
+      'GBPUSD=X':'GBP/USD','GBPUSD':'GBP/USD',
+      'AUDCAD=X':'AUD/CAD','AUDCAD':'AUD/CAD',
+      'EURCHF=X':'EUR/CHF','EURCHF':'EUR/CHF',
+      'USDCAD=X':'USD/CAD','USDCAD':'USD/CAD',
+      'BTC-USD':'Bitcoin','BTCUSD':'Bitcoin',
+      'ETH-USD':'Ethereum','ETHUSD':'Ethereum'
+    }};
     if(map[raw]) return map[raw];
     let n = raw.replace(/[^A-Za-z0-9\\/&. _-]/g, '').trim();
     if(map[n]) return map[n];
-    for(let k in map){{ if(raw.indexOf(k) >= 0) return map[k]; }}
+    for(let k in map){{ if(raw.toUpperCase().indexOf(k.toUpperCase()) >= 0) return map[k]; }}
     return n;
   }}
 
@@ -2523,9 +2610,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       html += '<td style="padding:8px;font-weight:600">' + normName(t.nombre || t.ticker || '-') + '</td>';
       html += '<td style="padding:8px">' + tipoIcon + ' ' + (t.tipo || '-') + '</td>';
       const _entrada = t.entrada || t.precio_entrada;
-      const _salida = t.salida || t.precio_salida;
+      const _salida = t.salida || t.precio_salida || t.precio_cierre;
       const _hora_e = t.hora_entrada || t.hora || '';
-      const _hora_s = t.hora_salida || '';
+      const _hora_s = t.hora_salida || t.hora_cierre || '';
       html += '<td style="padding:8px;font-family:monospace">' + (_entrada ? Number(_entrada).toFixed(dec) : '-') + '</td>';
       html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (_hora_e || '-') + '</td>';
       html += '<td style="padding:8px;font-family:monospace">' + (_salida ? Number(_salida).toFixed(dec) : '-') + '</td>';
@@ -2775,6 +2862,33 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     _dash_resp.headers['Content-Type'] = 'text/html; charset=utf-8'
     _dash_resp.headers['Cache-Control'] = 'no-cache'
     return _dash_resp
+
+@app.route("/suscribir", methods=["POST"])
+def suscribir_email():
+    import json as _json2
+    try:
+        data = request.get_json(silent=True) or {}
+        email = str(data.get("email", "")).strip().lower()
+        if not email or "@" not in email or len(email) > 200:
+            return jsonify({"ok": False, "error": "Email inválido"}), 400
+        subs_path = os.path.join(os.path.dirname(__file__), "suscriptores.json")
+        subs = []
+        if os.path.exists(subs_path):
+            try:
+                with open(subs_path) as f:
+                    subs = _json2.load(f)
+            except Exception:
+                subs = []
+        emails_existentes = [s.get("email") for s in subs]
+        if email in emails_existentes:
+            return jsonify({"ok": True, "msg": "ya_registrado"})
+        import datetime as _dt
+        subs.append({"email": email, "fecha": _dt.datetime.now().isoformat(), "fuente": "landing"})
+        with open(subs_path, "w") as f:
+            _json2.dump(subs, f, ensure_ascii=False, indent=2)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 # ============================================================
 #  LEGAL PAGES
