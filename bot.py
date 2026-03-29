@@ -4949,7 +4949,8 @@ def cmd_broker():
     return (
         "🏦 *BROKER RECOMENDADO — XM*\n"
         "━━━━━━━━━━\n\n"
-        "✅ BuySell365 Pro opera sobre *XM Global* — broker regulado y de confianza.\n\n"
+        "🎁 *BONO EXCLUSIVO: 100% hasta $100 en tu primer depósito*\n\n"
+        "✅ BuySell365 Pro opera sobre *XM Global* — broker regulado internacionalmente.\n\n"
         "📋 *¿Por qué XM?*\n"
         "   • Regulado CySEC · ASIC · FCA\n"
         "   • +5 millones de clientes en 196 países\n"
@@ -4958,11 +4959,11 @@ def cmd_broker():
         "   • Ejecución sin re-quotes\n"
         "   • App iOS y Android ✅\n"
         "   • Fondos en cuentas segregadas 🔒\n\n"
-        "⚡ *Para usar Copy Trading y señales automáticas DEBES registrarte con nuestro código:*\n"
-        "   🔑 Código de afiliado: *6CTHK*\n\n"
-        "👇 Pulsa el botón para abrir tu cuenta gratis:",
+        "⚡ *Para Copy Trading DEBES registrarte con nuestro código de afiliado:*\n"
+        "   🔑 Código: *6CTHK*\n\n"
+        "👇 Pulsa el botón — son 2 minutos:",
         {"inline_keyboard": [
-            [{"text": "🚀 Abrir Cuenta Real en XM — Gratis", "url": "https://affs.click/jhA2x"}],
+            [{"text": "🎁 Abrir Cuenta + Bono 100% hasta $100", "url": "https://affs.click/jhA2x"}],
             [{"text": "📱 Descargar App XM", "url": "https://affs.click/dy3cG"}],
             [{"text": "🤖 Activar Copy Trading", "callback_data": "copy_info"}],
         ]}
