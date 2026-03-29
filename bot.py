@@ -14120,17 +14120,19 @@ def _verificar_entradas_pendientes():
 def loop_publicidad_grupo():
     """
     Hilo de publicidad automática en el grupo:
-    - 1 anuncio por hora, de 06:00 a 23:00
-    - Rota los 5 modelos en orden, sin repetir el mismo seguido
-    - El índice se calcula por hora del día para que los reinicios no repitan
+    - 2 anuncios al día: mañana (10:00) y tarde (17:00)
+    - Rota los 5 modelos: cada franja usa el siguiente modelo del día
+    - Sin repetición por reinicio (índice basado en día del año)
     - Borra el anuncio anterior antes de publicar el nuevo
     """
-    PUBLICIDAD_INTERVALO = 60 * 60   # 1 hora entre anuncios
     PUBLICIDAD_PRIMERA_ESPERA = 3 * 60  # Esperar 3 min al arrancar
+    HORA_MANANA = 10   # Anuncio de mañana a las 10:00
+    HORA_TARDE  = 17   # Anuncio de tarde a las 17:00
 
-    _ultimo_anuncio_id = None   # Message ID del último anuncio enviado
-    _ultima_hora_enviada = -1   # Hora (int) del último envío para evitar duplicados
-    _dia_borrado_grupo = ""     # Para el borrado nocturno del grupo
+    _ultimo_anuncio_id  = None   # Message ID del último anuncio enviado
+    _dia_borrado_grupo  = ""     # Para el borrado nocturno
+    _franja_manana_dia  = ""     # Fecha del último anuncio de mañana enviado
+    _franja_tarde_dia   = ""     # Fecha del último anuncio de tarde enviado
 
     # ── Anuncios rotativos del GRUPO (cada 30 min) ──
     ANUNCIOS = [
@@ -14255,19 +14257,28 @@ def loop_publicidad_grupo():
                 time.sleep(PUBLICIDAD_INTERVALO)
                 continue
 
-            # ── Solo enviar entre 06:00 y 22:59 ──
+            # ── Solo actuar entre 06:00 y 22:59 ──
             if not (6 <= _hora_g < 23):
-                time.sleep(60)   # Revisar cada minuto fuera de horario
-                continue
-
-            # ── Evitar enviar dos veces en la misma hora ──
-            if _hora_g == _ultima_hora_enviada:
                 time.sleep(60)
                 continue
 
-            # Índice basado en la hora del día para que los reinicios no repitan
-            # (hora 6=idx0, hora 7=idx1 … hora 22=idx16, cicla entre los 5 modelos)
-            _indice = (_hora_g - 6) % len(ANUNCIOS)
+            # ── Determinar si toca franja mañana o tarde ──
+            _dia_num   = _ahora_g.timetuple().tm_yday  # día del año (1-365)
+            _es_manana = (_hora_g == HORA_MANANA and _franja_manana_dia != _clave_dia_g)
+            _es_tarde  = (_hora_g == HORA_TARDE  and _franja_tarde_dia  != _clave_dia_g)
+
+            if not _es_manana and not _es_tarde:
+                time.sleep(60)
+                continue
+
+            # Índice rotativo por día: mañana usa slot par, tarde slot impar
+            if _es_manana:
+                _indice = (_dia_num * 2) % len(ANUNCIOS)
+                _franja = "mañana"
+            else:
+                _indice = (_dia_num * 2 + 1) % len(ANUNCIOS)
+                _franja = "tarde"
+
             texto, teclado = ANUNCIOS[_indice]
 
             # Borrar anuncio anterior antes de publicar el nuevo
@@ -14282,8 +14293,11 @@ def loop_publicidad_grupo():
             nuevo_id = enviar_telegram(texto, destino=GROUP_ID, teclado=teclado)
             if nuevo_id:
                 _ultimo_anuncio_id = nuevo_id
-                _ultima_hora_enviada = _hora_g
-                logger.info(f"📢 Publicidad grupo — modelo {_indice+1}/{len(ANUNCIOS)} (hora {_hora_g}:00)")
+                if _es_manana:
+                    _franja_manana_dia = _clave_dia_g
+                else:
+                    _franja_tarde_dia = _clave_dia_g
+                logger.info(f"📢 Publicidad grupo — {_franja} modelo {_indice+1}/{len(ANUNCIOS)} ({_hora_g}:00)")
 
         except Exception as e:
             logger.error(f"⚠️ Error en loop_publicidad_grupo: {e}")
