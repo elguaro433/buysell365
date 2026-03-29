@@ -775,9 +775,10 @@ body{{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);over
 section{{padding:60px 20px}}
 .section-title{{text-align:center;margin-bottom:36px}}
 .section-title h2{{font-size:clamp(1.8rem,4vw,2.8rem);font-weight:900;margin-bottom:14px;
-  background:linear-gradient(135deg,#fff 20%,#00ffcc 55%,#4d9fff 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   filter:drop-shadow(0 0 20px rgba(0,255,204,0.2))}}
+.section-title h2 span{{
+  background:linear-gradient(135deg,#fff 20%,#00ffcc 55%,#4d9fff 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
 .section-title p{{color:var(--text2);font-size:1.1rem;max-width:650px;margin:0 auto;line-height:1.6}}
 
 /* ═══ FEATURES ═══ */
@@ -834,8 +835,6 @@ section{{padding:60px 20px}}
 /* ═══ CTA ═══ */
 .cta{{text-align:center;padding:70px 20px;background:radial-gradient(ellipse at 50% 50%,rgba(0,255,204,0.07) 0%,transparent 70%)}}
 .cta h2{{font-size:clamp(1.8rem,4vw,2.5rem);font-weight:900;margin-bottom:16px;
-  background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   filter:drop-shadow(0 0 24px rgba(0,255,204,0.25))}}
 .cta p{{color:var(--text2);margin-bottom:32px;font-size:1.1rem}}
 
@@ -1025,7 +1024,7 @@ if('serviceWorker' in navigator){{
 <!-- PRICING — Visible inmediatamente después del Hero -->
 <section class="pricing fade-in" id="pricing">
   <div class="section-title" style="margin-bottom:48px">
-    <h2 style="font-size:clamp(2rem,5vw,3rem);background:linear-gradient(135deg,#fff 20%,#fbbf24 50%,#00ffcc 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(251,191,36,0.2))">\U0001f4b0 <span data-i18n="pricing.title" style="-webkit-text-fill-color:inherit">Servicios y Planes</span></h2>
+    <h2 style="font-size:clamp(2rem,5vw,3rem);filter:drop-shadow(0 0 20px rgba(251,191,36,0.2))">\U0001f4b0 <span data-i18n="pricing.title" style="background:linear-gradient(135deg,#fff 20%,#fbbf24 50%,#00ffcc 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Servicios y Planes</span></h2>
     <p data-i18n="pricing.subtitle" style="font-size:1.15rem;color:#a0aec0">Elige el plan que mejor se adapte a tu estilo de trading.</p>
   </div>
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
@@ -1154,26 +1153,26 @@ if('serviceWorker' in navigator){{
 
 <!-- ABOUT / TRUST BAR -->
 <section id="about" class="fade-in" style="padding:30px 20px;background:var(--bg2)">
-  <div style="max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:center;gap:20px">
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">6+</div>
-      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_ai">Modelos de IA</div>
+  <div style="max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:center;gap:16px">
+    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(0,255,204,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(0,255,204,0.06)">
+      <div style="font-size:1.8rem;font-weight:900;color:#00ffcc;text-shadow:0 0 20px rgba(0,255,204,0.6)">6+</div>
+      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_ai">Modelos de IA</div>
     </div>
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">24/5</div>
-      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_monitor">Monitoreo</div>
+    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(77,159,255,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(77,159,255,0.06)">
+      <div style="font-size:1.8rem;font-weight:900;color:#4d9fff;text-shadow:0 0 20px rgba(77,159,255,0.6)">24/5</div>
+      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_monitor">Monitoreo</div>
     </div>
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">3min</div>
-      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_scan">Escaneo</div>
+    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(167,139,250,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(167,139,250,0.06)">
+      <div style="font-size:1.8rem;font-weight:900;color:#a78bfa;text-shadow:0 0 20px rgba(167,139,250,0.6)">3min</div>
+      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_scan">Escaneo</div>
     </div>
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">100%</div>
-      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_transparent">Transparente</div>
+    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(251,191,36,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(251,191,36,0.06)">
+      <div style="font-size:1.8rem;font-weight:900;color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,0.6)">100%</div>
+      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_transparent">Transparente</div>
     </div>
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">+20</div>
-      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_assets">Activos</div>
+    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(0,230,118,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(0,230,118,0.06)">
+      <div style="font-size:1.8rem;font-weight:900;color:#00e676;text-shadow:0 0 20px rgba(0,230,118,0.6)">+20</div>
+      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_assets">Activos</div>
     </div>
   </div>
   <p style="text-align:center;font-size:.8rem;color:var(--text2);margin:16px auto 0;max-width:800px;opacity:.7" data-i18n="about.powered">\u26a1 Inteligencia Artificial \u00b7 An\u00e1lisis de Noticias \u00b7 Datos Institucionales \u00b7 An\u00e1lisis T\u00e9cnico \u00b7 MetaTrader 5</p>
@@ -1331,22 +1330,34 @@ if('serviceWorker' in navigator){{
     <p>Lo que nos diferencia de otros servicios de se\u00f1ales</p>
   </div>
   <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;max-width:1100px;margin:0 auto">
-    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+    <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
+         onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
+         onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
+         >
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f916</div>
       <h4 style="color:#00ffc8;margin-bottom:8px">IA Real, No Opiniones</h4>
       <p style="color:var(--text2);font-size:.85rem">Nuestro bot analiza datos reales cada 3 minutos. Sin emociones, sin sesgos — solo datos y algoritmos.</p>
     </div>
-    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+    <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
+         onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
+         onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
+         >
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4b0</div>
       <h4 style="color:#ffd700;margin-bottom:8px">Copy Trading Sin Cuota</h4>
       <p style="color:var(--text2);font-size:.85rem">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias reales.</p>
     </div>
-    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+    <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
+         onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
+         onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
+         >
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4ca</div>
       <h4 style="color:#00e676;margin-bottom:8px">100% Transparente</h4>
       <p style="color:var(--text2);font-size:.85rem">Dashboard p\u00fablico con resultados en vivo. Cada operaci\u00f3n visible con entrada, SL, TP y resultado.</p>
     </div>
-    <div style="flex:1;min-width:220px;max-width:260px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center">
+    <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
+         onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
+         onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
+         >
       <div style="font-size:2.2rem;margin-bottom:10px">\u26a1</div>
       <h4 style="color:#a855f7;margin-bottom:8px">Ejecuci\u00f3n Instant\u00e1nea</h4>
       <p style="color:var(--text2);font-size:.85rem">Las se\u00f1ales se ejecutan en menos de 1 segundo. Sin retrasos, sin slippage. Tu cuenta siempre sincronizada.</p>
@@ -1358,8 +1369,8 @@ if('serviceWorker' in navigator){{
 <section style="padding:60px 20px;text-align:center" class="fade-in">
 <div style="max-width:500px;margin:0 auto">
     <div style="font-size:11px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px">&#128227; Ejemplo de Se\u00f1al en Vivo</div>
-    <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:20px;color:#fff">As\u00ed Recibir\u00e1s las Se\u00f1ales</h2>
-    <div style="background:linear-gradient(135deg,#111820,#1a0d2e);border:1px solid rgba(0,212,170,.15);border-radius:16px;padding:24px;text-align:left;margin-bottom:24px">
+    <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:20px;background:linear-gradient(135deg,#fff 20%,#a78bfa 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">As\u00ed Recibir\u00e1s las Se\u00f1ales</h2>
+    <div style="background:linear-gradient(135deg,#0f1e2e,#1a0d2e);border:1px solid rgba(0,212,170,.3);border-radius:16px;padding:24px;text-align:left;margin-bottom:24px;box-shadow:0 4px 30px rgba(0,212,170,0.08)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
             <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#00d4aa,#00a080);display:flex;align-items:center;justify-content:center;font-size:18px">&#129302;</div>
             <div><div style="font-weight:700;font-size:14px;color:#fff">BuySell365 Pro</div><div style="font-size:10px;color:#5a6a7a">Canal de Se\u00f1ales</div></div>
@@ -1369,16 +1380,16 @@ if('serviceWorker' in navigator){{
             <div style="margin-top:8px;font-size:13px">&#128205; <strong>Entrada:</strong> 110.50</div>
             <div style="color:#00e676;margin-top:2px;font-size:13px">&#127919; <strong>TP:</strong> 106.50</div>
             <div style="color:#ff6b35;margin-top:2px;font-size:13px">&#128737; <strong>SL:</strong> 112.50</div>
-            <div style="margin-top:8px;font-size:12px;color:#5a6a7a">Rendimiento en vivo &bull; <a href="/dashboard" style="color:#00d4aa;text-decoration:none">Ver Dashboard &rarr;</a></div>
+            <div style="margin-top:8px;font-size:12px;color:#7a90a8">Rendimiento en vivo &bull; <a href="/dashboard" style="color:#00d4aa;text-decoration:none">Ver Dashboard &rarr;</a></div>
         </div>
     </div>
-    <p style="color:#5a6a7a;font-size:13px;margin-bottom:12px">Recibe alertas como esta directamente en tu Telegram</p>
+    <p style="color:#8a9ab5;font-size:13px;margin-bottom:12px">Recibe alertas como esta directamente en tu Telegram</p>
 </div>
 </section>
 
 <!-- CTA -->
 <section class="cta fade-in" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
-  <h2 style="background:linear-gradient(135deg,#fff,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f680 Empieza a Operar con IA</h2>
+  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Empieza a Operar con IA</span></h2>
   <p style="font-size:1.1rem">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
   <div class="hero-buttons">
     <a href="#pricing" class="btn btn-primary">\U0001f451 Ver Planes</a>
