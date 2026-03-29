@@ -710,7 +710,7 @@ def index_web():
   "name": "BuySell365 Pro",
   "applicationCategory": "FinanceApplication",
   "operatingSystem": "Web, Telegram",
-  "description": "Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en +20 activos con IA avanzada y datos institucionales.",
+  "description": "Se\u00f1ales de trading automatizadas con Inteligencia Artificial. EUR/USD, NASDAQ, S&P 500 y m\u00e1s activos. An\u00e1lisis con IA avanzada y datos institucionales.",
   "url": "https://buysell365.pro",
   "offers": {{
     "@type": "Offer",
@@ -1048,7 +1048,7 @@ if('serviceWorker' in navigator){{
       <ul class="price-list" style="margin-top:20px">
         <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP y SL exactos</li>
         <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
-        <li style="color:#ffd740">&#129302; <strong>Acceso total al bot de trading y asistencia 24/7</strong></li>
+        <li style="color:#ffd740">&#129302; <strong>Acceso total al bot de trading y soporte prioritario</strong></li>
         <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas — nunca pierdas una se\u00f1al</li>
         <li style="color:#ffd740">&#128161; Soporte prioritario directo</li>
         <li style="color:#ffd740">&#128202; An\u00e1lisis IA exclusivo por activo</li>
@@ -1064,7 +1064,7 @@ if('serviceWorker' in navigator){{
       <ul class="price-list" style="color:#e0e0e0">
         <li style="color:#00e676" data-i18n="pricing.cp1">&#128640; Copia autom\u00e1tica de todas nuestras operaciones</li>
         <li style="color:#00e676" data-i18n="pricing.cp2">&#127919; Entry, SL y TP exactos \u2014 sin hacer nada t\u00fa</li>
-        <li style="color:#00e676" data-i18n="pricing.cp3">&#128202; +20 activos \u2014 Oro, Forex e \u00cdndices</li>
+        <li style="color:#00e676" data-i18n="pricing.cp3">&#128202; EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos</li>
         <li style="color:#00e676" data-i18n="pricing.cp4">&#127963; Broker XM regulado internacionalmente</li>
         <li style="color:#ffd740" data-i18n="pricing.cp5">&#128176; Sin cuota mensual \u2014 pagas solo si ganas</li>
         <li style="color:#00e676" data-i18n="pricing.cp6">&#128065; Ves cada operaci\u00f3n en tiempo real</li>
@@ -1087,7 +1087,7 @@ if('serviceWorker' in navigator){{
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00ffc8,#00d4aa);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">1</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4f2</div>
       <h3 style="color:#00ffc8;font-size:1.1rem;margin-bottom:8px">Únete al Canal VIP</h3>
-      <p style="color:var(--text2);font-size:.9rem">Activa el canal VIP y obtén acceso completo al bot de trading y asistencia personal 24/7.</p>
+      <p style="color:var(--text2);font-size:.9rem">Activa el canal VIP y obt\u00e9n acceso completo al bot de trading y soporte prioritario.</p>
     </div>
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(255,200,0,.05),rgba(255,150,0,.05));border:1px solid rgba(255,200,0,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ffd700,#f0b90b);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">2</div>
@@ -1151,7 +1151,7 @@ if('serviceWorker' in navigator){{
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_ai">Modelos de IA</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">24/7</div>
+      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">24/5</div>
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_monitor">Monitoreo</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
@@ -1281,7 +1281,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q4">\u00bfQu\u00e9 broker necesito?</div>
-      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (Oro, Forex e \u00cdndices). Recomendamos brokers con MetaTrader 5 para aprovechar nuestro servicio de Copy Trading activo.</div>
+      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para aprovechar nuestro servicio de Copy Trading activo.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q_copy">\u00bfC\u00f3mo funciona el Copy Trading con XM?</div>
@@ -1986,7 +1986,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <p style="font-size:14px;max-width:520px;margin:8px auto 20px" data-i18n="dash.promo_unified_sub">Se&ntilde;ales de IA + Copy Trading autom&aacute;tico en tu cuenta MT5 con broker regulado XM</p>
             <div class="promo-features" style="margin-bottom:20px">
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Se&ntilde;ales con TP y SL exactos</div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Copy Trading 24/7</div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Copy Trading autom\u00e1tico</div>
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Broker regulado XM</div>
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> SL y TP autom&aacute;ticos</div>
             </div>
