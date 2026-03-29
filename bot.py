@@ -109,7 +109,13 @@ class _CategoryFilter(logging.Filter):
 logger.addFilter(_CategoryFilter())
 
 # Silenciar loggers ruidosos de librerías externas
-for _noisy in ("urllib3", "requests", "urllib3.connectionpool"):
+for _noisy in (
+    "urllib3", "requests", "urllib3.connectionpool",
+    "httpcore", "httpcore.http11", "httpcore.connection",
+    "httpx", "groq", "groq._base_client",
+    "openai", "openai._base_client",
+    "hpack", "h2", "h11",
+):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 _file_handler.addFilter(_CategoryFilter())   # También en el handler → cubre urllib3, requests, etc.
 
@@ -415,7 +421,7 @@ _lock_ops         = threading.RLock()  # Thread-safety para operaciones_activas
 _lock_yf          = threading.Lock()   # Thread-safety para descargas de yfinance
 _FUENTES_PRECIO: dict[str, dict]   = {}  # {ticker: {'precio': float, 'apertura': float, 'ts': float}} — cache 30s
 
-import sys
+# CRÍTICO-2 FIX: 'import sys' duplicado eliminado (ya importado en línea 1)
 # COT Reports - Posicionamiento Institucional
 try:
     from cot_module import cot_confirma_senal, descargar_cot_cftc
@@ -482,13 +488,21 @@ _acc1_login = os.getenv("MT5_LOGIN", "").strip()
 _acc1_pass  = os.getenv("MT5_PASSWORD", "").strip()
 _acc1_srv   = os.getenv("MT5_SERVER", "").strip()
 if _acc1_login and _acc1_pass and _acc1_srv:
-    MT5_ACCOUNTS.append({"login": int(_acc1_login), "password": _acc1_pass, "server": _acc1_srv, "name": "Cuenta-1"})
+    # IMPORTANTE-1 FIX: int() sin try-except crashea si MT5_LOGIN tiene caracteres no numéricos
+    try:
+        MT5_ACCOUNTS.append({"login": int(_acc1_login), "password": _acc1_pass, "server": _acc1_srv, "name": "Cuenta-1"})
+    except (ValueError, TypeError) as _e_acc1:
+        print(f"⚠️ MT5_LOGIN inválido (no es entero): '{_acc1_login}' — {_e_acc1}. Cuenta-1 no añadida.")
 # Cuenta secundaria
 _acc2_login = os.getenv("MT5_LOGIN_2", "").strip()
 _acc2_pass  = os.getenv("MT5_PASSWORD_2", "").strip()
 _acc2_srv   = os.getenv("MT5_SERVER_2", "").strip()
 if _acc2_login and _acc2_pass and _acc2_srv:
-    MT5_ACCOUNTS.append({"login": int(_acc2_login), "password": _acc2_pass, "server": _acc2_srv, "name": "Cuenta-2"})
+    # IMPORTANTE-1 FIX: int() sin try-except crashea si MT5_LOGIN_2 tiene caracteres no numéricos
+    try:
+        MT5_ACCOUNTS.append({"login": int(_acc2_login), "password": _acc2_pass, "server": _acc2_srv, "name": "Cuenta-2"})
+    except (ValueError, TypeError) as _e_acc2:
+        print(f"⚠️ MT5_LOGIN_2 inválido (no es entero): '{_acc2_login}' — {_e_acc2}. Cuenta-2 no añadida.")
 
 _mt5_primary_account = MT5_ACCOUNTS[0] if MT5_ACCOUNTS else None
 _lock_mt5_switch = threading.RLock()  # Proteger cambio de cuenta
@@ -2562,59 +2576,11 @@ def evaluar_senal_profesional(ind, ticker=""):
     # Backtest: 12 señales, 16.7% WR, -499 pips. No rentable.
     # Solo Premium activo: Breakout (score 4) + Reversión con divergencia (score 5)
     # ━━━━━━━━━━
-    if False and ind['adx'] > adx_min:  # DESACTIVADA
-
-        # ── Pullback Alcista Premium ──
-        if (ind['precio'] > ind['ema200']          # Sobre tendencia principal
-            and ind['ema20'] > ind['ema50']         # Estructura alcista en 15m
-            and ind['macd'] > ind['signal']         # MACD apoya (nuevo)
-            and ind['low'] <= ind['ema50'] * 1.010  # Proximidad EMA50 (1% tolerancia)
-            and ind['precio'] > ind['ema50']        # Cierra por encima
-            and ind['rsi'] < (rsi_os + 15)          # RSI descargado
-            and ind['stoch_k'] < 50                 # Estocástico bajo
-            and ind['vol_ratio'] >= 0.8  # Volumen mínimo
-            and _ml_pass_alcista(ml_umbral_fuerte)):  # ML confirma o no disponible
-            _ml_tag = f"🤖 ML confirma: *{prob_alcista}% probabilidad alcista*" if _ml_disponible else "🤖 ML: no disponible — señal por análisis técnico puro"
-            razones = [
-                "✓ Estrategia: *Pullback Premium a Tendencia Alcista*",
-                f"✓ ADX {ind['adx']:.1f} — Tendencia fuerte en {cat.upper()}",
-                f"✓ Rebote preciso en EMA50 · Precio cerró por encima",
-                f"✓ RSI descargado ({ind['rsi']:.1f}) + Estocástico bajo ({ind['stoch_k']:.0f})",
-                f"✓ MACD alcista · Volumen {ind['vol_ratio']:.1f}x media",
-                _ml_tag
-            ]
-            if _eurusd_solo_score5:
-                return None, 0, ["📉 EUR/USD filtrado: Pullback es score 4, requiere score 5"]
-            _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
-            if not _filt_ok:
-                return None, 0, [_filt_msg]
-            return "COMPRA", 4, razones
-
-        # ── Pullback Bajista Premium ──
-        if (ind['precio'] < ind['ema200']
-            and ind['ema20'] < ind['ema50']
-            and ind['macd'] < ind['signal']
-            and ind['high'] >= ind['ema50'] * 0.990  # Proximidad EMA50 (1% tolerancia)
-            and ind['precio'] < ind['ema50']
-            and ind['rsi'] > (rsi_ob - 15)
-            and ind['stoch_k'] > 50
-            and ind['vol_ratio'] >= 0.8  # Volumen mínimo
-            and _ml_pass_bajista(ml_umbral_fuerte)):
-            _ml_tag = f"🤖 ML confirma: *{prob_bajista}% probabilidad bajista*" if _ml_disponible else "🤖 ML: no disponible — señal por análisis técnico puro"
-            razones = [
-                "✓ Estrategia: *Pullback Premium a Tendencia Bajista*",
-                f"✓ ADX {ind['adx']:.1f} — Tendencia fuerte en {cat.upper()}",
-                f"✓ Rechazo preciso en EMA50 · Precio cerró por debajo",
-                f"✓ RSI sobrecomprado ({ind['rsi']:.1f}) + Estocástico alto ({ind['stoch_k']:.0f})",
-                f"✓ MACD bajista · Volumen {ind['vol_ratio']:.1f}x media",
-                _ml_tag
-            ]
-            if _eurusd_solo_score5:
-                return None, 0, ["📉 EUR/USD filtrado: Pullback es score 4, requiere score 5"]
-            _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
-            if not _filt_ok:
-                return None, 0, [_filt_msg]
-            return "VENTA", 4, razones
+    # OPTIMIZACIÓN-1 FIX: Bloque ESTRATEGIA 1 "Pullback" eliminado — condición 'if False' hace
+    # que este código sea código muerto (nunca se ejecuta). Backtest: 16.7% WR, -499 pips.
+    # Guardado en comentario por si se rehabilita en el futuro con nuevos parámetros.
+    # if False and ind['adx'] > adx_min:  # PERMANENTEMENTE DESACTIVADA
+    #     ... (ver git history para el código completo de Pullback Alcista/Bajista)
 
     # ━━━━━━━━━━
     # ESTRATEGIA 2 — RUPTURA DE ALTA CONVICCIÓN  (Score 4)
@@ -4977,6 +4943,29 @@ def cmd_como():
         "4️⃣ *Gestión Estricta del Capital*\n"
         "   Si la auditoría es EXITOSA, te entregamos una Entrada precisa, un Stop Loss para proteger tu dinero, y un objetivo de ganancia (TP) calculado por Volatilidad (ATR).\n\n"
         "💡 *Consejo:* Escribe el nombre de un activo (Ej: *Oro*) para que te dé el pronóstico inmediato de lo que sucederá."
+    )
+
+def cmd_broker():
+    return (
+        "🏦 *BROKER RECOMENDADO — XM*\n"
+        "━━━━━━━━━━\n\n"
+        "✅ BuySell365 Pro opera sobre *XM Global* — broker regulado y de confianza.\n\n"
+        "📋 *¿Por qué XM?*\n"
+        "   • Regulado CySEC · ASIC · FCA\n"
+        "   • +5 millones de clientes en 196 países\n"
+        "   • Depósito mínimo: *$5 USD*\n"
+        "   • Spread desde 0 pips (Ultra Low)\n"
+        "   • Ejecución sin re-quotes\n"
+        "   • App iOS y Android ✅\n"
+        "   • Fondos en cuentas segregadas 🔒\n\n"
+        "⚡ *Para usar Copy Trading y señales automáticas DEBES registrarte con nuestro código:*\n"
+        "   🔑 Código de afiliado: *6CTHK*\n\n"
+        "👇 Pulsa el botón para abrir tu cuenta gratis:",
+        {"inline_keyboard": [
+            [{"text": "🚀 Abrir Cuenta Real en XM — Gratis", "url": "https://affs.click/jhA2x"}],
+            [{"text": "📱 Descargar App XM", "url": "https://affs.click/dy3cG"}],
+            [{"text": "🤖 Activar Copy Trading", "callback_data": "copy_info"}],
+        ]}
     )
 
 def cmd_riesgo():
@@ -8218,6 +8207,31 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     # ── 1. COMANDOS EXACTOS CON SLASH (máxima prioridad) ─────
 
     # 🆕 /start — Primera interacción del usuario con el bot (CRÍTICO para onboarding)
+    # Deep links desde botones del grupo/canal: /start analisis_eurusd, /start panel, etc.
+    if t.startswith("/start ") or t.startswith("start "):
+        _dl_param = t.split(" ", 1)[1].strip().lower()
+        _dl_map = {
+            "panel":            "/panel",
+            "analisis":         "/analisis_eurusd",
+            "analisis_eurusd":  "/analisis_eurusd",
+            "analisis_nasdaq":  "/analisis_nasdaq",
+            "analisis_sp500":   "/analisis_sp500",
+            "analisis_xauusd":  "/analisis_xauusd",
+            "senales":          "/activas",
+            "resumen":          "/resumen",
+            "precios":          "/precios",
+            "noticias":         "/noticias",
+            "cuenta":           "/cuenta",
+            "vip":              "/vip",
+            "grupo":            "/start",   # Bienvenida normal
+            "horarios":         "/horarios",
+            "semana":           "/semana",
+        }
+        _dl_cmd = _dl_map.get(_dl_param)
+        if _dl_cmd and _dl_cmd != "/start":
+            return procesar_mensaje(_dl_cmd, remitente, es_admin=es_admin)
+        # Si no se reconoce el parámetro → caer al /start normal
+
     if t in ("/start", "start"):
         pi_start = _vip_precio_info()
         _puede_trial_start = remitente not in _vip_trials_usados
@@ -8358,6 +8372,36 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     if t in ("/señales", "/senales", "/operaciones", "/abiertas", "/activas", "activas",
              "señales", "senales", "señales activas", "📊 señales activas"):
         return cmd_senales(), crear_teclado_principal()
+    # ━━━ PUERTA DE ESCAPE UNIVERSAL — siempre funciona ━━━
+    if t in ("/ayuda", "/help", "/reset", "/sos", "ayuda", "help", "socorro", "no funciona", "error"):
+        _es_vip_esc = (remitente in suscripciones_vip
+                       and suscripciones_vip[remitente].get("entrada_confirmada", False))
+        _teclado_escape = {"inline_keyboard": [
+            [{"text": "🔄 Reiniciar — Menú principal", "callback_data": "/start"}],
+            [{"text": "🔍 Análisis de mercado",  "callback_data": "/analisis_eurusd"},
+             {"text": "📡 Señales activas",      "callback_data": "/activas"}],
+            [{"text": "📊 Precios en vivo",      "callback_data": "/precios"},
+             {"text": "📈 Resumen del día",      "callback_data": "/resumen"}],
+            *([[{"text": "🏆 Mi Panel VIP",      "callback_data": "/panel"}]] if _es_vip_esc else []),
+            [{"text": "💎 Planes VIP",           "callback_data": "vip_pagar_usdt"}],
+            [{"text": "🌐 Dashboard en vivo",    "url": "https://buysell365.pro"}],
+        ]}
+        return (
+            "🆘 *Centro de Ayuda — BuySell365 Pro*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Si algo no funciona, usa los botones de abajo para reiniciar.\n\n"
+            "⚡ *Comandos que siempre funcionan:*\n"
+            "• /start — Menú principal\n"
+            "• /panel — Tu panel de control\n"
+            "• /precios — Precios en vivo\n"
+            "• /senales — Señales activas\n"
+            "• /resumen — Resumen del día\n"
+            "• /cuenta — Tu estado VIP\n"
+            "• /ayuda — Esta pantalla\n\n"
+            "💬 Si el problema persiste, escríbeme directamente y lo resolvemos.",
+            _teclado_escape
+        )
+
     if t in ("/estado", "/stats", "/estadisticas", "⚙️ estado bot"):
         return cmd_estado(), crear_teclado_principal()
     if t in ("/resumen", "/historial", "/reporte", "📈 resumen diario"):
@@ -8369,6 +8413,41 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return None
     if t in ("💰 mi cuenta", "/cuenta", "mi cuenta", "cuenta"):
         return cmd_mi_cuenta(remitente), crear_teclado_principal()
+    if t in ("/panel", "panel", "/inicio", "/menu", "/start panel"):
+        # Panel VIP interactivo — muestra botones de análisis y herramientas
+        _es_vip_panel = (remitente in suscripciones_vip
+                         and suscripciones_vip[remitente].get("entrada_confirmada", False))
+        if _es_vip_panel or es_admin:
+            return (
+                "🏆 *Panel VIP — BuySell365 Pro*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n\n"
+                "Selecciona lo que necesitas 👇",
+                {"inline_keyboard": [
+                    [{"text": "🔍 Análisis EUR/USD",  "callback_data": "/analisis_eurusd"},
+                     {"text": "🔍 Análisis NASDAQ",   "callback_data": "/analisis_nasdaq"}],
+                    [{"text": "🔍 Análisis S&P 500",  "callback_data": "/analisis_sp500"},
+                     {"text": "🔍 Análisis ORO",      "callback_data": "/analisis_xauusd"}],
+                    [{"text": "📡 Señales Activas",   "callback_data": "/activas"},
+                     {"text": "📈 Resumen del Día",   "callback_data": "/resumen"}],
+                    [{"text": "📊 Precios en Vivo",   "callback_data": "/precios"},
+                     {"text": "📅 Noticias Eco.",     "callback_data": "/noticias"}],
+                    [{"text": "💎 Mi Estado VIP",     "callback_data": "/cuenta"},
+                     {"text": "📉 Resumen Semanal",   "callback_data": "/semana"}],
+                    [{"text": "⏰ Horarios",           "callback_data": "/horarios"},
+                     {"text": "📌 Estado del Bot",    "callback_data": "/estado"}],
+                    [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
+                ]}
+            )
+        else:
+            return (
+                "💎 *Panel VIP* — disponible para miembros activos\n\n"
+                "Únete al canal VIP para acceder a análisis, señales y herramientas exclusivas.",
+                {"inline_keyboard": [
+                    [{"text": "💎 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "🌐 buysell365.pro", "url": "https://buysell365.pro"}],
+                ]}
+            )
     if t in ("💎 vip", "/vip", "vip"):
         return cmd_vip(user_id=remitente), crear_teclado_principal()
     if t in ("💱 análisis eur/usd", "análisis eur/usd"):
@@ -8503,6 +8582,10 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return cmd_precios_tv()
     if t in ("/web", "web", "web en vivo", "/dashboard", "dashboard", "📊 web en vivo"):
         return cmd_url_dashboard()
+    if t in ("/broker", "broker", "xm", "abrir cuenta", "cuenta xm", "cuenta real",
+             "donde operar", "que broker", "que broker usar", "broker recomendado", "que broker usas",
+             "registrarme", "como me registro", "donde me registro"):
+        return cmd_broker()
     if t in ("/mercados", "mercados", "activos", "/activos", "que activos", "que mercados"):
         return cmd_mercados()
     if t in ("/mis alertas", "/alertas", "mis alertas", "alertas"):
@@ -8537,12 +8620,14 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "🔒 +5M clientes · fondos segregados\n"
             "💰 *Sin mensualidad — pagas solo si ganas*\n\n"
             "3️⃣ pasos para empezar:\n"
-            "1️⃣ Regístrate en XM _(gratis, 2 min)_\n"
+            "1️⃣ Regístrate en XM con código *6CTHK* _(gratis, 2 min)_\n"
             "2️⃣ Copia la estrategia *BuySell365Pro*\n"
             "3️⃣ Tu cuenta opera sola 🚀\n\n"
+            "⚠️ _Debes registrarte con el código *6CTHK* para que el copy funcione correctamente._\n\n"
             "👇 Pulsa el botón para activarlo ahora:",
             {"inline_keyboard": [
                 [{"text": "🚀 ACTIVAR COPY TRADING AHORA", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                [{"text": "🏦 Abrir Cuenta XM con Código 6CTHK", "url": "https://affs.click/jhA2x"}],
                 [{"text": "📊 Ver Rendimiento en Vivo", "url": "https://buysell365.pro"}],
                 [{"text": "💎 Canal VIP — Señales", "callback_data": "vip_pagar_usdt"}],
             ]}
@@ -11433,6 +11518,27 @@ def limpiar_caches_memoria():
     except Exception:
         pass
 
+    # CRÍTICO-3 FIX: Limpiar _cache_div_alertas con más de 24h de antigüedad (memory leak)
+    try:
+        _div_expired = [k for k, v in _cache_div_alertas.items() if ahora_ts - v > 86400]
+        for k in _div_expired:
+            _cache_div_alertas.pop(k, None)
+        if _div_expired:
+            logger.debug(f"🧹 _cache_div_alertas: eliminadas {len(_div_expired)} entradas antiguas")
+    except Exception:
+        pass
+
+    # CRÍTICO-4 FIX: Limitar tamaño de _cola_borrado (heapq) para evitar crecimiento ilimitado
+    try:
+        global _cola_borrado
+        with _lock_borrado:
+            if len(_cola_borrado) > 5000:
+                _cola_borrado = _cola_borrado[:5000]
+                heapq.heapify(_cola_borrado)
+                logger.warning(f"⚠️ _cola_borrado recortada a 5000 entradas (memory leak prevenido)")
+    except Exception:
+        pass
+
 @app.route("/dashboard_legacy")
 def dashboard():
     """🌐 PANEL DE CONTROL BuySell365 — VISTA WEB (Legacy)"""
@@ -12295,7 +12401,8 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                 if _orphan.get('_reservado', False) and not _orphan.get('mt5_ejecutado', False):
                     with _lock_ops:
                         if op_id in operaciones_activas and operaciones_activas[op_id].get('_reservado', False):
-                            del operaciones_activas[op_id]
+                            # CRÍTICO-1 FIX: usar .pop() en lugar de del para evitar KeyError en condición de carrera
+                            operaciones_activas.pop(op_id, None)
                             logger.warning(f"🧹 Reservación huérfana limpiada: {op_id}")
         except Exception:
             pass
@@ -13601,7 +13708,8 @@ def analizar_activo(nombre, ticker):
             # MT5 falló sin _skip_mt5 → limpiar reserva huérfana
             with _lock_ops:
                 if op_id in operaciones_activas and operaciones_activas[op_id].get('_reservado'):
-                    del operaciones_activas[op_id]
+                    # CRÍTICO-1 FIX: usar .pop() en lugar de del para evitar KeyError en condición de carrera
+                    operaciones_activas.pop(op_id, None)
                     estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 1) - 1)
             log_op(f"⚠️ MT5 rechazó orden {nombre} {tipo} — reserva limpiada")
 
@@ -13616,7 +13724,8 @@ def analizar_activo(nombre, ticker):
                 with _lock_ops:
                     _orphan_scan = operaciones_activas.get(op_id, {})
                     if _orphan_scan.get('_reservado', False) and not _orphan_scan.get('mt5_ejecutado', False):
-                        del operaciones_activas[op_id]
+                        # CRÍTICO-1 FIX: usar .pop() en lugar de del para evitar KeyError en condición de carrera
+                        operaciones_activas.pop(op_id, None)
                         estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 1) - 1)
                         logger.warning(f"🧹 Scanner: reservación huérfana limpiada tras excepción: {op_id}")
         except Exception:
@@ -13868,12 +13977,45 @@ def loop_publicidad_grupo():
     - 1 anuncio cada 2 horas, de 06:00 a 23:00  (~9 anuncios/día)
     - Rota los 5 modelos en orden, sin repetir el mismo seguido
     - El índice se calcula por hora del día para que los reinicios no repitan
-    - Borra el anuncio anterior antes de publicar el nuevo
+    - Borra el anuncio anterior antes de publicar el nuevo (incluso tras reinicios)
     """
     PUBLICIDAD_PRIMERA_ESPERA = 3 * 60  # Esperar 3 min al arrancar
     PUBLICIDAD_INTERVALO_HORAS = 2       # Horas mínimas entre anuncios
 
-    _ultimo_anuncio_id   = None   # Message ID del último anuncio enviado
+    # ── Persistencia de IDs en disco (sobrevive reinicios) ──────────────
+    _PUB_STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pub_state.json")
+
+    def _cargar_estado():
+        try:
+            if os.path.exists(_PUB_STATE):
+                with open(_PUB_STATE, encoding="utf-8") as _f:
+                    return json.loads(_f.read())
+        except Exception:
+            pass
+        return {}
+
+    def _guardar_estado(data: dict):
+        try:
+            with open(_PUB_STATE, "w", encoding="utf-8") as _f:
+                _f.write(json.dumps(data, ensure_ascii=False))
+        except Exception:
+            pass
+
+    # Cargar IDs anteriores al arrancar
+    _estado = _cargar_estado()
+    _ultimo_anuncio_id    = _estado.get("grupo_msg_id")      # puede ser None o int
+    _ids_canal_persistidos = _estado.get("canal_msg_ids", [])
+
+    # Borrar anuncio viejo del grupo al arrancar (si existe)
+    if _ultimo_anuncio_id:
+        try:
+            borrar_mensaje_telegram(GROUP_ID, _ultimo_anuncio_id)
+        except Exception:
+            pass
+        _ultimo_anuncio_id = None
+        _guardar_estado({**_cargar_estado(), "grupo_msg_id": None})
+        logger.info("🗑️ Anuncio anterior del grupo borrado al arrancar")
+
     _ultima_publicacion_g = None  # datetime del último envío para control de intervalo
     _dia_borrado_grupo   = ""     # Para el borrado nocturno del grupo
 
@@ -13980,7 +14122,7 @@ def loop_publicidad_grupo():
     while True:
         try:
             if not GROUP_ID:
-                time.sleep(PUBLICIDAD_INTERVALO)
+                time.sleep(60)
                 continue
 
             _ahora_g = ahora()
@@ -13995,9 +14137,10 @@ def loop_publicidad_grupo():
                     except Exception:
                         pass
                     _ultimo_anuncio_id = None
+                    _guardar_estado({**_cargar_estado(), "grupo_msg_id": None})
                 _dia_borrado_grupo = _clave_dia_g
                 logger.info("🗑️ Publicidad del grupo borrada al cierre del día (23:00)")
-                time.sleep(PUBLICIDAD_INTERVALO)
+                time.sleep(60)
                 continue
 
             # ── Solo enviar entre 06:00 y 22:59 ──
@@ -14024,12 +14167,14 @@ def loop_publicidad_grupo():
                 except Exception:
                     pass
                 _ultimo_anuncio_id = None
+                _guardar_estado({**_cargar_estado(), "grupo_msg_id": None})
 
             # Publicar nuevo anuncio
             nuevo_id = enviar_telegram(texto, destino=GROUP_ID, teclado=teclado)
             if nuevo_id:
                 _ultimo_anuncio_id = nuevo_id
                 _ultima_publicacion_g = _ahora_g
+                _guardar_estado({**_cargar_estado(), "grupo_msg_id": nuevo_id})
                 logger.info(f"📢 Publicidad grupo — modelo {_indice+1}/{len(ANUNCIOS)} (hora {_hora_g}:00, cada {PUBLICIDAD_INTERVALO_HORAS}h)")
 
         except Exception as e:
@@ -14083,8 +14228,41 @@ def loop_publicidad_canal():
         ),
     ]
 
+    # ── Persistencia en disco (igual que el grupo) ──────────────────────
+    _PUB_STATE_C = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pub_state.json")
+
+    def _cargar_canal():
+        try:
+            if os.path.exists(_PUB_STATE_C):
+                with open(_PUB_STATE_C, encoding="utf-8") as _f:
+                    return json.loads(_f.read())
+        except Exception:
+            pass
+        return {}
+
+    def _guardar_canal(canal_ids: list):
+        try:
+            d = _cargar_canal()
+            d["canal_msg_ids"] = canal_ids
+            with open(_PUB_STATE_C, "w", encoding="utf-8") as _f:
+                _f.write(json.dumps(d, ensure_ascii=False))
+        except Exception:
+            pass
+
+    # Al arrancar: borrar anuncios viejos del canal
+    _estado_c = _cargar_canal()
+    _ids_canal_dia = list(_estado_c.get("canal_msg_ids", []))
+    if _ids_canal_dia:
+        for _mid_viejo in _ids_canal_dia:
+            try:
+                borrar_mensaje_telegram(CHANNEL_ID, _mid_viejo)
+            except Exception:
+                pass
+        _ids_canal_dia = []
+        _guardar_canal([])
+        logger.info("🗑️ Anuncios anteriores del canal borrados al arrancar")
+
     _publicado_hoy = set()   # "manana" o "tarde" para no repetir en el mismo día
-    _ids_canal_dia = []      # IDs de mensajes publicados hoy en el canal (para borrarlos)
     _dia_borrado = ""        # Día en que ya se hizo el borrado nocturno
 
     time.sleep(60)  # Esperar 1 min al arrancar
@@ -14102,21 +14280,39 @@ def loop_publicidad_canal():
             # Franja media mañana: 10:00 - 10:59
             _clave_manana = f"{_clave_dia}_manana"
             if 10 <= _hora < 11 and _clave_manana not in _publicado_hoy:
+                # Borrar anuncio anterior antes de publicar
+                if _ids_canal_dia:
+                    for _mid_prev in _ids_canal_dia:
+                        try:
+                            borrar_mensaje_telegram(CHANNEL_ID, _mid_prev)
+                        except Exception:
+                            pass
+                    _ids_canal_dia = []
                 texto, teclado = ANUNCIOS_CANAL[0]
                 _id = enviar_telegram(texto, destino=CHANNEL_ID, teclado=teclado)
                 if _id:
                     _publicado_hoy.add(_clave_manana)
                     _ids_canal_dia.append(_id)
+                    _guardar_canal(_ids_canal_dia)
                     logger.info(f"📢 Publicidad canal MAÑANA enviada (msg_id={_id})")
 
             # Franja media tarde: 16:00 - 16:59
             _clave_tarde = f"{_clave_dia}_tarde"
             if 16 <= _hora < 17 and _clave_tarde not in _publicado_hoy:
+                # Borrar anuncio anterior antes de publicar
+                if _ids_canal_dia:
+                    for _mid_prev in _ids_canal_dia:
+                        try:
+                            borrar_mensaje_telegram(CHANNEL_ID, _mid_prev)
+                        except Exception:
+                            pass
+                    _ids_canal_dia = []
                 texto, teclado = ANUNCIOS_CANAL[1]
                 _id = enviar_telegram(texto, destino=CHANNEL_ID, teclado=teclado)
                 if _id:
                     _publicado_hoy.add(_clave_tarde)
                     _ids_canal_dia.append(_id)
+                    _guardar_canal(_ids_canal_dia)
                     logger.info(f"📢 Publicidad canal TARDE enviada (msg_id={_id})")
 
             # Borrado automático al final del día: 23:50 - 23:59
@@ -14397,7 +14593,8 @@ def _cerrar_operacion_manual(op_key):
         historial_operaciones.append(_hist)
 
         # Eliminar del tracking
-        del operaciones_activas[op_key]
+        # CRÍTICO-1 FIX: usar .pop() en lugar de del para evitar KeyError en condición de carrera
+        operaciones_activas.pop(op_key, None)
         guardar_estado()
         log_op(f"🔧 CIERRE MANUAL: {nombre} {tipo} eliminado del tracking (dur: {_dur_min}min)")
 
@@ -14616,30 +14813,31 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         return False  # Indica que NO se envió (cooldown activo)
     _cooldown_bienvenida[user_id] = _ahora
 
-    # ── Menú completo para el chat PRIVADO ──
+    # ── Menú completo para el chat PRIVADO (grupo público) ──
     menu_privado = (
-        f"👋 *Hola {nombre}!* Bienvenido a *BuySell365.pro*\n"
-        f"━━━━━━━━━━━━━━\n\n"
-        f"🤖 Soy tu asistente de trading con IA. ¿En qué te puedo ayudar?\n\n"
-        f"📌 *¿Qué quieres hacer?*\n\n"
+        f"👋 *¡Hola {nombre}!* Bienvenido a *BuySell365 Pro* 🚀\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Soy tu asistente de trading con IA, disponible 24/7.\n"
+        f"En el grupo solo se publican señales y análisis — "
+        f"aquí en privado te atiendo a ti directamente.\n\n"
+        f"━━ *¿Qué ofrecemos?* ━━\n\n"
         f"💎 *Canal VIP* — Señales con Entry, SL y TP exactos\n"
-        f"   Forex, Índices — análisis IA 24/5\n\n"
-        f"🤖 *Copy Trading* — Tu cuenta opera sola\n"
+        f"   EUR/USD · NASDAQ · S&P 500 · ORO · Forex · Índices\n"
+        f"   Análisis con IA · Alertas en tiempo real\n\n"
+        f"🤖 *Copy Trading XM* — Tu cuenta opera sola\n"
         f"   Sin pantallas. Sin estrés. Comisión solo sobre ganancias.\n\n"
-        f"📊 *Herramientas gratuitas:*\n"
-        f"   /precios — Precios en vivo\n"
-        f"   /noticias — Calendario económico\n"
-        f"   /horarios — Horarios de mercado\n"
-        f"   /web — Dashboard en vivo\n\n"
-        f"👉 *Escribe /vip para ver planes y contratar*\n"
-        f"💬 *O escríbeme aquí cualquier duda, te respondo ahora*"
+        f"📊 *Dashboard en vivo* — buysell365.pro\n"
+        f"   Stats, posiciones abiertas, historial de señales\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 *Escríbeme aquí cualquier pregunta — te respondo ahora* ✅"
     )
     markup_privado = {
         "inline_keyboard": [
-            [{"text": "💎 CANAL VIP — Ver Planes", "callback_data": "vip_pagar_usdt"}],
-            [{"text": "🤖 COPY TRADING — Más Info", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
-            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
-            [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
+            [{"text": "💎 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "🤖 Copy Trading en XM (gratis)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
+            [{"text": "⏰ Horarios de Mercado", "callback_data": "/horarios"}, {"text": "📈 Resumen Hoy", "callback_data": "/resumen"}],
+            [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
         ]
     }
 
@@ -14656,14 +14854,14 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         else:
             # ❌ DM falló — el usuario no ha hecho /start → indicar cómo hacerlo
             aviso = (
-                f"👋 *{nombre}*, para atenderte mejor necesito que primero\n"
-                f"me escribas por privado:\n\n"
-                f"👉 Abre @Andoperandobot y pulsa *Start*\n"
-                f"Luego te envío toda la información aquí 📩"
+                f"👋 *{nombre}*, para atenderte en privado pulsa el botón 👇"
             )
-        aviso_id = enviar_telegram(aviso, grupo_chat_id)
+        _markup_aviso = {"inline_keyboard": [[
+            {"text": "💬 Hablar con el bot", "url": f"https://t.me/Andoperandobot?start=grupo"}
+        ]]} if not dm_ok else None
+        aviso_id = enviar_telegram(aviso, grupo_chat_id, teclado=_markup_aviso)
         if aviso_id:
-            programar_borrado(grupo_chat_id, aviso_id, 120)
+            programar_borrado(grupo_chat_id, aviso_id, 600)  # 10 min visible
 
     # Notificar al admin
     admin_id = USERS_AUTORIZADOS[0] if USERS_AUTORIZADOS else None
@@ -14754,14 +14952,39 @@ def loop_polling():
             {"command": "sentimiento", "description": "Fear & Greed index"},
             {"command": "vip", "description": "Acceso VIP premium"},
             {"command": "web", "description": "Dashboard web en vivo"},
+            {"command": "broker", "description": "🏦 Broker recomendado XM"},
             {"command": "ayuda", "description": "Lista de comandos"},
         ]
+        # Comandos públicos (todos los usuarios)
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
             json={"commands": _cmds},
             timeout=10
         )
-        print("✅ Comandos registrados en BotFather.")
+        # Comandos admin (solo propietario — visible en su menú de comandos)
+        _cmds_admin = _cmds + [
+            {"command": "admin",      "description": "🛡️ Panel de administrador"},
+            {"command": "pausar",     "description": "⏸️ Pausar scanner + MT5"},
+            {"command": "reanudar",   "description": "▶️ Reanudar scanner + MT5"},
+            {"command": "pausarmt5",  "description": "⏸️ Pausar solo MT5"},
+            {"command": "reiniciar",  "description": "🔄 Reiniciar proceso del bot"},
+            {"command": "apagar",     "description": "🔴 Apagar el bot"},
+            {"command": "cuenta",     "description": "💰 Cuenta MT5 en tiempo real"},
+            {"command": "vips",       "description": "👑 Ver suscriptores VIP activos"},
+        ]
+        for _aid in ADMIN_IDS:
+            try:
+                requests.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
+                    json={
+                        "commands": _cmds_admin,
+                        "scope": {"type": "chat", "chat_id": _aid},
+                    },
+                    timeout=10,
+                )
+            except Exception:
+                pass
+        print("✅ Comandos registrados en BotFather (público + admin).")
     except Exception as e:
         print(f"⚠️ Error registrando comandos: {e}")
 
@@ -15137,28 +15360,33 @@ def loop_polling():
                                     if _nm_id not in directorio_usuarios:
                                         directorio_usuarios[_nm_id] = {"nombre": _nm_nombre, "username": _nm.get("username", "")}
                                     _bienvenida_vip = (
-                                        f"👋 *¡Hola {_nm_nombre}!* Bienvenido al *Canal VIP BuySell365.pro* 💎\n"
-                                        f"━━━━━━━━━━━━━━━━\n\n"
-                                        f"🤖 *Soy tu asistente personal de trading con IA.*\n"
-                                        f"Estoy disponible 24/7 para ayudarte con todo:\n\n"
-                                        f"💎 *Tu acceso VIP incluye:*\n"
-                                        f"   📍 Señales con Entry, TP y SL exactos\n"
-                                        f"   📊 20+ activos analizados en tiempo real\n"
-                                        f"   🤖 Copy Trading disponible en XM\n"
-                                        f"   🛠️ Asistente personal — yo, aquí en privado\n\n"
-                                        f"🛠️ *Comandos disponibles:*\n"
-                                        f"   /precios — Precios en vivo\n"
-                                        f"   /noticias — Calendario económico\n"
-                                        f"   /cuenta — Tu estado VIP\n"
-                                        f"   /web — Dashboard en vivo\n\n"
-                                        f"💬 *Escríbeme cualquier duda aquí — te respondo al instante* ✅"
+                                        f"🏆 *¡Bienvenido al VIP, {_nm_nombre}!*\n"
+                                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                                        f"Soy tu asistente personal de trading con IA. "
+                                        f"El canal es solo lectura — aquí en privado te atiendo a ti.\n\n"
+                                        f"━━ *Tu acceso VIP incluye* ━━\n\n"
+                                        f"📡 Señales con Entry · SL · TP exactos\n"
+                                        f"🔍 Análisis IA en tiempo real: EUR/USD, NASDAQ, S&P500, ORO\n"
+                                        f"📊 Dashboard en vivo con stats y posiciones\n"
+                                        f"🤖 Copy Trading en XM (tu cuenta opera sola)\n"
+                                        f"🛠️ Asistente personal 24/7 — yo, aquí\n\n"
+                                        f"━━ *Usa los botones para empezar* ━━\n"
+                                        f"O escríbeme directamente cualquier pregunta ✅"
                                     )
                                     _botones_vip = {
                                         "inline_keyboard": [
-                                            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
-                                            [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
+                                            [{"text": "🔍 Análisis EUR/USD", "callback_data": "/analisis_eurusd"},
+                                             {"text": "🔍 Análisis NASDAQ", "callback_data": "/analisis_nasdaq"}],
+                                            [{"text": "🔍 Análisis S&P 500", "callback_data": "/analisis_sp500"},
+                                             {"text": "🔍 Análisis ORO", "callback_data": "/analisis_xauusd"}],
+                                            [{"text": "📡 Señales Activas", "callback_data": "/activas"},
+                                             {"text": "📈 Resumen del Día", "callback_data": "/resumen"}],
+                                            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
+                                             {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
+                                            [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
+                                             {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
                                             [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
-                                            [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
+                                            [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                                         ]
                                     }
                                     _dm_ok = enviar_telegram(_bienvenida_vip, _nm_id, teclado=_botones_vip)
@@ -15279,27 +15507,49 @@ def loop_polling():
                         )
                         es_tema_publico = any(p in _t for p in TEMAS_PUBLICOS)
 
-                        # 🧹 Auto-borrar CUALQUIER mensaje de usuario en grupo/canal
-                        # (señales/TP/SL llegan por enviar_canal, no por polling)
-                        # IMPORTANTE: se hace ANTES del check de autorización para que
-                        # mensajes de usuarios no autorizados también se borren
-                        # EXCEPTO mensajes del ADMIN — solo él puede borrar los suyos
-                        if (es_grupo or es_canal) and msg.get("message_id") and user_id not in ADMIN_IDS:
-                            programar_borrado(chat_id, msg.get("message_id"), 15)  # 15s: grupo limpio rápido
+                        # 🔒 GRUPO/CANAL = SOLO LECTURA
+                        # Los mensajes de usuarios normales no deberían llegar (grupo restringido),
+                        # pero por si acaso: borrar inmediato + redirigir al DM del bot
+                        if (es_grupo or es_canal) and user_id not in ADMIN_IDS:
+                            if msg.get("message_id"):
+                                programar_borrado(chat_id, msg.get("message_id"), 3)
 
-                        # 🎟️ DETECCIÓN DE CÓDIGO DE INVITACIÓN — cualquier usuario, grupo o privado
+                            # 🎟️ Código de invitación (caso especial — procesar aunque llegue en grupo)
+                            _match_code_poll = re.match(r'^BS365-[A-Z0-9]{4}$', texto.strip().upper())
+                            if _match_code_poll:
+                                _code_poll = _match_code_poll.group(0)
+                                _nombre_code_poll = escapar_markdown(from_user.get("first_name", "Trader"))
+                                _procesar_codigo_invitacion(_code_poll, user_id, _nombre_code_poll)
+                                _aviso_code_id = enviar_telegram(
+                                    f"💬 *{_nombre_code_poll}*, te envié la información por privado 📩",
+                                    chat_id
+                                )
+                                if _aviso_code_id:
+                                    programar_borrado(chat_id, _aviso_code_id, 30)
+                                continue
+
+                            # Redirigir al DM — aviso breve en el grupo + menú completo por DM
+                            _nombre_redir = escapar_markdown(from_user.get("first_name", ""))
+                            _aviso_redir_id = enviar_telegram(
+                                f"👋 *{_nombre_redir}*, el grupo es solo lectura.\n"
+                                f"Escríbeme en privado para ayudarte 👇",
+                                chat_id,
+                                teclado={"inline_keyboard": [[
+                                    {"text": "💬 Hablar con el bot", "url": "https://t.me/Andoperandobot?start=grupo"}
+                                ]]}
+                            )
+                            if _aviso_redir_id:
+                                programar_borrado(chat_id, _aviso_redir_id, 120)
+                            # Intentar enviar panel completo al DM
+                            manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=None)
+                            continue
+
+                        # Código de invitación en chat PRIVADO
                         _match_code_poll = re.match(r'^BS365-[A-Z0-9]{4}$', texto.strip().upper())
                         if _match_code_poll:
                             _code_poll = _match_code_poll.group(0)
-                            _nombre_code_poll = escapar_markdown(from_user.get("first_name", "Trader"))  # H-11
-                            # Siempre enviar al DM del usuario (no al grupo)
+                            _nombre_code_poll = escapar_markdown(from_user.get("first_name", "Trader"))
                             _procesar_codigo_invitacion(_code_poll, user_id, _nombre_code_poll)
-                            if es_grupo or es_canal:
-                                # Avisar brevemente en grupo/canal
-                                _aviso_code = f"💬 *{_nombre_code_poll}*, te envie la informacion por privado 📩"
-                                _aviso_code_id = enviar_telegram(_aviso_code, chat_id)
-                                if _aviso_code_id:
-                                    programar_borrado(chat_id, _aviso_code_id, 60)
                             continue
 
                         # 📺 En CANAL solo pueden escribir admins → tratar como autorizado
@@ -15307,60 +15557,38 @@ def loop_polling():
                             usuario_no_autorizado = False
 
                         if usuario_no_autorizado:
-                            if (es_grupo or es_canal) and not es_tema_publico:
-                                # 📢 Mensaje sin tema público → IA atiende en privado
-                                # Primero intenta IA, si no hay Groq → bienvenida normal
-                                _ia_atendio = _procesar_ia_telegram(
-                                    texto, chat_id, user_id, nombre_u, es_grupo_publico=True
-                                )
-                                if not _ia_atendio:
-                                    manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
-                                continue
-                            elif (es_grupo or es_canal) and es_tema_publico:
-                                # 📢 Tema público → IA en DM + aviso breve en grupo
-                                # Si IA no responde (rate limit) → bienvenida normal
-                                _ia_atendio2 = _procesar_ia_telegram(
-                                    texto, chat_id, user_id, nombre_u, es_grupo_publico=True
-                                )
-                                if not _ia_atendio2:
-                                    manejar_usuario_nuevo(msg, from_user, texto, grupo_chat_id=chat_id)
-                                continue  # No pasar a procesar_mensaje — evita doble respuesta
-                            else:
-                                # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
-                                # Formato: "Sell Gold Now / Target 4447 / Sl 4468" o similar
-                                if user_id in ADMIN_IDS:
-                                    _senal_manual = _parsear_senal_externa(texto)
-                                    if _senal_manual:
-                                        try:
-                                            _ejecutar_senal_manual(_senal_manual, chat_id, nombre_u)
-                                        except Exception as _e_sm:
-                                            enviar_telegram(f"❌ Error ejecutando señal: {_e_sm}", chat_id)
-                                        continue
-
-                                # 🤖 IA: responde a TODOS en privado (admin, VIP y nuevos)
-                                if _procesar_ia_telegram(texto, chat_id, user_id, nombre_u, es_privado=True):
+                            # Chat privado con usuario no autorizado
+                            # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
+                            if user_id in ADMIN_IDS:
+                                _senal_manual = _parsear_senal_externa(texto)
+                                if _senal_manual:
+                                    try:
+                                        _ejecutar_senal_manual(_senal_manual, chat_id, nombre_u)
+                                    except Exception as _e_sm:
+                                        enviar_telegram(f"❌ Error ejecutando señal: {_e_sm}", chat_id)
                                     continue
-                                # 💬 Si la IA no responde (cooldown/sin Groq): menú con botones o bienvenida
-                                _enviado_bienvenida = manejar_usuario_nuevo(msg, from_user, texto)
-                                if not _enviado_bienvenida:
-                                    # Ya pasó el cooldown de bienvenida → menú rápido con botones
-                                    _np = escapar_markdown(from_user.get("first_name", ""))
-                                    _admin_c = ADMIN_USER.replace("@", "")
-                                    enviar_telegram(
-                                        f"👋 *{_np}*, ¿en qué puedo ayudarte?\n\n"
-                                        "📊 *BuySell365 Pro* — señales con entrada,\n"
-                                        "SL y TP exactos en tiempo real 🎯\n\n"
-                                        "👇 Elige lo que más te interesa:",
-                                        chat_id,
-                                        teclado={"inline_keyboard": [
-                                            [{"text": "💎 VER PLANES VIP — Señales", "callback_data": "vip_pagar_usdt"}],
-                                            [{"text": "🤖 Copy Trading en XM (gratis)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
-                                            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}],
-                                            [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
-                                            [{"text": f"❓ Hablar con Admin", "url": f"https://t.me/{_admin_c}"}],
-                                        ]}
-                                    )
+
+                            # 🤖 IA: responde en privado (todos)
+                            if _procesar_ia_telegram(texto, chat_id, user_id, nombre_u, es_privado=True):
                                 continue
+                            # 💬 Si la IA no responde → bienvenida o menú rápido
+                            _enviado_bienvenida = manejar_usuario_nuevo(msg, from_user, texto)
+                            if not _enviado_bienvenida:
+                                _np = escapar_markdown(from_user.get("first_name", ""))
+                                enviar_telegram(
+                                    f"👋 *{_np}*, ¿en qué puedo ayudarte?\n\n"
+                                    "📊 *BuySell365 Pro* — señales con entrada, SL y TP exactos 🎯\n\n"
+                                    "👇 Elige lo que más te interesa:",
+                                    chat_id,
+                                    teclado={"inline_keyboard": [
+                                        [{"text": "💎 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
+                                        [{"text": "🤖 Copy Trading en XM (gratis)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                                        [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
+                                         {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                                        [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
+                                    ]}
+                                )
+                            continue
 
                         # Admin anónimo: GroupAnonymousBot o Channel_Bot son admins del grupo/canal
                         _es_admin_anonimo = str(from_user.get("id", "")) in ("1087968824", "136817688")
@@ -15846,11 +16074,19 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
             if _aviso_id:
                 programar_borrado(chat_id, _aviso_id, 25)  # 25s: aviso breve
         else:
-            # DM falló → responder directo en el grupo (más corto)
+            # DM falló (usuario no ha abierto el bot en privado) → responder en el grupo
             _resp_corta = respuesta[:300] + ("..." if len(respuesta) > 300 else "")
-            _mid = enviar_telegram(f"🤖 {_resp_corta}", chat_id)
+            _teclado_dm = {"inline_keyboard": [[
+                {"text": "💬 Hablar con el bot en privado", "url": f"https://t.me/Andoperandobot?start=grupo"}
+            ]]}
+            _mid = enviar_telegram(
+                f"🤖 *{escapar_markdown(nombre)}*, {_resp_corta}\n\n"
+                f"_Para análisis completos, escríbeme en privado 👇_",
+                chat_id,
+                teclado=_teclado_dm
+            )
             if _mid:
-                programar_borrado(chat_id, _mid, 120)
+                programar_borrado(chat_id, _mid, 600)  # 10 min visible
     else:
         enviar_telegram(f"🤖 {respuesta}", chat_id)
 
@@ -16943,6 +17179,7 @@ def _watchdog():
         "publicidad_canal": loop_publicidad_canal,
         "delete_sched": _hilo_borrado_scheduler,
     }
+    _wd_alertas_enviadas = set()  # Evitar spam de alertas repetidas
     while True:
         try:
             for nombre, hilo in list(_hilos_registrados.items()):
@@ -16952,8 +17189,37 @@ def _watchdog():
                     if target:
                         _iniciar_hilo(nombre, target)
                         log_sistema(f"✅ WATCHDOG: Hilo '{nombre}' reiniciado correctamente")
+                        # Notificar al admin solo 1 vez por hilo caído
+                        if nombre not in _wd_alertas_enviadas:
+                            _wd_alertas_enviadas.add(nombre)
+                            _nombres_legibles = {
+                                "scanner": "Escáner de señales",
+                                "monitor": "Monitor de posiciones",
+                                "polling": "Recepción de mensajes Telegram",
+                                "health": "Health check",
+                                "vip": "Control VIP",
+                                "publicidad": "Publicidad grupo",
+                                "publicidad_canal": "Publicidad canal",
+                                "delete_sched": "Borrado de mensajes",
+                            }
+                            _nombre_legible = _nombres_legibles.get(nombre, nombre)
+                            try:
+                                admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
+                                if admin_id:
+                                    enviar_telegram(
+                                        f"⚠️ *WATCHDOG ACTIVO*\n"
+                                        f"━━━━━━━━━━━━━━\n"
+                                        f"Hilo caído: *{_nombre_legible}*\n"
+                                        f"Estado: ✅ Reiniciado automáticamente\n"
+                                        f"🕒 {datetime.now().strftime('%H:%M:%S')}",
+                                        admin_id
+                                    )
+                            except Exception: pass
                     else:
                         logger.error(f"❌ WATCHDOG: No hay target para reiniciar '{nombre}'")
+                else:
+                    # Hilo vivo → limpiar alerta previa si existía
+                    _wd_alertas_enviadas.discard(nombre)
         except Exception as e_wd:
             logger.error(f"⚠️ Error en watchdog: {e_wd}")
         time.sleep(60)

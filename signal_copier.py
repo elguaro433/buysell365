@@ -273,6 +273,11 @@ def parse_signal(text, chat_title=""):
     if not text or len(text) < 10:
         return None
 
+    # Normalizar superíndices Unicode → dígitos normales
+    # GOLD FOREX MARKET usa TP¹ TP² TP³ TP⁴ TP⁵ (U+00B9, U+00B2, U+00B3, U+2074-2079)
+    _superscript_map = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+    text = text.translate(_superscript_map)
+
     upper = text.upper().replace("\n", " ").replace("  ", " ").strip()
     # Versión sin slash para búsqueda de pares (AUDJPY, GBPUSD...)
     upper_noslash = upper.replace("/", "")
@@ -289,6 +294,10 @@ def parse_signal(text, chat_title=""):
         "STAY SHARP", "SIGNALS WILL FOLLOW", "HEY TRADERS",
         "FAILED TO TRIGGER", "GETTING DELETED", "BECOME INVALID IF NOT TRIGGERED",
         "FED SPEAKERS", "GEOPOLITICAL", "ECONOMIC DATA",
+        # GOLD FOREX MARKET — celebraciones / actualizaciones de TP
+        "SMASHED", "BLAZING PROFIT", "BOOM BOOM", "POWER TRADE DONE",
+        "PATIENCE PAYS", "TRADE SMART", "STAY DISCIPLINED",
+        "MARKET OPENING ALERT", "VOLATILITY EXPECTED",
     ]
     if any(w in upper for w in _ignore_keywords):
         return None
@@ -313,6 +322,8 @@ def parse_signal(text, chat_title=""):
         source = "Learn2Trade"
     elif "fxpremiere" in chat_lower or "fxpremiere" in text_lower or "goldSignals" in chat_title:
         source = "FXPremiere"
+    elif "gold forex" in chat_lower:
+        source = "GoldForexMarket"
 
     # ── DETECTAR DIRECCIÓN ──
     # Learn2Trade usa ▲▲▲=BUY y ▼▼▼=SELL
@@ -745,7 +756,12 @@ def send_to_channel(signal, executed, detail):
 
     dir_es    = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
-    src_emoji = "📡" if source == "SureShotFX" else "🔔"
+    src_emoji = {
+        "SureShotFX":      "📡",
+        "Learn2Trade":     "📊",
+        "FXPremiere":      "🔔",
+        "GoldForexMarket": "🥇",
+    }.get(source, "🔔")
 
     # Nombre para mostrar del par
     pair_display = pair.replace("USDJPY","USD/JPY").replace("AUDJPY","AUD/JPY") \
@@ -768,8 +784,7 @@ def send_to_channel(signal, executed, detail):
     entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
     lines = [
-        f"{dir_emoji} *SEÑAL {dir_es} — {pair_display}*",
-        f"━━━━━━━━━━━━━━━━━━━━",
+        f"{dir_emoji} *{dir_es} {pair_display}*",
         f"",
         f"📍 Entrada: {entry_display}",
         f"🎯 TP: {fmt(tp)}",
@@ -844,8 +859,9 @@ async def main():
         "fxpremiere", "fx premiere", "goldSignals", "gold signals",
         "anabelsignals", "anabel signals", "forex signals", "forexsignals",
         "nasdaq vip", "vip signals", "signal vip",
+        "gold forex market", "gold forex",  # GOLD FOREX MARKET (@Jerry77446)
     ]
-    SIGNAL_KEYWORDS = ["sureshot", "learn", "fxpremiere", "anabel"]
+    SIGNAL_KEYWORDS = ["sureshot", "learn", "fxpremiere", "anabel", "gold forex"]
 
     @client.on(events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
     async def handler(event):
