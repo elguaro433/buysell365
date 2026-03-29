@@ -8330,7 +8330,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 "inline_keyboard": [
                     [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
-                    [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                     {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
                 ]
             }
@@ -8436,7 +8437,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                      {"text": "📉 Resumen Semanal",   "callback_data": "/semana"}],
                     [{"text": "⏰ Horarios",           "callback_data": "/horarios"},
                      {"text": "📌 Estado del Bot",    "callback_data": "/estado"}],
-                    [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                     {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                 ]}
             )
@@ -15386,7 +15388,8 @@ def loop_polling():
                                              {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
                                             [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
                                              {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
-                                            [{"text": "🤖 Copy Trading XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                                            [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                                             {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                                             [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                                         ]
                                     }

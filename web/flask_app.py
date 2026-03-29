@@ -854,8 +854,9 @@ section{{padding:60px 20px}}
 .xm-section-cta{{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#b8960a,#FFD700 40%,#FFA500 70%,#b8960a);color:#000;text-decoration:none;padding:16px 40px;border-radius:14px;font-weight:800;font-size:16px;transition:all .3s;box-shadow:0 6px 30px rgba(255,215,0,.35);letter-spacing:.3px}}
 .xm-section-cta:hover{{box-shadow:0 8px 40px rgba(255,215,0,.6);transform:translateY(-3px)}}
 .xm-section-note{{font-size:10px;color:rgba(139,148,158,.4);margin-top:14px}}
-.xm-nav-btn{{background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);color:#000!important;padding:8px 16px!important;border-radius:8px;font-weight:800!important;font-size:13px!important;transition:all .3s;box-shadow:0 2px 10px rgba(255,215,0,.3)}}
-.xm-nav-btn:hover{{box-shadow:0 4px 20px rgba(255,215,0,.5)!important;transform:translateY(-1px)}}
+.xm-nav-btn{{background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);color:#000!important;padding:10px 20px!important;border-radius:10px;font-weight:900!important;font-size:14px!important;transition:all .3s;box-shadow:0 3px 14px rgba(255,215,0,.4);line-height:1.2;text-align:center}}
+.xm-nav-btn:hover{{box-shadow:0 5px 24px rgba(255,215,0,.65)!important;transform:translateY(-2px)}}
+.xm-nav-btn small{{display:block;font-size:10px;font-weight:700;opacity:.85;letter-spacing:.3px}}
 /* ═══ FOOTER ═══ */
 .footer{{background:var(--bg2);border-top:1px solid var(--border);padding:40px 20px;text-align:center}}
 .footer-links{{display:flex;justify-content:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}}
@@ -998,7 +999,7 @@ if('serviceWorker' in navigator){{
       </div>
     </div>
   </div>
-    <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker</a>
+    <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker<small>&#127873; Bono 100% hasta $100</small></a>
   <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()">
     <span></span><span></span><span></span>
   </button>
@@ -1098,9 +1099,43 @@ if('serviceWorker' in navigator){{
         <li style="color:#00e676" data-i18n="pricing.cp7">&#128275; Retira tu capital cuando quieras</li>
         <li style="color:#00e676" data-i18n="pricing.cp8">&#129302; Totalmente autom\u00e1tico \u2014 sin experiencia requerida</li>
       </ul>
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(0,230,118,0.5);transition:all 0.3s">&#128640; Empezar Copy Trading</a>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+        <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(255,215,0,.35);transition:all .3s;line-height:1.3">
+          &#127873; Abrir Cuenta XM<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Bono 100% hasta $100</span>
+        </a>
+        <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(0,230,118,.4);transition:all .3s;line-height:1.3">
+          &#128640; Empezar Copy Trading<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Ya tengo cuenta XM</span>
+        </a>
+      </div>
     </div>
   </div>
+</section>
+
+<!-- XM BROKER SECTION -->
+<section class="xm-section fade-in">
+  <div class="xm-section-logo">XM</div>
+  <div class="xm-section-sub">Broker oficial de BuySell365 Pro &mdash; Regulado internacionalmente</div>
+  <div class="xm-bonus-badge">
+    <div class="xm-bonus-text">
+      &#127873; Reciba un bono del 100% hasta $100
+      <span>Dep&oacute;sito m&iacute;nimo $5 &bull; Retira tus ganancias cuando quieras</span>
+    </div>
+  </div>
+  <div class="xm-section-pills">
+    <span class="xm-section-pill">&#10003; Regulado CySEC &middot; ASIC &middot; FCA</span>
+    <span class="xm-section-pill">&#128176; Dep&oacute;sito desde $5</span>
+    <span class="xm-section-pill">&#9889; Sin re-quotes</span>
+    <span class="xm-section-pill">&#128241; App iOS &amp; Android</span>
+    <span class="xm-section-pill">&#128274; Fondos segregados</span>
+    <span class="xm-section-pill">&#127758; +5M clientes</span>
+  </div>
+  <div class="xm-section-code">
+    Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b>
+  </div><br>
+  <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-section-cta">
+    &#128640; Abrir Cuenta Real &mdash; Gratis
+  </a>
+  <div class="xm-section-note">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
 </section>
 
 <!-- HOW IT WORKS -->
@@ -1424,33 +1459,6 @@ if('serviceWorker' in navigator){{
 
 <!-- BACK TO TOP -->
 <div class="back-to-top" id="backToTop" onclick="window.scrollTo({{top:0,behavior:'smooth'}})">\u2191</div>
-
-<!-- XM BROKER SECTION -->
-<section class="xm-section fade-in">
-  <div class="xm-section-logo">XM</div>
-  <div class="xm-section-sub">Broker oficial de BuySell365 Pro &mdash; Regulado internacionalmente</div>
-  <div class="xm-bonus-badge">
-    <div class="xm-bonus-text">
-      Reciba un bono del 100% hasta $100
-      <span>Dep&oacute;sito m&iacute;nimo $5 &bull; Retira tus ganancias cuando quieras</span>
-    </div>
-  </div>
-  <div class="xm-section-pills">
-    <span class="xm-section-pill">&#10003; Regulado CySEC &middot; ASIC &middot; FCA</span>
-    <span class="xm-section-pill">&#128176; Dep&oacute;sito desde $5</span>
-    <span class="xm-section-pill">&#9889; Ejecuci&oacute;n sin re-quotes</span>
-    <span class="xm-section-pill">&#128241; App iOS &amp; Android</span>
-    <span class="xm-section-pill">&#128274; Fondos segregados</span>
-    <span class="xm-section-pill">&#127758; +5M clientes</span>
-  </div>
-  <div class="xm-section-code">
-    Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b>
-  </div><br>
-  <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-section-cta">
-    &#128640; Abrir Cuenta Real &mdash; Gratis
-  </a>
-  <div class="xm-section-note">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
-</section>
 
 <!-- FOOTER -->
 <footer class="footer">
