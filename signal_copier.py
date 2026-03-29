@@ -767,11 +767,53 @@ def send_to_channel(signal, executed, detail):
 
     entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
+    # Calcular R:R y pips estimados
+    _rr_str = ""
+    _tp_pts = ""
+    _sl_pts = ""
+    if entry > 0 and tp > 0 and sl > 0:
+        _risk   = abs(entry - sl)
+        _reward = abs(tp - entry)
+        if _risk > 0:
+            _rr_val = _reward / _risk
+            _rr_str = f"📊 R:R: *{_rr_val:.1f}:1*"
+        _tp_pts = f"+{_reward:.1f}" if _reward > 1 else f"+{_reward:.5f}".rstrip('0')
+        _sl_pts = f"-{_risk:.1f}"  if _risk  > 1 else f"-{_risk:.5f}".rstrip('0')
+
+    # Fuente limpia
+    _src_map = {
+        "SureShotFX": "SureShot FX",
+        "Learn2Trade": "Learn 2 Trade",
+        "FxPremiere": "FxPremiere",
+        "AnabelSignals": "AnabelSignals",
+    }
+    src_clean = _src_map.get(source, source)
+
+    # Timeframe del signal si está disponible
+    _tf = signal.get("timeframe", "")
+    _tf_str = f" · {_tf}" if _tf else ""
+
     lines = [
-        f"{dir_emoji} *{dir_es} {pair}*",
-        f"📍 Entrada: {entry_display}",
-        f"🎯 TP: {fmt(tp)}",
-        f"🛡️ SL: {fmt(sl)}",
+        f"{dir_emoji} *SEÑAL {dir_es} — {pair_display}*",
+        f"━━━━━━━━━━━━━━━━━━━━",
+        f"",
+        f"📍 *Entrada:* `{entry_display}`",
+        f"🎯 *TP:* `{fmt(tp)}`" + (f"  _{_tp_pts} pts_" if _tp_pts else ""),
+        f"🛡️ *SL:* `{fmt(sl)}`" + (f"  _{_sl_pts} pts_" if _sl_pts else ""),
+    ]
+    if _rr_str:
+        lines.append(f"")
+        lines.append(_rr_str)
+
+    # Comentario IA si existe
+    _ia_c = signal.get("ia_comment", "")
+    if _ia_c:
+        lines.append(f"🤖 _{_ia_c}_")
+
+    lines += [
+        f"",
+        f"📡 *Fuente:* {src_clean}{_tf_str}",
+        f"⚡ _BuySell365 Pro · buysell365.pro_",
     ]
 
     msg = "\n".join(lines)
@@ -834,9 +876,16 @@ async def main():
         except Exception as _e:
             log.warning(f"⚠️ No se pudo resolver @{_uname}: {_e}")
 
-    # Auto-discover: buscar canales Learn2Trade VIP y agregarlos
+    # Auto-discover: buscar canales por keywords conocidos
     L2T_KEYWORDS = ["learn 2 trade", "learn2trade", "l2t"]
-    SIGNAL_KEYWORDS = ["sureshot", "learn"]  # Para el log de monitoreo
+    # Keywords para auto-descubrir canales de señales
+    AUTO_DISCOVER_KEYWORDS = [
+        "sureshot", "learn2trade", "learn 2 trade",
+        "fxpremiere", "fx premiere", "goldSignals", "gold signals",
+        "anabelsignals", "anabel signals", "forex signals", "forexsignals",
+        "nasdaq vip", "vip signals", "signal vip",
+    ]
+    SIGNAL_KEYWORDS = ["sureshot", "learn", "fxpremiere", "anabel"]
 
     @client.on(events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
     async def handler(event):
@@ -909,14 +958,15 @@ async def main():
     me = await client.get_me()
     log.info(f"📡 Conectado como: {me.first_name} (@{me.username})")
 
-    # Auto-discover Learn2Trade VIP channels + list monitored channels
+    # Auto-discover TODOS los canales de señales conocidos
     async for dialog in client.iter_dialogs():
         title_lower = (dialog.title or "").lower()
-        # Auto-add Learn2Trade VIP channels
-        if any(kw in title_lower for kw in L2T_KEYWORDS) and "vip" in title_lower:
-            if dialog.id not in ALLOWED_CHANNEL_IDS:
-                ALLOWED_CHANNEL_IDS.add(dialog.id)
-                log.info(f"📡 AUTO-AGREGADO: {dialog.title} (ID: {dialog.id})")
+        # Auto-agregar canales que coincidan con keywords de señales
+        _es_canal = hasattr(dialog.entity, 'broadcast') or hasattr(dialog.entity, 'megagroup')
+        _match = any(kw in title_lower for kw in AUTO_DISCOVER_KEYWORDS)
+        if _match and _es_canal and dialog.id not in ALLOWED_CHANNEL_IDS:
+            ALLOWED_CHANNEL_IDS.add(dialog.id)
+            log.info(f"📡 AUTO-AGREGADO: {dialog.title} (ID: {dialog.id})")
         if dialog.id in ALLOWED_CHANNEL_IDS:
             log.info(f"📡 Monitoreando: {dialog.title} (ID: {dialog.id})")
 
