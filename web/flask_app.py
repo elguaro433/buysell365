@@ -2566,7 +2566,12 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     }}
     let totalPips = 0;
     filtered.forEach(function(t){{ totalPips += (t.pips || 0); }});
-    const sorted = filtered.slice().reverse();
+    const sorted = filtered.slice().sort(function(a, b){{
+      // Ordenar por fecha+hora descendente (más reciente primero)
+      var da = (a.fecha||'').split('/').reverse().join('') + (a.hora||'');
+      var db = (b.fecha||'').split('/').reverse().join('') + (b.hora||'');
+      return db.localeCompare(da);
+    }});
     const totalPages = Math.ceil(sorted.length / TRADES_PER_PAGE);
     if(currentPage > totalPages) currentPage = totalPages;
     if(currentPage < 1) currentPage = 1;
