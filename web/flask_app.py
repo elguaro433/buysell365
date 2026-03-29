@@ -2524,8 +2524,8 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       html += '<td style="padding:8px">' + tipoIcon + ' ' + (t.tipo || '-') + '</td>';
       const _entrada = t.entrada || t.precio_entrada;
       const _salida = t.salida || t.precio_salida;
-      const _hora_e = t.hora_entrada || t.hora_entrada || '';
-      const _hora_s = t.hora_salida || t.hora || '';
+      const _hora_e = t.hora_entrada || t.hora || '';
+      const _hora_s = t.hora_salida || '';
       html += '<td style="padding:8px;font-family:monospace">' + (_entrada ? Number(_entrada).toFixed(dec) : '-') + '</td>';
       html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (_hora_e || '-') + '</td>';
       html += '<td style="padding:8px;font-family:monospace">' + (_salida ? Number(_salida).toFixed(dec) : '-') + '</td>';
@@ -2642,7 +2642,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         normName(t.nombre || t.ticker || ''),
         t.tipo || '',
         t.entrada ? Number(t.entrada).toFixed(decCSV) : '',
-        t.hora_entrada || '',
+        t.hora_entrada || t.hora || '',
         t.salida ? Number(t.salida).toFixed(decCSV) : '',
         t.hora_salida || '',
         (t.pips || 0).toFixed(1)
