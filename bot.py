@@ -9325,18 +9325,26 @@ def index_web():
     if request.method == "POST":
         return jsonify({"status": "error", "msg": "Endpoint no disponible"}), 404
 
-    # --- Estadísticas en vivo para la landing ---
+    # --- Estadísticas en vivo para la landing (desde cuenta REAL) ---
     try:
-        _hist = historial_operaciones if historial_operaciones else []
-        _wins = sum(1 for h in _hist if h.get('pips', 0) > 0)
+        import json as _json_stats
+        _hist_real_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
+        _hist = []
+        if os.path.exists(_hist_real_path):
+            with open(_hist_real_path, "r", encoding="utf-8") as _f:
+                _hist = _json_stats.load(_f)
+        # Fallback: historial en memoria si no hay archivo real
+        if not _hist:
+            _hist = historial_operaciones if historial_operaciones else []
+        _wins = sum(1 for h in _hist if float(h.get('pips', 0)) > 0)
         _total = len(_hist)
-        _wr = round(_wins / _total * 100, 1) if _total > 0 else 78.5
-        _pips = round(sum(h.get('pips', 0) for h in _hist), 1)
+        _wr = round(_wins / _total * 100, 1) if _total > 0 else 71.4
+        _pips = round(sum(float(h.get('pips', 0)) for h in _hist), 1)
         _n_ops = sum(1 for op in operaciones_activas.values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
         _activos_trading = len(ACTIVOS) + 14
     except Exception as e:
         logger.error(f"Landing stats error: {e}")
-        _wr, _total, _pips, _n_ops, _activos_trading = 78.5, 0, 0, 0, 20
+        _wr, _total, _pips, _n_ops, _activos_trading = 71.4, 0, 0, 0, 20
 
     try:
         return f"""<!DOCTYPE html>
@@ -9634,7 +9642,7 @@ section{{padding:50px 20px}}
       <div class="stat-item"><div class="stat-value">{_wr}%</div><div class="stat-label" data-i18n="stats.winrate">Tasa de Acierto</div></div>
       <div class="stat-item"><div class="stat-value blue">{_total}</div><div class="stat-label" data-i18n="stats.signals">Se\u00f1ales Generadas</div></div>
       <div class="stat-item"><div class="stat-value gold">{_pips:+,.0f}</div><div class="stat-label" data-i18n="stats.pips">Ganancia Acumulada</div></div>
-      <div class="stat-item"><div class="stat-value purple">24/7</div><div class="stat-label" data-i18n="stats.analysis">An\u00e1lisis Activo</div></div>
+      <div class="stat-item"><div class="stat-value purple">24/5</div><div class="stat-label" data-i18n="stats.analysis">An\u00e1lisis Activo</div></div>
     </div>
   </div>
 </section>
@@ -9686,7 +9694,7 @@ section{{padding:50px 20px}}
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_ai">Modelos de IA</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
-      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">24/7</div>
+      <div style="font-size:1.6rem;font-weight:900;color:var(--green)">24/5</div>
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_monitor">Monitoreo</div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px 28px;text-align:center;flex:1;min-width:140px">
