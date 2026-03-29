@@ -1161,59 +1161,6 @@ if('serviceWorker' in navigator){{
   </div>
 </section>
 
-<!-- EMAIL CAPTURE -->
-<section class="fade-in" id="email-capture" style="padding:50px 20px;background:linear-gradient(135deg,rgba(0,212,170,.05),rgba(77,159,255,.05));border-top:1px solid rgba(0,212,170,.1);border-bottom:1px solid rgba(0,212,170,.1)">
-  <div style="max-width:560px;margin:0 auto;text-align:center">
-    <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600">&#127381; GRATIS — SIN TARJETA</div>
-    <h2 style="font-size:clamp(1.5rem,4vw,2.2rem);font-weight:900;color:#f0f6ff;margin-bottom:10px">Recibe 3 se&#241;ales de ejemplo <span style="color:#00ffc8">gratis</span></h2>
-    <p style="color:#8b9fc4;font-size:1rem;margin-bottom:28px;line-height:1.6">Ve c&#243;mo funciona BuySell365 Pro antes de suscribirte. Entry, TP y SL exactos — directamente en tu email.</p>
-    <form id="emailCaptureForm" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:480px;margin:0 auto" onsubmit="return _submitEmail(event)">
-      <input type="email" id="emailInput" placeholder="tu@email.com" required
-        style="flex:1;min-width:220px;padding:14px 18px;background:rgba(255,255,255,.06);border:1px solid rgba(0,212,170,.3);border-radius:12px;color:#f0f6ff;font-size:1rem;font-family:inherit;outline:none">
-      <button type="submit" id="emailBtn"
-        style="padding:14px 24px;background:linear-gradient(135deg,#00ffc8,#00a89d);border:none;border-radius:12px;color:#000;font-weight:800;font-size:1rem;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .3s">
-        &#128640; Enviar se&#241;ales
-      </button>
-    </form>
-    <div id="emailMsg" style="margin-top:14px;font-size:14px;display:none"></div>
-    <p style="margin-top:14px;font-size:11px;color:rgba(139,159,196,.5)">Sin spam. Puedes darte de baja en cualquier momento. &bull; <a href="/privacidad" style="color:rgba(0,255,200,.4);text-decoration:none">Privacidad</a></p>
-  </div>
-</section>
-<script>
-function _submitEmail(e){{
-  e.preventDefault();
-  var email = document.getElementById('emailInput').value;
-  var btn = document.getElementById('emailBtn');
-  var msg = document.getElementById('emailMsg');
-  btn.textContent = 'Enviando...';
-  btn.disabled = true;
-  fetch('/suscribir', {{
-    method:'POST',
-    headers:{{'Content-Type':'application/json'}},
-    body: JSON.stringify({{email: email}})
-  }}).then(function(r){{ return r.json(); }}).then(function(d){{
-    if(d.ok){{
-      msg.innerHTML = '&#9989; &#161;Listo! Revisa tu email en los pr&#243;ximos minutos.';
-      msg.style.color = '#00ffc8';
-      document.getElementById('emailCaptureForm').style.display = 'none';
-    }} else {{
-      msg.innerHTML = '&#9888;&#65039; ' + (d.error || 'Error. Intenta de nuevo.');
-      msg.style.color = '#ff6b6b';
-      btn.textContent = '&#128640; Enviar se&#241;ales';
-      btn.disabled = false;
-    }}
-    msg.style.display = 'block';
-  }}).catch(function(){{
-    msg.innerHTML = '&#9888;&#65039; Error de conexi&#243;n. Intenta de nuevo.';
-    msg.style.color = '#ff6b6b';
-    msg.style.display = 'block';
-    btn.textContent = '&#128640; Enviar se&#241;ales';
-    btn.disabled = false;
-  }});
-  return false;
-}}
-</script>
-
 <!-- PRICING — Visible inmediatamente después del Hero -->
 <section class="pricing fade-in" id="pricing">
   <div class="section-title" style="margin-bottom:48px">
@@ -2910,33 +2857,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     _dash_resp.headers['Content-Type'] = 'text/html; charset=utf-8'
     _dash_resp.headers['Cache-Control'] = 'no-cache'
     return _dash_resp
-
-@app.route("/suscribir", methods=["POST"])
-def suscribir_email():
-    import json as _json2
-    try:
-        data = request.get_json(silent=True) or {}
-        email = str(data.get("email", "")).strip().lower()
-        if not email or "@" not in email or len(email) > 200:
-            return jsonify({"ok": False, "error": "Email inválido"}), 400
-        subs_path = os.path.join(os.path.dirname(__file__), "suscriptores.json")
-        subs = []
-        if os.path.exists(subs_path):
-            try:
-                with open(subs_path) as f:
-                    subs = _json2.load(f)
-            except Exception:
-                subs = []
-        emails_existentes = [s.get("email") for s in subs]
-        if email in emails_existentes:
-            return jsonify({"ok": True, "msg": "ya_registrado"})
-        import datetime as _dt
-        subs.append({"email": email, "fecha": _dt.datetime.now().isoformat(), "fuente": "landing"})
-        with open(subs_path, "w") as f:
-            _json2.dump(subs, f, ensure_ascii=False, indent=2)
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
 
 # ============================================================
 #  LEGAL PAGES
