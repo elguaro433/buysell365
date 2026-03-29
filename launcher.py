@@ -1,8 +1,7 @@
 """
 BuySell365 Pro - Consola de Control
 Herramienta de gestion profesional para el bot de trading BuySell365 Pro.
-Interfaz completa con 8 pestanas: Dashboard, Senales, Analisis, Trading Config,
-Conexiones, VIP, Logs y Web.
+Interfaz con 6 pestanas: Dashboard, Senales, Noticias, Config, VIP, Logs.
 """
 import sys
 import os
@@ -63,24 +62,18 @@ ICO_PATH = os.path.join(BASE_DIR, "static", "bull-logo.ico")
 #  ASSET NAME NORMALIZATION
 # ============================================================
 _ASSET_MAP = {
-    "ORO": "ORO", "GC=F": "ORO", "XAUUSD": "ORO", "Gold": "ORO", "GOLD": "ORO",
     "EUR/USD": "EUR/USD", "EURUSD=X": "EUR/USD", "EURUSD": "EUR/USD",
-    "USD/JPY": "USD/JPY", "JPY=X": "USD/JPY", "USDJPY": "USD/JPY", "USDJPY=X": "USD/JPY",
-    "GBP/JPY": "GBP/JPY", "GBPJPY=X": "GBP/JPY", "GBPJPY": "GBP/JPY",
     "NASDAQ": "NASDAQ", "NQ=F": "NASDAQ", "US100": "NASDAQ", "US100Cash": "NASDAQ",
     "S&P 500": "S&P 500", "ES=F": "S&P 500", "US500": "S&P 500", "US500Cash": "S&P 500",
     "AUD/CAD": "AUD/CAD", "AUDCAD": "AUD/CAD", "AUDCAD=X": "AUD/CAD",
     "EUR/CHF": "EUR/CHF", "EURCHF": "EUR/CHF", "EURCHF=X": "EUR/CHF",
     "USD/CAD": "USD/CAD", "USDCAD": "USD/CAD", "USDCAD=X": "USD/CAD",
 }
-_VALID_ASSETS = {"ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"}
+_VALID_ASSETS = {"EUR/USD", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"}
 
 # Reverse map: friendly name -> tickers used in estado.json
 _ASSET_TICKERS = {
-    "ORO": "GC=F",
     "EUR/USD": "EURUSD=X",
-    "USD/JPY": "USDJPY=X",
-    "GBP/JPY": "GBPJPY=X",
     "NASDAQ": "NQ=F",
     "S&P 500": "ES=F",
 }
@@ -146,7 +139,6 @@ def load_trading_config() -> dict:
         "capital": 555.0,
         "riesgo_trade": 0.01,
         "riesgo_premium": 0.015,
-        "riesgo_oro": 0.01,
         "modo": "Normal",
         "min_score": 3,
         "max_trades": 6,
@@ -159,10 +151,7 @@ def load_trading_config() -> dict:
         "auto_trading_mt5": True,
         "solo_premium_mt5": True,
         "spreads_max": {
-            "ORO": 50,
             "EUR/USD": 3,
-            "USD/JPY": 3,
-            "GBP/JPY": 5,
             "NASDAQ": 30,
             "S&P 500": 20,
             "AUD/CAD": 30,
@@ -170,10 +159,7 @@ def load_trading_config() -> dict:
             "USD/CAD": 25,
         },
         "activos_habilitados": {
-            "ORO": True,
             "EUR/USD": True,
-            "USD/JPY": True,
-            "GBP/JPY": False,
             "NASDAQ": True,
             "S&P 500": True,
             "AUD/CAD": True,
@@ -432,6 +418,40 @@ class BotManager:
         self.start_time = None
         self.restart_count = 0
         self._watchdog_thread = None
+        # Subprocesos auxiliares (arrancan/paran junto al bot)
+        self._copier_proc  = None   # signal_copier.py
+        self._monitor_proc = None   # monitor_real.py
+
+    def _start_aux(self, script_name):
+        """Inicia un subproceso auxiliar si el script existe."""
+        script = os.path.join(BASE_DIR, script_name)
+        if not os.path.exists(script):
+            _log(f"⚠️ {script_name} no encontrado, omitiendo")
+            return None
+        try:
+            _flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+            proc = subprocess.Popen(
+                [sys.executable, script],
+                cwd=BASE_DIR,
+                creationflags=_flags,
+            )
+            _log(f"▶ {script_name} iniciado PID={proc.pid}")
+            return proc
+        except Exception as e:
+            _log(f"Error iniciando {script_name}: {e}")
+            return None
+
+    def _stop_aux(self, proc, name):
+        """Detiene un subproceso auxiliar."""
+        if proc and proc.poll() is None:
+            try:
+                if os.name == 'nt':
+                    subprocess.run(["taskkill", "/F", "/PID", str(proc.pid)], capture_output=True, timeout=5)
+                else:
+                    proc.terminate()
+                _log(f"■ {name} detenido (PID={proc.pid})")
+            except Exception as e:
+                _log(f"Error deteniendo {name}: {e}")
 
     @property
     def is_running(self):
@@ -486,6 +506,13 @@ class BotManager:
             if self._watchdog_thread is None or not self._watchdog_thread.is_alive():
                 self._watchdog_thread = threading.Thread(target=self.watchdog_loop, daemon=True)
                 self._watchdog_thread.start()
+            # Arrancar auxiliares con pequeño delay
+            def _start_aux_delayed():
+                time.sleep(5)
+                self._copier_proc  = self._start_aux("signal_copier.py")
+                time.sleep(3)
+                self._monitor_proc = self._start_aux("monitor_real.py")
+            threading.Thread(target=_start_aux_delayed, daemon=True).start()
         except Exception as e:
             _log(f"Error iniciando bot: {e}")
 
@@ -550,7 +577,12 @@ class BotManager:
         self.pid = None
         self._running = False
         self._cleanup_pid_file()
-        _log("Bot detenido")
+        # Detener auxiliares
+        self._stop_aux(self._copier_proc,  "signal_copier.py")
+        self._stop_aux(self._monitor_proc, "monitor_real.py")
+        self._copier_proc  = None
+        self._monitor_proc = None
+        _log("Bot y servicios auxiliares detenidos")
 
     @staticmethod
     def _pid_alive(pid):
@@ -680,24 +712,18 @@ class ManagementConsole:
         # Create all tabs
         self._tab_dashboard = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_senales = tk.Frame(self.notebook, bg=BG_MAIN)
-        self._tab_analisis = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_trading = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_conexiones = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_vip = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_logs = tk.Frame(self.notebook, bg=BG_MAIN)
-        self._tab_web = tk.Frame(self.notebook, bg=BG_MAIN)
-        self._tab_copy = tk.Frame(self.notebook, bg=BG_MAIN)
         self._tab_noticias = tk.Frame(self.notebook, bg=BG_MAIN)
 
         self.notebook.add(self._tab_dashboard, text=" \U0001F4CA Dashboard ")
         self.notebook.add(self._tab_senales, text=" \U0001F4E1 Se\u00f1ales ")
-        self.notebook.add(self._tab_copy, text=" \U0001F916 Copy Trading ")
         self.notebook.add(self._tab_noticias, text=" \U0001F4F0 Noticias ")
-        self.notebook.add(self._tab_analisis, text=" \U0001F50D Analisis ")
-        self.notebook.add(self._tab_trading, text=" \u2699 Trading Config ")
+        self.notebook.add(self._tab_trading, text=" \u2699 Config ")
         self.notebook.add(self._tab_vip, text=" \u2B50 VIP ")
         self.notebook.add(self._tab_logs, text=" \U0001F4DD Logs ")
-        self.notebook.add(self._tab_web, text=" \U0001F310 Web ")
 
         # Scrollable canvases dict for mousewheel binding
         self._scroll_canvases = {}
@@ -705,13 +731,10 @@ class ManagementConsole:
         # Build each tab
         self._build_dashboard()
         self._build_senales()
-        self._build_analisis()
         self._build_trading()
         self._build_conexiones()
         self._build_vip()
         self._build_logs()
-        self._build_web()
-        self._build_copy_trading()
         self._build_noticias()
 
         # Mousewheel binding
@@ -895,7 +918,7 @@ class ManagementConsole:
         dash_header = tk.Frame(scroll_frame, bg=BG_MAIN)
         dash_header.pack(fill="x", padx=10, pady=(10, 4))
 
-        self._dash_estado_lbl = _make_label(dash_header, "● Detenido",
+        self._dash_estado_lbl = _make_label(dash_header, "● Bot Detenido",
                                              fg=ERR, font=("Segoe UI", 11, "bold"))
         self._dash_estado_lbl.pack(side="left")
 
@@ -995,7 +1018,7 @@ class ManagementConsole:
         tl_row = tk.Frame(traffic_frame, bg=BG_PANEL)
         tl_row.pack(fill="x", pady=4)
 
-        all_assets = ["EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]
+        all_assets = ["EUR/USD", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]
         for asset in all_assets:
             af = tk.Frame(tl_row, bg=BG_PANEL)
             af.pack(side="left", padx=10, pady=2)
@@ -1029,7 +1052,7 @@ class ManagementConsole:
             "Acerca de BuySell365 Pro",
             "BuySell365 Pro v5.0\n\n"
             "Bot de trading automatizado con IA\n"
-            "Senales para ORO, EUR/USD, USD/JPY, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD\n\n"
+            "Senales para EUR/USD, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD\n\n"
             "Creado por Emmanuel Diaz\n"
             "https://buysell365.pro\n\n"
             "(c) 2026 BuySell365. Todos los derechos reservados."
@@ -1168,15 +1191,15 @@ class ManagementConsole:
     # ============================================================
     # Mapeo moneda → pares afectados
     _CURRENCY_PAIRS = {
-        "USD": ["EUR/USD", "USD/JPY", "ORO", "NASDAQ", "S&P 500", "USD/CAD"],
+        "USD": ["EUR/USD", "NASDAQ", "S&P 500", "USD/CAD"],
         "EUR": ["EUR/USD", "EUR/CHF"],
         "GBP": [],
-        "JPY": ["USD/JPY"],
+        "JPY": [],
         "CHF": ["EUR/CHF"],
-        "AUD": ["AUD/CAD", "ORO"],
-        "CAD": ["AUD/CAD", "USD/CAD", "ORO"],
+        "AUD": ["AUD/CAD"],
+        "CAD": ["AUD/CAD", "USD/CAD"],
         "NZD": [],
-        "CNY": ["ORO", "NASDAQ", "S&P 500"],
+        "CNY": ["NASDAQ", "S&P 500"],
     }
 
     def _build_noticias(self):
@@ -1549,9 +1572,7 @@ class ManagementConsole:
 
         # Horarios por activo (Andorra time)
         horarios = {
-            "ORO": (8, 20), "EUR/USD": (8, 18), "USD/JPY": (2, 18),
-            "NASDAQ": (15, 22), "S&P 500": (15, 22),
-            "AUD/CAD": (2, 16), "EUR/CHF": (9, 18), "USD/CAD": (15, 22),
+            "EUR/USD": (7, 21), "NASDAQ": (13, 21), "S&P 500": (13, 21),
         }
 
         # Assets with open positions
@@ -1936,13 +1957,7 @@ class ManagementConsole:
                                       0.01, 0.08, 0.005,
                                       "% de riesgo para senales premium (score>=4)")
 
-        # 4. Riesgo ORO
-        row = self._add_trading_scale(params_grid, row, "Riesgo ORO (%):",
-                                      "riesgo_oro", tc.get("riesgo_oro", 0.02),
-                                      0.01, 0.05, 0.005,
-                                      "Riesgo especifico para Oro")
-
-        # 5. Modo
+        # 4. Modo
         row = self._add_trading_combo(params_grid, row, "Modo:",
                                       "modo", tc.get("modo", "Normal"),
                                       ["Conservador", "Normal", "Agresivo"],
@@ -2020,7 +2035,7 @@ class ManagementConsole:
 
         self._spread_entries = {}
         spreads = tc.get("spreads_max", {})
-        for idx, asset in enumerate(["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]):
+        for idx, asset in enumerate(["EUR/USD", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]):
             r = idx // 3
             c = (idx % 3) * 2
             _make_label(spreads_grid, f"{asset}:", fg=TEXT_SEC).grid(
@@ -2039,7 +2054,7 @@ class ManagementConsole:
 
         self._activo_vars = {}
         habilitados = tc.get("activos_habilitados", {})
-        for idx, asset in enumerate(["ORO", "EUR/USD", "USD/JPY", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]):
+        for idx, asset in enumerate(["EUR/USD", "NASDAQ", "S&P 500", "AUD/CAD", "EUR/CHF", "USD/CAD"]):
             r = idx // 3
             c = idx % 3
             var = tk.BooleanVar(value=habilitados.get(asset, True))
@@ -3285,13 +3300,6 @@ class ManagementConsole:
                 except Exception:
                     pass
 
-            # Analisis (every 10s) — solo si bot activo
-            if _bot_on and self._tick_count % 5 == 0:
-                try:
-                    self._refresh_analisis()
-                except Exception:
-                    pass
-
             # News (every 30 min = 900 ticks at 2s each)
             if self._tick_count % 900 == 0 or self._tick_count == 1:
                 try:
@@ -3321,11 +3329,12 @@ class ManagementConsole:
 
         # Bot status
         if self.bot.is_running:
-            self._dash_estado_lbl.config(text="● Ejecutando", fg=WIN_COLOR)
+            self._dash_estado_lbl.config(text="● Bot Activo", fg=WIN_COLOR)
             self._dash_uptime_lbl.config(text=f"Uptime: {self.bot.uptime_str()}")
         else:
-            self._dash_estado_lbl.config(text="● Detenido", fg=ERR)
+            self._dash_estado_lbl.config(text="● Bot Detenido", fg=ERR)
             self._dash_uptime_lbl.config(text="")
+
 
         # Stats
         historial = estado.get("historial_operaciones", [])

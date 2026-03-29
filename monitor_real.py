@@ -1,140 +1,224 @@
 """
-BuySell365 — Monitor de cuenta REAL
-Lee posiciones de MSC Gold Stable Pro y las envía a Telegram.
-Solo lectura — no ejecuta nada.
-Corre como proceso separado del bot principal.
+BuySell365 — Monitor cuenta REAL XM (88849791)
+================================================
+- Lee TODAS las posiciones abiertas (manuales + bot) cada 30s
+- Lee historial de deals cerrados del día
+- Calcula WR, pips, profit en tiempo real
+- Escribe mt5_realtime.json para el dashboard web
+- SOLO LECTURA — nunca ejecuta órdenes
 """
-import os, time, json, logging, requests
+import os, time, json, logging
 from pathlib import Path
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-# Config
-MT5_LOGIN_REAL = 88849791
-MT5_PASSWORD_REAL = "Andorra433+"
-MT5_SERVER_REAL = "XMGlobal-MT5 4"
-BOT_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
-ADMIN_ID = os.getenv("USER_ID_1", "8696207137")
-CHECK_INTERVAL = 30  # segundos
+# ── Configuración ──────────────────────────────────────────────
+MT5_LOGIN    = 88849791
+MT5_PASSWORD = "Andorra433+"
+MT5_SERVER   = "XMGlobal-MT5 4"
 
-# Logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [MONITOR] %(message)s",
-                    handlers=[logging.FileHandler(Path(__file__).parent / "logs" / "monitor_real.log", encoding="utf-8"),
-                              logging.StreamHandler()])
+CHECK_INTERVAL = 30  # segundos entre lecturas
+
+REALTIME_FILE = Path(__file__).parent / "mt5_realtime.json"
+
+# ── Logging ────────────────────────────────────────────────────
+_log_dir = Path(__file__).parent / "logs"
+_log_dir.mkdir(exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [MONITOR_REAL] %(message)s",
+    handlers=[
+        logging.FileHandler(_log_dir / "monitor_real.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
 log = logging.getLogger("monitor_real")
 
-# State
-_posiciones_conocidas: dict = {}  # {ticket: {symbol, type, price_open, volume, sl, tp}}
-_state_file = Path(__file__).parent / "monitor_real_state.json"
+
+# ── Helpers ────────────────────────────────────────────────────
+
+def _pip_size(symbol: str) -> float:
+    """Retorna el tamaño de pip para calcular pips desde precio."""
+    s = symbol.upper()
+    if "JPY" in s:
+        return 0.01
+    if any(x in s for x in ["GOLD", "XAUUSD", "GC"]):
+        return 0.1
+    if any(x in s for x in ["NAS", "US100", "NDX"]):
+        return 1.0
+    if any(x in s for x in ["SPX", "US500", "SP500"]):
+        return 1.0
+    if any(x in s for x in ["US30", "DOW", "DJI"]):
+        return 1.0
+    return 0.0001  # Forex estándar
 
 
-def _cargar_estado():
-    global _posiciones_conocidas
+def _pips(symbol: str, price_open: float, price_close: float, is_buy: bool) -> float:
+    """Calcula pips de ganancia/pérdida."""
+    diff = (price_close - price_open) if is_buy else (price_open - price_close)
+    pip = _pip_size(symbol)
+    return round(diff / pip, 1) if pip > 0 else round(diff, 2)
+
+
+def _escribir_json(data: dict):
+    """Escribe el JSON de forma atómica."""
+    tmp = REALTIME_FILE.with_suffix(".tmp")
     try:
-        if _state_file.exists():
-            data = json.loads(_state_file.read_text(encoding="utf-8"))
-            _posiciones_conocidas = {int(k): v for k, v in data.items()}
-    except Exception:
-        _posiciones_conocidas = {}
-
-
-def _guardar_estado():
-    try:
-        _state_file.write_text(json.dumps(_posiciones_conocidas, default=str), encoding="utf-8")
-    except Exception:
-        pass
-
-
-def _enviar_telegram(msg, chat_id=None):
-    """Envía mensaje a Telegram."""
-    if not BOT_TOKEN:
-        return
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    target = chat_id or CHANNEL_ID
-    try:
-        requests.post(url, json={"chat_id": target, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        tmp.replace(REALTIME_FILE)
     except Exception as e:
-        log.warning(f"Error Telegram: {e}")
+        log.error(f"Error escribiendo JSON: {e}")
 
+
+# ── Monitor principal ──────────────────────────────────────────
 
 def main():
-    import MetaTrader5 as mt5
+    try:
+        import MetaTrader5 as mt5
+    except ImportError:
+        log.error("MetaTrader5 no instalado. Instala: pip install MetaTrader5")
+        return
 
-    log.info("📊 Monitor cuenta REAL iniciando...")
-    log.info(f"📊 Login: {MT5_LOGIN_REAL} | Server: {MT5_SERVER_REAL}")
-
-    _cargar_estado()
+    log.info(f"📊 Monitor REAL iniciando — cuenta {MT5_LOGIN} en {MT5_SERVER}")
 
     while True:
         try:
-            # Conectar a cuenta real
+            # ── 1. Inicializar y conectar ──────────────────────
             if not mt5.initialize():
-                log.warning("MT5 no se pudo inicializar")
+                log.warning(f"MT5 initialize() falló: {mt5.last_error()}")
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            # Login a cuenta real
-            authorized = mt5.login(MT5_LOGIN_REAL, password=MT5_PASSWORD_REAL, server=MT5_SERVER_REAL)
-            if not authorized:
+            if not mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
                 log.warning(f"Login fallido: {mt5.last_error()}")
+                mt5.shutdown()
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            # Leer posiciones
-            positions = mt5.positions_get()
-            account = mt5.account_info()
-            balance = account.balance if account else 0
-            equity = account.equity if account else 0
+            # ── 2. Info de cuenta ──────────────────────────────
+            acc = mt5.account_info()
+            balance    = round(acc.balance, 2)  if acc else 0
+            equity     = round(acc.equity, 2)   if acc else 0
+            profit_fl  = round(acc.profit, 2)   if acc else 0
+            margen_libre = round(acc.margin_free, 2) if acc else 0
 
-            current_tickets = set()
-            if positions:
-                for pos in positions:
-                    current_tickets.add(pos.ticket)
-                    # ¿Es nueva?
-                    if pos.ticket not in _posiciones_conocidas:
-                        _dir = "COMPRA" if pos.type == 0 else "VENTA"
-                        emoji = "🟢" if pos.type == 0 else "🔴"
+            # ── 3. Posiciones abiertas ─────────────────────────
+            raw_pos = mt5.positions_get() or []
+            posiciones = []
+            for p in raw_pos:
+                is_buy = (p.type == 0)
+                posiciones.append({
+                    "ticket":      p.ticket,
+                    "symbol":      p.symbol,
+                    "tipo":        "COMPRA" if is_buy else "VENTA",
+                    "volumen":     p.volume,
+                    "entrada":     p.price_open,
+                    "precio_actual": p.price_current,
+                    "sl":          p.sl,
+                    "tp":          p.tp,
+                    "profit":      round(p.profit, 2),
+                    "pips":        _pips(p.symbol, p.price_open, p.price_current, is_buy),
+                    "hora_apertura": datetime.fromtimestamp(p.time).strftime("%H:%M"),
+                    "fecha_apertura": datetime.fromtimestamp(p.time).strftime("%d/%m/%Y"),
+                    "comentario":  p.comment,
+                })
 
-                        msg = (
-                            f"{emoji} *{_dir} {pos.symbol}*\n"
-                            f"Entrada: {pos.price_open}\n"
-                            f"SL: {pos.sl}\n"
-                            f"TP: {pos.tp}"
-                        )
+            # ── 4. Historial del día (deals cerrados) ──────────
+            hoy_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            manana     = hoy_inicio + timedelta(days=1)
+            deals_raw  = mt5.history_deals_get(hoy_inicio, manana) or []
 
-                        _enviar_telegram(msg)
-                        log.info(f"📊 NUEVA POSICIÓN: {_dir} {pos.symbol} @ {pos.price_open}")
+            historial_hoy = []
+            _pos_vistos   = {}  # position_id → deal de entrada
 
-                        _posiciones_conocidas[pos.ticket] = {
-                            "symbol": pos.symbol,
-                            "type": pos.type,
-                            "price_open": pos.price_open,
-                            "volume": pos.volume,
-                            "sl": pos.sl,
-                            "tp": pos.tp,
-                            "profit": pos.profit,
-                        }
+            for d in deals_raw:
+                if d.entry == 0:   # DEAL_ENTRY_IN  (apertura)
+                    _pos_vistos[d.position_id] = d
+                elif d.entry == 1: # DEAL_ENTRY_OUT (cierre)
+                    entrada_deal = _pos_vistos.get(d.position_id)
+                    is_buy = (d.type == 1)  # DEAL_TYPE_SELL cierra una compra
+                    price_open  = entrada_deal.price if entrada_deal else d.price
+                    price_close = d.price
+                    pips_val = _pips(d.symbol, price_open, price_close, not is_buy)
+                    historial_hoy.append({
+                        "ticket":      d.position_id,
+                        "symbol":      d.symbol,
+                        "tipo":        "COMPRA" if not is_buy else "VENTA",
+                        "entrada":     price_open,
+                        "salida":      price_close,
+                        "profit":      round(d.profit, 2),
+                        "pips":        pips_val,
+                        "volumen":     d.volume,
+                        "hora_salida": datetime.fromtimestamp(d.time).strftime("%H:%M"),
+                        "fecha":       datetime.fromtimestamp(d.time).strftime("%d/%m/%Y"),
+                        "resultado":   "WIN" if d.profit > 0 else "LOSS",
+                    })
 
-            # Detectar posiciones cerradas
-            cerradas = set(_posiciones_conocidas.keys()) - current_tickets
-            for ticket in cerradas:
-                info = _posiciones_conocidas[ticket]
-                _dir = "COMPRA" if info["type"] == 0 else "VENTA"
+            # ── 5. Estadísticas del día ────────────────────────
+            total   = len(historial_hoy)
+            wins    = sum(1 for h in historial_hoy if h["profit"] > 0)
+            losses  = total - wins
+            wr      = round(wins / total * 100, 1) if total > 0 else 0
+            pips_d  = round(sum(h["pips"] for h in historial_hoy), 1)
+            profit_d = round(sum(h["profit"] for h in historial_hoy), 2)
 
-                msg = f"🔄 *{info['symbol']}* — CIERRE ({_dir})"
-                _enviar_telegram(msg)
-                log.info(f"📊 POSICIÓN CERRADA: {_dir} {info['symbol']} (ticket {ticket})")
-                del _posiciones_conocidas[ticket]
+            # ── 6. Estadísticas históricas (historial_real.json) ─
+            hist_real_path = Path(__file__).parent / "historial_real.json"
+            wr_hist = 0; total_hist = 0; pips_hist = 0
+            try:
+                if hist_real_path.exists():
+                    _hr = json.loads(hist_real_path.read_text(encoding="utf-8"))
+                    total_hist = len(_hr)
+                    wins_hist  = sum(1 for h in _hr if float(h.get("pips", 0)) > 0)
+                    wr_hist    = round(wins_hist / total_hist * 100, 1) if total_hist > 0 else 0
+                    pips_hist  = round(sum(float(h.get("pips", 0)) for h in _hr), 1)
+            except Exception:
+                pass
 
-            _guardar_estado()
+            # ── 7. Escribir JSON para el dashboard ─────────────
+            data = {
+                "last_update":    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                "cuenta": {
+                    "login":       MT5_LOGIN,
+                    "balance":     balance,
+                    "equity":      equity,
+                    "profit_fl":   profit_fl,
+                    "margen_libre": margen_libre,
+                },
+                "posiciones_abiertas": posiciones,
+                "historial_hoy":       historial_hoy,
+                "stats_hoy": {
+                    "total":   total,
+                    "wins":    wins,
+                    "losses":  losses,
+                    "wr":      wr,
+                    "pips":    pips_d,
+                    "profit":  profit_d,
+                },
+                "stats_historico": {
+                    "total":   total_hist,
+                    "wr":      wr_hist,
+                    "pips":    pips_hist,
+                },
+            }
+            _escribir_json(data)
 
-            # Reconectar a cuenta demo para que el bot principal siga funcionando
-            mt5.login(336093063, password="Emmanuel433+", server="XMGlobal-MT5 9")
+            log.info(
+                f"✅ Sync OK | Abiertas: {len(posiciones)} | "
+                f"Hoy: {wins}W/{losses}L WR{wr}% | "
+                f"Balance: ${balance} Equity: ${equity}"
+            )
+
+            mt5.shutdown()
 
         except Exception as e:
-            log.error(f"Error monitor: {e}")
+            log.error(f"Error en ciclo monitor: {e}")
+            try:
+                mt5.shutdown()
+            except Exception:
+                pass
 
         time.sleep(CHECK_INTERVAL)
 

@@ -201,9 +201,6 @@ MIN_SCORE = 3                   # Score mínimo para enviar señal (auto-calibra
 # ✅ PARÁMETROS INSTITUCIONALES
 CAPITAL_USUARIO   = 555.00      # Capital base (se actualiza con balance real de MT5)
 RIESGO_POR_TRADE  = 0.01        # 1% para TODOS los activos (~$5.5 por trade)
-RIESGO_ORO        = 0.01        # 1% para ORO
-RIESGO_USDJPY     = 0.01        # 1% para USD/JPY
-RIESGO_GBPJPY     = 0.01        # 1% para GBP/JPY
 RIESGO_PREMIUM    = 0.015       # 1.5% para señales premium (~$8 por trade — solo score≥4)
 BOT_TZ = pytz.timezone('Europe/Andorra')  # Zona horaria del usuario (CET/CEST)
 HORA_APERTURA_LOCAL = 0         # 00:00 — sin restricción horaria, opera 24/5
@@ -220,7 +217,6 @@ try:
             _tc = json.load(_tcf)
         RIESGO_POR_TRADE = _tc.get("riesgo_trade", RIESGO_POR_TRADE)
         RIESGO_PREMIUM = _tc.get("riesgo_premium", RIESGO_PREMIUM)
-        RIESGO_ORO = _tc.get("riesgo_oro", RIESGO_ORO)
         MIN_SCORE = _tc.get("min_score", MIN_SCORE)
         MAX_TRADES_SIMULTANEOS = _tc.get("max_trades", MAX_TRADES_SIMULTANEOS)
         MAX_PERDIDA_DIARIA = _tc.get("max_perdida_diaria", MAX_PERDIDA_DIARIA)
@@ -277,9 +273,6 @@ WISE_PAY_LINK        = os.getenv("WISE_PAY_LINK", "").strip()  # Link de pago co
 # Si el spread es mayor a esto, el bot no entrará para proteger el capital.
 MAX_SPREAD_ALLOWED = {
     "EURUSD=X": 25,    # 2.5 pips (diezmilésimas)
-    "USDJPY=X": 25,    # 2.5 pips (centésimas)
-    "GBPJPY=X": 35,    # 3.5 pips (centésimas) — GBP/JPY spread más ancho que USD/JPY
-    "GC=F":     80,    # $0.80 puntos (Oro ~$2900)
     "NQ=F":     400,   # 4.00 puntos (Nasdaq ~20000)
     "ES=F":     150,   # 1.50 puntos (S&P500 ~5800)
 }
@@ -384,8 +377,7 @@ MODO_RIESGO = "normal"
 alertas_precio = []  # [{"ticker", "nombre", "precio", "tipo": ">="|"<="}]
 
 # Activos desactivados por suscripción
-# ORO bloqueado por decisión del operador hasta nuevo aviso
-activos_desactivados = {"ORO", "GC=F", "GOLD"}
+activos_desactivados = set()
 
 # Briefing matutino y notificaciones de sesión
 ultimo_briefing = time.time()  # Esperar desde arranque antes del primer briefing
@@ -458,16 +450,8 @@ MT5_TICKER_MAP = {
     'SP500':     'US500Cash',
     'SPX500USD': 'US500Cash',
     'SP500USD':  'US500Cash',
-    'GC=F':       'GOLD',
-    'XAUUSD':     'GOLD',
-    'GOLD':        'GOLD',
-    'ORO':         'GOLD',
     'EURUSD=X': 'EURUSD',
     'EURUSD':   'EURUSD',
-    'USDJPY=X': 'USDJPY',
-    'USDJPY':   'USDJPY',
-    'GBPJPY=X': 'GBPJPY',
-    'GBPJPY':   'GBPJPY',
     # Scalper Fibonacci pairs
     'AUDCAD':   'AUDCAD',
     'EURCHF':   'EURCHF',
@@ -478,14 +462,12 @@ MT5_TICKER_MAP = {
 
 # Mapa inverso: MT5/webhook ticker → yfinance ticker (para cooldown consistente)
 _TICKER_TO_YFINANCE = {
-    'GOLD': 'GC=F', 'XAUUSD': 'GC=F',
     'US100CASH': 'NQ=F', 'NAS100': 'NQ=F', 'US100': 'NQ=F', 'NASDAQ': 'NQ=F', 'NQ': 'NQ=F',
     'US500CASH': 'ES=F', 'US500': 'ES=F', 'SP500': 'ES=F', 'SPX500USD': 'ES=F', 'SPX': 'ES=F',
-    'EURUSD': 'EURUSD=X', 'USDJPY': 'USDJPY=X', 'GBPJPY': 'GBPJPY=X',
+    'EURUSD': 'EURUSD=X',
     'AUDCAD': 'AUDCAD', 'EURCHF': 'EURCHF', 'USDCAD': 'USDCAD', 'GBPUSD': 'GBPUSD=X',
     # Tickers yfinance ya correctos (pass-through)
-    'GC=F': 'GC=F',
-    'NQ=F': 'NQ=F', 'ES=F': 'ES=F', 'EURUSD=X': 'EURUSD=X', 'USDJPY=X': 'USDJPY=X', 'GBPJPY=X': 'GBPJPY=X',
+    'NQ=F': 'NQ=F', 'ES=F': 'ES=F', 'EURUSD=X': 'EURUSD=X',
 }
 
 # ── CONFIGURACIÓN DE AUTO-TRADING (cuenta real — solo lectura) ────────
@@ -570,12 +552,9 @@ TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_KEY", "").strip()
 
 # Mapa de tickers internos → símbolos Twelve Data
 TWELVE_DATA_MAP = {
-    'GC=F':     'XAU/USD',    # ORO spot (no futuros)
     'NQ=F':     'IXIC',       # NASDAQ Composite index
     'ES=F':     'SPX',        # S&P 500 index
     'EURUSD=X': 'EUR/USD',    # Euro/Dólar
-    'USDJPY=X': 'USD/JPY',    # Dólar/Yen
-    'GBPJPY=X': 'GBP/JPY',    # Libra/Yen
 }
 
 # ── MAPA DE TICKERS PARA PRECIO EN VIVO (yfinance) ─────────────────────────
@@ -583,15 +562,9 @@ TWELVE_DATA_MAP = {
 # ORO → XAUUSD=X (spot forex, igual a XM) en lugar de GC=F (futuros COMEX)
 # El análisis técnico (velas 15m) sigue usando GC=F para el historial.
 YF_PRICE_TICKER = {
-    # NOTA: XAUUSD=X no existe en Yahoo Finance → usar GC=F (futuros COMEX).
-    # La diferencia con XM (spot) es ~$5-20, pequeña vs el problema anterior de 15min de delay.
-    # Lo importante es que fast_info da precio actualizado cada ~15 segundos, no cada 15 minutos.
-    'GC=F':     'GC=F',       # ORO: futuros COMEX (XAUUSD=X no soportado por YF)
     'NQ=F':     'NQ=F',       # NASDAQ futuros
     'ES=F':     'ES=F',       # S&P 500 futuros
     'EURUSD=X': 'EURUSD=X',   # EUR/USD spot forex
-    'USDJPY=X': 'USDJPY=X',   # USD/JPY spot forex
-    'GBPJPY=X': 'GBPJPY=X',   # GBP/JPY spot forex
 }
 
 # ── CALENDARIO DE FESTIVOS (Mercado Cerrado) ─────────────────────────
@@ -905,12 +878,8 @@ def cargar_estado():
 # ============================================================
 
 ACTIVOS = {
-    # ORO — bloqueado en activos_desactivados (señales manuales del admin)
-    "ORO":          "GC=F",
     # FOREX — pares propios del scanner
     "EUR/USD":      "EURUSD=X",
-    "USD/JPY":      "USDJPY=X",
-    "GBP/JPY":      "GBPJPY=X",
     "AUD/CAD":      "AUDCAD=X",
     "EUR/CHF":      "EURCHF=X",
     "USD/CAD":      "USDCAD=X",
@@ -921,9 +890,6 @@ ACTIVOS = {
 
 # Mapa de palabras clave simplificado
 KEYWORDS_ACTIVOS = {
-    # ORO
-    "oro": "ORO", "gold": "ORO", "gc": "ORO", "xauusd": "ORO", "xau/usd": "ORO", "xau": "ORO",
-
     # ❌ BITCOIN y ETHEREUM eliminados
 
     # EUR/USD
@@ -937,14 +903,6 @@ KEYWORDS_ACTIVOS = {
     "sp500": "S&P 500", "s&p": "S&P 500", "sp": "S&P 500",
     "es": "S&P 500", "spx": "S&P 500", "s&p500": "S&P 500",
     "500": "S&P 500", "s&p 500": "S&P 500", "sandp": "S&P 500",
-
-    # USD/JPY
-    "usdjpy": "USD/JPY", "usd/jpy": "USD/JPY", "yen": "USD/JPY",
-    "dolaryen": "USD/JPY", "dolaren": "USD/JPY", "jpyusd": "USD/JPY",
-
-    # GBP/JPY
-    "gbpjpy": "GBP/JPY", "gbp/jpy": "GBP/JPY", "librayen": "GBP/JPY",
-    "beast": "GBP/JPY", "dragon": "GBP/JPY", "gj": "GBP/JPY",
 
     # Pares adicionales (señales externas)
     "gbpusd": "GBP/USD", "gbp/usd": "GBP/USD", "cable": "GBP/USD",
@@ -1379,8 +1337,8 @@ CATEGORIA_EMOJI = {"crypto": "🪙", "forex": "💱", "futuros": "📦", "accion
 
 def unidad_medida(ticker=""):
     """Retorna la unidad de medida correcta para cada activo.
-    Forex (EUR/USD, USD/JPY, GBP/JPY) → pips
-    Oro, NASDAQ, S&P 500 → pts (puntos)
+    Forex (EUR/USD) → pips
+    NASDAQ, S&P 500 → pts (puntos)
     """
     cat = get_categoria(ticker)
     if cat == "forex":
@@ -1393,11 +1351,9 @@ def fmt_val(valor, ticker=""):
     if valor is None:
         return "N/A"
     cat = get_categoria(ticker)
-    if ticker in ("GC=F", "NQ=F", "ES=F"):
+    if ticker in ("NQ=F", "ES=F"):
         return f"{valor:,.2f}"
     elif cat == "forex":
-        if "JPY" in ticker:
-            return f"{valor:.3f}"
         return f"{valor:.5f}"
     return f"{valor:.2f}"
 
@@ -1411,8 +1367,8 @@ def fmt(v: float, ticker: str) -> str:
             return f"{v:.3f}"
         return f"{v:.5f}"
     
-    # Futuros / Índices: 2 decimales es el estándar para Gold, NQ, ES
-    if ticker in ("GC=F", "ES=F", "NQ=F"):
+    # Futuros / Índices: 2 decimales es el estándar para NQ, ES
+    if ticker in ("ES=F", "NQ=F"):
         return f"{v:,.2f}"
     
     # Fallback: intentar detectar si es un valor pequeño para usar más precisión
@@ -2222,104 +2178,6 @@ def predecir_direccion_ml(df, ticker=""):
         logger.warning(f"⚠️ Error en ML ({ticker}): {e}")
         return 50.0
 
-def _calcular_rango_asiatico(df, ticker=""):
-    """
-    🌏 Calcula el rango de la sesión asiática (00:00-07:00 UTC) para Asian Range Breakout.
-    Solo se activa para ORO (GC=F) y USD/JPY (USDJPY=X).
-    Usa la ÚLTIMA vela del df como referencia temporal (funciona tanto en real como backtest).
-    Retorna dict con: asian_high, asian_low, asian_range_valid, is_london_session
-    """
-    resultado = {
-        "asian_high": 0.0,
-        "asian_low": 0.0,
-        "asian_range_valid": False,
-        "is_london_session": False,
-    }
-
-    # Solo calcular para activos que usan esta estrategia
-    if ticker not in ("GC=F", "USDJPY=X"):
-        return resultado
-
-    try:
-        idx = df.index
-        if len(idx) < 30:
-            return resultado
-
-        # Normalizar a UTC
-        if hasattr(idx, 'tz') and idx.tz is not None:
-            idx_utc = idx.tz_convert('UTC')
-        else:
-            # MT5 XM: UTC+2 invierno, UTC+3 verano (Europe/Helsinki)
-            # Detectar automáticamente según fecha
-            try:
-                import pytz as _pytz_ar
-                _hel = _pytz_ar.timezone('Europe/Helsinki')
-                _sample = idx[-1].to_pydatetime() if hasattr(idx[-1], 'to_pydatetime') else idx[-1]
-                _offset_h = _hel.localize(_sample).utcoffset().total_seconds() / 3600
-                _tz_str = f'Etc/GMT-{int(_offset_h)}'
-                idx_utc = idx.tz_localize(_tz_str).tz_convert('UTC')
-            except Exception:
-                try:
-                    idx_utc = idx.tz_localize('Etc/GMT-2').tz_convert('UTC')
-                except Exception:
-                    idx_utc = idx
-
-        # Usar la ÚLTIMA vela como referencia temporal (no datetime.now)
-        # Así funciona correctamente tanto en real como en backtest
-        ultima_vela = idx_utc[-1]
-        if hasattr(ultima_vela, 'date'):
-            hoy = ultima_vela.date()
-        else:
-            return resultado
-
-        # Hora actual de la vela (en UTC)
-        if hasattr(ultima_vela, 'hour'):
-            hora_utc = ultima_vela.hour
-        else:
-            return resultado
-
-        # Solo buscar si estamos en horario London (07:00-16:00 UTC)
-        # Ampliado hasta 16:00 para cubrir sesión US matutina también
-        if hora_utc < 7 or hora_utc > 16:
-            return resultado
-
-        # Sesión asiática: 00:00-07:00 UTC del DÍA de la vela actual
-        asian_start = pd.Timestamp(hoy.year, hoy.month, hoy.day, 0, 0, tzinfo=pytz.UTC)
-        asian_end = pd.Timestamp(hoy.year, hoy.month, hoy.day, 7, 0, tzinfo=pytz.UTC)
-        london_end = pd.Timestamp(hoy.year, hoy.month, hoy.day, 16, 0, tzinfo=pytz.UTC)
-
-        # Crear un df temporal con índice UTC para filtrar
-        df_temp = df.copy()
-        df_temp.index = idx_utc
-
-        # Filtrar velas de sesión asiática de HOY
-        mask_asian = (df_temp.index >= asian_start) & (df_temp.index < asian_end)
-        df_asian = df_temp.loc[mask_asian]
-
-        if len(df_asian) >= 8:  # Mínimo 8 velas de 15m (2 horas) para ser válido
-            asian_high = float(df_asian['High'].max())
-            asian_low = float(df_asian['Low'].min())
-            asian_range = asian_high - asian_low
-
-            resultado["asian_high"] = asian_high
-            resultado["asian_low"] = asian_low
-
-            # Validar que el rango no sea demasiado amplio (mercado ya se movió mucho)
-            # ORO: rango entre $2-$30 (típico $8-$20)
-            # USD/JPY: rango entre 5-60 pips (típico 20-40 pips)
-            if ticker == "GC=F":
-                resultado["asian_range_valid"] = 2.0 < asian_range < 30.0
-            elif ticker == "USDJPY=X":
-                resultado["asian_range_valid"] = 0.05 < asian_range < 0.60
-
-            # ¿La vela actual está en sesión London/US? (07:00-16:00 UTC)
-            resultado["is_london_session"] = asian_end <= ultima_vela <= london_end
-
-    except Exception as e:
-        print(f"⚠️ Error calculando rango asiático [{ticker}]: {e}")
-
-    return resultado
-
 
 def calcular_indicadores_profesionales(df, precio, ticker=""):
     """
@@ -2540,7 +2398,7 @@ def calcular_indicadores_profesionales(df, precio, ticker=""):
             # VOLATILIDAD: BB width > umbral (ORO=5% porque es naturalmente volátil, resto=2.5%)
             # FIX 2026-03-19: ORO siempre salía VOLATILIDAD con 2.5% — su rango normal es ~3-4%
             "regimen": (
-                "VOLATILIDAD" if (float(get_col(bb, 'BBU').iloc[-1] - get_col(bb, 'BBL').iloc[-1]) / precio * 100 > (5.0 if ticker in ("GC=F", "XAUUSD") else 2.5)) else
+                "VOLATILIDAD" if (float(get_col(bb, 'BBU').iloc[-1] - get_col(bb, 'BBL').iloc[-1]) / precio * 100 > 2.5) else
                 "TENDENCIA" if float(get_col(adx_df, 'ADX_').iloc[-1]) > 25 else
                 "RANGO" if float(get_col(adx_df, 'ADX_').iloc[-1]) < 20 else
                 "TRANSICIÓN"
@@ -2552,9 +2410,6 @@ def calcular_indicadores_profesionales(df, precio, ticker=""):
             # ML DESACTIVADO — accuracy 44-52% no aporta valor, ahorra CPU
             "ml_prob_alcista": 50.0,  # Neutral fijo, sin reentrenamiento
             # FIX: eliminadas claves "high" y "low" duplicadas (ya existen arriba en el dict)
-
-            # 🌏 RANGO ASIÁTICO (para Asian Range Breakout — ORO y USD/JPY)
-            **_calcular_rango_asiatico(df, ticker),
         }
     except Exception as e:
         print(f"⚠️ Error calculando indicadores: {e}")
@@ -2612,7 +2467,7 @@ def evaluar_senal_profesional(ind, ticker=""):
         return None, 0, [f"⚠️ Transición extrema (ADX {adx_val:.1f}<12)"]
 
     # Bloqueo de Volatilidad Extrema
-    _vol_min_extrema = (_prof["premium"].get("vol_min_extrema", 0.3) if (_prof and _prof.get("premium", {}).get("enabled")) else (0.3 if ticker in ("GC=F", "XAUUSD") else 0.3))
+    _vol_min_extrema = (_prof["premium"].get("vol_min_extrema", 0.3) if (_prof and _prof.get("premium", {}).get("enabled")) else 0.3)
     if regimen == "VOLATILIDAD" and ind.get('vol_ratio', 1) < _vol_min_extrema:
         return None, 0, [f"⚠️ Volatilidad extrema sin volumen institucional (vol={ind.get('vol_ratio',0):.1f}x < {_vol_min_extrema}x)"]
 
@@ -2825,20 +2680,17 @@ def evaluar_senal_profesional(ind, ticker=""):
     # Reversión Alcista (Score 5 si hay divergencia, Score 4 si RSI+S/R+ML)
     # ⚠️ FIX: Agregar filtro anti-tendencia — NO comprar en tendencia bajista fuerte
     # ML Reversión: 53% para ORO/JPY (original), 57% para el resto (estricto)
-    _ml_rev = max(ml_umbral_fuerte, 53.0) if ticker in ("GC=F", "USDJPY=X", "GBPJPY=X") else max(ml_umbral_fuerte, 57.0)
+    _ml_rev = max(ml_umbral_fuerte, 57.0)
     _tendencia_bajista_fuerte = (ind['ema20'] < ind['ema50'] and ind['ema50'] < ind['ema200'])  # EMAs alineadas a la baja
     _tendencia_alcista_fuerte = (ind['ema20'] > ind['ema50'] and ind['ema50'] > ind['ema200'])  # EMAs alineadas al alza
 
-    # Rev Score 4: filtros ORIGINALES para ORO/USD/JPY/GBP/JPY (rsi_os por activo, soporte opcional)
-    # Rev Score 4 ESTRICTO: para otros activos (RSI < 30, soporte obligatorio)
-    # FIX 2026-03-19: USD/JPY reversión tiene 40.8% WR — desactivado (perdió -91 pips hoy)
-    _rev4_permitido = (_prof["premium"].get("rev4_allowed", False) if (_prof and _prof.get("premium", {}).get("enabled")) else ticker in ("GC=F", "GBPJPY=X"))
+    # Rev Score 4: activo solo si el par tiene rev4_allowed=True en PAR_PROFILES
+    _rev4_permitido = (_prof["premium"].get("rev4_allowed", False) if (_prof and _prof.get("premium", {}).get("enabled")) else False)
     if _rev4_permitido:
-        # Filtros ORIGINALES — ORO: RSI<36, USD/JPY: RSI<33, GBP/JPY: RSI<30
-        # Soporte es bonus, no obligatorio (el original no lo requería)
+        # RSI oversold + soporte O debajo de EMA200
         conf_alcista_extra = (
             not _tendencia_bajista_fuerte
-            and ind['rsi'] < rsi_os                # RSI por activo (36 ORO, 33 JPY, 30 GBP/JPY)
+            and ind['rsi'] < rsi_os
             and (cercania_soporte or ind['precio'] < ind['ema200'])  # Soporte O debajo de EMA200
             and _ml_pass_alcista(_ml_rev)
         )
@@ -2884,10 +2736,10 @@ def evaluar_senal_profesional(ind, ticker=""):
     # Reversión Bajista (Score 5 si hay divergencia, Score 4 si RSI+R+ML)
     # ⚠️ FIX: NO vender si tendencia es alcista fuerte
     if _rev4_permitido:
-        # Filtros ORIGINALES — ORO: RSI>64, USD/JPY: RSI>67, GBP/JPY: RSI>70
+        # RSI overbought + resistencia O encima de EMA200
         conf_bajista_extra = (
             not _tendencia_alcista_fuerte
-            and ind['rsi'] > rsi_ob                # RSI por activo (64 ORO, 67 JPY, 70 GBP/JPY)
+            and ind['rsi'] > rsi_ob
             and (cercania_resistencia or ind['precio'] > ind['ema200'])  # Resistencia O encima de EMA200
             and _ml_pass_bajista(_ml_rev)
         )
@@ -2913,7 +2765,7 @@ def evaluar_senal_profesional(ind, ticker=""):
         if not _filt_ok:
             return None, 0, [_filt_msg]
         return "VENTA", 5, razones
-    # Reversión Score 4 bajista — SOLO para ORO, USD/JPY, GBP/JPY
+    # Reversión Score 4 bajista — solo si rev4_allowed=True en PAR_PROFILES
     if conf_bajista_extra and _rev4_permitido:
         _ml_tag = f"🤖 ML apoya: *{prob_bajista}% bajista*" if _ml_disponible else "🤖 ML: no disponible — señal técnica pura"
         razones = [
@@ -2929,71 +2781,7 @@ def evaluar_senal_profesional(ind, ticker=""):
         return "VENTA", 4, razones
 
     # ━━━━━━━━━━
-    # ESTRATEGIA 4 — ASIAN RANGE BREAKOUT  🌏 (Score 4)
-    # Solo para ORO (GC=F) y USD/JPY (USDJPY=X)
-    # Lógica: La sesión asiática (00:00-07:00 UTC) forma un rango.
-    # Al abrir London (07:00-13:00 UTC), si el precio rompe ese rango
-    # con confirmación (MACD + cuerpo de vela), se genera señal.
-    # Research: 60-70% WR para ORO, 55-65% WR para USD/JPY.
-    # ━━━━━━━━━━
-    _asian_high = ind.get('asian_high', 0)
-    _asian_low = ind.get('asian_low', 0)
-    _asian_valid = ind.get('asian_range_valid', False)
-    _is_london = ind.get('is_london_session', False)
-
-    if _asian_valid and _is_london and ticker in ("GC=F", "USDJPY=X"):
-        _asian_range = _asian_high - _asian_low
-        # Cuerpo de vela > 40% del rango de la vela (no doji)
-        _vela_range = ind['high'] - ind['low']
-        _vela_body = abs(ind['open'] - ind['precio'])
-        _body_ratio = _vela_body / max(_vela_range, 1e-10)
-
-        # Breakout Alcista: precio cierra ENCIMA del máximo asiático
-        if (ind['precio'] > _asian_high
-            and ind['macd'] > ind['signal']           # MACD confirma dirección
-            and _body_ratio > 0.40                     # Vela con cuerpo real (>40%)
-            and ind['rsi'] < 75                        # No sobrecomprado extremo
-            and _ml_pass_alcista(ml_umbral_fuerte)):   # ML confirma o no disponible
-            _asset_name = "ORO" if ticker == "GC=F" else "USD/JPY"
-            _range_fmt = f"${_asian_range:.1f}" if ticker == "GC=F" else f"{_asian_range*100:.0f} pips"
-            _ml_tag = f"🤖 ML apoya: *{prob_alcista}% alcista*" if _ml_disponible else "🤖 ML: no disponible — breakout de sesión puro"
-            razones = [
-                f"🌏 Estrategia: *Asian Range Breakout Alcista — {_asset_name}*",
-                f"✓ Precio rompió máximo asiático ({_asian_high:.4g}) · Rango: {_range_fmt}",
-                f"✓ Sesión London activa — máxima liquidez",
-                f"✓ MACD alcista · Cuerpo de vela {_body_ratio*100:.0f}%",
-                f"✓ RSI en zona sana ({ind['rsi']:.1f})",
-                _ml_tag
-            ]
-            _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
-            if not _filt_ok:
-                return None, 0, [_filt_msg]
-            return "COMPRA", 4, razones
-
-        # Breakout Bajista: precio cierra DEBAJO del mínimo asiático
-        if (ind['precio'] < _asian_low
-            and ind['macd'] < ind['signal']           # MACD confirma dirección
-            and _body_ratio > 0.40                     # Vela con cuerpo real (>40%)
-            and ind['rsi'] > 25                        # No sobrevendido extremo
-            and _ml_pass_bajista(ml_umbral_fuerte)):   # ML confirma o no disponible
-            _asset_name = "ORO" if ticker == "GC=F" else "USD/JPY"
-            _range_fmt = f"${_asian_range:.1f}" if ticker == "GC=F" else f"{_asian_range*100:.0f} pips"
-            _ml_tag = f"🤖 ML apoya: *{prob_bajista}% bajista*" if _ml_disponible else "🤖 ML: no disponible — breakout de sesión puro"
-            razones = [
-                f"🌏 Estrategia: *Asian Range Breakout Bajista — {_asset_name}*",
-                f"✓ Precio rompió mínimo asiático ({_asian_low:.4g}) · Rango: {_range_fmt}",
-                f"✓ Sesión London activa — máxima liquidez",
-                f"✓ MACD bajista · Cuerpo de vela {_body_ratio*100:.0f}%",
-                f"✓ RSI en zona sana ({ind['rsi']:.1f})",
-                _ml_tag
-            ]
-            _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
-            if not _filt_ok:
-                return None, 0, [_filt_msg]
-            return "VENTA", 4, razones
-
-    # ━━━━━━━━━━
-    # ESTRATEGIA 5 — MOMENTUM TREND FOLLOWING  (Score 3)
+    # ESTRATEGIA 4 — MOMENTUM TREND FOLLOWING  (Score 3)
     # Detecta INICIO de tendencia usando EMA crossover + MACD + ADX creciente.
     # Genera señales cuando el mercado empieza a moverse, no cuando ya está en extremo.
     # Más señales que Breakout/Reversal pero con score 3 (menor confianza).
@@ -3114,41 +2902,10 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
     # Ajuste por estrategia (Breakout = SL más amplio, backtest: 51% WR)
     if estrategia == "breakout":
         sl_mult *= 1.2    # 20% más amplio → más espacio para respirar
-    elif estrategia == "asian_breakout":
-        sl_mult *= 1.3    # 30% más amplio — SL al otro lado del rango asiático
-        tp1_mult *= 1.1   # TP1 ligeramente mayor (breakout de sesión = movimiento amplio)
     elif estrategia == "reversion":
         sl_mult *= 1.1    # 10% más amplio para reversiones (score 5 = alta calidad)
 
     sl = atr * sl_mult
-
-    # [1] SL ADAPTATIVO AL RANGO ASIÁTICO
-    # Para asian_breakout: usar asian high/low + 20% buffer como SL
-    # Cap máximo: 2.5x ATR (no exceder)
-    if estrategia == "asian_breakout" and ticker in ("GC=F", "USDJPY=X"):
-        try:
-            _cached_ind = _cache_ind.get(ticker, {})
-            _a_high = _cached_ind.get('asian_high', 0)
-            _a_low = _cached_ind.get('asian_low', 0)
-            _a_valid = _cached_ind.get('asian_range_valid', False)
-            if _a_valid and _a_high > 0 and _a_low > 0:
-                _a_range = _a_high - _a_low
-                _buffer = _a_range * 0.20  # 20% buffer
-                if tipo.upper() in ("COMPRA", "BUY", "LONG"):
-                    # Compra: SL debajo del mínimo asiático con buffer
-                    sl_asian = precio - (_a_low - _buffer)
-                else:
-                    # Venta: SL encima del máximo asiático con buffer
-                    sl_asian = (_a_high + _buffer) - precio
-                # Cap a 2.5x ATR máximo
-                sl_max = atr * 2.5
-                sl_asian = min(sl_asian, sl_max)
-                # Solo usar si es mayor que el SL base (más protección)
-                if sl_asian > 0:
-                    sl = sl_asian
-                    logger.info(f"🌏 SL ADAPTATIVO ASIÁTICO {ticker}: SL={sl:.5g} (rango={_a_range:.5g}, buffer={_buffer:.5g}, cap={sl_max:.5g})")
-        except Exception as e:
-            logger.warning(f"⚠️ Error SL asiático adaptativo {ticker}: {e}")
 
     # MIN_SL floor from PAR_PROFILES
     _min_sl_val = _prof_tp["sl_tp"].get("min_sl", 0) if (_prof_tp and _prof_tp.get("sl_tp")) else 0
@@ -3186,7 +2943,7 @@ def calcular_niveles_3tp(precio, tipo, atr, ticker="", estrategia=""):
 def _clasificar_tipo_trade(ticker):
     """Retorna 'premium' para futuros y 'swing' para divisas. Los activos del bot."""
     t = ticker.upper()
-    if any(x in t for x in ["GC=F", "ES=F", "NQ=F"]):
+    if any(x in t for x in ["ES=F", "NQ=F"]):
         return "premium"
     return "swing"
 
@@ -3211,9 +2968,6 @@ def calcular_pips(precio_entrada, precio_salida, ticker, tipo=None):
     if cat == "forex":
         multi = 100 if "JPY" in ticker.upper() else 10000
         return diff * multi
-
-    if any(x in ticker.upper() for x in ["GC=F", "GOLD", "XAUUSD"]):
-        return diff  # Oro: 1 punto = $1 de movimiento (sin multiplicar)
 
     if any(x in ticker.upper() for x in ["ES=F", "US500CASH", "US500"]):
         return diff  # S&P 500: 1 punto = 1 punto (sin multiplicar)
@@ -3288,12 +3042,6 @@ def calcular_lote_sugerido(capital, riesgo_pct, entrada, sl, ticker):
             else:
                 # Non-JPY: 1 lote (100k) = 10$/pip. 0.01 lote (1k) = 0.10$/pip.
                 lote = riesgo_usd / (pips_riesgo * 10)
-            return f"{max(0.01, round(lote, 2))}"
-        elif ticker == "GC=F" or "GOLD" in ticker.upper() or "XAU" in ticker.upper():
-            # GOLD XM: 1 lote = 100 oz. $1 movimiento × 1 lote = $100.
-            # pips_riesgo = distancia en $ (ej: SL a $9 del entry)
-            # lote = riesgo / (distancia × 100)
-            lote = riesgo_usd / (pips_riesgo * 100)
             return f"{max(0.01, round(lote, 2))}"
         elif cat == "futuros" or any(x in ticker.upper() for x in ["US100", "US500", "NQ", "ES"]):
             # Índices en XM: 1 lote suele ser 1$ por punto (o similar)
@@ -3580,21 +3328,10 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
         # - Índices: margen bajo → lotes más altos OK
         # - Forex: margen alto (100k contract) → lotes más bajos
         # - Oro: margen medio
-        _es_forex = mt5_ticker in ("EURUSD", "USDJPY", "GBPJPY") or ("USD" in mt5_ticker and len(mt5_ticker) == 6)
+        _es_forex = mt5_ticker in ("EURUSD",) or ("USD" in mt5_ticker and len(mt5_ticker) == 6)
         _es_indice = mt5_ticker in ("US100Cash", "US500Cash")
-        _es_oro = mt5_ticker == "GOLD" or ticker == "GC=F" or "XAU" in ticker.upper()
 
-        if _es_oro:
-            # ORO: 1 lote = 100 oz, $1 mov = $100. MUY ALTO RIESGO.
-            # Con $600 y SL $5: max seguro = 0.03 ($15 riesgo = 2.5%)
-            # Con $600 y SL $20: max seguro = 0.01 ($20 riesgo = 3.3%)
-            if capital_real <= 300:    MAX_LOTE_SEGURIDAD = 0.01
-            elif capital_real <= 500:  MAX_LOTE_SEGURIDAD = 0.01
-            elif capital_real <= 1000: MAX_LOTE_SEGURIDAD = 0.02
-            elif capital_real <= 2000: MAX_LOTE_SEGURIDAD = 0.05
-            elif capital_real <= 5000: MAX_LOTE_SEGURIDAD = 0.10
-            else:                     MAX_LOTE_SEGURIDAD = 0.20
-        elif _es_forex:
+        if _es_forex:
             # Forex: alto margen por contract_size=100k
             if capital_real <= 300:    MAX_LOTE_SEGURIDAD = 0.01
             elif capital_real <= 500:  MAX_LOTE_SEGURIDAD = 0.02
@@ -3654,9 +3391,7 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
 
         # Calcular riesgo real en USD para el log
         _pips_sl = abs(price_norm - sl_norm)
-        if "GOLD" in mt5_ticker.upper() or ticker == "GC=F":
-            _riesgo_estimado_usd = lote_val * _pips_sl * 100  # Gold: $100/punto/lote
-        elif get_categoria(ticker) == "forex":
+        if get_categoria(ticker) == "forex":
             if "JPY" in mt5_ticker.upper() or "JPY" in (ticker or "").upper():
                 # JPY: 1 lote = 100k unidades, valor pip = 1000 JPY / rate
                 _riesgo_estimado_usd = lote_val * _pips_sl * (1000.0 / max(1, price_norm))
@@ -4846,11 +4581,9 @@ def cmd_precio(activo_raw: str):
 
         # Nota de instrumento
         nota_instrumento = ""
-        if ticker == "GC=F" and "XAUUSD" in fuente:
-            nota_instrumento = "\n📌 _XAUUSD spot (XAUUSD spot)_"
-        elif ticker in ("NQ=F", "ES=F") and ("US100" in fuente or "US500" in fuente):
+        if ticker in ("NQ=F", "ES=F") and ("US100" in fuente or "US500" in fuente):
             nota_instrumento = "\n📌 _CFD (igual a XM)_"
-        elif "Yahoo" in fuente and ticker in ("GC=F", "NQ=F", "ES=F"):
+        elif "Yahoo" in fuente and ticker in ("NQ=F", "ES=F"):
             nota_instrumento = "\n⚠️ _Futuros YF (puede diferir ~$5-20 de XM)_"
 
         return (
@@ -5114,7 +4847,7 @@ def cmd_precios_tv():
         for f in as_completed(futs):
             pass
 
-    orden = ["ORO", "EUR/USD", "USD/JPY", "GBP/JPY", "NASDAQ", "S&P 500"]
+    orden = ["EUR/USD", "NASDAQ", "S&P 500"]
     _titulo = "ÚLTIMO CIERRE" if _es_weekend_p else "PRECIOS EN VIVO"
     lineas = [f"📊 *{_titulo}*", "━━━━━━━━━━\n"]
 
@@ -5172,9 +4905,7 @@ def cmd_mercados():
     lineas = [
         "*+20 ACTIVOS*\n",
         "━━━━━━━━━━\n",
-        "ORO · EUR/USD · USD/JPY · GBP/JPY\n",
-        "AUD/CAD · EUR/CHF · USD/CAD\n",
-        "NASDAQ · S&P 500\n",
+        "EUR/USD · NASDAQ · S&P 500\n",
         "AUD/CAD · EUR/CHF · USD/CAD · y más\n",
         "━━━━━━━━━━\n",
         "Horario: 8:00 - 18:00 (L-V)\n",
@@ -5238,7 +4969,7 @@ def cmd_como():
         "🔬 *¿CÓMO OPERA EL CEREBRO DE ESTE BOT?*\n"
         "━━━━━━━━━━\n\n"
         "1️⃣ *Escaneo de Alta Frecuencia (3 min)*\n"
-        "   Nuestros servidores analizan ORO, NASDAQ y más activos ininterrumpidamente, extrayendo datos institucionales.\n\n"
+        "   Nuestros servidores analizan EUR/USD, NASDAQ, S&P 500 y señales de canales afiliados ininterrumpidamente.\n\n"
         "2️⃣ *Motor de Inteligencia Artificial (ML)*\n"
         "   Usa el algoritmo Random Forest junto con 9 indicadores matemáticos pesados (RSI, EMAs, MACD, ADX) para no fallar.\n\n"
         "3️⃣ *Aprobación Multidimensional*\n"
@@ -5269,10 +5000,7 @@ def cmd_riesgo():
 def cmd_horarios():
     hora_utc = datetime.now(pytz.UTC).strftime("%H:%M")
     info = [
-        ("ORO",      "GC=F",     "08:00 — 21:00"),
         ("EUR/USD",  "EURUSD=X", "07:00 — 21:00"),
-        ("USD/JPY", "USDJPY=X", "00:00 — 15:00  (sesión asiática)"),
-        ("GBP/JPY", "GBPJPY=X", "01:00 — 21:00  (London+Tokyo)"),
         ("NASDAQ",    "NQ=F",     "09:00 — 21:00"),
         ("S&P 500",   "ES=F",     "09:00 — 21:00"),
     ]
@@ -5618,8 +5346,8 @@ GLOSARIO = {
         "   Spread = 0.5 pips\n\n"
         "📌 *Spreads típicos (cuenta ECN):*\n"
         "   EUR/USD:  0.1-1 pip\n"
-        "   ORO:      0.10-0.30 $/oz\n"
-        "   NASDAQ:   1-4 pts\n\n"
+        "   NASDAQ:   1-4 pts\n"
+        "   S&P 500:  1-3 pts\n\n"
         "💡 Spreads bajos = menos costo por operación"
     ),
     "margen": (
@@ -5939,18 +5667,6 @@ def cmd_glosario(termino):
 # ── Descripciones de activos ─────────────────────────────────
 
 DESCRIPCIONES_ACTIVOS = {
-    "ORO": (
-        "🏅 *ORO (Gold Futures — GC=F)*\n"
-        "━━━━━━━━━━\n\n"
-        "El activo refugio por excelencia. Se usa para protegerse en épocas de incertidumbre.\n\n"
-        "📌 *Características:*\n"
-        "   • Sesión principal: Nueva York (13-20 UTC)\n"
-        "   • Alta liquidez, baja volatilidad relativa\n"
-        "   • Correlación negativa con el dólar USD\n"
-        "   • Sube en crisis, guerras e inflación alta\n\n"
-        "⚡ Volatilidad: Media-Baja\n"
-        "💡 Ideal para operaciones estables"
-    ),
     # BITCOIN eliminado del bot
     "EUR/USD": (
         "💱 *EUR/USD (Euro / Dólar)*\n"
@@ -5964,33 +5680,6 @@ DESCRIPCIONES_ACTIVOS = {
         "   • Noticias clave: NFP, IPC, tipos de interés\n\n"
         "⚡ Volatilidad: Media\n"
         "💡 Referencia del mercado forex"
-    ),
-    "USD/JPY": (
-        "💴 *USD/JPY (Dólar / Yen japonés)*\n"
-        "━━━━━━━━━━\n\n"
-        "El segundo par más operado del mundo (~13% del volumen diario global).\n\n"
-        "📌 *Características:*\n"
-        "   • Sesión activa: 00:00 — 15:00 UTC\n"
-        "   • Máxima liquidez: sesión de Tokio (00-09 UTC)\n"
-        "   • Cubre el hueco nocturno de EUR/USD\n"
-        "   • Afectado por Banco de Japón (BoJ) y Fed\n"
-        "   • Sensible a política monetaria divergente\n"
-        "   • Noticias clave: IPC Japón, decisiones BoJ, NFP\n\n"
-        "⚡ Volatilidad: Media-Alta\n"
-        "💡 Ideal para sesión asiática — spreads muy bajos"
-    ),
-    "GBP/JPY": (
-        "🐉 *GBP/JPY (Libra / Yen japonés)*\n"
-        "━━━━━━━━━━\n\n"
-        "Conocido como 'The Beast' o 'The Dragon' por su alta volatilidad.\n\n"
-        "📌 *Características:*\n"
-        "   • Sesión activa: 01:00 — 21:00 UTC\n"
-        "   • Máxima liquidez: cruce London-Tokyo (07-09 UTC)\n"
-        "   • ~90% correlación con USD/JPY pero más volátil\n"
-        "   • 120-180 pips de rango diario (vs 80-100 de USD/JPY)\n"
-        "   • Afectado por BoE, BoJ, y sentimiento de riesgo global\n\n"
-        "⚡ Volatilidad: MUY Alta\n"
-        "💡 Ideal para traders que buscan movimientos rápidos y amplios"
     ),
     "📊 NASDAQ": (
         "📊 *NASDAQ 100 (NQ=F)*\n"
@@ -6068,7 +5757,7 @@ def cmd_pip(activo_raw):
             "━━━━━━━━━━\n\n"
             "Para futuros se usan puntos directos:\n"
             "   Ganancia = diferencia de precio\n\n"
-            "💡 Ej: si ORO va de 2,900 a 2,950\n"
+            "💡 Ej: si NASDAQ va de 18,000 a 18,050\n"
             "   → 50 puntos de ganancia"
         )
 
@@ -6163,8 +5852,8 @@ def formatear_lista_resultados():
     total_ops = 0
     activas_count = 0
 
-    _emojis_activo = {"GC": "🥇", "EURUSD": "💱", "USDJPY": "💴", "GBPJPY": "🐉", "NQ": "📊", "ES": "📈"}
-    _nombres_activo = {"GC": "Oro", "EURUSD": "EUR/USD", "USDJPY": "USD/JPY", "GBPJPY": "GBP/JPY", "NQ": "NASDAQ", "ES": "S&P 500"}
+    _emojis_activo = {"EURUSD": "💱", "NQ": "📊", "ES": "📈"}
+    _nombres_activo = {"EURUSD": "EUR/USD", "NQ": "NASDAQ", "ES": "S&P 500"}
 
     for op in historial_operaciones:
         ticker_raw = op['ticker']
@@ -7269,7 +6958,7 @@ def _generar_reporte_diario():
         _ia_market = ""
         try:
             _ia_market = _ia_responder(
-                f"Dame un resumen de 2 líneas del mercado para hoy. Pares: ORO, EURUSD, NASDAQ. Incluye qué esperar.",
+                f"Dame un resumen de 2 líneas del mercado para hoy. Pares: EUR/USD, NASDAQ, S&P 500. Incluye qué esperar.",
                 "Canal VIP"
             ) or ""
         except Exception:
@@ -8261,8 +7950,6 @@ INTENCIONES = {
 
 # Aliases de activos para fuzzy matching
 ALIASES_ACTIVOS_FUZZY = {
-    "oro": "ORO", "gold": "ORO", "xauusd": "ORO", "dorado": "ORO",
-    "gc": "ORO", "xau": "ORO", "metal": "ORO",
     "eurusd": "EUR/USD", "euro": "EUR/USD", "eur": "EUR/USD",
     "eurodolar": "EUR/USD", "dolareuro": "EUR/USD", "ed": "EUR/USD",
     "nasdaq": "NASDAQ", "nq": "NASDAQ", "ndq": "NASDAQ",
@@ -8271,10 +7958,6 @@ ALIASES_ACTIVOS_FUZZY = {
     "sp500": "S&P 500", "spx": "S&P 500", "sp": "S&P 500",
     "s&p": "S&P 500", "s&p500": "S&P 500", "us500": "S&P 500",
     "sandp": "S&P 500", "snp": "S&P 500", "500": "S&P 500",
-    # USD/JPY
-    "usdjpy": "USD/JPY", "usd/jpy": "USD/JPY", "yen": "USD/JPY",
-    "dolaryen": "USD/JPY", "dolaren": "USD/JPY", "jpyusd": "USD/JPY",
-    "jpy": "USD/JPY", "yenusd": "USD/JPY", "uj": "USD/JPY",
 }
 
 def obtener_contexto(remitente: str) -> dict:
@@ -8497,29 +8180,40 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             if tick:
                 entrada = tick.ask if tipo == "COMPRA" else tick.bid
 
-        # Ejecutar trade si el auto-trading está activo
+        # Formato unificado de señal (igual al signal copier)
+        _dir_es  = "COMPRA" if tipo == "COMPRA" else "VENTA"
+        _emoji   = "🟢" if tipo == "COMPRA" else "🔴"
+        _nombre  = senal['nombre']
+        _entry_d = f"{entrada:,.2f}" if entrada and entrada > 0 else "Mercado"
+        _msg_canal = (
+            f"{_emoji} *SEÑAL {_dir_es} — {_nombre}*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📍 Entrada: {_entry_d}\n"
+            f"🎯 TP: {fmt(tp)}\n"
+            f"🛡️ SL: {fmt(sl)}"
+        )
+
+        # Ejecutar en MT5 si está activo
         if MT5_AVAILABLE and AUTO_TRADING:
             exito = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, RIESGO_POR_TRADE, entrada, sl, tp)
             if exito:
-                # Enviar al canal VIP
-                _dir_txt = "COMPRA" if tipo == "COMPRA" else "VENTA"
-                _emoji = "🟢" if tipo == "COMPRA" else "🔴"
-                _msg_canal = f"{_emoji} *{_dir_txt} — {senal['nombre']}*\n\n📍 Entrada: `{entrada}`\n🎯 TP: `{tp}`\n🛡️ SL: `{sl}`"
                 enviar_canal(_msg_canal)
-                return f"✅ *SEÑAL EJECUTADA*\n{_emoji} {_dir_txt} {senal['nombre']} @ {entrada}\nSL: {sl}\nTP: {tp}"
+                return f"✅ *SEÑAL EJECUTADA y enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre} @ {_entry_d}\nSL: {fmt(sl)} | TP: {fmt(tp)}"
             else:
-                # Error de ejecución: solo notificar al admin, NO mostrar públicamente
                 admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
                 if admin_id:
                     enviar_telegram(
                         f"⚠️ *Error MT5*: No se pudo abrir {tipo} {ticker}\n"
-                        f"Entry: {entrada} | SL: {sl} | TP: {tp}",
+                        f"Entry: {_entry_d} | SL: {fmt(sl)} | TP: {fmt(tp)}",
                         admin_id
                     )
-                return None
+                # Aunque MT5 falle, enviar la señal al canal VIP
+                enviar_canal(_msg_canal)
+                return f"⚠️ MT5 falló pero la señal fue enviada al canal VIP."
         else:
-            # Solo informar al admin, no al chat público
-            return None
+            # MT5 desactivado — enviar señal al canal VIP de todas formas
+            enviar_canal(_msg_canal)
+            return f"✅ *Señal enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre}\n📍 {_entry_d} | 🎯 {fmt(tp)} | 🛡️ {fmt(sl)}"
 
     # ── 1. COMANDOS EXACTOS CON SLASH (máxima prioridad) ─────
 
@@ -8630,10 +8324,9 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 f"👋 *Hola {nombre_user}!* Bienvenido a *BuySell365.pro*\n"
                 f"━━━━━━━━━━━━━━━━\n\n"
                 f"🤖 *Soy tu asistente de trading con Inteligencia Artificial.*\n\n"
-                f"📡 Analizamos *20+ activos* en tiempo real:\n"
-                f"   Oro · EUR/USD · USD/JPY · GBP/JPY\n"
-                f"   AUD/CAD · EUR/CHF · USD/CAD\n"
-                f"   NASDAQ · S&P 500\n\n"
+                f"📡 Analizamos activos en tiempo real:\n"
+                f"   EUR/USD · NASDAQ · S&P 500\n"
+                f"   + señales de canales afiliados: Oro, BTC, Forex\n\n"
             )
             if n_ops_s > 0:
                 start_txt += f"📊 Ahora mismo: *{n_ops_s} operaciones activas*\n"
@@ -8678,8 +8371,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return cmd_mi_cuenta(remitente), crear_teclado_principal()
     if t in ("💎 vip", "/vip", "vip"):
         return cmd_vip(user_id=remitente), crear_teclado_principal()
-    if t in ("🚀 análisis oro"):
-        return cmd_analisis("ORO"), crear_teclado_principal()
+    if t in ("💱 análisis eur/usd", "análisis eur/usd"):
+        return cmd_analisis("EUR/USD"), crear_teclado_principal()
     if t in ("🔍 análisis nasdaq"):
         return cmd_analisis("NASDAQ"), crear_teclado_principal()
     if t in ("/tendencia", "/tendencias", "tendencia", "tendencias"):
@@ -9000,14 +8693,14 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                               "me perdí", "estoy perdido", "ayudame", "no te entiendo"]):
         return (
             "😅 Sin problema, dime el activo que te interesa:\n"
-            "_\"Oro\"_, _\"EUR/USD\"_, _\"USD/JPY\"_, _\"Nasdaq\"_... y hago el análisis.\n"
+            "_\"EUR/USD\"_, _\"Nasdaq\"_, _\"S&P 500\"_... y hago el análisis.\n"
             "O escribe *ayuda* para ver todos los comandos."
         )
 
     if any(p in t for p in ["eres", "quien eres", "quién eres", "que eres", "presentate", "quien te creo", "vienes de", "quien es emmanuel", "quien es el creador"]):
         return (
             "🤖 *BuySell365.pro* — Bot de senales de trading\n\n"
-            "📡 +20 activos analizados: Oro, Forex e Índices\n"
+            "📡 EUR/USD, NASDAQ, S&P 500 y canales afiliados\n"
             "🎯 Señales con Entry, TP y SL exactos\n"
             "🛡️ Gestión de riesgo profesional\n"
             "📊 Trading en Vivo: /web\n\n"
@@ -9182,32 +8875,24 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "   Lotes: 10$ / (20 × 1$) = *0.50 mini lotes*\n\n"
             "📌 *Valores por pip (1 lote estándar):*\n"
             "   EUR/USD:  ≈ 10 $/pip\n"
-            "   ORO:      ≈ 10 $/pip\n"
             "   NASDAQ:   ≈ 1 $/punto\n\n"
             "💡 Reducir el lote es más inteligente que eliminar el SL"
         )
 
     # Correlaciones entre activos
     if intencion_detectada == "correlacion" or any(p in t for p in [
-        "correlacion entre", "el oro y el dolar", "nasdaq y sp500",
+        "correlacion entre", "nasdaq y sp500",
         "relacion entre activos", "se mueven juntos", "activos correlacionados"
     ]):
         return (
             "🔗 *CORRELACIONES CLAVE DE MERCADO*\n"
             "━━━━━━━━━━\n\n"
-            "📌 *ORO vs USD (correlación negativa):*\n"
-            "   Dólar fuerte 📈  →  Oro baja 📉\n"
-            "   Dólar débil  📉  →  Oro sube 📈\n"
             "📌 *NASDAQ vs S&P 500 (correlación positiva):*\n"
             "   Suelen moverse en la misma dirección\n"
             "   NASDAQ es más volátil (más tecnología)\n\n"
             "📌 *EUR/USD vs USD Index (DXY):*\n"
             "   EUR/USD sube cuando el DXY baja (inversa)\n\n"
-            "📌 *USD/JPY vs USD Index (DXY):*\n"
-            "   USD/JPY sube cuando el DXY sube (directa)\n"
-            "   Contraria al EUR/USD — útil para confirmar fuerza del dólar\n\n"
-            "⚠️ Las correlaciones no son fijas — cambian con el mercado\n"
-            "💡 Evita abrir EUR/USD y USD/JPY COMPRA al mismo tiempo (correlación inversa)"
+            "⚠️ Las correlaciones no son fijas — cambian con el mercado"
         )
 
     # Fibonacci
@@ -9325,26 +9010,38 @@ def index_web():
     if request.method == "POST":
         return jsonify({"status": "error", "msg": "Endpoint no disponible"}), 404
 
-    # --- Estadísticas en vivo para la landing (desde cuenta REAL) ---
+    # --- Estadísticas en vivo para la landing (prioridad: mt5_realtime.json → historial_real.json) ---
     try:
         import json as _json_stats
-        _hist_real_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
-        _hist = []
-        if os.path.exists(_hist_real_path):
-            with open(_hist_real_path, "r", encoding="utf-8") as _f:
-                _hist = _json_stats.load(_f)
-        # Fallback: historial en memoria si no hay archivo real
-        if not _hist:
-            _hist = historial_operaciones if historial_operaciones else []
-        _wins = sum(1 for h in _hist if float(h.get('pips', 0)) > 0)
-        _total = len(_hist)
-        _wr = round(_wins / _total * 100, 1) if _total > 0 else 71.4
-        _pips = round(sum(float(h.get('pips', 0)) for h in _hist), 1)
-        _n_ops = sum(1 for op in operaciones_activas.values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
+        _rt_path   = os.path.join(os.path.dirname(__file__), "mt5_realtime.json")
+        _hist_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
+        _rt = None
+        if os.path.exists(_rt_path):
+            with open(_rt_path, "r", encoding="utf-8") as _f:
+                _rt = _json_stats.load(_f)
+
+        if _rt:
+            # Datos en tiempo real desde monitor_real.py
+            _wr    = _rt["stats_historico"]["wr"]  or _rt["stats_hoy"]["wr"] or 71.4
+            _total = _rt["stats_historico"]["total"] or _rt["stats_hoy"]["total"]
+            _pips  = _rt["stats_historico"]["pips"]  or _rt["stats_hoy"]["pips"]
+            _n_ops = len(_rt.get("posiciones_abiertas", []))
+        else:
+            # Fallback: SOLO historial_real.json (datos reales MT5)
+            # NO usar historial_operaciones en memoria (datos de señales ≠ trades reales)
+            _hist = []
+            if os.path.exists(_hist_path):
+                with open(_hist_path, "r", encoding="utf-8") as _f:
+                    _hist = _json_stats.load(_f)
+            _wins  = sum(1 for h in _hist if float(h.get('pips', 0)) > 0)
+            _total = len(_hist)
+            _wr    = round(_wins / _total * 100, 1) if _total > 0 else 0
+            _pips  = round(sum(float(h.get('pips', 0)) for h in _hist), 1)
+            _n_ops = len(operaciones_activas)
         _activos_trading = len(ACTIVOS) + 14
     except Exception as e:
         logger.error(f"Landing stats error: {e}")
-        _wr, _total, _pips, _n_ops, _activos_trading = 71.4, 0, 0, 0, 20
+        _wr, _total, _pips, _n_ops, _activos_trading = 0, 0, 0, 0, 20
 
     try:
         return f"""<!DOCTYPE html>
@@ -9356,9 +9053,9 @@ def index_web():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con Inteligencia Artificial</title>
-<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial para Oro, Forex e \u00cdndices. An\u00e1lisis en 6 activos con IA avanzada y datos institucionales.">
+<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos. An\u00e1lisis con IA avanzada y datos institucionales.">
 <meta property="og:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. Oro, EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P 500.">
+<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. EUR/USD, NASDAQ, S&P 500 + señales de canales afiliados.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -9633,7 +9330,7 @@ section{{padding:50px 20px}}
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-ops="{_n_ops}">Bot activo \u2014 {_n_ops} operaciones en vivo</span></div>
     <h1 data-i18n="hero.title">Trading Inteligente<br>Impulsado por IA</h1>
-    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial. Forex, Oro e \u00cdndices \u2014 m\u00e1s de 20 activos analizados en tiempo real, 24/5.</p>
+    <p data-i18n="hero.subtitle">Se\u00f1ales de trading con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 e \u00cdndices \u2014 an\u00e1lisis profesional en tiempo real, 24/5.</p>
     <div class="hero-buttons">
       <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-primary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Unirse a Telegram</span></a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
@@ -9720,26 +9417,11 @@ section{{padding:50px 20px}}
     <p data-i18n="assets.subtitle">Cada activo tiene par\u00e1metros de detecci\u00f3n calibrados individualmente para m\u00e1xima precisi\u00f3n.</p>
   </div>
   <div class="assets-grid">
-    <!-- ORO: Lingote 3D premium con gráfico -->
-    <div class="asset-card">
-      <div class="asset-icon gold"><svg viewBox="0 0 64 64" fill="none"><defs><linearGradient id="gbar1" x1="10" y1="15" x2="54" y2="55"><stop offset="0%" stop-color="#ffe88a"/><stop offset="25%" stop-color="#f0c030"/><stop offset="50%" stop-color="#d4a020"/><stop offset="75%" stop-color="#f0c030"/><stop offset="100%" stop-color="#b8860b"/></linearGradient><linearGradient id="gbar2" x1="10" y1="20" x2="10" y2="50"><stop offset="0%" stop-color="#d4a020"/><stop offset="100%" stop-color="#8b6914"/></linearGradient><linearGradient id="gtop" x1="20" y1="20" x2="45" y2="32"><stop offset="0%" stop-color="#ffe88a"/><stop offset="100%" stop-color="#f0c030"/></linearGradient><linearGradient id="gline" x1="0" y1="0" x2="64" y2="0"><stop offset="0%" stop-color="#f0b90b" stop-opacity=".2"/><stop offset="100%" stop-color="#f0b90b" stop-opacity=".6"/></linearGradient></defs><path d="M6 48l10-6 10 3 10-10 10-8 8-6" stroke="url(#gline)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".5"/><path d="M6 48l10-6 10 3 10-10 10-8 8-6v32H6z" fill="#f0b90b" opacity=".06"/><path d="M12 52l8-3h24l8 3z" fill="#8b6914"/><path d="M20 49l-8 3V44l5-12h30l5 12v11l-8-3v-3z" fill="url(#gbar2)"/><path d="M17 32h30l5 12H12z" fill="url(#gbar1)"/><path d="M17 32l5-12h20l5 12z" fill="url(#gtop)"/><path d="M22 20h20l5 12H17z" fill="none" stroke="#ffe88a" stroke-width=".5" opacity=".5"/><line x1="17" y1="32" x2="47" y2="32" stroke="#b8860b" stroke-width=".5"/><text x="32" y="29" text-anchor="middle" font-size="7" font-weight="800" fill="#7a5a00" font-family="Arial" letter-spacing=".5">GOLD</text><text x="32" y="41" text-anchor="middle" font-size="5.5" font-weight="700" fill="#5a4200" font-family="Arial">999.9</text><circle cx="50" cy="14" r="8" fill="#f0c030" opacity=".12"/><circle cx="50" cy="14" r="5" fill="#f0c030" opacity=".08"/></svg></div>
-      <div class="asset-name" data-i18n="assets.gold">ORO</div><div class="asset-tag">XAU/USD</div>
-    </div>
     <!-- BITCOIN y ETHEREUM eliminados del bot -->
     <!-- EUR/USD: S\u00edmbolo \u20ac y $ juntos -->
     <div class="asset-card">
       <div class="asset-icon eur"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#003399"/><text x="14" y="25" text-anchor="middle" font-size="16" font-weight="900" fill="#ffcc00" font-family="Arial">\u20ac</text><circle cx="28" cy="20" r="12" fill="#1a6b3c"/><text x="28" y="25" text-anchor="middle" font-size="16" font-weight="900" fill="#fff" font-family="Arial">$</text><path d="M20 10v20" stroke="#0d1117" stroke-width="2" stroke-dasharray="2 2" opacity=".3"/></svg></div>
       <div class="asset-name">EUR/USD</div><div class="asset-tag" data-i18n="assets.forex_major">Forex Principal</div>
-    </div>
-    <!-- USD/JPY: $ y \u00a5 juntos -->
-    <div class="asset-card">
-      <div class="asset-icon jpy"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#1a6b3c"/><text x="14" y="25" text-anchor="middle" font-size="16" font-weight="900" fill="#fff" font-family="Arial">$</text><circle cx="28" cy="20" r="12" fill="#bc002d"/><text x="28" y="25" text-anchor="middle" font-size="15" font-weight="900" fill="#fff" font-family="Arial">\u00a5</text><path d="M20 10v20" stroke="#0d1117" stroke-width="2" stroke-dasharray="2 2" opacity=".3"/></svg></div>
-      <div class="asset-name">USD/JPY</div><div class="asset-tag" data-i18n="assets.forex_major">Forex Principal</div>
-    </div>
-    <!-- GBP/JPY: The Beast -->
-    <div class="asset-card">
-      <div class="asset-icon gbpjpy"><svg viewBox="0 0 40 40" fill="none"><circle cx="14" cy="20" r="12" fill="#012169"/><text x="14" y="25" text-anchor="middle" font-size="14" font-weight="900" fill="#fff" font-family="Arial">\u00a3</text><circle cx="28" cy="20" r="12" fill="#bc002d"/><text x="28" y="25" text-anchor="middle" font-size="15" font-weight="900" fill="#fff" font-family="Arial">\u00a5</text><path d="M20 10v20" stroke="#0d1117" stroke-width="2" stroke-dasharray="2 2" opacity=".3"/></svg></div>
-      <div class="asset-name">GBP/JPY</div><div class="asset-tag">La Bestia \u2022 Forex</div>
     </div>
     <!-- NASDAQ: Candlestick chart profesional -->
     <div class="asset-card">
@@ -9803,7 +9485,7 @@ section{{padding:50px 20px}}
       <div class="price-amount" style="font-size:1.1rem;color:var(--text2)" data-i18n="pricing.copy_price">Sin cuota fija</div>
       <p style="color:var(--text2);margin-bottom:16px" data-i18n="pricing.copy_desc">Tu cuenta opera sola 24/7 sobre XM — broker regulado. Pagas solo si ganas.</p>
       <ul class="price-list">
-        <li data-i18n="pricing.cp1">Operativa automatizada — Oro, Forex e \u00cdndices</li>
+        <li data-i18n="pricing.cp1">Operativa automatizada — EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s</li>
         <li data-i18n="pricing.cp2">Copia automatica en tiempo real</li>
         <li data-i18n="pricing.cp3">SL y TP colocados automaticamente</li>
         <li data-i18n="pricing.cp4">Si ganas, pagas un peque\u00f1o % de comisi\u00f3n</li>
@@ -9836,7 +9518,7 @@ section{{padding:50px 20px}}
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q4">\u00bfQu\u00e9 broker necesito?</div>
-      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (Oro, Forex e \u00cdndices). Recomendamos brokers con MetaTrader 5 para aprovechar nuestro servicio de Copy Trading activo.</div>
+      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para aprovechar nuestro servicio de Copy Trading activo.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q_copy">\u00bfC\u00f3mo funciona el Copy Trading con XM?</div>
@@ -10278,6 +9960,32 @@ def api_winning_trades():
             status=200, mimetype="application/json"
         )
 
+@app.route("/api/mt5_realtime")
+def api_mt5_realtime():
+    """API: datos en tiempo real desde monitor_real.py (cuenta XM 88849791).
+    Devuelve posiciones abiertas, historial del día y estadísticas live."""
+    try:
+        import json as _jrt
+        _rt_path = os.path.join(os.path.dirname(__file__), "mt5_realtime.json")
+        if os.path.exists(_rt_path):
+            with open(_rt_path, "r", encoding="utf-8") as _f:
+                data = _jrt.load(_f)
+            return app.response_class(
+                response=_jrt.dumps(data, ensure_ascii=False),
+                status=200, mimetype="application/json"
+            )
+        else:
+            return app.response_class(
+                response=_jrt.dumps({"error": "monitor_real.py no está corriendo", "posiciones_abiertas": [], "historial_hoy": [], "stats_hoy": {}, "stats_historico": {}}),
+                status=200, mimetype="application/json"
+            )
+    except Exception as e:
+        return app.response_class(
+            response=json.dumps({"error": str(e), "posiciones_abiertas": [], "historial_hoy": []}),
+            status=200, mimetype="application/json"
+        )
+
+
 @app.route("/api/active_ops")
 def api_active_ops():
     """API: operaciones activas con progreso hacia TP.
@@ -10287,14 +9995,12 @@ def api_active_ops():
     if not _check_api_auth():
         return app.response_class(response='{"error":"unauthorized"}', status=401, mimetype="application/json")
     _MT5_TO_NOMBRE = {
-        'GOLD': 'ORO',
         'US100Cash': 'NASDAQ', 'US500Cash': 'S&P 500',
-        'EURUSD': 'EUR/USD', 'USDJPY': 'USD/JPY', 'GBPJPY': 'GBP/JPY',
+        'EURUSD': 'EUR/USD',
     }
     _MT5_TO_TICKER = {
-        'GOLD': 'GC=F',
         'US100Cash': 'NQ=F', 'US500Cash': 'ES=F',
-        'EURUSD': 'EURUSD=X', 'USDJPY': 'USDJPY=X', 'GBPJPY': 'GBPJPY=X',
+        'EURUSD': 'EURUSD=X',
     }
     try:
         result = []
@@ -10700,21 +10406,67 @@ def pagina_privacidad():
 @app.route("/dashboard", methods=["GET"])
 def dashboard_visual():
     """Panel de rendimiento BuySell365 — metricas agregadas, sin datos de senales."""
+    import json as _jd
 
-    # --- Estadísticas globales ---
-    _hist_all = historial_operaciones if historial_operaciones else []
-    _global_wins = sum(1 for h in _hist_all if h.get('pips', 0) > 0)
-    _global_losses = sum(1 for h in _hist_all if h.get('pips', 0) <= 0)
+    # --- Leer datos MT5 real (monitor_real.py) si están disponibles ---
+    _rt = None
+    try:
+        _rt_path = os.path.join(os.path.dirname(__file__), "mt5_realtime.json")
+        if os.path.exists(_rt_path):
+            with open(_rt_path, "r", encoding="utf-8") as _f:
+                _rt = _jd.load(_f)
+    except Exception:
+        _rt = None
+
+    # --- Estadísticas globales (prioridad: mt5_realtime → historial_real → memoria) ---
+    _hist_real_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
+    _hist_all = []
+    try:
+        if _rt and _rt.get("historial_hoy"):
+            # Usar historial del día de MT5 real
+            _hist_all = _rt["historial_hoy"]
+        elif os.path.exists(_hist_real_path):
+            with open(_hist_real_path, "r", encoding="utf-8") as _f:
+                _hist_all = _jd.load(_f)
+        if not _hist_all:
+            _hist_all = historial_operaciones if historial_operaciones else []
+    except Exception:
+        _hist_all = historial_operaciones if historial_operaciones else []
+
+    _global_wins = sum(1 for h in _hist_all if float(h.get('pips', 0)) > 0)
+    _global_losses = sum(1 for h in _hist_all if float(h.get('pips', 0)) <= 0)
     _global_total = _global_wins + _global_losses
-    _global_winrate = round(_global_wins / _global_total * 100, 1) if _global_total > 0 else 0
-    _global_pips = round(sum(h.get('pips', 0) for h in _hist_all), 1)
-    _global_avg_win = round(sum(h.get('pips', 0) for h in _hist_all if h.get('pips', 0) > 0) / max(_global_wins, 1), 1)
-    _global_avg_loss = round(sum(abs(h.get('pips', 0)) for h in _hist_all if h.get('pips', 0) <= 0) / max(_global_losses, 1), 1)
-    _global_rr = round(_global_avg_win / _global_avg_loss, 2) if _global_avg_loss > 0 else 0
 
-    # --- Actividad en vivo ---
-    n_activas = len(operaciones_activas)
-    activos_en_curso = list(set(op.get('nombre', op.get('ticker', '')) for op in operaciones_activas.values()))
+    # Priorizar stats del JSON realtime si existen
+    if _rt and _rt.get("stats_historico", {}).get("total", 0) > 0:
+        _sh = _rt["stats_historico"]
+        _global_winrate = _sh.get("wr", 0)
+        _global_pips    = _sh.get("pips", 0)
+        _global_total   = _sh.get("total", _global_total)
+    else:
+        _global_winrate = round(_global_wins / _global_total * 100, 1) if _global_total > 0 else 0
+        _global_pips    = round(sum(float(h.get('pips', 0)) for h in _hist_all), 1)
+
+    _global_avg_win  = round(sum(float(h.get('pips', 0)) for h in _hist_all if float(h.get('pips', 0)) > 0) / max(_global_wins, 1), 1)
+    _global_avg_loss = round(sum(abs(float(h.get('pips', 0))) for h in _hist_all if float(h.get('pips', 0)) <= 0) / max(_global_losses, 1), 1)
+    _global_rr       = round(_global_avg_win / _global_avg_loss, 2) if _global_avg_loss > 0 else 0
+
+    # --- Actividad en vivo (MT5 real primero, luego bot memory) ---
+    if _rt and _rt.get("posiciones_abiertas"):
+        _pos_abiertas = _rt["posiciones_abiertas"]
+        n_activas = len(_pos_abiertas)
+        activos_en_curso = list(set(p.get("symbol", "") for p in _pos_abiertas))
+    else:
+        _pos_abiertas = []
+        n_activas = len(operaciones_activas)
+        activos_en_curso = list(set(op.get('nombre', op.get('ticker', '')) for op in operaciones_activas.values()))
+
+    # Info cuenta real
+    _balance  = _rt["cuenta"]["balance"]  if _rt and _rt.get("cuenta") else 0
+    _equity   = _rt["cuenta"]["equity"]   if _rt and _rt.get("cuenta") else 0
+    _profit_f = _rt["cuenta"]["profit_fl"] if _rt and _rt.get("cuenta") else 0
+    _rt_update = _rt.get("last_update", "") if _rt else ""
+
     if activos_en_curso:
         activos_txt = " &middot; ".join(activos_en_curso)
     else:
@@ -10771,12 +10523,9 @@ def dashboard_visual():
         asset_perf[nombre]['pips'] += h.get('pips', 0)
 
     _all_assets = [
-        ('ORO', '#f0b90b', ['ORO', 'GOLD', 'XAUUSD', 'XAU']),
         ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100']),
         ('S&amp;P 500', '#3b82f6', ['S&P', 'SP500', 'US500', 'ES']),
         ('EUR/USD', '#a855f7', ['EUR/USD', 'EURUSD', 'EUR']),
-        ('USD/JPY', '#ef4444', ['USD/JPY', 'USDJPY', 'JPY']),
-        ('GBP/JPY', '#10b981', ['GBP/JPY', 'GBPJPY', 'GJ']),
     ]
     asset_cards_html = ""
     for display_name, accent, aliases in _all_assets:
@@ -11101,6 +10850,40 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     </div>
 
 
+    <!-- CUENTA REAL MT5 -->
+    {"" if not _rt else f"""
+    <div class="card" style="margin-bottom:24px;border-color:rgba(0,212,170,.3)">
+        <div class="card-title" style="color:var(--primary)">&#128178; Cuenta Real XM &mdash; {_rt.get('last_update','')}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+            <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Balance</div>
+                <div style="font-size:22px;font-weight:800;color:#fff">${_rt['cuenta']['balance']:,.2f}</div>
+            </div>
+            <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Equity</div>
+                <div style="font-size:22px;font-weight:800;color:{'#00e676' if _rt['cuenta']['equity'] >= _rt['cuenta']['balance'] else '#ff3b30'}">${_rt['cuenta']['equity']:,.2f}</div>
+            </div>
+            <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Profit Flotante</div>
+                <div style="font-size:22px;font-weight:800;color:{'#00e676' if _rt['cuenta']['profit_fl'] >= 0 else '#ff3b30'}">${_rt['cuenta']['profit_fl']:+,.2f}</div>
+            </div>
+        </div>
+        {"<div style='color:var(--muted);text-align:center;padding:12px;font-size:13px'>Sin posiciones abiertas ahora mismo</div>" if not _rt.get('posiciones_abiertas') else "".join(f'''
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--panel2);border-radius:8px;padding:12px 14px;margin-bottom:8px;border-left:3px solid {"#00e676" if p["tipo"]=="COMPRA" else "#ff3b30"}">
+            <div>
+                <span style="font-weight:700">{p["symbol"]}</span>
+                <span style="margin-left:8px;color:{"#00e676" if p["tipo"]=="COMPRA" else "#ff3b30"};font-size:12px">{"&#9650;" if p["tipo"]=="COMPRA" else "&#9660;"} {p["tipo"]}</span>
+                <span style="margin-left:8px;color:var(--muted);font-size:12px">Entrada: {p["entrada"]}</span>
+                <span style="margin-left:8px;color:var(--muted);font-size:12px">Vol: {p["volumen"]}</span>
+            </div>
+            <div style="text-align:right">
+                <div style="font-weight:700;color:{"#00e676" if p["profit"]>=0 else "#ff3b30"}">${p["profit"]:+,.2f}</div>
+                <div style="font-size:11px;color:var(--muted)">{p.get("hora_apertura","")} &bull; {p["pips"]:+.1f} pts</div>
+            </div>
+        </div>''' for p in _rt["posiciones_abiertas"])}
+    </div>
+    """}
+
     <!-- FOOTER -->
     <div class="footer">
         <p>&#169; 2026 BuySell365 Pro &mdash; <span data-i18n="dash.footer_created">Creado por</span> <strong>Emmanuel D&iacute;az</strong> | <span data-i18n="dash.footer_refresh">Auto-refresh cada 30s</span></p>
@@ -11226,7 +11009,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
           const isMt5 = op.fuente === 'mt5';
           const plColor = (op.beneficio !== undefined) ? (op.beneficio >= 0 ? '#00c853' : '#ff5252') : '#8b949e';
           html += '<div class="alert-op">';
-          const _dispName = (function(raw){{ if(!raw) return '?'; const m={{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY'}}; if(m[raw]) return m[raw]; var n=raw; for(var k in m){{ if(raw.indexOf(k)>=0) return m[k]; }}; n=n.replace(/[^A-Za-z0-9\\/&. _-]/g,'').trim(); if(m[n]) return m[n]; return n||raw; }})(op.nombre || op.ticker);
+          const _dispName = (function(raw){{ if(!raw) return '?'; const m={{'NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD'}}; if(m[raw]) return m[raw]; var n=raw; for(var k in m){{ if(raw.indexOf(k)>=0) return m[k]; }}; n=n.replace(/[^A-Za-z0-9\\/&. _-]/g,'').trim(); if(m[n]) return m[n]; return n||raw; }})(op.nombre || op.ticker);
           html += '<div class="alert-name">' + _dispName;
           if(isMt5 && op.volumen) html += ' <span style="font-size:11px;color:#8b949e">(' + op.volumen + ' lots)</span>';
           html += '</div>';
@@ -11278,9 +11061,8 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
   function getDec(tkr){{
     tkr = (tkr || '').toUpperCase();
-    if(tkr.indexOf('NQ=F')>=0||tkr.indexOf('ES=F')>=0||tkr.indexOf('GC=F')>=0) return 2;
+    if(tkr.indexOf('NQ=F')>=0||tkr.indexOf('ES=F')>=0) return 2;
     if(tkr.indexOf('BTC')>=0||tkr.indexOf('ETH')>=0) return 2;
-    if(tkr.indexOf('JPY')>=0) return 3;
     return 5;
   }}
 
@@ -11358,7 +11140,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
   // ── NORMALIZE ASSET NAME ──
   function normName(raw){{
     if(!raw) return '?';
-    const map = {{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY','BTC-USD':'BITCOIN','ETH-USD':'ETHEREUM','XAUUSD':'ORO','BTCUSD':'BITCOIN','ETHUSD':'ETHEREUM','US100Cash':'NASDAQ','US500Cash':'S&P 500'}};
+    const map = {{'NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','BTC-USD':'BITCOIN','ETH-USD':'ETHEREUM','BTCUSD':'BITCOIN','ETHUSD':'ETHEREUM','US100Cash':'NASDAQ','US500Cash':'S&P 500'}};
     if(map[raw]) return map[raw];
     let n = raw.replace(/[^A-Za-z0-9\\/&. _-]/g, '').trim();
     if(map[n]) return map[n];
@@ -11427,7 +11209,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       html += '<td style="padding:8px;font-weight:600">' + normName(t.nombre || t.ticker || '-') + '</td>';
       html += '<td style="padding:8px">' + tipoIcon + ' ' + (t.tipo || '-') + '</td>';
       html += '<td style="padding:8px;font-family:monospace">' + (t.entrada ? Number(t.entrada).toFixed(dec) : '-') + '</td>';
-      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_entrada || '-') + '</td>';
+      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_entrada || t.hora || '-') + '</td>';
       html += '<td style="padding:8px;font-family:monospace">' + (t.salida ? Number(t.salida).toFixed(dec) : '-') + '</td>';
       html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (t.hora_salida || '-') + '</td>';
       html += '<td style="padding:8px;color:#00e676;font-weight:700">+' + pips.toFixed(1) + ' ' + unit + '</td>';
@@ -12005,11 +11787,8 @@ def _parsear_texto_gainzalgo(raw_body: str) -> dict:
 
     # 2. TICKER: buscar símbolos conocidos en el texto
     ticker_aliases = {
-        "XAUUSD": "XAUUSD", "GOLD": "XAUUSD", "ORO": "XAUUSD",
         # BTC/ETH eliminados
         "EURUSD": "EURUSD", "EUR/USD": "EURUSD",
-        "USDJPY": "USDJPY", "USD/JPY": "USDJPY",
-        "GBPJPY": "GBPJPY", "GBP/JPY": "GBPJPY",
         "NAS100": "NQ=F", "NASDAQ": "NQ=F", "US100": "NQ=F", "NQ": "NQ=F",
         "SP500": "ES=F", "SPX": "ES=F", "US500": "ES=F", "SPX500USD": "ES=F",
     }
@@ -12145,7 +11924,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                     score = score or 3
                 else:
                     # Fallback de último recurso (porcentajes) si falla la descarga
-                    pcts = {"GOLD": 0.005, "US100Cash": 0.008, "US500Cash": 0.006, "EURUSD": 0.001, "USDJPY": 0.01, "GBPJPY": 0.012}
+                    pcts = {"US100Cash": 0.008, "US500Cash": 0.006, "EURUSD": 0.001}
                     dist = price * pcts.get(mt5_sym, 0.007)
                     sign = 1 if direccion == "COMPRA" else -1
                     sl = sl or (price - sign * dist)
@@ -12231,7 +12010,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                     logger.info(f"✅ Niveles recalculados: SL={sl} TP1={tp1} TP2={tp2} TP3={tp3}")
                 else:
                     # Fallback porcentajes si falla descarga
-                    pcts = {"GOLD": 0.005, "US100Cash": 0.008, "US500Cash": 0.006, "EURUSD": 0.001, "USDJPY": 0.005, "GBPJPY": 0.007}
+                    pcts = {"US100Cash": 0.008, "US500Cash": 0.006, "EURUSD": 0.001}
                     dist_fix = price * pcts.get(mt5_sym, 0.007)
                     sign = 1 if direccion == "COMPRA" else -1
                     sl = price - sign * dist_fix
@@ -12257,14 +12036,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
             # Indices: sin decimales (24,620 no 24,620.50)
             if any(x in _t for x in ['NQ=F', 'ES=F', 'US100', 'US500']):
                 return f"{v:,.0f}"
-            # Oro: 1 decimal (3,100.5 no 3,100.50)
-            if any(x in _t for x in ['GC=F', 'GOLD']):
-                if v == int(v): return f"{v:,.0f}"
-                return f"{v:,.1f}"
-            # GBP/JPY: 3 decimales
-            if 'GBPJPY' in _t: return f"{v:,.3f}"
-            # Forex: 5 decimales (standard) o 3 para JPY
-            if 'JPY' in _t: return f"{v:.3f}"
+            # Forex: 5 decimales (standard)
             if any(x in _t for x in ['EUR', 'GBP', 'AUD', 'NZD', 'CHF', 'CAD']):
                 return f"{v:.5f}"
             return fmt_val(v, ticker_yf)
@@ -12272,9 +12044,8 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         # Nombre bonito del activo (EUR/USD, no EURUSD)
         _nombre_map = {
-            'GOLD': 'ORO',
             'US100Cash': '📊 NASDAQ', 'US500Cash': '📈 S&P 500',
-            'EURUSD': 'EUR/USD', 'USDJPY': 'USD/JPY', 'GBPJPY': 'GBP/JPY'
+            'EURUSD': 'EUR/USD',
         }
         nombre_activo = _nombre_map.get(mt5_sym, ticker_yf)
 
@@ -12447,14 +12218,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
             _wh_skip_mt5 = True
             _wh_skip_mt5_razon = "Solo señales premium pasan a MT5"
 
-        if ticker_yf == "GC=F":
-            _riesgo = max(RIESGO_ORO, RIESGO_PREMIUM if _es_premium else RIESGO_ORO)
-        elif ticker_yf == "USDJPY=X":
-            _riesgo = max(RIESGO_USDJPY, RIESGO_PREMIUM if _es_premium else RIESGO_USDJPY)
-        elif ticker_yf == "GBPJPY=X":
-            _riesgo = max(RIESGO_GBPJPY, RIESGO_PREMIUM if _es_premium else RIESGO_GBPJPY)
-        else:
-            _riesgo = RIESGO_PREMIUM if _es_premium else RIESGO_POR_TRADE
+        _riesgo = RIESGO_PREMIUM if _es_premium else RIESGO_POR_TRADE
 
         # OBS-2 FIX: Mover BLOQUEO TOTAL de horario ANTES de ejecutar MT5
         # Si está fuera de horario total → limpiar reserva ANTES de intentar MT5
@@ -12684,7 +12448,7 @@ def enviar_briefing_matutino():
     _ia_outlook = ""
     try:
         _ia_outlook = _ia_responder(
-            "Dame un outlook de 2 líneas para hoy: ORO, EURUSD, NASDAQ. Menciona niveles clave y qué sesión será más activa.",
+            "Dame un outlook de 2 líneas para hoy: EUR/USD, NASDAQ, S&P 500. Menciona niveles clave y qué sesión será más activa.",
             "Canal VIP"
         ) or ""
     except Exception:
@@ -12833,10 +12597,10 @@ def enviar_notificacion_sesion(sesion):
     hora = ahora().strftime("%H:%M")
     if sesion == "london":
         titulo = "🇬🇧 APERTURA SESIÓN LONDRES"
-        activos_clave = ["EUR/USD", "USD/JPY", "ORO"]
+        activos_clave = ["EUR/USD"]
     else:
         titulo = "🇺🇸 APERTURA SESIÓN NUEVA YORK"
-        activos_clave = ["ORO", "📊 NASDAQ", "📈 S&P 500"]
+        activos_clave = ["📊 NASDAQ", "📈 S&P 500"]
 
     lineas = [
         f"🔔 *{titulo}* | {hora} UTC\n"
@@ -12862,7 +12626,7 @@ def crear_teclado_principal():
     return {
         "keyboard": [
             [{"text": "📊 Señales Activas"}, {"text": "📈 Resumen Diario"}],
-            [{"text": "🚀 Análisis Oro"}, {"text": "🔍 Análisis NASDAQ"}],
+            [{"text": "💱 Análisis EUR/USD"}, {"text": "🔍 Análisis NASDAQ"}],
             [{"text": "📅 Noticias"}, {"text": "☀️ Briefing"}],
             [{"text": "💰 Mi Cuenta"}, {"text": "⚙️ Estado Bot"}],
             [{"text": "💎 VIP"}, {"text": "❓ Ayuda"}]
@@ -13295,7 +13059,7 @@ def filtro_multi_timeframe(ticker, tipo):
     return True
 
 def analizar_mercado():
-    """Escanea los activos del bot: EUR/USD, USD/JPY, GBP/JPY, NASDAQ, S&P500 y más."""
+    """Escanea los activos del bot: EUR/USD, NASDAQ, S&P500."""
     global ultimo_recordatorio, ultimo_briefing
 
     momento = ahora()
@@ -13377,7 +13141,6 @@ def analizar_activo(nombre, ticker):
             if cat_local == "forex":
                 if "JPY" in ticker and (precio_mon < 80 or precio_mon > 250): es_precio_valido = False
                 elif "JPY" not in ticker and (precio_mon < 0.5 or precio_mon > 2.0): es_precio_valido = False
-            if ticker == "GC=F" and (precio_mon < 3500 or precio_mon > 10000): es_precio_valido = False
             if ticker == "NQ=F" and (precio_mon < 15000 or precio_mon > 40000): es_precio_valido = False
             if ticker == "ES=F" and (precio_mon < 4000 or precio_mon > 12000): es_precio_valido = False
             if es_precio_valido:
@@ -13755,26 +13518,7 @@ def analizar_activo(nombre, ticker):
                             log_op(f"🔗 CORRELACIÓN: {nombre} {tipo} bloqueado MT5 — {_nombre_idx} tiene {_dir_corr_idx} (señal Telegram sigue)")
                         break
 
-            # Check 7: Anti-doble-exposición JPY (dentro del lock atómico)
-            # MISMA dirección (ambos BUY o ambos SELL) = doble exposición JPY → peligroso → bloquear
-            # DIFERENTE dirección (uno BUY + otro SELL) = tesis distintas (ej: USD débil + GBP fuerte) → permitir
-            _JPY_PAIRS = {"USDJPY=X": "GBPJPY=X", "GBPJPY=X": "USDJPY=X"}
-            if ticker in _JPY_PAIRS and not _skip_mt5:
-                _par_correlado = _JPY_PAIRS[ticker]
-                for _v in operaciones_activas.values():
-                    if _v.get('ticker') == _par_correlado:
-                        _dir_corr = _v.get('tipo', '')
-                        if _dir_corr and _dir_corr == tipo:  # MISMA dirección = doble exposición
-                            _skip_mt5 = True
-                            _skip_mt5_razon = f"Doble exposición JPY: {_par_correlado} también tiene {_dir_corr}"
-                            _nombre_corr = "USD/JPY" if _par_correlado == "USDJPY=X" else "GBP/JPY"
-                            log_op(f"🔗 DOBLE EXPOSICIÓN JPY: {nombre} {tipo} bloqueado MT5 — {_nombre_corr} también tiene {_dir_corr}")
-                        else:
-                            _nombre_corr = "USD/JPY" if _par_correlado == "USDJPY=X" else "GBP/JPY"
-                            print(f"✅ JPY PERMITIDO: {nombre} {tipo} + {_nombre_corr} {_dir_corr} — tesis distintas, no doble exposición")
-                        break
-
-            # BUG-3 FIX: Check 8: Anti doble ejecución webhook+scanner (señal reciente < 60s)
+            # BUG-3 FIX: Check 7: Anti doble ejecución webhook+scanner (señal reciente < 60s)
             if _base_symbol in _senal_reciente and (time.time() - _senal_reciente[_base_symbol]) < 60:
                 logger.warning(f"🚫 ANTI-DOBLE SCANNER: {nombre} bloqueado — señal reciente hace {int(time.time()-_senal_reciente[_base_symbol])}s")
                 return
@@ -13817,14 +13561,7 @@ def analizar_activo(nombre, ticker):
             _skip_mt5_razon = "Solo señales premium pasan a MT5"
 
         # 💎 Lotaje por activo + premium
-        if ticker == "GC=F":
-            _riesgo = max(RIESGO_ORO, RIESGO_PREMIUM if _es_premium else RIESGO_ORO)
-        elif ticker == "USDJPY=X":
-            _riesgo = max(RIESGO_USDJPY, RIESGO_PREMIUM if _es_premium else RIESGO_USDJPY)
-        elif ticker == "GBPJPY=X":
-            _riesgo = max(RIESGO_GBPJPY, RIESGO_PREMIUM if _es_premium else RIESGO_GBPJPY)
-        else:
-            _riesgo = RIESGO_PREMIUM if _es_premium else RIESGO_POR_TRADE
+        _riesgo = RIESGO_PREMIUM if _es_premium else RIESGO_POR_TRADE
 
         # Ejecutar trade en MT5 (solo si no hay flag _skip_mt5)
         mt5_ok = True
@@ -14128,16 +13865,17 @@ def _verificar_entradas_pendientes():
 def loop_publicidad_grupo():
     """
     Hilo de publicidad automática en el grupo:
-    - 1 anuncio por hora, de 06:00 a 23:00
+    - 1 anuncio cada 2 horas, de 06:00 a 23:00  (~9 anuncios/día)
     - Rota los 5 modelos en orden, sin repetir el mismo seguido
     - El índice se calcula por hora del día para que los reinicios no repitan
     - Borra el anuncio anterior antes de publicar el nuevo
     """
     PUBLICIDAD_PRIMERA_ESPERA = 3 * 60  # Esperar 3 min al arrancar
+    PUBLICIDAD_INTERVALO_HORAS = 2       # Horas mínimas entre anuncios
 
-    _ultimo_anuncio_id  = None   # Message ID del último anuncio enviado
-    _ultima_hora_enviada = -1    # Hora (int) del último envío para evitar duplicados
-    _dia_borrado_grupo  = ""     # Para el borrado nocturno del grupo
+    _ultimo_anuncio_id   = None   # Message ID del último anuncio enviado
+    _ultima_publicacion_g = None  # datetime del último envío para control de intervalo
+    _dia_borrado_grupo   = ""     # Para el borrado nocturno del grupo
 
     # ── Anuncios rotativos del GRUPO (cada 30 min) ──
     ANUNCIOS = [
@@ -14148,7 +13886,7 @@ def loop_publicidad_grupo():
             "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
             "⚡ Nuestro bot opera *por ti* en tiempo real\n"
             "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
-            "🌍 Forex · Índices · Oro — 24/7\n"
+            "🌍 EUR/USD · NASDAQ · S&P 500 y más activos\n"
             "💰 Pagas *solo si ganas* — sin mensualidad fija\n\n"
             "🔥 *Sin pantallas. Sin estrés. Sin perder señales.*",
             {"inline_keyboard": [[
@@ -14167,9 +13905,9 @@ def loop_publicidad_grupo():
             "📍 Entrada: `1.0845`\n"
             "🎯 TP: `1.0910`  ·  🛡️ SL: `1.0800`\n\n"
             "✅ Análisis IA multi-timeframe\n"
-            "✅ 20+ activos: Forex, Índices y más\n"
-            "✅ Alertas 24h — nunca pierdas una señal\n"
-            "🤖 *Bot asistente personal incluido 24/7*\n\n"
+            "✅ EUR/USD, NASDAQ, S&P 500, Oro, Crypto y más\n"
+            "✅ Alertas en tiempo real — nunca pierdas una señal\n"
+            "🤖 *Bot asistente personal incluido*\n\n"
             "👇 *Únete al canal VIP ahora*",
             {"inline_keyboard": [[
                 {"text": "💎 UNIRME AL VIP", "url": "https://t.me/BUYSELL365_PRO_BOT?start=vip"}
@@ -14186,7 +13924,7 @@ def loop_publicidad_grupo():
             "🔒 +5M clientes · fondos segregados · 100% transparente\n\n"
             "1️⃣  *Regístrate* en XM _(gratis, 2 min)_\n"
             "2️⃣  *Copia* la estrategia BuySell365Pro\n"
-            "3️⃣  Tu cuenta opera *sola* 24/7 🚀\n\n"
+            "3️⃣  Tu cuenta opera *sola* en las sesiones 🚀\n\n"
             "✅ Ves cada operación en tiempo real\n"
             "💰 *Sin mensualidad — pagas solo si ganas*",
             {"inline_keyboard": [[
@@ -14208,7 +13946,7 @@ def loop_publicidad_grupo():
             "🤖 *Copy Trading — Sin mensualidad*\n"
             "   ├ 🔄 Opera automáticamente en XM\n"
             "   ├ 💰 Pagas solo sobre ganancias reales\n"
-            "   └ 🌍 Activo 24/7 — sin intervención\n\n"
+            "   └ 🌍 Activo en sesiones — sin intervención\n\n"
             "👇 *Elige tu plan y empieza ahora*",
             {"inline_keyboard": [[
                 {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
@@ -14267,14 +14005,16 @@ def loop_publicidad_grupo():
                 time.sleep(60)
                 continue
 
-            # ── Evitar enviar dos veces en la misma hora ──
-            if _hora_g == _ultima_hora_enviada:
-                time.sleep(60)
-                continue
+            # ── Evitar enviar si no han pasado PUBLICIDAD_INTERVALO_HORAS horas ──
+            if _ultima_publicacion_g is not None:
+                _horas_desde_ultimo = (_ahora_g - _ultima_publicacion_g).total_seconds() / 3600
+                if _horas_desde_ultimo < PUBLICIDAD_INTERVALO_HORAS:
+                    time.sleep(60)
+                    continue
 
             # Índice basado en la hora del día para que los reinicios no repitan
-            # (hora 6=idx0, hora 7=idx1 … hora 22=idx16, cicla entre los 5 modelos)
-            _indice = (_hora_g - 6) % len(ANUNCIOS)
+            # (hora 6=idx0, hora 8=idx1 … cicla entre los 5 modelos cada 2h)
+            _indice = ((_hora_g - 6) // PUBLICIDAD_INTERVALO_HORAS) % len(ANUNCIOS)
             texto, teclado = ANUNCIOS[_indice]
 
             # Borrar anuncio anterior antes de publicar el nuevo
@@ -14289,8 +14029,8 @@ def loop_publicidad_grupo():
             nuevo_id = enviar_telegram(texto, destino=GROUP_ID, teclado=teclado)
             if nuevo_id:
                 _ultimo_anuncio_id = nuevo_id
-                _ultima_hora_enviada = _hora_g
-                logger.info(f"📢 Publicidad grupo — modelo {_indice+1}/{len(ANUNCIOS)} (hora {_hora_g}:00)")
+                _ultima_publicacion_g = _ahora_g
+                logger.info(f"📢 Publicidad grupo — modelo {_indice+1}/{len(ANUNCIOS)} (hora {_hora_g}:00, cada {PUBLICIDAD_INTERVALO_HORAS}h)")
 
         except Exception as e:
             logger.error(f"⚠️ Error en loop_publicidad_grupo: {e}")
@@ -14311,7 +14051,7 @@ def loop_publicidad_canal():
             "🚀 *¿TU DINERO PUEDE TRABAJAR SOLO?*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
-            "⚡ Nuestro bot opera *por ti* 24/7 en tiempo real\n"
+            "⚡ Nuestro bot opera *por ti* en tiempo real\n"
             "📍 Entry · 🎯 TP · 🛡️ SL — completamente automático\n"
             "🏦 Sobre *XM* — broker regulado (CySEC, ASIC)\n"
             "💰 Sin mensualidad — *pagas solo si ganas*\n\n"
@@ -14706,18 +14446,16 @@ def loop_sync_mt5_real():
     # Mapa pip_size por símbolo
     # Divisores de pip — misma convencion que calcular_pips() en bot.py
     _PIP = {
-        "XAUUSD": 1.0, "GOLD": 1.0,           # ORO: 1 pip = $1 movimiento
         "US100Cash": 1.0, "US100": 1.0,        # NASDAQ: 1 pip = 1 punto
         "US500Cash": 1.0, "US500": 1.0,        # S&P 500: 1 pip = 1 punto
         "DE40Cash": 1.0, "UK100Cash": 1.0,     # DAX / FTSE: 1 pip = 1 punto
-        "USDJPY": 0.01, "GBPJPY": 0.01,        # JPY: 1 pip = 0.01
         "EURJPY": 0.01, "AUDJPY": 0.01,
         "EURUSD": 0.0001, "AUDUSD": 0.0001,    # Forex: 1 pip = 0.0001
         "AUDCAD": 0.0001, "EURCHF": 0.0001,
         "USDCAD": 0.0001, "GBPUSD": 0.0001,
     }
     _NOMBRE = {
-        "XAUUSD": "ORO", "EURUSD": "EUR/USD", "USDJPY": "USD/JPY", "GBPJPY": "GBP/JPY",
+        "EURUSD": "EUR/USD",
         "AUDUSD": "AUD/USD", "AUDCAD": "AUD/CAD", "EURCHF": "EUR/CHF", "USDCAD": "USD/CAD",
         "GBPUSD": "GBP/USD", "US100Cash": "NASDAQ", "US500Cash": "S&P 500",
         "DE40Cash": "DAX", "UK100Cash": "FTSE 100", "US100": "NASDAQ", "US500": "S&P 500",
@@ -15988,7 +15726,7 @@ CURRENT CONTEXT ({ahora().strftime('%d/%m %H:%M')} Andorra):
 - Scanner: {'ACTIVE' if not escaneo_pausado else 'PAUSED'}
 {f'- Extra: {contexto_extra}' if contexto_extra else ''}
 
-PAIRS: GOLD/XAUUSD, EUR/USD, USD/JPY, USD/CHF, USD/CAD, AUD/USD, NASDAQ, S&P 500, US30, GBP/JPY
+PAIRS: EUR/USD, NASDAQ (US100), S&P 500 (US500) — plus affiliated channel signals (GOLD, BTC, Forex, Indices)
 SERVICES: VIP Channel (signals with Entry+SL+TP), Copy Trading (auto-account on XM broker)
 
 RULES:
@@ -16059,12 +15797,11 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
             return True
 
         _pares_cierre = {
-            "oro": "GOLD", "gold": "GOLD", "xauusd": "GOLD",
-            "eurusd": "EURUSD", "gbpusd": "GBPUSD", "usdjpy": "USDJPY",
+            "eurusd": "EURUSD", "gbpusd": "GBPUSD",
             "nasdaq": "US100Cash", "us100": "US100Cash", "nas100": "US100Cash",
             "sp500": "US500Cash", "us500": "US500Cash",
             "audcad": "AUDCAD", "eurchf": "EURCHF", "usdcad": "USDCAD",
-            "gbpjpy": "GBPJPY", "gbpnzd": "GBPNZD",
+            "gbpnzd": "GBPNZD",
         }
         for palabra, mt5_sym in _pares_cierre.items():
             if any(cmd in texto_lower for cmd in [f"cierra {palabra}", f"cerrar {palabra}", f"close {palabra}"]):
@@ -16205,13 +15942,12 @@ if _GROQ_KEY:
 _SIGNAL_COPIER_MAGIC = 20260325
 _copier_posiciones_activas: dict = {}  # {symbol: {ticket, tipo, entrada, sl, tp, fuente}}
 _COPIER_SYMBOL_MAP = {
-    "XAUUSD": "GOLD", "GOLD": "GOLD", "ORO": "GOLD",
     "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
     "US30": "US30Cash", "DOW": "US30Cash",
     "SPX500": "US500Cash", "SP500": "US500Cash", "US500": "US500Cash",
     "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
-    "USDJPY": "USDJPY", "EURJPY": "EURJPY", "GBPJPY": "GBPJPY",
+    "EURJPY": "EURJPY",
     "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "EURCHF": "EURCHF",
     "AUDNZD": "AUDNZD", "EURGBP": "EURGBP", "EURAUD": "EURAUD",
     "GBPAUD": "GBPAUD", "NZDJPY": "NZDJPY", "CADJPY": "CADJPY",
@@ -16455,16 +16191,6 @@ PAR_PROFILES = {
         "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
-    # ━━━━ GOLD — Momentum breakout, London open ━━━━
-    "GOLD": {
-        "identity": {"mt5": "GOLD", "yf": "GC=F", "display": "ORO", "category": "commodity", "currencies": ["USD"], "pip_size": 0.01},
-        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 36, "rsi_ob": 64, "adx_min": 15, "bb_squeeze": 0.012, "min_atr": 0.2, "vol_breakout": 1.0, "ml_umbral": 56.0, "min_score": 4, "rsi_gate_buy": 45, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True, "bb_width_volatility": 5.0, "vol_min_extrema": 0.5},
-        "risk": {"risk_pct": 0.005, "max_sl_pips": 200},
-        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.5, "tp2_mult": 2.2, "tp3_mult": 3.0, "ze_mult": 0.2, "min_sl": 5.0},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
-        "news": {"currencies": ["USD"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": True, "max_positions": 1, "cooldown_minutes": 30},
-    },
     # ━━━━ US100 (NASDAQ) — NY session 13:30-20:30 UTC (09:30-16:30 ET) ━━━━
     # Tendencia alcista → COMPRA | Tendencia bajista → VENTA | Neutral → bloqueado
     "US100Cash": {
@@ -16485,26 +16211,6 @@ PAR_PROFILES = {
         "time_filter": {"best_hours_utc": [(13, 21)], "peak_hours_utc": [(13, 17)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
-    },
-    # ━━━━ USDJPY — DESACTIVADO (WR 46% en 50 ops — no rentable) ━━━━
-    "USDJPY": {
-        "identity": {"mt5": "USDJPY", "yf": "USDJPY=X", "display": "USD/JPY", "category": "forex", "currencies": ["USD", "JPY"], "pip_size": 0.01},
-        "premium": {"enabled": False},
-        "risk": {"risk_pct": 0.01, "max_sl_pips": 80},
-        "sl_tp": {"sl_mult": 1.0, "tp1_mult": 1.4, "tp2_mult": 2.0, "tp3_mult": 2.8, "ze_mult": 0.3, "min_sl": 0.150},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
-        "news": {"currencies": ["USD", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": True, "block_sell": True, "max_positions": 0, "cooldown_minutes": 60},
-    },
-    # ━━━━ GBPJPY — "The Beast", London breakout, alta volatilidad ━━━━
-    "GBPJPY": {
-        "identity": {"mt5": "GBPJPY", "yf": "GBPJPY=X", "display": "GBP/JPY", "category": "forex", "currencies": ["GBP", "JPY"], "pip_size": 0.01},
-        "premium": {"enabled": False, "strategies": ["breakout", "reversal_4", "reversal_5", "momentum"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 70, "adx_min": 18, "bb_squeeze": 0.012, "min_atr": 0.004, "vol_breakout": 1.3, "ml_umbral": 55.0, "min_score": 4, "rsi_gate_buy": 55, "rsi_gate_sell": 45, "adx_gate": 20, "rev4_allowed": True},
-        "risk": {"risk_pct": 0.004, "max_sl_pips": 150},
-        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.8, "tp2_mult": 2.5, "tp3_mult": 3.5, "ze_mult": 0.3, "min_sl": 0.200},
-        "time_filter": {"best_hours_utc": [(0, 24)], "peak_hours_utc": [(0, 24)], "best_days": [0, 1, 2, 3, 4]},
-        "news": {"currencies": ["GBP", "JPY"], "block_minutes_before": 60, "reduce_minutes_before": 180},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 1, "cooldown_minutes": 30},
     },
     # ━━━━ AUDCAD — Fibonacci range trading, Asian + London ━━━━
     "AUDCAD": {
@@ -16711,7 +16417,6 @@ _INTER_MARKET_MAP = {
     "NQ=F":     {"corr": "ES=F",     "relacion": "directa"},    # NQ y ES van juntos
     "ES=F":     {"corr": "NQ=F",     "relacion": "directa"},    # ES y NQ van juntos
     "EURUSD=X": {"corr": "DX-Y.NYB", "relacion": "inversa"},   # EUR vs DXY
-    "GC=F":     {"corr": "DX-Y.NYB", "relacion": "inversa"},   # Gold vs DXY
 }
 
 def _confirmar_inter_mercado(ticker, tipo):
