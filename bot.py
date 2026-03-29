@@ -7286,18 +7286,22 @@ def _generar_reporte_diario():
             ]}
         )
 
-        # Enviar resumen al canal VIP
-        _canal_msg = (
-            f"📊 *RESUMEN DEL DÍA — {hoy_str}*\n"
-            f"Señales: {total_senales} | WR: {wr:.0f}% | Pips: {pips_net:+.1f}\n"
-            f"Capital: ${CAPITAL_USUARIO:.0f}"
-        )
-        if _ia_market:
-            _canal_msg += f"\n\n💡 {_ia_market[:200]}"
-        try:
-            enviar_canal(_canal_msg)
-        except Exception:
-            pass
+        # Enviar resumen al canal VIP — solo resultados del día, sin datos privados del admin
+        if total_senales > 0:
+            _canal_msg = (
+                f"📊 *RESUMEN DEL DÍA — {hoy_str}*\n"
+                f"━━━━━━━━━━\n\n"
+                f"🎯 Señales: *{total_senales}* operaciones\n"
+                f"✅ Win Rate: *{wr:.0f}%*\n"
+                f"📈 Pips netos: *{pips_net:+.1f}*"
+            )
+            if _ia_market:
+                _canal_msg += f"\n\n💡 _{_ia_market[:300]}_"
+            _canal_msg += "\n\n📊 Resultados en vivo → buysell365.pro"
+            try:
+                enviar_canal(_canal_msg)
+            except Exception:
+                pass
 
         log_sistema(f"📊 Reporte diario enviado al admin {admin_id}")
         guardar_estado()
@@ -12781,8 +12785,6 @@ def enviar_cierre_nocturno():
 
     if n_activas > 0:
         lineas.append(f"\n🔔 *{n_activas} operaciones* siguen abiertas overnight")
-
-    lineas.append(f"\n💰 Capital: *${CAPITAL_USUARIO:.0f}*")
 
     # IA resumen nocturno
     try:
