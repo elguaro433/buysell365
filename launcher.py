@@ -2636,9 +2636,9 @@ class ManagementConsole:
         name_entry = _make_entry(form, width=30)
         name_entry.pack(fill="x", pady=(0, 8))
 
-        _make_label(form, "Dias de VIP:", fg=TEXT).pack(anchor="w")
-        days_var = tk.IntVar(value=7)
-        tk.Spinbox(form, from_=1, to=365, textvariable=days_var, width=8,
+        _make_label(form, "Dias de VIP (9999 = permanente):", fg=TEXT).pack(anchor="w")
+        days_var = tk.IntVar(value=30)
+        tk.Spinbox(form, from_=1, to=9999, textvariable=days_var, width=8,
                    bg=BG_INPUT, fg=TEXT, buttonbackground=BG_INPUT,
                    insertbackground=TEXT, font=("Segoe UI", 10),
                    relief="flat").pack(anchor="w", pady=(0, 8))
