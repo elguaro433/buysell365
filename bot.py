@@ -8521,8 +8521,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             f"{_emoji} *SEÑAL {_dir_es} — {_nombre}*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📍 Entrada: {_entry_d}\n"
-            f"🎯 TP: {fmt(tp)}\n"
-            f"🛡️ SL: {fmt(sl)}"
+            f"🎯 TP: {fmt(tp, ticker)}\n"
+            f"🛡️ SL: {fmt(sl, ticker)}"
         )
         _xm_teclado = {"inline_keyboard": [
             [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
@@ -8534,13 +8534,13 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             exito = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, RIESGO_POR_TRADE, entrada, sl, tp)
             if exito:
                 enviar_canal(_msg_canal, teclado=_xm_teclado)
-                return f"✅ *SEÑAL EJECUTADA y enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre} @ {_entry_d}\nSL: {fmt(sl)} | TP: {fmt(tp)}"
+                return f"✅ *SEÑAL EJECUTADA y enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre} @ {_entry_d}\nSL: {fmt(sl, ticker)} | TP: {fmt(tp, ticker)}"
             else:
                 admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
                 if admin_id:
                     enviar_telegram(
                         f"⚠️ *Error MT5*: No se pudo abrir {tipo} {ticker}\n"
-                        f"Entry: {_entry_d} | SL: {fmt(sl)} | TP: {fmt(tp)}",
+                        f"Entry: {_entry_d} | SL: {fmt(sl, ticker)} | TP: {fmt(tp, ticker)}",
                         admin_id
                     )
                 # Aunque MT5 falle, enviar la señal al canal VIP
@@ -14818,7 +14818,10 @@ def loop_vip_check():
                 pend = pagos_pendientes_vip.get(uid, {})
                 ts_str = pend.get("timestamp", "")
                 try:
-                    ts_pend = datetime.fromisoformat(ts_str)
+                    if isinstance(ts_str, (int, float)):
+                        ts_pend = datetime.fromtimestamp(ts_str)
+                    else:
+                        ts_pend = datetime.fromisoformat(str(ts_str))
                     horas_transcurridas = (ahora().replace(tzinfo=None) - ts_pend).total_seconds() / 3600
                     if horas_transcurridas > 24:
                         logger.info(f"🧹 Limpiando pago pendiente expirado: {uid}")
