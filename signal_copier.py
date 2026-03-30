@@ -94,14 +94,25 @@ _pending_entry_lock = threading.Lock()
 _published_msg_ids: set = set()  # msg_ids ya publicados como señal completa (evita duplicar en edit)
 
 
+def _normalize_twelve_symbol(pair: str) -> str:
+    """Convierte símbolo interno → formato Twelve Data (XAU/USD, EUR/USD, etc.)."""
+    _twelve_map = {
+        "GOLD": "XAU/USD", "XAUUSD": "XAU/USD",
+        "BRENT": "BRENT", "US100Cash": "NDX", "US30Cash": "DJI", "US500Cash": "SPX",
+    }
+    if pair in _twelve_map:
+        return _twelve_map[pair]
+    # Forex pairs: EURUSD → EUR/USD (insertar "/" en posición 3)
+    if len(pair) == 6 and pair.isalpha():
+        return f"{pair[:3]}/{pair[3:]}"
+    return pair
+
+
 def _get_current_price(pair: str) -> float | None:
     """Fetch current price via Twelve Data API. Returns float or None."""
     if not TWELVE_KEY:
         return None
-    # Twelve Data usa "XAU/USD" para gold — normalizar
-    symbol = pair
-    if pair in ("GOLD", "XAUUSD"):
-        symbol = "XAU/USD"
+    symbol = _normalize_twelve_symbol(pair)
     try:
         import requests
         resp = requests.get(
@@ -120,7 +131,7 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> by
     """Generate mini-chart using Twelve Data + matplotlib. Returns PNG bytes or None."""
     if not TWELVE_KEY:
         return None
-    symbol = "XAU/USD" if pair in ("GOLD", "XAUUSD") else pair
+    symbol = _normalize_twelve_symbol(pair)
     try:
         import requests
         import matplotlib
@@ -516,6 +527,22 @@ def parse_signal(text, chat_title=""):
     if sl <= 0:
         return None
 
+    # ── Validación lógica: TP y SL deben estar en la dirección correcta ──
+    if entry > 0 and tp > 0:
+        if direction == "BUY" and tp < entry and abs(tp - entry) > 0.001:
+            log.warning(f"⚠️ Parser: BUY pero TP({tp}) < entry({entry}) — señal invertida, descartando")
+            return None
+        if direction == "SELL" and tp > entry and abs(tp - entry) > 0.001:
+            log.warning(f"⚠️ Parser: SELL pero TP({tp}) > entry({entry}) — señal invertida, descartando")
+            return None
+    if entry > 0 and sl > 0:
+        if direction == "BUY" and sl > entry and abs(sl - entry) > 0.001:
+            log.warning(f"⚠️ Parser: BUY pero SL({sl}) > entry({entry}) — señal invertida, descartando")
+            return None
+        if direction == "SELL" and sl < entry and abs(sl - entry) > 0.001:
+            log.warning(f"⚠️ Parser: SELL pero SL({sl}) < entry({entry}) — señal invertida, descartando")
+            return None
+
     # ── RRR ──
     rrr = ""
     rrr_match = re.search(r'RR+R?\s*[:\s]+(\d+:\d+)', upper)
@@ -859,15 +886,17 @@ def send_to_channel(signal, executed, detail):
         "GoldForexMarket": "🥇",
     }.get(source, "🔔")
 
-    # Nombre para mostrar del par
-    pair_display = pair.replace("USDJPY","USD/JPY").replace("AUDJPY","AUD/JPY") \
-                       .replace("GBPJPY","GBP/JPY").replace("EURUSD","EUR/USD") \
-                       .replace("GBPUSD","GBP/USD").replace("NZDUSD","NZD/USD") \
-                       .replace("USDCAD","USD/CAD").replace("USDCHF","USD/CHF") \
-                       .replace("EURJPY","EUR/JPY").replace("CADJPY","CAD/JPY") \
-                       .replace("GBPAUD","GBP/AUD").replace("GBPNZD","GBP/NZD") \
-                       .replace("AUDUSD","AUD/USD").replace("US100Cash","NASDAQ") \
-                       .replace("US500Cash","S&P 500").replace("US30Cash","DOW 30")
+    # Nombre para mostrar del par — mapeo completo
+    _display_special = {
+        "GOLD": "XAU/USD", "US100Cash": "NASDAQ", "US500Cash": "S&P 500",
+        "US30Cash": "DOW 30", "GER40Cash": "DAX 40", "BRENT": "BRENT",
+    }
+    if pair in _display_special:
+        pair_display = _display_special[pair]
+    elif len(pair) == 6 and pair.isalpha():
+        pair_display = f"{pair[:3]}/{pair[3:]}"  # EURUSD → EUR/USD
+    else:
+        pair_display = pair
 
     # Tipo de orden en español
     tipo_es = {"Market": "A Mercado", "Limit": "Orden Límite", "Stop": "Orden Stop"}.get(order_type, order_type)
@@ -1010,6 +1039,17 @@ async def main():
 
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
+            # ── Deduplicación: evitar procesar la misma señal 2 veces en <5 min ──
+            if signal["type"] == "new_signal":
+                _dedup_key = f"{signal['pair']}_{signal['direction']}_{signal.get('sl',0)}"
+                with _signals_lock:
+                    for _sid, _sdata in _open_signals.items():
+                        _s = _sdata.get("signal", {})
+                        _existing_key = f"{_s.get('pair','')}_{_s.get('direction','')}_{_s.get('sl',0)}"
+                        if _existing_key == _dedup_key and (time.time() - _sdata.get("sent_at", 0)) < 300:
+                            log.info(f"⏭️ Señal duplicada ignorada: {_dedup_key} (ya existe en últimos 5 min)")
+                            return
+
             # ══════════════════════════════════════════════════════════════
             # 🔒 KILL-SWITCH GLOBAL — MT5 EXECUTION COMPLETAMENTE DESACTIVADO
             # Para reactivar cuando el usuario autorice:
@@ -1111,6 +1151,16 @@ async def main():
                 if resp.status_code == 200:
                     log.info(f"✏️ Entrada confirmada publicada: {dir_es} {pair} @ {entry}")
                     _published_msg_ids.add(msg_id)
+                    # Actualizar entry en _open_signals para que el monitor TP/SL use el precio real
+                    with _signals_lock:
+                        for _sid, _sdata in _open_signals.items():
+                            _sig = _sdata.get("signal", {})
+                            if _sig.get("pair") == pair and _sig.get("direction") == direction and _sig.get("entry", 0) == 0:
+                                _sig["entry"] = entry
+                                _sig["sl"] = signal.get("sl", _sig.get("sl", 0))
+                                _sig["tp"] = signal.get("tp", _sig.get("tp", 0))
+                                log.info(f"✏️ _open_signals actualizado: {_sid} entry={entry}")
+                                break
                 else:
                     log.warning(f"✏️ Error publicando actualización: {resp.status_code}")
                 with _pending_entry_lock:

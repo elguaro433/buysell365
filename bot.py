@@ -179,6 +179,7 @@ def log_pago(msg: str, nivel: str = "info"):
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
 if not TELEGRAM_TOKEN:
     raise RuntimeError("❌ TELEGRAM_TOKEN no configurado en .env — bot no puede arrancar sin token")
+BOT_USERNAME   = "Andoperandobot"  # Username del bot (sin @) — usado en URLs de t.me
 CHANNEL_ID     = os.getenv("CHANNEL_ID", "-1003729609114").strip()
 # 👥 Grupo de Logs/Alertas (Entrada: https://t.me/BUYSELL_365_24_7)
 GROUP_ID       = os.getenv("GROUP_ID", "@BUYSELL_365_24_7").strip()
@@ -258,6 +259,18 @@ def _kill_switch_activo() -> bool:
         _fecha_stats_diarias = hoy
 
     # Verificar límite de pérdidas diarias
+    _perdidas_hoy = int(estadisticas_diarias.get("perdidas", 0))
+    _pips_perdidos = float(estadisticas_diarias.get("pips_perdidos", 0.0))
+    _pips_ganados  = float(estadisticas_diarias.get("pips_ganados", 0.0))
+    # Límite 1: más de 15 pérdidas en un día
+    if _perdidas_hoy >= 15:
+        logger.warning(f"🚨 KILL SWITCH: {_perdidas_hoy} pérdidas hoy — bot pausado")
+        return True
+    # Límite 2: pérdida neta > 12% del capital (estimado por pips)
+    _neto_pips = _pips_ganados - _pips_perdidos
+    if _neto_pips < -200:  # ~200 pips de pérdida neta = ~12% en $500 con 0.01 lote
+        logger.warning(f"🚨 KILL SWITCH: pips netos hoy = {_neto_pips:.1f} — bot pausado")
+        return True
     return False
 
 # ============================================================
@@ -2996,7 +3009,6 @@ def _get_last_loss_time():
         for op in reversed(historial_operaciones):
             if op.get('resultado') == 'LOSS':
                 return op.get('timestamp_cierre', op.get('timestamp', 0))
-            break
     return None
 
 def calcular_lote_sugerido(capital, riesgo_pct, entrada, sl, ticker):
@@ -3076,7 +3088,7 @@ def _init_horarios_from_profiles():
         _yf_tk = _pp_v["identity"].get("yf")
         if _yf_tk and _pp_v.get("premium", {}).get("enabled"):
             _tf = _pp_v["time_filter"]
-            _bh = _tf.get("best_hours_utc", [(7, 21)])
+            _bh = _tf.get("best_hours_utc", [(7, 21)]) or [(7, 21)]
             _h_min = min(h[0] for h in _bh)
             _h_max = max(h[1] for h in _bh)
             HORARIOS_MERCADO[_yf_tk] = (_h_min, max(_h_max, 21))
@@ -7039,8 +7051,11 @@ def cmd_senal_manual(texto_completo: str) -> str:
             with open(manual_file, 'r', encoding='utf-8') as _f:
                 existentes = _json.load(_f)
         existentes.append(nueva)
-        with open(manual_file, 'w', encoding='utf-8') as _f:
+        # Escritura atómica: escribir a .tmp y renombrar para evitar corrupción
+        _tmp_file = manual_file + ".tmp"
+        with open(_tmp_file, 'w', encoding='utf-8') as _f:
             _json.dump(existentes, _f, ensure_ascii=False, indent=2)
+        os.replace(_tmp_file, manual_file)
     except Exception as _ej:
         pass  # Si falla el JSON, la señal igual se publicó en el canal
 
@@ -7112,8 +7127,10 @@ def cmd_rastrear(texto_completo: str) -> str:
         else:
             existentes = []
         existentes.append(nueva)
-        with open(manual_file, 'w', encoding='utf-8') as _f:
+        _tmp_file = manual_file + ".tmp"
+        with open(_tmp_file, 'w', encoding='utf-8') as _f:
             _json.dump(existentes, _f, ensure_ascii=False, indent=2)
+        os.replace(_tmp_file, manual_file)
         dir_es = "COMPRA" if direccion == "BUY" else "VENTA"
         return (
             f"📌 *Señal registrada para seguimiento*\n\n"
@@ -8895,7 +8912,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         )
         panel_botones = {
             "inline_keyboard": [
-                [{"text": "💬 Hablar con el Bot", "url": "https://t.me/Andoperandobot?start=grupo"}],
+                [{"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
                 [{"text": "🔍 Análisis de Mercado", "callback_data": "/analisis_eurusd"},
                  {"text": "💎 Ver Planes VIP", "callback_data": "vip_pagar_usdt"}],
                 [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
@@ -9934,7 +9951,7 @@ section{{padding:50px 20px}}
         <li data-i18n="pricing.v6">An\u00e1lisis multi-IA exclusivo</li>
         <li data-i18n="pricing.v7">Gr\u00e1ficos de entrada y salida</li>
       </ul>
-      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
+      <a href="https://t.me/{BOT_USERNAME}?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
     </div>
     <div class="price-card" style="position:relative;">
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#1b5e20);box-shadow:0 0 16px rgba(0,200,83,.4)">🟢 ACTIVO</div>
@@ -9997,7 +10014,7 @@ section{{padding:50px 20px}}
   <h2>\U0001f680 <span data-i18n="cta.title">Empieza Hoy \u2014 Sin Riesgo</span></h2>
   <p data-i18n="cta.subtitle" data-i18n-days="5">5 d\u00edas h\u00e1biles de prueba gratuita. Sin tarjeta de cr\u00e9dito. Cancela cuando quieras.</p>
   <div class="hero-buttons">
-    <a href="https://t.me/Andoperandobot?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Suscribirme al VIP</span></a>
+    <a href="https://t.me/{BOT_USERNAME}?start=vip" target="_blank" class="btn btn-primary">\U0001f451 <span data-i18n="cta.btn_vip">Suscribirme al VIP</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4ac <span data-i18n="cta.btn_community">Unirse a la Comunidad</span></a>
   </div>
 </section>
@@ -14392,8 +14409,14 @@ def loop_publicidad_grupo():
 
     def _guardar_estado(data: dict):
         try:
+            # Preservar keys existentes (canal loop escribe al mismo archivo)
+            _existing = {}
+            if os.path.exists(_PUB_STATE):
+                with open(_PUB_STATE, encoding="utf-8") as _f:
+                    _existing = json.loads(_f.read())
+            _existing.update(data)
             with open(_PUB_STATE, "w", encoding="utf-8") as _f:
-                _f.write(json.dumps(data, ensure_ascii=False))
+                _f.write(json.dumps(_existing, ensure_ascii=False))
         except Exception:
             pass
 
@@ -14430,7 +14453,7 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "🤖 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Ver Canal VIP", "url": "https://t.me/Andoperandobot?start=vip"},
+                {"text": "💎 Ver Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -14448,7 +14471,7 @@ def loop_publicidad_grupo():
             "🤖 *Bot asistente personal incluido*\n\n"
             "👇 *Únete al canal VIP ahora*",
             {"inline_keyboard": [[
-                {"text": "💎 UNIRME AL VIP", "url": "https://t.me/Andoperandobot?start=vip"}
+                {"text": "💎 UNIRME AL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
             ], [
                 {"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
@@ -14468,7 +14491,7 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Canal VIP", "url": "https://t.me/Andoperandobot?start=vip"},
+                {"text": "💎 Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -14488,7 +14511,7 @@ def loop_publicidad_grupo():
             "👇 *Elige tu plan y empieza ahora*",
             {"inline_keyboard": [[
                 {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-                {"text": "💎 CANAL VIP", "url": "https://t.me/Andoperandobot?start=vip"}
+                {"text": "💎 CANAL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
             ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
@@ -14507,7 +14530,7 @@ def loop_publicidad_grupo():
             {"inline_keyboard": [[
                 {"text": "📊 VER ESTRATEGIA EN XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
-                {"text": "💎 Canal VIP", "url": "https://t.me/Andoperandobot?start=vip"},
+                {"text": "💎 Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -15262,7 +15285,7 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
                 f"👋 *{nombre}*, para atenderte en privado pulsa el botón 👇"
             )
         _markup_aviso = {"inline_keyboard": [[
-            {"text": "💬 Hablar con el bot", "url": f"https://t.me/Andoperandobot?start=grupo"}
+            {"text": "💬 Hablar con el bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
         ]]} if not dm_ok else None
         aviso_id = enviar_telegram(aviso, grupo_chat_id, teclado=_markup_aviso)
         if aviso_id:
@@ -15527,7 +15550,7 @@ def loop_polling():
 
                         # ── Callback VIP: PASO 3 — Instrucciones USDT Binance ──
                         if texto == "vip_pagar_confirmar":
-                            nombre_cb = from_user.get("first_name", "Trader")
+                            nombre_cb = escapar_markdown(from_user.get("first_name", "Trader"))
                             username_cb = from_user.get("username", "")
                             _mostrar_instrucciones_pago(user_id, user_id, nombre_cb, username_cb, fallback_chat=_fallback_dest)
                             continue
@@ -15535,7 +15558,7 @@ def loop_polling():
                         # ── Callback CÓDIGO DE INVITACIÓN: aceptar ──
                         if texto.startswith("codigo_aceptar_"):
                             _code_cb = texto.replace("codigo_aceptar_", "").strip().upper()
-                            nombre_cb = from_user.get("first_name", "Trader")
+                            nombre_cb = escapar_markdown(from_user.get("first_name", "Trader"))
                             username_cb = from_user.get("username", "")
                             _activar_codigo_invitacion(_code_cb, user_id, nombre_cb, username_cb)
                             continue
@@ -15545,6 +15568,21 @@ def loop_polling():
                             _es_admin_cb = user_id in ADMIN_IDS
                             if _es_admin_cb:
                                 enviar_telegram(cmd_vip_lista(), user_id)
+                            continue
+
+                        # ── Callback COPY TRADING: info de cómo activar ──
+                        if texto == "copy_info":
+                            enviar_telegram(
+                                "🤖 *COPY TRADING — BuySell365 Pro*\n"
+                                "━━━━━━━━━━\n\n"
+                                "Copia nuestras operaciones automáticamente en tu cuenta XM.\n\n"
+                                "📋 *Pasos:*\n"
+                                "1️⃣ Abre tu cuenta XM (si no la tienes)\n"
+                                "2️⃣ Escribe /vip para activar tu suscripción\n"
+                                "3️⃣ Te enviaremos las instrucciones de conexión\n\n"
+                                "💡 _Todas las señales se ejecutan automáticamente en tu cuenta._",
+                                user_id
+                            )
                             continue
 
                         # ── Callback VIP: ver pago pendiente ──
@@ -15701,7 +15739,7 @@ def loop_polling():
                                         if _av: programar_borrado(chat_id, _av, 90)
                                     else:
                                         _av2 = enviar_telegram(
-                                            f"👉 *Primero escribeme al DM:* @Andoperandobot y pulsa *Start*\n"
+                                            f"👉 *Primero escribeme al DM:* @{BOT_USERNAME} y pulsa *Start*\n"
                                             f"Luego escribe /vip aqui.", chat_id)
                                         if _av2: programar_borrado(chat_id, _av2, 120)
                                     continue
@@ -15944,7 +15982,7 @@ def loop_polling():
                                 f"Escríbeme en privado para ayudarte 👇",
                                 chat_id,
                                 teclado={"inline_keyboard": [[
-                                    {"text": "💬 Hablar con el bot", "url": "https://t.me/Andoperandobot?start=grupo"}
+                                    {"text": "💬 Hablar con el bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
                                 ]]}
                             )
                             if _aviso_redir_id:
@@ -16195,7 +16233,7 @@ def loop_polling():
                                             # ❌ DM falló — usuario no ha hecho /start
                                             aviso = (
                                                 f"💬 Para proteger tus datos de pago, te respondo por privado.\n"
-                                                f"👉 *Primero escribeme al DM:* @Andoperandobot y pulsa *Start*\n"
+                                                f"👉 *Primero escribeme al DM:* @{BOT_USERNAME} y pulsa *Start*\n"
                                                 f"y luego vuelve a escribir /vip aqui."
                                             )
                                             aviso_id = enviar_telegram(aviso, _chat_id)
@@ -16474,7 +16512,7 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
                 try:
                     _resultado_analisis = cmd_analisis(_activo_pedido)
                     if _resultado_analisis and not _resultado_analisis.startswith("⚠️ No"):
-                        enviar_telegram(_resultado_analisis, chat_id, parse_mode="Markdown")
+                        enviar_telegram(_resultado_analisis, chat_id)
                         return True
                 except Exception:
                     pass  # Si falla, cae al Groq como respaldo
@@ -16519,7 +16557,7 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
             # DM falló (usuario no ha abierto el bot en privado) → responder en el grupo
             _resp_corta = respuesta[:300] + ("..." if len(respuesta) > 300 else "")
             _teclado_dm = {"inline_keyboard": [[
-                {"text": "💬 Hablar con el bot en privado", "url": f"https://t.me/Andoperandobot?start=grupo"}
+                {"text": "💬 Hablar con el bot en privado", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
             ]]}
             _mid = enviar_telegram(
                 f"🤖 *{escapar_markdown(nombre)}*, {_resp_corta}\n\n"
