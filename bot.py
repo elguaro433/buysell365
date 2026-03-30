@@ -4648,163 +4648,259 @@ def cmd_analisis(activo_raw: str):
         f_     = lambda v: fmt(v, ticker)
         cat    = get_categoria(ticker)
 
-        # Detectar mercado abierto/cerrado
+        # ── SESIÓN Y MERCADO ──────────────────────────────────
+        hora_utc  = datetime.now(pytz.UTC).hour
+        hora_local = ahora().replace(tzinfo=None).hour
         _es_weekend_analisis = datetime.now(pytz.UTC).weekday() >= 5
         _mercado_cerrado = _es_weekend_analisis
 
-        # ── CONTEXTO DE MERCADO ──────────────────────
-        hora_utc = datetime.now(pytz.UTC).hour
         if 13 <= hora_utc < 17:
-            sesion_txt = "🇺🇸 Overlap Londres-Nueva York (Máx. liquidez)"
+            sesion_txt  = "🇺🇸🇬🇧 Overlap NY-Londres"
+            sesion_info = "Máxima liquidez — los mejores movimientos ocurren ahora"
         elif 7 <= hora_utc < 13:
-            sesion_txt = "🇬🇧 Sesión Londres"
+            sesion_txt  = "🇬🇧 Sesión Londres"
+            sesion_info = "Alta liquidez en EUR/GBP — índices con menor volumen"
         elif 17 <= hora_utc < 21:
-            sesion_txt = "🇺🇸 Sesión Nueva York"
+            sesion_txt  = "🇺🇸 Sesión Nueva York"
+            sesion_info = "Máxima volatilidad en NASDAQ/S&P 500 — buena liquidez en forex"
         elif 0 <= hora_utc < 7:
-            sesion_txt = "🌏 Sesión Asiática (Tokio/Sídney)"
+            sesion_txt  = "🌏 Sesión Asiática"
+            sesion_info = "Mercados de Asia activos — menor volatilidad en EUR/USD"
         else:
-            sesion_txt = "🌙 Post-mercado / Pre-Asia"
+            sesion_txt  = "🌙 Post-mercado"
+            sesion_info = "Liquidez reducida — evitar entradas en índices"
 
-        regimen = ind.get('regimen', 'TRANSICIÓN')
-        emoji_reg = "⚖️" if regimen == "RANGO" else "📈" if regimen == "TENDENCIA" else "⚡" if regimen == "VOLATILIDAD" else "🔄"
-        
-        # Fear & Greed (si está disponible)
-        fg_val, fg_class = get_fear_greed()
-        fg_class = str(fg_class)  # Asegurar string para evitar errores de tipo
-        fg_emoji = "😱" if "Fear" in fg_class else "🤑" if "Greed" in fg_class else "😐"
+        # Calidad de sesión para este activo específico
+        _es_indice = ticker in ('NQ=F', 'ES=F', 'YM=F')
+        _es_oro    = 'XAU' in ticker or 'GOLD' in ticker
+        if _es_indice:
+            if 13 <= hora_utc < 21:
+                _sesion_calidad = "✅ Sesión ideal para este activo"
+            elif _mercado_cerrado:
+                _sesion_calidad = "🔴 Mercado cerrado — solo referencia"
+            else:
+                _sesion_calidad = "⚠️ Sesión subóptima para índices USA"
+        elif _es_oro:
+            if 7 <= hora_utc < 21:
+                _sesion_calidad = "✅ Sesión activa para ORO"
+            else:
+                _sesion_calidad = "⚠️ Sesión asiática — movimientos más lentos en ORO"
+        else:  # forex
+            if 7 <= hora_utc < 17:
+                _sesion_calidad = "✅ Sesión ideal para este par"
+            else:
+                _sesion_calidad = "⚠️ Liquidez reducida — spreads más amplios"
 
-        # ── SEÑAL ACTIVA ────────────────────────────────────
-        if tipo:
-            niveles = calcular_niveles_3tp(precio, tipo, ind['atr_1h'], ticker)
-            tipo_txt = f"{'🟢 COMPRA' if tipo == 'COMPRA' else '🔴 VENTA'}"
-            razones_resumen = "\n   ".join(razones[:5])
-
-            # R:R ratio
-            sl_dist = abs(precio - niveles['sl'])
-            tp1_dist = abs(niveles['tp1'] - precio)
-            tp2_dist = abs(niveles['tp2'] - precio)
-            tp3_dist = abs(niveles['tp3'] - precio)
-            rr1 = tp1_dist / sl_dist if sl_dist > 0 else 0
-            rr2 = tp2_dist / sl_dist if sl_dist > 0 else 0
-            rr3 = tp3_dist / sl_dist if sl_dist > 0 else 0
-
-            lote = calcular_lote_sugerido(CAPITAL_USUARIO, RIESGO_POR_TRADE, precio, niveles['sl'], ticker)
-
-            senal_txt = (
-                f"\n🚨 *SEÑAL ACTIVA: {tipo_txt}*  {barra_confianza(score)}\n\n"
-                f"   🛑 SL:  `{f_(niveles['sl'])}`\n"
-                f"   1️⃣ TP1: `{f_(niveles['tp1'])}`  (R:R {rr1:.1f}:1)\n"
-                f"   2️⃣ TP2: `{f_(niveles['tp2'])}`  (R:R {rr2:.1f}:1)\n"
-                f"   3️⃣ TP3: `{f_(niveles['tp3'])}`  (R:R {rr3:.1f}:1)\n\n"
-                f"   _{razones_resumen}_\n"
-            )
-        else:
-            _razon_principal = razones[0] if razones else 'Esperando confirmación'
-            senal_txt = f"\n⏸️ *Sin señal activa*  —  _{_razon_principal}_\n"
-
-        # ── TENDENCIA MULTI-TEMPORAL ────────────────────────
+        # ── TENDENCIA MULTI-TEMPORAL ──────────────────────────
         tendencia_15m = "📈 Alcista" if ind['ema9'] > ind['ema20'] > ind['ema50'] else ("📉 Bajista" if ind['ema9'] < ind['ema20'] < ind['ema50'] else "➡️ Mixta")
-
         alcista_1h = _obtener_tendencia_tf(ticker, "1h", _cache_mtf_1h, ttl=900)
         tendencia_1h = "📈 Alcista" if alcista_1h is True else ("📉 Bajista" if alcista_1h is False else "➡️ Neutra")
-
         alcista_4h = _obtener_tendencia_tf(ticker, "4h", _cache_mtf_4h, ttl=1800)
         tendencia_4h = "📈 Alcista" if alcista_4h is True else ("📉 Bajista" if alcista_4h is False else "➡️ Neutra")
 
-        # ── POSICIÓN EN BOLLINGER ───────────────────────────
-        bb_rango = ind['bb_up'] - ind['bb_lo']
-        if bb_rango > 0:
-            bb_pos = (precio - ind['bb_lo']) / bb_rango * 100
+        # Alineación de tendencias
+        _tendencias = [tendencia_15m, tendencia_1h, tendencia_4h]
+        _alcistas_count = sum(1 for t in _tendencias if "Alcista" in t)
+        _bajistas_count = sum(1 for t in _tendencias if "Bajista" in t)
+        if _alcistas_count == 3:
+            _alineacion = "🟢 Triple alineación alcista (muy favorable)"
+        elif _bajistas_count == 3:
+            _alineacion = "🔴 Triple alineación bajista (muy favorable)"
+        elif _alcistas_count == 2:
+            _alineacion = "↗️ Mayoría alcista (2/3 temporales)"
+        elif _bajistas_count == 2:
+            _alineacion = "↘️ Mayoría bajista (2/3 temporales)"
         else:
-            bb_pos = 50
-        if bb_pos > 80:
-            bb_txt = f"Zona alta ({bb_pos:.0f}%) — cerca de banda superior"
-        elif bb_pos < 20:
-            bb_txt = f"Zona baja ({bb_pos:.0f}%) — cerca de banda inferior"
-        else:
-            bb_txt = f"Zona media ({bb_pos:.0f}%) — entre bandas"
+            _alineacion = "⚖️ Tendencias mixtas — esperar claridad"
 
-        # ── ML PROBABILIDAD ─────────────────────────────────
+        # ── NIVELES Y DISTANCIAS ──────────────────────────────
+        dist_s_pct  = ind['dist_soporte']
+        dist_r_pct  = ind['dist_resistencia']
+        dist_s_abs  = abs(precio - ind['soporte'])
+        dist_r_abs  = abs(precio - ind['resistencia'])
+
+        if dist_s_pct < 0.5:
+            _pos_sr = f"⚠️ *En soporte* — zona de rebote o ruptura"
+        elif dist_r_pct < 0.5:
+            _pos_sr = f"⚠️ *En resistencia* — zona de rechazo o ruptura"
+        elif dist_s_pct < dist_r_pct:
+            _pos_sr = f"Más cerca del soporte ({dist_s_pct:.1f}% de distancia)"
+        else:
+            _pos_sr = f"Más cerca de resistencia ({dist_r_pct:.1f}% de distancia)"
+
+        _macro_txt = "ALCISTA ↑" if precio > ind['ema200'] else "BAJISTA ↓"
+        _macro_dist = abs(precio - ind['ema200']) / ind['ema200'] * 100
+
+        # ── RSI / MACD / ADX ─────────────────────────────────
+        rsi = ind['rsi']
+        if rsi > 75:
+            _rsi_txt = f"*{rsi:.0f}* 🔴 Sobrecomprado extremo — riesgo de reversión"
+        elif rsi > 65:
+            _rsi_txt = f"*{rsi:.0f}* 🟠 Sobrecomprado — cuidado con compras"
+        elif rsi < 25:
+            _rsi_txt = f"*{rsi:.0f}* 🟢 Sobrevendido extremo — posible rebote"
+        elif rsi < 35:
+            _rsi_txt = f"*{rsi:.0f}* 🟡 Sobrevendido — cerca de zona de compra"
+        elif rsi > 50:
+            _rsi_txt = f"*{rsi:.0f}* ↗️ Zona alcista (>50)"
+        else:
+            _rsi_txt = f"*{rsi:.0f}* ↘️ Zona bajista (<50)"
+
+        _macd_dir  = "🟢 Alcista" if ind['macd'] > ind['signal'] else "🔴 Bajista"
+        _macd_hist = ind['macd_hist']
+        _macd_txt  = f"{_macd_dir}  _(histograma {'creciendo' if abs(_macd_hist) > 0 and _macd_hist == _macd_hist else 'decreciendo'})_"
+
+        if ind['adx'] > 35:
+            _adx_txt = f"*{ind['adx']:.0f}* — Tendencia muy fuerte"
+        elif ind['adx'] > 25:
+            _adx_txt = f"*{ind['adx']:.0f}* — Tendencia activa"
+        elif ind['adx'] > 15:
+            _adx_txt = f"*{ind['adx']:.0f}* — Tendencia débil / rango"
+        else:
+            _adx_txt = f"*{ind['adx']:.0f}* — Mercado lateral"
+
+        # Volumen
+        vr = ind['vol_ratio']
+        if vr > 2.0:
+            _vol_txt = f"🔥 {vr:.1f}x la media — movimiento institucional"
+        elif vr > 1.3:
+            _vol_txt = f"⬆️ {vr:.1f}x la media — volumen elevado"
+        elif vr < 0.5:
+            _vol_txt = f"⬇️ {vr:.1f}x la media — sin convicción"
+        else:
+            _vol_txt = f"➡️ {vr:.1f}x la media — normal"
+
+        # ── ML PROBABILIDAD ──────────────────────────────────
         prob_alcista = ind.get('ml_prob_alcista', 50.0)
         prob_bajista = round(100.0 - prob_alcista, 1)
-        if prob_alcista >= 60:
-            ml_txt = f"🟢 *{prob_alcista}% alcista* — ML favorece subida"
-        elif prob_bajista >= 60:
-            ml_txt = f"🔴 *{prob_bajista}% bajista* — ML favorece caída"
+        if prob_alcista >= 65:
+            ml_txt = f"🟢 *{prob_alcista:.0f}% alcista* — IA favorece subida"
+        elif prob_bajista >= 65:
+            ml_txt = f"🔴 *{prob_bajista:.0f}% bajista* — IA favorece caída"
         else:
-            ml_txt = f"⚖️ Indeciso ({prob_alcista}% alcista / {prob_bajista}% bajista)"
+            ml_txt = f"⚖️ *Indeciso* ({prob_alcista:.0f}% alcista / {prob_bajista:.0f}% bajista)"
 
-        # ── LECTURA ALGORÍTMICA ─────────────────────────────
-        estado_vol = "Detectamos inyección de capital institucional (volumen {:.1f}x la media)".format(ind['vol_ratio']) if ind['vol_ratio'] > 1.2 else "Flujo de órdenes estándar (volumen {:.1f}x)".format(ind['vol_ratio'])
+        # ── FEAR & GREED (índices) ────────────────────────────
+        fg_val, fg_class = get_fear_greed()
+        fg_class = str(fg_class)
+        fg_emoji = "😱" if "Extreme Fear" in fg_class else "😨" if "Fear" in fg_class else "🤑" if "Greed" in fg_class else "😐"
+        _fg_txt = ""
+        if _es_indice and fg_val:
+            _fg_txt = f"\n{fg_emoji} *Fear & Greed:* {fg_val}/100 ({fg_class})"
+            if fg_val <= 20:
+                _fg_txt += " — mercado en pánico, rebotes posibles"
+            elif fg_val >= 80:
+                _fg_txt += " — euforia, cuidado con correcciones"
 
-        if precio > ind['ema200']:
-            estado_macro = "La estructura macro es ALCISTA (precio sobre EMA200)"
-        else:
-            estado_macro = "La estructura macro es BAJISTA (precio bajo EMA200)"
-
-        if ind['dist_soporte'] < 1.0:
-            estado_sr = "reaccionando a zona de soporte ({})".format(f_(ind['soporte']))
-        elif ind['dist_resistencia'] < 1.0:
-            estado_sr = "testeando zona de resistencia ({})".format(f_(ind['resistencia']))
-        else:
-            estado_sr = "en zona de transición entre S {} y R {}".format(f_(ind['soporte']), f_(ind['resistencia']))
-
-        if ind['adx'] > 30:
-            fuerza = "La tendencia es FUERTE (ADX {:.1f})".format(ind['adx'])
-        elif ind['adx'] > 20:
-            fuerza = "La tendencia es MODERADA (ADX {:.1f})".format(ind['adx'])
-        else:
-            fuerza = "El mercado está LATERAL/sin tendencia clara (ADX {:.1f})".format(ind['adx'])
-
-        # ── DIVERGENCIAS ────────────────────────────────────
+        # ── DIVERGENCIAS Y PATRONES ───────────────────────────
         div_txt = ""
         if ind.get('div_alcista'):
-            div_txt = "\n⭐ *DIVERGENCIA ALCISTA detectada* — el precio hace mínimos pero el RSI sube (suelo potencial)"
+            div_txt = "\n⭐ *DIVERGENCIA ALCISTA* — RSI sube mientras precio baja → suelo potencial\n"
         elif ind.get('div_bajista'):
-            div_txt = "\n⭐ *DIVERGENCIA BAJISTA detectada* — el precio hace máximos pero el RSI baja (techo potencial)"
-
-        # ── PATRONES DE VELAS ───────────────────────────────
+            div_txt = "\n⭐ *DIVERGENCIA BAJISTA* — RSI baja mientras precio sube → techo potencial\n"
         patrones = ind.get('patrones', [])
-        patron_txt = ""
-        if patrones:
-            patron_txt = "\n🕯️ *Patrones:* " + ", ".join(patrones[:3])
+        patron_txt = f"\n🕯️ *Patrón detectado:* {', '.join(patrones[:2])}\n" if patrones else ""
 
-        # ── VEREDICTO FIRME ─────────────────────────────────
+        # ── VEREDICTO ────────────────────────────────────────
         if tipo == "COMPRA":
-            veredicto = "🟢 *PRONÓSTICO: ALCISTA — Alta Probabilidad de Subida*"
+            veredicto = "🟢 *SEÑAL DE COMPRA ACTIVA*"
         elif tipo == "VENTA":
-            veredicto = "🔴 *PRONÓSTICO: BAJISTA — Alta Probabilidad de Caída*"
-        elif ind.get('ema20', 0) > ind.get('ema50', 0) and ind['rsi'] > 50:
-            veredicto = "↗️ *PRONÓSTICO: SESGO ALCISTA — Esperando confirmación*"
-        elif ind.get('ema20', 0) < ind.get('ema50', 0) and ind['rsi'] < 50:
-            veredicto = "↘️ *PRONÓSTICO: SESGO BAJISTA — Esperando confirmación*"
+            veredicto = "🔴 *SEÑAL DE VENTA ACTIVA*"
+        elif _alcistas_count >= 2 and rsi < 60:
+            veredicto = "↗️ *SESGO ALCISTA — Esperando entrada*"
+        elif _bajistas_count >= 2 and rsi > 40:
+            veredicto = "↘️ *SESGO BAJISTA — Esperando entrada*"
         else:
-            veredicto = "⚖️ *PRONÓSTICO: NEUTRO — Consolidación en rango*"
+            veredicto = "⚖️ *MERCADO EN RANGO — Sin señal clara*"
 
-        _estado_mercado = "🔴 MERCADO CERRADO" if _mercado_cerrado else sesion_txt
-        _precio_label = "Último" if _mercado_cerrado else "Precio"
-        _fuente_precio = cot.get('fuente', '') if cot else 'yfinance'
-        _rsi_txt = '🔴 OB' if ind['rsi'] > 70 else ('🟢 OS' if ind['rsi'] < 30 else '⚪')
-        _macd_dir = '🟢 ↑' if ind['macd'] > ind['signal'] else '🔴 ↓'
-        _precio_macro = "sobre" if precio > ind['ema200'] else "bajo"
+        # ── BLOQUE DE SEÑAL O CONSEJO ────────────────────────
+        if tipo:
+            niveles   = calcular_niveles_3tp(precio, tipo, ind['atr_1h'], ticker)
+            sl_dist   = abs(precio - niveles['sl'])
+            tp1_dist  = abs(niveles['tp1'] - precio)
+            tp2_dist  = abs(niveles['tp2'] - precio)
+            tp3_dist  = abs(niveles['tp3'] - precio)
+            rr1 = tp1_dist / sl_dist if sl_dist > 0 else 0
+            rr2 = tp2_dist / sl_dist if sl_dist > 0 else 0
+            rr3 = tp3_dist / sl_dist if sl_dist > 0 else 0
+            tipo_txt  = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
+            # Zona de entrada: ±0.3 ATR del precio actual
+            _atr_15 = ind.get('atr', sl_dist * 0.5)
+            _zona_inf = f_(precio - _atr_15 * 0.3) if tipo == "COMPRA" else f_(precio)
+            _zona_sup = f_(precio) if tipo == "COMPRA" else f_(precio + _atr_15 * 0.3)
 
-        # Indicador de fuente solo si no es MT5 (MT5 = precio exacto XM)
-        _fuente_tag = "" if "MT5" in _fuente_precio else f"  _(≈ {_fuente_precio})_"
+            senal_txt = (
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"🚨 *{tipo_txt}*  {barra_confianza(score)}\n\n"
+                f"   📍 *Zona de entrada:*  `{_zona_inf}` — `{_zona_sup}`\n"
+                f"   🛑 *Stop Loss:*        `{f_(niveles['sl'])}`  _({sl_dist/precio*100:.1f}% de riesgo)_\n"
+                f"   1️⃣ *TP1:*              `{f_(niveles['tp1'])}`  _(R:R {rr1:.1f}:1)_\n"
+                f"   2️⃣ *TP2:*              `{f_(niveles['tp2'])}`  _(R:R {rr2:.1f}:1)_\n"
+                f"   3️⃣ *TP3:*              `{f_(niveles['tp3'])}`  _(R:R {rr3:.1f}:1)_\n\n"
+                f"   ✅ *Confluencias:*\n"
+                + "".join(f"   • _{r}_\n" for r in razones[:4])
+            )
+        else:
+            # Sin señal — dar consejo condicional según sesgo
+            if _alcistas_count >= 2:
+                _consejo = (
+                    f"   👀 *Qué observar para COMPRA:*\n"
+                    f"   • RSI supere 50 con volumen alto\n"
+                    f"   • Precio rompa resistencia `{f_(ind['resistencia'])}`\n"
+                    f"   • MACD cruce al alza\n"
+                )
+            elif _bajistas_count >= 2:
+                _consejo = (
+                    f"   👀 *Qué observar para VENTA:*\n"
+                    f"   • RSI caiga bajo 50 con volumen\n"
+                    f"   • Precio pierda soporte `{f_(ind['soporte'])}`\n"
+                    f"   • MACD cruce a la baja\n"
+                )
+            else:
+                _consejo = (
+                    f"   👀 *Mercado en rango:*\n"
+                    f"   • COMPRA cerca de soporte `{f_(ind['soporte'])}`\n"
+                    f"   • VENTA cerca de resistencia `{f_(ind['resistencia'])}`\n"
+                    f"   • Confirmar con ruptura de volumen\n"
+                )
 
+            senal_txt = (
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"⏸️ *SIN SEÑAL ACTIVA*\n"
+                f"   _Razón: {razones[0] if razones else 'Esperando alineación técnica'}_\n\n"
+                + _consejo
+            )
+
+        # ── FUENTE DE PRECIO ─────────────────────────────────
+        _fuente_precio = cot.get('fuente', 'yfinance') if cot else 'yfinance'
+        _fuente_tag    = "" if "MT5" in _fuente_precio else f" _({_fuente_precio})_"
+        _precio_label  = "Último cierre" if _mercado_cerrado else "Precio en vivo"
+
+        # ── MENSAJE FINAL ─────────────────────────────────────
         return (
-            f"📊 *{nombre}*  •  {_estado_mercado}\n"
-            f"💵 {_precio_label}: *{f_(precio)}*{_fuente_tag}\n\n"
+            f"📊 *ANÁLISIS — {nombre}*\n"
+            f"🕐 {sesion_txt}  •  {_sesion_calidad}\n"
+            f"💵 {_precio_label}: *{f_(precio)}*{_fuente_tag}\n"
+            f"{_fg_txt}\n\n"
             f"{veredicto}\n"
             f"{div_txt}{patron_txt}"
             f"{senal_txt}\n"
-            "━━━━━━━━━━\n"
-            f"⚡ RSI: *{ind['rsi']:.0f}* {_rsi_txt}  │  MACD: {_macd_dir}  │  ADX: *{ind['adx']:.0f}*\n"
-            f"📈 15m: {tendencia_15m}  │  1H: {tendencia_1h}  │  4H: {tendencia_4h}\n\n"
-            "🏛️ *Niveles clave*\n"
-            f"   🟢 Soporte:    {f_(ind['soporte'])}\n"
-            f"   🔴 Resistencia: {f_(ind['resistencia'])}\n"
-            f"   📏 EMA200:     {f_(ind['ema200'])}  _(precio {_precio_macro} la media)_\n\n"
-            f"🧠 IA: {ml_txt}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📈 *Tendencia multi-temporal*\n"
+            f"   15min: {tendencia_15m}  │  1H: {tendencia_1h}  │  4H: {tendencia_4h}\n"
+            f"   {_alineacion}\n\n"
+            f"🏛️ *Mapa de precio*\n"
+            f"   🔴 Resistencia:  `{f_(ind['resistencia'])}`  _({dist_r_pct:.1f}% arriba — {f_(dist_r_abs)} pts)_\n"
+            f"   📍 Precio actual: `{f_(precio)}`  ← {_pos_sr}\n"
+            f"   🟢 Soporte:      `{f_(ind['soporte'])}`  _({dist_s_pct:.1f}% abajo — {f_(dist_s_abs)} pts)_\n"
+            f"   📏 EMA200:       `{f_(ind['ema200'])}`  _({_macro_dist:.1f}% — macro {_macro_txt})_\n\n"
+            f"⚡ *Indicadores*\n"
+            f"   RSI(14):  {_rsi_txt}\n"
+            f"   MACD:     {_macd_txt}\n"
+            f"   ADX:      {_adx_txt}\n"
+            f"   Volumen:  {_vol_txt}\n\n"
+            f"🧠 *IA:*  {ml_txt}\n"
+            f"💬 _{sesion_info}_\n"
         )
 
     except Exception as e:
