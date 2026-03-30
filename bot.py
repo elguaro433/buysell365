@@ -919,10 +919,9 @@ KEYWORDS_ACTIVOS = {
     # NASDAQ
     "nasdaq": "NASDAQ", "nq": "NASDAQ", "tech": "NASDAQ",
 
-    # S&P 500
-    "sp500": "S&P 500", "s&p": "S&P 500", "sp": "S&P 500",
-    "es": "S&P 500", "spx": "S&P 500", "s&p500": "S&P 500",
-    "500": "S&P 500", "s&p 500": "S&P 500", "sandp": "S&P 500",
+    # S&P 500 — NO usar "es" ni "500" (demasiado cortos, match falso en precios forex)
+    "sp500": "S&P 500", "s&p500": "S&P 500", "s&p 500": "S&P 500",
+    "sandp": "S&P 500", "spx500": "S&P 500", "us500": "S&P 500",
 
     # Pares adicionales (señales externas)
     "gbpusd": "GBP/USD", "gbp/usd": "GBP/USD", "cable": "GBP/USD",
@@ -6957,7 +6956,15 @@ def cmd_rastrear(texto_completo: str) -> str:
     # Formato: /rastrear PAR DIRECCION ENTRADA TP:xxx SL:xxx
     upper = texto_completo.upper().strip()
     # Detectar par
-    _pares = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "GBPJPY", "US100", "NAS100", "NASDAQ", "US500", "SP500"]
+    _pares = [
+        "XAUUSD", "GOLD", "ORO",
+        "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "USDJPY",
+        "GBPJPY", "GBPAUD", "GBPNZD", "GBPCAD", "GBPCHF",
+        "EURJPY", "EURAUD", "EURGBP", "EURCHF", "EURCAD",
+        "AUDJPY", "AUDCAD", "AUDNZD", "AUDCHF",
+        "NZDJPY", "CADJPY", "CHFJPY", "NZDCAD",
+        "US100", "NAS100", "NASDAQ", "US500", "SP500", "US30", "DOW",
+    ]
     par = next((p for p in _pares if p in upper), None)
     if not par:
         return "❌ Par no reconocido. Ejemplo:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
@@ -15822,7 +15829,11 @@ def loop_polling():
                         if usuario_no_autorizado:
                             # Chat privado con usuario no autorizado
                             # 📡 SEÑAL MANUAL: admin puede enviar señales por chat privado
-                            if user_id in ADMIN_IDS:
+                            # Excluir comandos /señal y /rastrear — ya tienen su propio handler
+                            _t_lower = texto.strip().lower()
+                            _es_cmd_senal = (_t_lower.startswith("/señal") or _t_lower.startswith("/senal")
+                                             or _t_lower.startswith("/rastrear"))
+                            if user_id in ADMIN_IDS and not _es_cmd_senal:
                                 _senal_manual = _parsear_senal_externa(texto)
                                 if _senal_manual:
                                     try:

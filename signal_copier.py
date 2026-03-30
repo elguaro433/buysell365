@@ -42,25 +42,36 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [COPIER] %(message)s
                               logging.StreamHandler()])
 log = logging.getLogger("copier")
 
-# === SYMBOL MAP ===
+# === SYMBOL MAP — todos los pares de canales aliados (sin duplicados) ===
 SYMBOL_MAP = {
+    # Oro
     "XAUUSD": "GOLD", "GOLD": "GOLD", "ORO": "GOLD",
-    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "NASDAQ100": "US100Cash", "NQ": "US100Cash",
+    # Índices
+    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+    "NASDAQ100": "US100Cash", "NQ": "US100Cash",
     "US30": "US30Cash", "DOW": "US30Cash", "DJ30": "US30Cash",
     "SPX500": "US500Cash", "SP500": "US500Cash", "US500": "US500Cash",
-    "AUDJPY": "AUDJPY", "NZDJPY": "NZDJPY", "CADJPY": "CADJPY",
-    "EURJPY": "EURJPY", "CHFJPY": "CHFJPY",
-    "GBPUSD": "GBPUSD", "GBPJPY": "GBPJPY", "GBPAUD": "GBPAUD", "GBPNZD": "GBPNZD",
-    "AUDUSD": "AUDUSD", "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
+    "GER40": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
+    # Petróleo
     "BRENT": "BRENT", "UKOIL": "BRENT", "OIL": "BRENT",
+    # Pares USD principales
     "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
-    "USDJPY": "USDJPY", "EURJPY": "EURJPY", "GBPJPY": "GBPJPY",
-    "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "EURCHF": "EURCHF",
-    "EURGBP": "EURGBP", "EURAUD": "EURAUD", "GBPAUD": "GBPAUD",
+    "USDJPY": "USDJPY",
+    # Pares GBP
+    "GBPJPY": "GBPJPY", "GBPAUD": "GBPAUD", "GBPNZD": "GBPNZD",
+    "GBPCAD": "GBPCAD", "GBPCHF": "GBPCHF",
+    # Pares EUR
+    "EURJPY": "EURJPY", "EURAUD": "EURAUD", "EURGBP": "EURGBP",
+    "EURCHF": "EURCHF", "EURCAD": "EURCAD", "EURNZD": "EURNZD",
+    # Pares AUD
+    "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "AUDNZD": "AUDNZD",
+    "AUDCHF": "AUDCHF",
+    # Pares JPY cruzados
     "NZDJPY": "NZDJPY", "CADJPY": "CADJPY", "CHFJPY": "CHFJPY",
-    "AUDNZD": "AUDNZD", "GBPNZD": "GBPNZD",
-    "GER40": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
+    # Otros
+    "NZDCAD": "NZDCAD", "NZDCHF": "NZDCHF",
+    "CADCHF": "CADCHF",
 }
 
 MAGIC_COPIER = 20260325
