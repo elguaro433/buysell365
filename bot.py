@@ -15555,10 +15555,13 @@ def loop_polling():
                         )
                         es_tema_publico = any(p in _t for p in TEMAS_PUBLICOS)
 
-                        # 🔒 GRUPO/CANAL = SOLO LECTURA
+                        # 🔒 GRUPO = SOLO LECTURA (NO aplicar a canales — en canales solo admins pueden escribir)
                         # Los mensajes de usuarios normales no deberían llegar (grupo restringido),
                         # pero por si acaso: borrar inmediato + redirigir al DM del bot
-                        if (es_grupo or es_canal) and user_id not in ADMIN_IDS:
+                        # IDs de admin anónimo de Telegram (cuando el admin publica como canal/grupo)
+                        _ANON_ADMIN_IDS = {"1087968824", "136817688", "777000"}
+                        _es_anon_admin = str(from_user.get("id", "")) in _ANON_ADMIN_IDS
+                        if es_grupo and not _es_anon_admin and user_id not in ADMIN_IDS:
                             if msg.get("message_id"):
                                 programar_borrado(chat_id, msg.get("message_id"), 3)
 
