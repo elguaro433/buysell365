@@ -6810,6 +6810,71 @@ def cmd_vip_quitar(target_id: str):
     return f"🚫 *VIP revocado para {nombre}* (`{target_id}`)."
 
 
+def cmd_rastrear(texto_completo: str) -> str:
+    """Registra una señal manual en manual_signals.json para que el copier la monitoree.
+    Uso: /rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32
+    """
+    import json as _json, time as _time, re as _re
+    manual_file = os.path.join(os.path.dirname(__file__), "manual_signals.json")
+
+    # Parsear el texto del comando
+    # Formato: /rastrear PAR DIRECCION ENTRADA TP:xxx SL:xxx
+    upper = texto_completo.upper().strip()
+    # Detectar par
+    _pares = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "GBPJPY", "US100", "NAS100", "NASDAQ", "US500", "SP500"]
+    par = next((p for p in _pares if p in upper), None)
+    if not par:
+        return "❌ Par no reconocido. Ejemplo:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
+    # Detectar dirección
+    direccion = "BUY" if "BUY" in upper or "COMPRA" in upper else ("SELL" if "SELL" in upper or "VENTA" in upper else None)
+    if not direccion:
+        return "❌ Dirección no reconocida (BUY/SELL)."
+    # Extraer números
+    tp_m = _re.search(r'TP[:\s]+(\d+\.?\d*)', upper)
+    sl_m = _re.search(r'SL[:\s]+(\d+\.?\d*)', upper)
+    # Entrada: primer número grande después de dirección
+    entry_m = _re.search(rf'{direccion}\s+(\d{{4,6}}\.?\d*)', upper)
+    if not tp_m or not sl_m:
+        return "❌ Faltan TP o SL. Ejemplo:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
+    tp    = float(tp_m.group(1))
+    sl    = float(sl_m.group(1))
+    entry = float(entry_m.group(1)) if entry_m else 0.0
+
+    sig_id = f"{par}_manual_{int(_time.time())}"
+    nueva = {
+        "sig_id": sig_id,
+        "pair": par,
+        "direction": direccion,
+        "entry": entry,
+        "tp": tp,
+        "sl": sl,
+        "type": "new_signal",
+        "source": "Manual",
+        "sent_at": _time.time()
+    }
+    # Cargar existentes y agregar
+    try:
+        if os.path.exists(manual_file):
+            with open(manual_file, 'r', encoding='utf-8') as _f:
+                existentes = _json.load(_f)
+        else:
+            existentes = []
+        existentes.append(nueva)
+        with open(manual_file, 'w', encoding='utf-8') as _f:
+            _json.dump(existentes, _f, ensure_ascii=False, indent=2)
+        dir_es = "COMPRA" if direccion == "BUY" else "VENTA"
+        return (
+            f"📌 *Señal registrada para seguimiento*\n\n"
+            f"{'🟢' if direccion == 'BUY' else '🔴'} *{dir_es} {par}*\n"
+            f"📍 Entrada: {entry if entry > 0 else 'Mercado'}\n"
+            f"🎯 TP: {tp}\n"
+            f"🛡️ SL: {sl}\n\n"
+            f"✅ El bot avisará cuando toque TP o SL"
+        )
+    except Exception as _e:
+        return f"❌ Error guardando señal: {_e}"
+
+
 def cmd_pausar():
     """Pausa SOLO ejecución MT5. Escáner y Telegram siguen."""
     global mt5_pausado
@@ -8504,6 +8569,11 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "• `/logs` — Últimas líneas del log\n"
             "• `/briefing` — Enviar briefing al grupo"
         )
+    # 📌 /rastrear — Registra señal manual para monitoreo TP/SL
+    if t.startswith("/rastrear") or t.startswith("rastrear "):
+        if not es_admin: return "⛔ Solo administradores pueden registrar señales."
+        return cmd_rastrear(texto)
+
     # 🛑 /pausar — Pausa TOTAL: detiene señales y ejecuciones MT5
     if t in ("/pausar", "/pause", "pausar", "pausar todo", "stop trading"):
         if not es_admin: return "⛔ Solo administradores pueden pausar el bot."

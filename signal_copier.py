@@ -70,6 +70,10 @@ TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 # _open_signals: { sig_id → {"signal": signal_dict, "sent_at": float} }
 _open_signals: dict = {}
 _signals_lock = threading.Lock()
+_resolved_signals: set = set()  # sig_ids ya resueltos — no volver a cargar del JSON
+
+# Archivo de señales manuales — el admin registra señales vía /rastrear en bot.py
+MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
 
 # === EDIT TRACKER ===
 # Mensajes reenviados SIN precio de entrada (entry=0) → esperar edición del canal original
@@ -231,6 +235,23 @@ async def _monitor_tp_loop() -> None:
     log.info("🎯 Monitor TP/SL loop iniciado")
     while True:
         await asyncio.sleep(60)
+
+        # ── Cargar señales manuales del admin (manual_signals.json) ──
+        try:
+            if MANUAL_SIGNALS_FILE.exists():
+                with open(MANUAL_SIGNALS_FILE, 'r', encoding='utf-8') as _f:
+                    _manual = json.load(_f)
+                for _ms in _manual:
+                    _sid = _ms.get("sig_id", "")
+                    if not _sid or _sid in _resolved_signals:
+                        continue
+                    with _signals_lock:
+                        if _sid not in _open_signals:
+                            _open_signals[_sid] = {"signal": _ms, "sent_at": _ms.get("sent_at", time.time())}
+                            log.info(f"📌 Señal manual cargada: {_ms.get('direction')} {_ms.get('pair')} TP:{_ms.get('tp')} SL:{_ms.get('sl')}")
+        except Exception as _e_manual:
+            log.warning(f"Error leyendo manual_signals.json: {_e_manual}")
+
         with _signals_lock:
             signals_copy = dict(_open_signals)
 
@@ -263,6 +284,7 @@ async def _monitor_tp_loop() -> None:
         for sig_id, signal, result in to_resolve:
             with _signals_lock:
                 _open_signals.pop(sig_id, None)
+            _resolved_signals.add(sig_id)  # No volver a cargar del JSON
             if result == "tp":
                 log.info(f"🎯 TP ALCANZADO: {signal['direction']} {signal['pair']}")
                 _send_tp_celebration(signal)
