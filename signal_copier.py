@@ -1055,6 +1055,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    import sys
     # Lock file para evitar múltiples instancias
     _lock_file = Path(__file__).parent / ".copier.lock"
     try:
