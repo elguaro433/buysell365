@@ -568,6 +568,11 @@ DASHBOARD_URL  = os.getenv("DASHBOARD_URL", "https://buysell365.pro/dashboard").
 # Twelve Data da precios SPOT reales (XAUUSD, no futuros COMEX).
 TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_KEY", "").strip()
 
+# Circuit-breaker: cuando se agotan los créditos diarios, bloquear hasta medianoche
+# Evita el spam de miles de errores repetidos en el log
+import time as _td_time
+_twelve_data_exhausted_until: float = 0.0   # epoch; 0 = no bloqueado
+
 # Mapa de tickers internos → símbolos Twelve Data
 # NOTA: IXIC no existe en Twelve Data; SPX requiere plan Grow ($29/mes).
 # Usamos NDX (NASDAQ-100 index) y SPY (ETF S&P500) disponibles en plan Basic gratuito.
@@ -1146,6 +1151,11 @@ def _twelve_data_price(ticker):
     Da precios SPOT (XAU/USD, no futuros COMEX) → coincide con XM.
     Retorna (precio, apertura) o (None, None).
     """
+    global _twelve_data_exhausted_until
+    # Circuit-breaker: si los créditos se agotaron, no llamar hasta que se renueven
+    if _td_time.time() < _twelve_data_exhausted_until:
+        return None, None
+
     td_sym = TWELVE_DATA_MAP.get(ticker)
     if not td_sym or not TWELVE_DATA_API_KEY:
         return None, None
@@ -1157,8 +1167,19 @@ def _twelve_data_price(ticker):
             return None, None
         data = r.json()
         if data.get('code'):
-            # Error de API (rate limit, símbolo inválido, etc)
-            logger.debug(f"Twelve Data {td_sym} error: {data.get('message', data.get('code'))}")
+            msg = data.get('message', str(data.get('code', '')))
+            # Detectar agotamiento de créditos diarios → activar circuit-breaker hasta medianoche
+            if 'run out of API credits' in msg or 'daily limit' in msg.lower():
+                import datetime as _dt
+                now = _dt.datetime.now()
+                midnight = (_dt.datetime.combine(now.date(), _dt.time.max)
+                            .replace(hour=0, minute=0, second=0, microsecond=0)
+                            + _dt.timedelta(days=1))
+                _twelve_data_exhausted_until = midnight.timestamp()
+                logger.warning(f"⚡ Twelve Data: créditos agotados — pausado hasta {midnight.strftime('%H:%M')} UTC+0 (mañana)")
+            else:
+                # Error de API (rate limit, símbolo inválido, etc)
+                logger.debug(f"Twelve Data {td_sym} error: {msg}")
             return None, None
         precio   = float(data['close']) if data.get('close') else None
         apertura = float(data['open'])  if data.get('open')  else None
@@ -8364,8 +8385,13 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
     nombre_user = escapar_markdown(user_data.get("nombre", "Trader"))  # H-11 FIX
 
     # ── 0. DETECTAR SEÑAL EXTERNA (Solo admin — protección contra inyección) ────
-    senal = parsear_senal_externa(texto) if es_admin else None
-    if senal is None and es_admin:
+    # Excluir comandos con handler propio (/señal, /rastrear) para evitar doble procesado
+    _t_lower_pm = texto.strip().lower()
+    _es_cmd_especial = any(_t_lower_pm.startswith(x) for x in (
+        "/señal", "/senal", "señal ", "senal ", "/rastrear", "rastrear "
+    ))
+    senal = parsear_senal_externa(texto) if (es_admin and not _es_cmd_especial) else None
+    if senal is None and es_admin and not _es_cmd_especial:
         logger.info(f"📡 Parser señal: no detectó señal en: {texto[:60]}")
     if senal:
         ticker = senal['ticker']
