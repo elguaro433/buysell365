@@ -420,7 +420,8 @@ def parse_signal(text, chat_title=""):
 
     # ── EXTRAER SL ──
     # Formatos: "SL: 4499.60" | "SL 4499" | "❗️ SL 45370" | "Stop Loss → 1.3801" | "SL4415" (sin espacio)
-    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→]*(\d{3,6}\.?\d*)', upper_clean)
+    # FIX: \d{1,6} en vez de \d{3,6} — forex como EURUSD/GBPAUD tienen precio 1.XXXXX (1 solo dígito entero)
+    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→]*(\d{1,6}\.?\d+)', upper_clean)
 
     # ── EXTRAER TP1 (solo el primero) ──
     # Formatos: "TP1: 4513" | "TP: 4513" | "Tp 4540" | "🥇 TP 45530" | "Toma de Ganancias 1 : 4513"
@@ -431,12 +432,12 @@ def parse_signal(text, chat_title=""):
         r'(?:TOMA\s*DE\s*GANANCIAS\s*1\s*[:\s]+|TP\s*1\s*[:\s]+|TP\s*[:\s]+|TP\s+|TAKE\s*PROFIT\s*[:\s]*)(\d+\.?\d*)',
         _upper_clean_no_abierto
     )
-    # Fallback: "Tp 4540" (capital T lowercase p)
+    # Fallback: "Tp 4540" o "TP 1.9150" — \d{1,6} cubre forex (1.XXXX) y gold (4XXX)
     if not tp_match:
-        tp_match = re.search(r'\bTP\s+(\d{3,6}\.?\d*)', _upper_clean_no_abierto)
-    # Fallback AnabelSignals: "TP4430" (sin espacio entre TP y número)
+        tp_match = re.search(r'\bTP\s+(\d{1,6}\.?\d+)', _upper_clean_no_abierto)
+    # Fallback AnabelSignals: "TP4430" o "TP1.9150" (sin espacio entre TP y número)
     if not tp_match:
-        tp_match = re.search(r'\bTP(\d{3,6}\.?\d*)', _upper_clean_no_abierto)
+        tp_match = re.search(r'\bTP(\d{1,6}\.?\d+)', _upper_clean_no_abierto)
 
     # ── EXTRAER ENTRADA ──
     # Formatos: "Entrada: 4509/4504" | "Entrada 4545" | "Venta de Oro Ahora: 4416 - 4419"
