@@ -4218,12 +4218,11 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 
 def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
     f_ = lambda v: fmt(v, ticker)
-    txt_perc = f"  (+{perc_profit:.2f}%)" if perc_profit is not None else ""
     tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
     return (
         f"✅ *{nivel_tp} ALCANZADO* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{tipo_emoji}  *+{pips:.1f} {unidad_medida(ticker)}*{txt_perc}\n"
+        f"{tipo_emoji}  *+{pips:.1f} {unidad_medida(ticker)}*\n"
         f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
         f"━━━━━━━━━━━━━━"
     )
