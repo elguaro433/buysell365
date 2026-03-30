@@ -16443,44 +16443,33 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
                 enviar_telegram(f"✅ {n} posiciones de {mt5_sym} cerradas", chat_id)
                 return True
 
-    # ── DETECCIÓN DE ANÁLISIS DE ACTIVO ─────────────────────────────────────
-    # Si el usuario pide análisis de un activo concreto → dar análisis real
-    # (aplica a TODOS los usuarios, VIP o no, privado o grupo)
-    _palabras_analisis = [
-        "analisis", "análisis", "analiza", "analizame", "analiza el", "analizame el",
-        "como va", "como esta", "como anda", "como se ve", "que tal el", "que tal anda",
-        "tendencia", "señal de", "sube o baja", "es buen momento", "conviene",
-        "hay señal", "me recomiendas", "que opinas", "lo ves bien", "como lo ves",
-        "situacion del", "situación del", "información de", "informacion de",
-        "dame info", "dame analisis", "dame análisis", "dime como esta",
-    ]
-    _pide_analisis = any(p in texto_lower for p in _palabras_analisis)
-
-    if _pide_analisis or ("análisis" in texto_lower) or ("analisis" in texto_lower):
-        # Buscar qué activo menciona
-        _activo_pedido = None
-        for kw, nombre_act in KEYWORDS_ACTIVOS.items():
-            if kw in texto_lower:
-                _activo_pedido = nombre_act
-                break
-
-        if _activo_pedido:
-            try:
-                _resultado_analisis = cmd_analisis(_activo_pedido)
-                if _resultado_analisis and "⚠️" not in _resultado_analisis[:10]:
-                    # Añadir footer VIP solo a usuarios no-VIP
-                    if not es_vip and not es_admin:
-                        _footer = (
-                            "\n━━━━━━━━━━━━━━━━━━━━\n"
-                            "🔔 *¿Quieres alertas automáticas?*\n"
-                            "Los miembros VIP reciben señales en tiempo real con entrada, SL y TP exactos — sin esperar.\n"
-                            "👉 Escribe /vip para ver los planes"
-                        )
-                        _resultado_analisis += _footer
-                    enviar_telegram(_resultado_analisis, chat_id, parse_mode="Markdown")
-                    return True
-            except Exception:
-                pass  # Si falla el análisis, cae al Groq como respaldo
+    # ── DETECCIÓN DE ANÁLISIS DE ACTIVO (solo VIP y admin) ──────────────────
+    # El análisis técnico completo es un beneficio exclusivo del canal VIP.
+    # No-VIP recibe respuesta IA comercial que los invita a suscribirse.
+    if es_vip or es_admin:
+        _palabras_analisis = [
+            "analisis", "análisis", "analiza", "analizame", "analiza el", "analizame el",
+            "como va", "como esta", "como anda", "como se ve", "que tal el", "que tal anda",
+            "tendencia", "señal de", "sube o baja", "es buen momento", "conviene",
+            "hay señal", "me recomiendas", "que opinas", "lo ves bien", "como lo ves",
+            "situacion del", "situación del", "información de", "informacion de",
+            "dame info", "dame analisis", "dame análisis", "dime como esta",
+        ]
+        _pide_analisis = any(p in texto_lower for p in _palabras_analisis)
+        if _pide_analisis or ("análisis" in texto_lower) or ("analisis" in texto_lower):
+            _activo_pedido = None
+            for kw, nombre_act in KEYWORDS_ACTIVOS.items():
+                if kw in texto_lower:
+                    _activo_pedido = nombre_act
+                    break
+            if _activo_pedido:
+                try:
+                    _resultado_analisis = cmd_analisis(_activo_pedido)
+                    if _resultado_analisis and not _resultado_analisis.startswith("⚠️ No"):
+                        enviar_telegram(_resultado_analisis, chat_id, parse_mode="Markdown")
+                        return True
+                except Exception:
+                    pass  # Si falla, cae al Groq como respaldo
 
     # IA respuesta general (admin + VIP + grupo público)
     if not _GROQ_KEY:
