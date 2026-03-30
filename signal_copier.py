@@ -78,8 +78,9 @@ MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
 # === EDIT TRACKER ===
 # Mensajes reenviados SIN precio de entrada (entry=0) → esperar edición del canal original
 # { telegram_msg_id → signal_dict } para actualizarlos cuando el canal edite con el precio real
-_pending_entry: dict = {}   # { msg_id: signal }
+_pending_entry: dict = {}   # { msg_id: signal } — señales publicadas sin precio de entrada
 _pending_entry_lock = threading.Lock()
+_published_msg_ids: set = set()  # msg_ids ya publicados como señal completa (evita duplicar en edit)
 
 
 def _get_current_price(pair: str) -> float | None:
@@ -455,9 +456,13 @@ def parse_signal(text, chat_title=""):
     # AnabelSignals: "Límite de venta de oro 4442" | "Venta de oro 4467" → número tras dirección+activo
     if not entry_match:
         entry_match = re.search(r'(?:VENTA|COMPRA|LIMITE)\s+(?:DE\s+)?(?:ORO|XAUUSD|GOLD)\s{0,5}(\d{3,6}\.?\d*)', upper_clean)
-    # Formato inline: "GBP/CAD H1 Buy 1.8412" → número después de BUY/SELL
+    # Formato inline: "GBP/CAD H1 Buy 1.8412" → número después de BUY/SELL seguido de otro token
     if not entry_match:
         entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+[\w/]+\s+(?:H\d+\s+)?(\d+\.?\d*)', upper_clean)
+    # SureShotFX inline: "GBPAUD SELL  1.93236" — precio con decimal JUSTO tras BUY/SELL (sin keyword)
+    # Requiere decimal para evitar falsos positivos con números enteros del texto
+    if not entry_match:
+        entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s{1,10}(\d+\.\d+)', upper_clean)
 
     # SL es obligatorio — si no hay SL ignorar la señal (demasiado arriesgado)
     if not sl_match or not tp_match:
@@ -962,12 +967,14 @@ async def main():
                 # Send to BuySell365 channel (siempre activo)
                 send_to_channel(signal, executed, detail)
 
-                # Si se envió SIN precio de entrada, registrar el msg_id para esperar edición
+                # Registrar msg_id para manejar ediciones futuras
                 msg_id = event.message.id
-                if signal.get("entry", 0) == 0 and msg_id:
-                    with _pending_entry_lock:
-                        _pending_entry[msg_id] = signal.copy()
-                    log.info(f"⏳ Señal sin entrada registrada (msg_id={msg_id}) — esperando edición con precio real")
+                if msg_id:
+                    _published_msg_ids.add(msg_id)
+                    if signal.get("entry", 0) == 0:
+                        with _pending_entry_lock:
+                            _pending_entry[msg_id] = signal.copy()
+                        log.info(f"⏳ Señal sin entrada registrada (msg_id={msg_id}) — esperando edición con precio real")
 
             elif signal["type"] == "update":
                 # ── Updates de posiciones (cerrar, mover SL) ──
@@ -991,58 +998,73 @@ async def main():
     # ══════════════════════════════════════════════════════════════
     @client.on(events.MessageEdited(chats=list(ALLOWED_CHANNEL_IDS)))
     async def edit_handler(event):
-        """Captura ediciones de señales aliadas para obtener el precio de entrada real."""
+        """Captura ediciones de señales aliadas.
+        Caso A: msg fue enviado sin precio de entrada → publicar "Entrada confirmada"
+        Caso B: msg original no parseó (sin SL/TP) y la edición añadió todo → publicar como nueva señal
+        """
         try:
             msg_id = event.message.id
-            with _pending_entry_lock:
-                if msg_id not in _pending_entry:
-                    return  # No es una señal que hayamos enviado sin precio
-
             text = event.raw_text
             if not text or len(text) < 10:
                 return
 
             chat = await event.get_chat()
             chat_title = getattr(chat, 'title', 'Unknown')
-            signal = parse_signal(text, chat_title=chat_title)
 
-            if not signal or signal.get("entry", 0) <= 0:
-                return  # La edición no añadió precio de entrada — ignorar
-
-            # Tenemos el precio real. Publicar actualización en el canal.
             import requests
-            original = _pending_entry.get(msg_id, {})
-            pair = signal.get("pair", "")
-            direction = signal.get("direction", "")
-            entry = signal.get("entry", 0)
-            dir_emoji = "🟢" if direction == "BUY" else "🔴"
-            dir_es = "COMPRA" if direction == "BUY" else "VENTA"
 
             def fmt(v):
                 if v <= 0: return "—"
                 return f"{v:.5f}".rstrip('0').rstrip('.') if v < 100 else f"{v:.2f}"
 
-            msg = (
-                f"✏️ *Actualización de señal*\n\n"
-                f"{dir_emoji} *{dir_es} {pair}*\n\n"
-                f"📍 Entrada confirmada: *{fmt(entry)}*\n"
-                f"🎯 TP: {fmt(signal.get('tp', 0))}\n"
-                f"🛡️ SL: {fmt(signal.get('sl', 0))}"
-            )
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            resp = requests.post(url, json={
-                "chat_id": CHANNEL_ID,
-                "text": msg,
-                "parse_mode": "Markdown"
-            }, timeout=10)
-            if resp.status_code == 200:
-                log.info(f"✏️ Entrada confirmada publicada: {dir_es} {pair} @ {entry}")
-            else:
-                log.warning(f"✏️ Error publicando actualización: {resp.status_code}")
-
-            # Remover de pendientes para no duplicar
+            # ── CASO A: señal ya publicada sin precio de entrada ─────────────
             with _pending_entry_lock:
-                _pending_entry.pop(msg_id, None)
+                _is_pending = msg_id in _pending_entry
+
+            if _is_pending:
+                signal = parse_signal(text, chat_title=chat_title)
+                if not signal or signal.get("entry", 0) <= 0:
+                    return  # La edición no añadió precio de entrada — ignorar
+
+                pair = signal.get("pair", "")
+                direction = signal.get("direction", "")
+                entry = signal.get("entry", 0)
+                dir_emoji = "🟢" if direction == "BUY" else "🔴"
+                dir_es = "COMPRA" if direction == "BUY" else "VENTA"
+
+                msg = (
+                    f"✏️ *Actualización de señal*\n\n"
+                    f"{dir_emoji} *{dir_es} {pair}*\n\n"
+                    f"📍 Entrada confirmada: *{fmt(entry)}*\n"
+                    f"🎯 TP: {fmt(signal.get('tp', 0))}\n"
+                    f"🛡️ SL: {fmt(signal.get('sl', 0))}"
+                )
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                resp = requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+                if resp.status_code == 200:
+                    log.info(f"✏️ Entrada confirmada publicada: {dir_es} {pair} @ {entry}")
+                    _published_msg_ids.add(msg_id)
+                else:
+                    log.warning(f"✏️ Error publicando actualización: {resp.status_code}")
+                with _pending_entry_lock:
+                    _pending_entry.pop(msg_id, None)
+                return
+
+            # ── CASO B: mensaje NO estaba en _pending_entry ni en _published ──
+            # El mensaje original no se pudo parsear (ej: SureShotFX envió sin SL/TP)
+            # y la edición añadió la información completa → publicar como señal nueva
+            if msg_id in _published_msg_ids:
+                return  # Ya publicado, ignorar ediciones cosméticas
+
+            signal = parse_signal(text, chat_title=chat_title)
+            if not signal or signal.get("type") != "new_signal":
+                return  # No es señal nueva completa — ignorar
+
+            log.info(f"✏️ Señal capturada vía edición (msg_id={msg_id}): {signal.get('direction')} {signal.get('pair')}")
+            MT5_EXECUTION_ENABLED = False
+            executed, detail = False, "Ejecución MT5 desactivada (kill-switch activo)"
+            send_to_channel(signal, executed, detail)
+            _published_msg_ids.add(msg_id)
 
         except Exception as e:
             log.error(f"Error en edit_handler: {e}")
