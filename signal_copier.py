@@ -399,10 +399,11 @@ def parse_signal(text, chat_title=""):
 
     # ── EXTRAER TP1 (solo el primero) ──
     # Formatos: "TP1: 4513" | "TP: 4513" | "Tp 4540" | "🥇 TP 45530" | "Toma de Ganancias 1 : 4513"
+    # | "Take profit 4480" | "Take profit : 4480" (FxPremiere format)
     # Ignora líneas con "TP: abierto" / "TP: ABIERTO" (sin número fijo)
     _upper_clean_no_abierto = re.sub(r'TP\s*[:\s]*ABIERTO', '', upper_clean)
     tp_match = re.search(
-        r'(?:TOMA\s*DE\s*GANANCIAS\s*1\s*[:\s]+|TP\s*1\s*[:\s]+|TP\s*[:\s]+|TP\s+)(\d+\.?\d*)',
+        r'(?:TOMA\s*DE\s*GANANCIAS\s*1\s*[:\s]+|TP\s*1\s*[:\s]+|TP\s*[:\s]+|TP\s+|TAKE\s*PROFIT\s*[:\s]*)(\d+\.?\d*)',
         _upper_clean_no_abierto
     )
     # Fallback: "Tp 4540" (capital T lowercase p)
