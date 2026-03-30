@@ -977,19 +977,8 @@ async def main():
     # Sin filtros — todas las señales de todos los activos se reenvían al canal VIP
     CHANNEL_ASSET_FILTER = {}  # Vacío = sin restricción por activo
 
-    # Resolver usernames → IDs numéricos y agregarlos al set
+    # Resolver usernames → se hace DESPUÉS de client.start() (ver más abajo)
     _username_to_id = {}
-    for _uname in PUBLIC_CHANNELS_USERNAMES:
-        try:
-            _entity = await client.get_entity(_uname)
-            _cid = _entity.id
-            # Telethon usa IDs negativos para canales: -100XXXXXXXXXX
-            _cid_neg = int(f"-100{_cid}") if _cid > 0 else _cid
-            ALLOWED_CHANNEL_IDS.add(_cid_neg)
-            _username_to_id[_cid_neg] = _uname
-            log.info(f"✅ Canal público registrado: @{_uname} → {_cid_neg}")
-        except Exception as _e:
-            log.warning(f"⚠️ No se pudo resolver @{_uname}: {_e}")
 
     # Auto-discover: buscar canales por keywords conocidos
     L2T_KEYWORDS = ["learn 2 trade", "learn2trade", "l2t"]
@@ -1194,6 +1183,18 @@ async def main():
 
     me = await client.get_me()
     log.info(f"📡 Conectado como: {me.first_name} (@{me.username})")
+
+    # Resolver usernames de canales públicos → IDs numéricos
+    for _uname in PUBLIC_CHANNELS_USERNAMES:
+        try:
+            _entity = await client.get_entity(_uname)
+            _cid = _entity.id
+            _cid_neg = int(f"-100{_cid}") if _cid > 0 else _cid
+            ALLOWED_CHANNEL_IDS.add(_cid_neg)
+            _username_to_id[_cid_neg] = _uname
+            log.info(f"✅ Canal público registrado: @{_uname} → {_cid_neg}")
+        except Exception as _e:
+            log.warning(f"⚠️ No se pudo resolver @{_uname}: {_e}")
 
     # Auto-discover TODOS los canales de señales conocidos
     async for dialog in client.iter_dialogs():
