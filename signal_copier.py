@@ -174,6 +174,7 @@ def _send_tp_celebration(signal: dict) -> None:
     tp = signal["tp"]
 
     def fmt(v):
+        if v <= 0: return "Mercado"
         return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
