@@ -12832,8 +12832,16 @@ def enviar_briefing_matutino():
     except Exception:
         pass
 
+    _hora_actual = ahora().replace(tzinfo=None).hour
+    if _hora_actual < 12:
+        _saludo_emoji, _saludo = "☀️", "BUENOS DÍAS"
+    elif _hora_actual < 20:
+        _saludo_emoji, _saludo = "🌞", "BUENAS TARDES"
+    else:
+        _saludo_emoji, _saludo = "🌙", "BUENAS NOCHES"
+
     lineas = [
-        f"☀️ *BUENOS DÍAS — BRIEFING* {ahora().strftime('%d/%m/%Y')} | {hora}\n"
+        f"{_saludo_emoji} *{_saludo} — BRIEFING* {ahora().strftime('%d/%m/%Y')} | {hora}\n"
         f"━━━━━━━━━━━━━━━━━━━━"
     ]
 
@@ -14636,6 +14644,15 @@ def loop_vip_check():
     time.sleep(120)  # Esperar 2 min tras arranque
     _ultima_auditoria = time.time()
     logger.info("👑 Loop VIP check iniciado")
+
+    # Al arrancar, si ya pasó la ventana del briefing/cierre, marcar como enviado hoy
+    # para evitar reenvío al reiniciar el bot fuera de horario.
+    _init_hora = ahora().replace(tzinfo=None)
+    _init_hoy  = _init_hora.strftime("%Y-%m-%d")
+    if _init_hora.hour >= BRIEFING_HORA + 2:   # > 09:00 → briefing de hoy ya pasó
+        _ultimo_briefing_diario = _init_hoy
+    if _init_hora.hour >= CIERRE_HORA + 1:     # > 23:00 → cierre de hoy ya pasó
+        _ultimo_cierre_diario   = _init_hoy
 
     while True:
         try:
