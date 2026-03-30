@@ -482,12 +482,14 @@ def parse_signal(text, chat_title=""):
         entry_match = re.search(r'@\s*(\d{1,6}\.?\d*)', upper_clean)
 
     # SL es obligatorio — si no hay SL ignorar la señal (demasiado arriesgado)
-    if not sl_match or not tp_match:
+    # TP es opcional — Learn2Trade y otros canales a veces publican "Take profit: OPEN"
+    # o sin TP en el primer mensaje (lo añaden vía edición)
+    if not sl_match:
         return None
 
     try:
         sl    = float(sl_match.group(1))
-        tp    = float(tp_match.group(1))
+        tp    = float(tp_match.group(1)) if tp_match else 0.0
         entry = float(entry_match.group(1)) if entry_match else 0.0
     except (ValueError, IndexError):
         return None
@@ -503,7 +505,8 @@ def parse_signal(text, chat_title=""):
         log.warning(f"⚠️ Parser: entry={entry} == tp={tp} — descartando entrada (falso positivo exacto)")
         entry = 0.0
 
-    if sl <= 0 or tp <= 0:
+    # TP puede ser 0 (abierto) — solo SL es obligatorio
+    if sl <= 0:
         return None
 
     # ── RRR ──
@@ -849,11 +852,13 @@ def send_to_channel(signal, executed, detail):
 
     entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
+    tp_display = fmt(tp) if tp > 0 else "Abierto"
+
     lines = [
         f"{dir_emoji} *{dir_es} {pair_display}*",
         f"",
         f"📍 Entrada: {entry_display}",
-        f"🎯 TP: {fmt(tp)}",
+        f"🎯 TP: {tp_display}",
         f"🛡️ SL: {fmt(sl)}",
     ]
 

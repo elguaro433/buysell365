@@ -455,15 +455,11 @@ class BotManager:
 
     @property
     def is_running(self):
+        # FIX: is_running NO modifica self._running — evita race condition con watchdog_loop
+        # El watchdog es el único que debe cambiar self._running
         # 1. Si el launcher gestiona el proceso directamente
         if self._proc is not None:
-            if self._proc.poll() is None:
-                return True  # Vivo
-            else:
-                # FIX: murió — NO verificar .bot.pid (sería el mismo PID zombie)
-                # Windows puede devolver handle válido para procesos recién muertos
-                self._running = False
-                return False
+            return self._proc.poll() is None
         # 2. Solo verificar .bot.pid si NO hay _proc (bot iniciado externamente)
         pid_file = os.path.join(BASE_DIR, ".bot.pid")
         if os.path.exists(pid_file):
@@ -479,7 +475,6 @@ class BotManager:
                             if self.pid != ext_pid:
                                 self.pid = ext_pid
                                 self.start_time = self.start_time or time.time()
-                                self._running = True
                             return True
                 except ImportError:
                     # Fallback: kernel32 si no hay psutil
@@ -491,11 +486,9 @@ class BotManager:
                         if self.pid != ext_pid:
                             self.pid = ext_pid
                             self.start_time = self.start_time or time.time()
-                            self._running = True
                         return True
             except Exception:
                 pass
-        self._running = False
         return False
 
     def start(self):
@@ -509,9 +502,16 @@ class BotManager:
         try:
             # CREATE_NEW_PROCESS_GROUP allows sending CTRL_BREAK for graceful shutdown
             _flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+            # FIX: limpiar PYTHONUSERBASE/PYTHONPATH — evita conflicto numpy cuando el launcher
+            # es iniciado desde entorno WSL (hereda variables de Store Python que interfieren)
+            _env = dict(os.environ)
+            _env.pop('PYTHONUSERBASE', None)
+            _env.pop('PYTHONPATH', None)
+            _env['PYTHONNOUSERSITE'] = '1'
             self._proc = subprocess.Popen(
                 [python, BOT_SCRIPT],
                 cwd=BASE_DIR,
+                env=_env,
                 creationflags=_flags,
             )
             self.pid = self._proc.pid
@@ -643,14 +643,18 @@ class BotManager:
         return f"{h}h {m}m {s}s"
 
     def watchdog_loop(self):
-        """Watchdog: monitors bot + signal_copier, restarts on crash with backoff."""
+        """Watchdog: monitors bot + signal_copier, restarts on crash with backoff.
+        FIX: is_running ya NO modifica self._running — el watchdog lo gestiona solo.
+        """
         _consecutive_restarts = 0
         _last_restart_time = 0
         _copier_restarts = 0
         while self._running:
             time.sleep(15)
             # ── Watchdog bot.py ──────────────────────────────────────
-            if self._running and not self.is_running:
+            _bot_alive = self.is_running  # propiedad pura — no modifica self._running
+            if not _bot_alive:
+                self._running = False  # marcar caído SÓLO aquí (no en is_running)
                 _consecutive_restarts += 1
                 if _consecutive_restarts > 3:
                     _wait = min(60 * _consecutive_restarts, 300)
@@ -659,22 +663,45 @@ class BotManager:
                 else:
                     _log(f"Watchdog: bot caido, reiniciando... (intento #{_consecutive_restarts})")
                 self._cleanup_pid_file()
-                self.start()
+                self.start()  # start() pone self._running = True si arranca OK
                 self.restart_count += 1
                 _last_restart_time = time.time()
-            elif self.is_running:
+            else:
                 if _consecutive_restarts > 0 and (time.time() - _last_restart_time) > 300:
                     _consecutive_restarts = 0
 
             # ── Watchdog signal_copier.py ────────────────────────────
+            # FIX: verificar .copier.lock además de _copier_proc
+            # Antes: si _copier_proc is None (bot iniciado externamente) → spam "Otra instancia corriendo"
+            # Ahora: si el lock tiene un PID vivo → copier está corriendo, no reiniciar
+            _lock = os.path.join(BASE_DIR, ".copier.lock")
+            _lock_pid_alive = False
+            try:
+                if os.path.exists(_lock):
+                    _lock_pid = int(open(_lock).read().strip())
+                    try:
+                        import psutil as _psu
+                        if _psu.pid_exists(_lock_pid):
+                            _p = _psu.Process(_lock_pid)
+                            if _p.status() != _psu.STATUS_ZOMBIE:
+                                _lock_pid_alive = True
+                                # Adoptar PID externo para que _copier_proc no sea None la próxima vez
+                                if self._copier_proc is None or self._copier_proc.poll() is not None:
+                                    self._copier_proc = None  # no hay Popen, pero marcamos vivo via flag
+                    except ImportError:
+                        pass
+            except Exception:
+                pass
+
             _copier_dead = (
-                self._copier_proc is None or
-                self._copier_proc.poll() is not None
+                not _lock_pid_alive and (
+                    self._copier_proc is None or
+                    self._copier_proc.poll() is not None
+                )
             )
             if _copier_dead and self.is_running:
                 # Solo reiniciar copier si el bot está vivo
                 _copier_restarts += 1
-                _lock = os.path.join(BASE_DIR, ".copier.lock")
                 try:
                     os.remove(_lock)
                 except FileNotFoundError:
