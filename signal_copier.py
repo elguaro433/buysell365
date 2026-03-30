@@ -475,6 +475,10 @@ def parse_signal(text, chat_title=""):
     # Requiere decimal para evitar falsos positivos con números enteros del texto
     if not entry_match:
         entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s{1,10}(\d+\.\d+)', upper_clean)
+    # FxPremiere: "Gold buy now!!@4487 - 4482" — precio precedido de @
+    # También cubre formatos como "@4509/4504", "ENTRY @1.3741"
+    if not entry_match:
+        entry_match = re.search(r'@\s*(\d{1,6}\.?\d*)', upper_clean)
 
     # SL es obligatorio — si no hay SL ignorar la señal (demasiado arriesgado)
     if not sl_match or not tp_match:
@@ -487,12 +491,15 @@ def parse_signal(text, chat_title=""):
     except (ValueError, IndexError):
         return None
 
-    # Protección: si entry == sl o entry == tp, es un falso positivo del parser → ignorar entrada
-    if entry > 0 and sl > 0 and abs(entry - sl) < 0.01:
-        log.warning(f"⚠️ Parser: entry={entry} == sl={sl} — descartando entrada (falso positivo)")
+    # Protección: si entry == sl o entry == tp EXACTAMENTE, es un falso positivo del parser → ignorar entrada
+    # NOTA: umbral muy pequeño (0.0001) para no rechazar SL legítimos de pares forex con 5 decimales.
+    # Ejemplo legítimo: EURAUD SELL 1.67645 SL:1.68130 → diff=0.00485 (48.5 pips, válido)
+    # Falso positivo real: entry captura el mismo número que SL (diff ≈ 0)
+    if entry > 0 and sl > 0 and abs(entry - sl) < 0.0001:
+        log.warning(f"⚠️ Parser: entry={entry} == sl={sl} — descartando entrada (falso positivo exacto)")
         entry = 0.0
-    if entry > 0 and tp > 0 and abs(entry - tp) < 0.01:
-        log.warning(f"⚠️ Parser: entry={entry} == tp={tp} — descartando entrada (falso positivo)")
+    if entry > 0 and tp > 0 and abs(entry - tp) < 0.0001:
+        log.warning(f"⚠️ Parser: entry={entry} == tp={tp} — descartando entrada (falso positivo exacto)")
         entry = 0.0
 
     if sl <= 0 or tp <= 0:
@@ -1023,6 +1030,9 @@ async def main():
             chat = await event.get_chat()
             chat_title = getattr(chat, 'title', 'Unknown')
 
+            # Log SIEMPRE para trazabilidad — facilita debug cuando parse falla silenciosamente
+            log.info(f"✏️ EDIT recibido de [{chat_title}] msg_id={msg_id}: {text[:70].replace(chr(10), ' ')}")
+
             import requests
 
             def fmt(v):
@@ -1102,9 +1112,12 @@ async def main():
         if dialog.id in ALLOWED_CHANNEL_IDS:
             log.info(f"📡 Monitoreando: {dialog.title} (ID: {dialog.id})")
 
-    # Update event handler with new channels
+    # Update event handlers with ALL channels (incluyendo auto-descubiertos)
+    # FIX: re-registrar AMBOS handlers — antes solo se actualizaba NewMessage, no MessageEdited
     client.remove_event_handler(handler)
     client.add_event_handler(handler, events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
+    client.remove_event_handler(edit_handler)
+    client.add_event_handler(edit_handler, events.MessageEdited(chats=list(ALLOWED_CHANNEL_IDS)))
 
     # Iniciar monitor TP/SL en background
     asyncio.ensure_future(_monitor_tp_loop())
