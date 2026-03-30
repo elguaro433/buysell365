@@ -360,6 +360,14 @@ def ahora():
     """Retorna hora actual en Andorra (maneja DST automáticamente)"""
     return datetime.now(ANDORRA_TZ)
 
+def _parse_expira(expira_val) -> datetime:
+    """Parsea fecha de expiración VIP — acepta ISO string o Unix timestamp (int/float)."""
+    if isinstance(expira_val, (int, float)):
+        # Unix timestamp: 9999999999 = permanente → usar fecha lejana
+        ts = min(float(expira_val), 32503680000.0)  # máx año 3000
+        return datetime.fromtimestamp(ts)
+    return datetime.fromisoformat(str(expira_val))
+
 # ============================================================
 #  MEMORIA DEL BOT
 # ============================================================
@@ -6109,7 +6117,7 @@ def cmd_mi_cuenta(user_id):
         vip_txt = "👑 *VIP PERMANENTE* (Admin)"
     elif sub and sub.get("entrada_confirmada", False):
         try:
-            expira = datetime.fromisoformat(sub["expira"])
+            expira = _parse_expira(sub["expira"])
             dias_r = (expira - ahora().replace(tzinfo=None)).days
             vip_txt = f"💎 *VIP ACTIVO* — {dias_r} días restantes"
         except Exception:
@@ -6262,7 +6270,7 @@ def cmd_vip(user_id: str = None):
         else:
             # ── Suscripción confirmada ──
             try:
-                expira = datetime.fromisoformat(sub["expira"])
+                expira = _parse_expira(sub["expira"])
                 dias_restantes = max(0, (expira - ahora().replace(tzinfo=None)).days)
             except Exception:
                 dias_restantes = 0
@@ -6594,7 +6602,7 @@ def _otorgar_acceso_vip(user_id: str, nombre: str, username: str = "", monto: fl
     # Si ya es VIP, extender desde la fecha de expiración actual
     if user_id in suscripciones_vip:
         try:
-            expira_actual = datetime.fromisoformat(suscripciones_vip[user_id]["expira"])
+            expira_actual = _parse_expira(suscripciones_vip[user_id]["expira"])
             if expira_actual > ahora_dt:
                 ahora_dt = expira_actual  # Extender desde la expiración actual
         except Exception:
@@ -6854,7 +6862,7 @@ def cmd_vip_lista():
     lineas = ["👑 *SUSCRIPCIONES VIP ACTIVAS*\n━━━━━━━━━━\n"]
     for uid, sub in suscripciones_vip.items():
         try:
-            expira = datetime.fromisoformat(sub["expira"])
+            expira = _parse_expira(sub["expira"])
             dias = (expira - ahora().replace(tzinfo=None)).days
         except Exception:
             dias = 0
@@ -7220,7 +7228,7 @@ def _generar_reporte_diario():
             if not sub.get("entrada_confirmada", True):
                 continue
             try:
-                exp = datetime.fromisoformat(sub["expira"])
+                exp = _parse_expira(sub["expira"])
                 dias_r = (exp - ahora_dt).days
                 if 0 < dias_r <= 3:
                     vips_por_expirar.append(f"  ⚠️ {sub.get('nombre','?')} ({dias_r}d)")
@@ -13342,7 +13350,7 @@ def revisar_niveles_operaciones():
             # 2. 📢 Enviar VICTORIAS al grupo público (marketing)
             if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
                 enviar_grupo(
-                    f"✅ *{nivel_tp if toca_tp1 else 'WIN'}* — {nombre}\n"
+                    f"✅ *{'TP1' if toca_tp1 else 'WIN'}* — {nombre}\n"
                     f"+{pips:.1f} {unidad_medida(ticker)}",
                     incluir_promo=True
                 )
@@ -14815,7 +14823,7 @@ def loop_vip_check():
                         continue
 
                     try:
-                        expira = datetime.fromisoformat(sub["expira"])
+                        expira = _parse_expira(sub["expira"])
                     except (ValueError, KeyError):
                         logger.warning(f"⚠️ Fecha inválida VIP de {uid}, revocando")
                         _revocar_acceso_vip(uid)
