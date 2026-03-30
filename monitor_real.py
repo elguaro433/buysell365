@@ -14,10 +14,10 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-# ── Configuración ──────────────────────────────────────────────
-MT5_LOGIN    = 88849791
-MT5_PASSWORD = "Andorra433+"
-MT5_SERVER   = "XMGlobal-MT5 4"
+# ── Configuración — credenciales desde .env (nunca hardcodeadas) ───────────
+MT5_LOGIN    = int(os.getenv("MT5_LOGIN",    "88849791"))
+MT5_PASSWORD = os.getenv("MT5_PASSWORD", "")
+MT5_SERVER   = os.getenv("MT5_SERVER",   "XMGlobal-MT5 4")
 
 CHECK_INTERVAL = 30  # segundos entre lecturas
 

@@ -27,7 +27,7 @@ try:
     load_dotenv(dotenv_path=_env_path, override=True)
 except ImportError:
     # python-dotenv no instalado — token debe estar en variable de entorno del sistema
-    import sys
+    # sys ya está importado en la línea 1
     print("⚠️  AVISO: python-dotenv no está instalado. Ejecuta: pip install python-dotenv --user")
     print("⚠️  El bot continuará pero puede que el token de Telegram no se cargue correctamente.")
 try:
@@ -115,6 +115,10 @@ for _noisy in (
     "httpx", "groq", "groq._base_client",
     "openai", "openai._base_client",
     "hpack", "h2", "h11",
+    # yfinance genera cientos de líneas DEBUG por ciclo (cookies, SQL, OHLC)
+    "yfinance", "yfinance.base", "yfinance.utils",
+    "yfinance.cache", "yfinance.scrapers.history",
+    "peewee",  # ORM interno que usa yfinance para su cache SQLite
 ):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 _file_handler.addFilter(_CategoryFilter())   # También en el handler → cubre urllib3, requests, etc.
@@ -17786,7 +17790,7 @@ def _arrancar_interno():
 # Para ejecutar directamente
 # ============================================================
 if __name__ == "__main__":
-    import sys
+    # sys ya importado en línea 1
     try:
         # Registrar PID para evitar instancias dobles
         _pid_file = ".bot.pid"

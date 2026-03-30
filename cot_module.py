@@ -43,24 +43,31 @@ def descargar_cot_cftc():
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
         text = None
-        # Intento 1: requests con SSL flexible
+        # Intento 1: requests con SSL válido (correcto)
         try:
-            resp = requests.get(url, headers=headers, timeout=30, verify=False)
+            resp = requests.get(url, headers=headers, timeout=30, verify=True)
             resp.raise_for_status()
             text = resp.text
         except Exception as e1:
-            logger.info(f"COT requests falló ({e1}), probando urllib...")
-            # Intento 2: urllib con SSL deshabilitado
+            logger.info(f"COT SSL normal falló ({e1}), probando sin verificación...")
+            # Intento 2: requests sin SSL — fallback solo si el certificado de CFTC falla
             try:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                req = urllib.request.Request(url, headers=headers)
-                resp2 = urllib.request.urlopen(req, context=ctx, timeout=30)
-                text = resp2.read().decode('utf-8')
+                resp = requests.get(url, headers=headers, timeout=30, verify=False)
+                resp.raise_for_status()
+                text = resp.text
             except Exception as e2:
-                logger.warning(f"COT urllib también falló: {e2}")
-                raise e2
+                logger.info(f"COT requests falló ({e2}), probando urllib...")
+                # Intento 3: urllib como último recurso
+                try:
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    req = urllib.request.Request(url, headers=headers)
+                    resp3 = urllib.request.urlopen(req, context=ctx, timeout=30)
+                    text = resp3.read().decode('utf-8')
+                except Exception as e3:
+                    logger.warning(f"COT urllib también falló: {e3}")
+                    raise e3
 
         if not text or len(text) < 1000:
             raise ValueError(f"COT respuesta vacía o muy corta ({len(text) if text else 0} bytes)")
