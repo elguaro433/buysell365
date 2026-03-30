@@ -180,16 +180,13 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
 
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
-    src_line = f"\n📌 Señal: {source}" if source else ""
 
     msg = (
-        f"🎯 *TP ALCANZADO* ✅\n"
+        f"✅ *TP ALCANZADO* — {pair}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{dir_emoji} *{dir_es} {pair}*\n"
-        f"📍 Entrada: {fmt(entry)} → TP: {fmt(tp)}"
-        f"{src_line}\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"🏆 *¡SEÑAL GANADORA!* 🚀"
+        f"{dir_emoji} *{dir_es}*\n"
+        f"📍 Entrada: {fmt(entry)} → TP: {fmt(tp)}\n"
+        f"━━━━━━━━━━━━━━"
     )
 
     chart_bytes = _fetch_chart_image(pair, direction, entry, tp)
@@ -231,14 +228,12 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
     def fmt(v):
         return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
-    src_line = f"\n📌 Señal: {source}" if source else ""
     msg = (
-        f"🛑 *STOP LOSS* — {dir_emoji} {dir_es} {pair}\n"
+        f"🛑 *STOP LOSS* — {pair}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"📍 Entrada: {fmt(entry)} → SL: {fmt(sl)}"
-        f"{src_line}\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"🛡️ Capital protegido. Seguimos 💪"
+        f"{dir_emoji} *{dir_es}*\n"
+        f"📍 Entrada: {fmt(entry)} → SL: {fmt(sl)}\n"
+        f"━━━━━━━━━━━━━━"
     )
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"

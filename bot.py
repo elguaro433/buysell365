@@ -4218,31 +4218,14 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 
 def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
     f_ = lambda v: fmt(v, ticker)
-    txt_dur = ""
-    if duracion_seg:
-        m = int(duracion_seg // 60)
-        h = int(m // 60)
-        m = m % 60
-        txt_dur = f"\n⏱️ Duración: {h}h {m}m" if h > 0 else f"\n⏱️ Duración: {m}m"
     txt_perc = f"  (+{perc_profit:.2f}%)" if perc_profit is not None else ""
     tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
-    # Fuente legible
-    _fuente_map = {
-        'BuySell365_AI': '🤖 Scalper Bot', 'scalper': '🤖 Scalper Bot',
-        'SureShotFX': '📡 SureShotFX', 'Learn2Trade': '📊 Learn2Trade',
-        'FXPremiere': '🔔 FXPremiere', 'GoldForexMarket': '🥇 Gold Forex',
-        'webhook': '📲 Webhook', 'manual': '👤 Manual',
-    }
-    txt_fuente = _fuente_map.get(fuente, f'📌 {fuente}') if fuente else '🤖 Scalper Bot'
-    txt_real = '✅ Real MT5' if mt5_real else '🔵 Virtual'
     return (
-        f"🎯 *{nivel_tp} ALCANZADO* — {nombre}\n"
+        f"✅ *{nivel_tp} ALCANZADO* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{tipo_emoji}  *+{pips:.1f} {unidad_medida(ticker)}*{txt_perc}\n"
-        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`"
-        + (txt_dur if txt_dur else "") +
-        f"\n📌 Señal: {txt_fuente}  |  {txt_real}"
-        f"\n━━━━━━━━━━━━━━"
+        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
+        f"━━━━━━━━━━━━━━"
     )
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
@@ -4256,21 +4239,12 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, 
         p_txt = f"{pips_abs:.1f} pts"
     f_ = lambda v: fmt(v, ticker)
     cabecera = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
-    _fuente_map = {
-        'BuySell365_AI': '🤖 Scalper Bot', 'scalper': '🤖 Scalper Bot',
-        'SureShotFX': '📡 SureShotFX', 'Learn2Trade': '📊 Learn2Trade',
-        'FXPremiere': '🔔 FXPremiere', 'GoldForexMarket': '🥇 Gold Forex',
-        'webhook': '📲 Webhook', 'manual': '👤 Manual',
-    }
-    txt_fuente = _fuente_map.get(fuente, f'📌 {fuente}') if fuente else '🤖 Scalper Bot'
-    txt_real = '✅ Real MT5' if mt5_real else '🔵 Virtual'
     return (
         f"🛑 *STOP LOSS* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{cabecera}  *−{p_txt}*\n"
-        f"📍 Entrada `{f_(entrada)}`  →  Cierre `{f_(salida)}`\n"
-        f"📌 Señal: {txt_fuente}  |  {txt_real}"
-        f"\n━━━━━━━━━━━━━━"
+        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
+        f"━━━━━━━━━━━━━━"
     )
 
 def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
