@@ -71,6 +71,12 @@ TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 _open_signals: dict = {}
 _signals_lock = threading.Lock()
 
+# === EDIT TRACKER ===
+# Mensajes reenviados SIN precio de entrada (entry=0) → esperar edición del canal original
+# { telegram_msg_id → signal_dict } para actualizarlos cuando el canal edite con el precio real
+_pending_entry: dict = {}   # { msg_id: signal }
+_pending_entry_lock = threading.Lock()
+
 
 def _get_current_price(pair: str) -> float | None:
     """Fetch current price via Twelve Data API. Returns float or None."""
@@ -416,12 +422,14 @@ def parse_signal(text, chat_title=""):
     # FXPremiere: "Venta de Oro Ahora: 4416 - 4419" → tomar primer número después del ":"
     if not entry_match:
         entry_match = re.search(r'(?:AHORA|NOW)\s*[:\s]+(\d+\.?\d*)', upper_clean)
-    # AnabelSignals: "ORO COMPRA Ahora 4416_4413" | "XAUUSD COMPRA 4425" → número tras activo+dirección
+    # AnabelSignals/SureShot: "XAUUSD BUY 4458.22" → número INMEDIATAMENTE tras activo+dirección
+    # IMPORTANTE: usar \s{0,5} en vez de [^\d]* para NO capturar el SL cuando no hay precio de entrada
+    # Ejemplo malo: "XAUUSD BUY \n\nSL: 4450.32" → el [^\d]* antiguo capturaba 4450.32 como entrada
     if not entry_match:
-        entry_match = re.search(r'(?:ORO|XAUUSD|GOLD)\s+(?:COMPRA|VENTA|BUY|SELL)[^\d]*(\d{3,6}\.?\d*)', upper_clean)
+        entry_match = re.search(r'(?:ORO|XAUUSD|GOLD)\s+(?:COMPRA|VENTA|BUY|SELL)\s{0,5}(\d{3,6}\.?\d*)', upper_clean)
     # AnabelSignals: "Límite de venta de oro 4442" | "Venta de oro 4467" → número tras dirección+activo
     if not entry_match:
-        entry_match = re.search(r'(?:VENTA|COMPRA|LIMITE)\s+(?:DE\s+)?(?:ORO|XAUUSD|GOLD)[^\d]*(\d{3,6}\.?\d*)', upper_clean)
+        entry_match = re.search(r'(?:VENTA|COMPRA|LIMITE)\s+(?:DE\s+)?(?:ORO|XAUUSD|GOLD)\s{0,5}(\d{3,6}\.?\d*)', upper_clean)
     # Formato inline: "GBP/CAD H1 Buy 1.8412" → número después de BUY/SELL
     if not entry_match:
         entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+[\w/]+\s+(?:H\d+\s+)?(\d+\.?\d*)', upper_clean)
@@ -436,6 +444,14 @@ def parse_signal(text, chat_title=""):
         entry = float(entry_match.group(1)) if entry_match else 0.0
     except (ValueError, IndexError):
         return None
+
+    # Protección: si entry == sl o entry == tp, es un falso positivo del parser → ignorar entrada
+    if entry > 0 and sl > 0 and abs(entry - sl) < 0.01:
+        log.warning(f"⚠️ Parser: entry={entry} == sl={sl} — descartando entrada (falso positivo)")
+        entry = 0.0
+    if entry > 0 and tp > 0 and abs(entry - tp) < 0.01:
+        log.warning(f"⚠️ Parser: entry={entry} == tp={tp} — descartando entrada (falso positivo)")
+        entry = 0.0
 
     if sl <= 0 or tp <= 0:
         return None
@@ -920,6 +936,13 @@ async def main():
                 # Send to BuySell365 channel (siempre activo)
                 send_to_channel(signal, executed, detail)
 
+                # Si se envió SIN precio de entrada, registrar el msg_id para esperar edición
+                msg_id = event.message.id
+                if signal.get("entry", 0) == 0 and msg_id:
+                    with _pending_entry_lock:
+                        _pending_entry[msg_id] = signal.copy()
+                    log.info(f"⏳ Señal sin entrada registrada (msg_id={msg_id}) — esperando edición con precio real")
+
             elif signal["type"] == "update":
                 # ── Updates de posiciones (cerrar, mover SL) ──
                 # Solo ejecutar si el kill-switch está activo
@@ -933,6 +956,70 @@ async def main():
 
         except Exception as e:
             log.error(f"Error processing message: {e}")
+
+    # ══════════════════════════════════════════════════════════════
+    # Handler de mensajes EDITADOS — captura cuando el canal aliado
+    # edita el mensaje para agregar el precio de entrada real
+    # Ejemplo: SureShot envía "XAUUSD BUY" sin precio, luego edita
+    # para agregar "XAUUSD BUY 4458.22". Este handler lo captura.
+    # ══════════════════════════════════════════════════════════════
+    @client.on(events.MessageEdited(chats=list(ALLOWED_CHANNEL_IDS)))
+    async def edit_handler(event):
+        """Captura ediciones de señales aliadas para obtener el precio de entrada real."""
+        try:
+            msg_id = event.message.id
+            with _pending_entry_lock:
+                if msg_id not in _pending_entry:
+                    return  # No es una señal que hayamos enviado sin precio
+
+            text = event.raw_text
+            if not text or len(text) < 10:
+                return
+
+            chat = await event.get_chat()
+            chat_title = getattr(chat, 'title', 'Unknown')
+            signal = parse_signal(text, chat_title=chat_title)
+
+            if not signal or signal.get("entry", 0) <= 0:
+                return  # La edición no añadió precio de entrada — ignorar
+
+            # Tenemos el precio real. Publicar actualización en el canal.
+            import requests
+            original = _pending_entry.get(msg_id, {})
+            pair = signal.get("pair", "")
+            direction = signal.get("direction", "")
+            entry = signal.get("entry", 0)
+            dir_emoji = "🟢" if direction == "BUY" else "🔴"
+            dir_es = "COMPRA" if direction == "BUY" else "VENTA"
+
+            def fmt(v):
+                if v <= 0: return "—"
+                return f"{v:.5f}".rstrip('0').rstrip('.') if v < 100 else f"{v:.2f}"
+
+            msg = (
+                f"✏️ *Actualización de señal*\n\n"
+                f"{dir_emoji} *{dir_es} {pair}*\n\n"
+                f"📍 Entrada confirmada: *{fmt(entry)}*\n"
+                f"🎯 TP: {fmt(signal.get('tp', 0))}\n"
+                f"🛡️ SL: {fmt(signal.get('sl', 0))}"
+            )
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            resp = requests.post(url, json={
+                "chat_id": CHANNEL_ID,
+                "text": msg,
+                "parse_mode": "Markdown"
+            }, timeout=10)
+            if resp.status_code == 200:
+                log.info(f"✏️ Entrada confirmada publicada: {dir_es} {pair} @ {entry}")
+            else:
+                log.warning(f"✏️ Error publicando actualización: {resp.status_code}")
+
+            # Remover de pendientes para no duplicar
+            with _pending_entry_lock:
+                _pending_entry.pop(msg_id, None)
+
+        except Exception as e:
+            log.error(f"Error en edit_handler: {e}")
 
     log.info("📡 Signal Copier iniciando...")
     log.info(f"📡 API ID: {API_ID}")
