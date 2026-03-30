@@ -18103,7 +18103,9 @@ if __name__ == "__main__":
         def _signal_handler(sig=None, frame=None):
             """Signal handler: ejecutar limpieza y salir."""
             _cleanup_on_exit()
-            sys.exit(0)
+            # Forzar salida limpia — os._exit evita que Waitress/threads
+            # intercepten SystemExit y causen tracebacks al cerrar
+            os._exit(0)
 
         atexit.register(_cleanup_on_exit)
         signal.signal(signal.SIGINT, _signal_handler)

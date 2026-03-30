@@ -557,18 +557,18 @@ class BotManager:
                 self._running = False
                 return
 
-            # Graceful shutdown: taskkill en Windows (CTRL_BREAK mata el grupo entero)
+            # Graceful shutdown: taskkill en Windows
             import subprocess as _sp
             try:
                 if os.name == 'nt':
-                    # Primero intentar taskkill sin /F (graceful)
+                    # Intentar taskkill graceful (sin /F)
                     _sp.run(["taskkill", "/PID", str(_target_pid)],
                             capture_output=True, timeout=10)
                 else:
                     import signal as _sig
                     os.kill(_target_pid, _sig.SIGTERM)
-                # Esperar a que termine
-                for _ in range(30):
+                # Esperar a que termine (máx 8 segundos)
+                for _ in range(16):
                     time.sleep(0.5)
                     if self._proc and self._proc.poll() is not None:
                         break
@@ -581,7 +581,8 @@ class BotManager:
             except (TimeoutError, _sp.TimeoutExpired, OSError):
                 _log("Bot no respondio al cierre graceful, forzando kill...")
                 try:
-                    _sp.run(["taskkill", "/F", "/PID", str(_target_pid)],
+                    # /T mata el árbol completo de procesos hijo
+                    _sp.run(["taskkill", "/F", "/T", "/PID", str(_target_pid)],
                             capture_output=True, timeout=10)
                     time.sleep(1)
                 except Exception as e2:
