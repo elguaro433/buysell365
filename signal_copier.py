@@ -307,6 +307,8 @@ def parse_signal(text, chat_title=""):
     text = text.translate(_superscript_map)
 
     upper = text.upper().replace("\n", " ").replace("  ", " ").strip()
+    # Limpiar hashtags (#XAUUSD → XAUUSD) — formato GOLD FOREX MARKET
+    upper = upper.replace("#", "")
     # Versión sin slash para búsqueda de pares (AUDJPY, GBPUSD...)
     upper_noslash = upper.replace("/", "")
 
@@ -872,6 +874,7 @@ async def main():
     PUBLIC_CHANNELS_USERNAMES = [
         "forexsignalstrialgroup_00",  # FXPremiere Free Trial — Forex + Gold + Crypto
         "Anabelsignals08",            # AnabelSignals — XAUUSD/Gold
+        "Jerry77446",                 # GOLD FOREX MARKET — XAUUSD/Gold señales VIP
     ]
     # Sin filtros — todas las señales de todos los activos se reenvían al canal VIP
     CHANNEL_ASSET_FILTER = {}  # Vacío = sin restricción por activo
