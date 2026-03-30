@@ -455,29 +455,44 @@ class BotManager:
 
     @property
     def is_running(self):
-        # 1. Si el launcher arrancó el bot, verificar su proceso
-        if self._proc and self._proc.poll() is None:
-            return True
-        # 2. Si no, verificar si hay un bot corriendo via .bot.pid
+        # 1. Si el launcher gestiona el proceso directamente
+        if self._proc is not None:
+            if self._proc.poll() is None:
+                return True  # Vivo
+            else:
+                # FIX: murió — NO verificar .bot.pid (sería el mismo PID zombie)
+                # Windows puede devolver handle válido para procesos recién muertos
+                self._running = False
+                return False
+        # 2. Solo verificar .bot.pid si NO hay _proc (bot iniciado externamente)
         pid_file = os.path.join(BASE_DIR, ".bot.pid")
         if os.path.exists(pid_file):
             try:
                 with open(pid_file, "r") as f:
                     ext_pid = int(f.read().strip())
-                # Verificar si ese PID existe en Windows
-                import ctypes
-                kernel32 = ctypes.windll.kernel32
-                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, ext_pid)
-                if handle:
-                    kernel32.CloseHandle(handle)
-                    # Bot corriendo externamente — adoptar PID
-                    if self.pid != ext_pid:
-                        self.pid = ext_pid
-                        if not self.start_time:
-                            self.start_time = time.time()
-                        self._running = True
-                    return True
+                # Verificar PID real con psutil (más fiable que kernel32 para zombies)
+                try:
+                    import psutil as _ps
+                    if _ps.pid_exists(ext_pid):
+                        p = _ps.Process(ext_pid)
+                        if p.status() != _ps.STATUS_ZOMBIE:
+                            if self.pid != ext_pid:
+                                self.pid = ext_pid
+                                self.start_time = self.start_time or time.time()
+                                self._running = True
+                            return True
+                except ImportError:
+                    # Fallback: kernel32 si no hay psutil
+                    import ctypes
+                    kernel32 = ctypes.windll.kernel32
+                    handle = kernel32.OpenProcess(0x1000, False, ext_pid)
+                    if handle:
+                        kernel32.CloseHandle(handle)
+                        if self.pid != ext_pid:
+                            self.pid = ext_pid
+                            self.start_time = self.start_time or time.time()
+                            self._running = True
+                        return True
             except Exception:
                 pass
         self._running = False
@@ -628,18 +643,18 @@ class BotManager:
         return f"{h}h {m}m {s}s"
 
     def watchdog_loop(self):
-        """Watchdog: monitors bot process, restarts on crash with backoff."""
+        """Watchdog: monitors bot + signal_copier, restarts on crash with backoff."""
         _consecutive_restarts = 0
         _last_restart_time = 0
+        _copier_restarts = 0
         while self._running:
             time.sleep(15)
+            # ── Watchdog bot.py ──────────────────────────────────────
             if self._running and not self.is_running:
                 _consecutive_restarts += 1
-                _now = time.time()
-                # Backoff: wait longer if bot keeps crashing
                 if _consecutive_restarts > 3:
-                    _wait = min(60 * _consecutive_restarts, 300)  # Max 5 min
-                    _log(f"Watchdog: bot caido (crash #{_consecutive_restarts}), esperando {_wait}s antes de reiniciar...")
+                    _wait = min(60 * _consecutive_restarts, 300)
+                    _log(f"Watchdog: bot caido (crash #{_consecutive_restarts}), esperando {_wait}s...")
                     time.sleep(_wait)
                 else:
                     _log(f"Watchdog: bot caido, reiniciando... (intento #{_consecutive_restarts})")
@@ -648,9 +663,28 @@ class BotManager:
                 self.restart_count += 1
                 _last_restart_time = time.time()
             elif self.is_running:
-                # Bot is healthy, reset consecutive restart counter after 5 min of stability
                 if _consecutive_restarts > 0 and (time.time() - _last_restart_time) > 300:
                     _consecutive_restarts = 0
+
+            # ── Watchdog signal_copier.py ────────────────────────────
+            _copier_dead = (
+                self._copier_proc is None or
+                self._copier_proc.poll() is not None
+            )
+            if _copier_dead and self.is_running:
+                # Solo reiniciar copier si el bot está vivo
+                _copier_restarts += 1
+                _lock = os.path.join(BASE_DIR, ".copier.lock")
+                try:
+                    os.remove(_lock)
+                except FileNotFoundError:
+                    pass
+                _log(f"Watchdog: signal_copier caido, reiniciando... (#{_copier_restarts})")
+                time.sleep(3)
+                self._copier_proc = self._start_aux("signal_copier.py")
+            elif not _copier_dead:
+                if _copier_restarts > 0:
+                    _copier_restarts = 0
 
 
 # ============================================================
