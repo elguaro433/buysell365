@@ -15603,9 +15603,10 @@ def loop_polling():
                             _procesar_codigo_invitacion(_code_poll, user_id, _nombre_code_poll)
                             continue
 
-                        # 📺 En CANAL solo pueden escribir admins → tratar como autorizado
+                        # 📺 En CANAL solo pueden escribir admins → ignorar completamente
+                        # El canal es solo para publicar señales — el bot no responde nada allí
                         if es_canal:
-                            usuario_no_autorizado = False
+                            continue  # No procesar ni responder mensajes del canal
 
                         if usuario_no_autorizado:
                             # Chat privado con usuario no autorizado
