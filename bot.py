@@ -6810,6 +6810,127 @@ def cmd_vip_quitar(target_id: str):
     return f"🚫 *VIP revocado para {nombre}* (`{target_id}`)."
 
 
+def cmd_senal_manual(texto_completo: str) -> str:
+    """Publica señal al canal VIP Y la registra para monitoreo TP/SL.
+    Uso: /señal XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32
+    También acepta: /señal xauusd sell 4488 tp 4480 sl 4492
+    """
+    import json as _json, time as _time, re as _re, requests as _req
+
+    manual_file = os.path.join(os.path.dirname(__file__), "manual_signals.json")
+    upper = texto_completo.upper().strip()
+
+    # ── Detectar par ──
+    _mapa_pares = {
+        "XAUUSD": "XAUUSD", "ORO": "XAUUSD", "GOLD": "XAUUSD",
+        "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "USDJPY": "USDJPY",
+        "GBPJPY": "GBPJPY", "NASDAQ": "US100Cash", "NAS100": "US100Cash",
+        "US100": "US100Cash", "SP500": "US500Cash", "US500": "US500Cash",
+    }
+    par = None
+    for alias, sym in _mapa_pares.items():
+        if alias in upper:
+            par = sym
+            break
+    if not par:
+        return (
+            "❌ Par no reconocido.\n\n"
+            "Formato:\n"
+            "`/señal XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`\n\n"
+            "Pares disponibles: XAUUSD · EURUSD · GBPUSD · USDJPY · NASDAQ"
+        )
+
+    # ── Detectar dirección ──
+    if "SELL" in upper or "VENTA" in upper:
+        direccion = "SELL"
+    elif "BUY" in upper or "COMPRA" in upper:
+        direccion = "BUY"
+    else:
+        return "❌ Indica BUY o SELL.\nEjemplo: `/señal XAUUSD BUY 4458 TP:4482 SL:4450`"
+
+    # ── Extraer TP y SL (acepta TP:xxx o TP xxx) ──
+    tp_m = _re.search(r'TP[:\s]+(\d+\.?\d*)', upper)
+    sl_m = _re.search(r'SL[:\s]+(\d+\.?\d*)', upper)
+    if not tp_m or not sl_m:
+        return (
+            "❌ Faltan TP o SL.\n\n"
+            "Formato:\n"
+            "`/señal XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
+        )
+    tp = float(tp_m.group(1))
+    sl = float(sl_m.group(1))
+
+    # ── Extraer entrada (número grande tras BUY/SELL/COMPRA/VENTA) ──
+    entry_m = _re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+(\d{3,6}\.?\d*)', upper)
+    entry = float(entry_m.group(1)) if entry_m else 0.0
+
+    # ── Formato del mensaje para el canal ──
+    dir_es    = "COMPRA" if direccion == "BUY" else "VENTA"
+    dir_emoji = "🟢" if direccion == "BUY" else "🔴"
+    par_display = par.replace("US100Cash","NASDAQ").replace("US500Cash","S&P 500")
+
+    def _fmt(v):
+        if v <= 0: return "—"
+        return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
+
+    canal_msg = (
+        f"{dir_emoji} *{dir_es} {par_display}*\n\n"
+        f"📍 Entrada: {_fmt(entry) if entry > 0 else 'Precio de Mercado'}\n"
+        f"🎯 TP: {_fmt(tp)}\n"
+        f"🛡️ SL: {_fmt(sl)}"
+    )
+
+    # ── Publicar en el canal VIP ──
+    canal_id = int(os.getenv("CHANNEL_ID", "0"))
+    bot_token = os.getenv("TELEGRAM_TOKEN", "")
+    pub_ok = False
+    try:
+        resp = _req.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": canal_id, "text": canal_msg, "parse_mode": "Markdown"},
+            timeout=10
+        )
+        pub_ok = resp.status_code == 200
+    except Exception as _ep:
+        pass
+
+    if not pub_ok:
+        return "❌ No se pudo publicar en el canal. Verifica CHANNEL_ID y TELEGRAM_TOKEN."
+
+    # ── Registrar en manual_signals.json para monitoreo TP/SL ──
+    sig_id = f"{par}_manual_{int(_time.time())}"
+    nueva = {
+        "sig_id": sig_id,
+        "pair": par,
+        "direction": direccion,
+        "entry": entry,
+        "tp": tp,
+        "sl": sl,
+        "type": "new_signal",
+        "source": "Manual",
+        "sent_at": _time.time()
+    }
+    try:
+        existentes = []
+        if os.path.exists(manual_file):
+            with open(manual_file, 'r', encoding='utf-8') as _f:
+                existentes = _json.load(_f)
+        existentes.append(nueva)
+        with open(manual_file, 'w', encoding='utf-8') as _f:
+            _json.dump(existentes, _f, ensure_ascii=False, indent=2)
+    except Exception as _ej:
+        pass  # Si falla el JSON, la señal igual se publicó en el canal
+
+    return (
+        f"✅ *Señal publicada en el canal*\n\n"
+        f"{dir_emoji} *{dir_es} {par_display}*\n"
+        f"📍 Entrada: {_fmt(entry) if entry > 0 else 'Precio de Mercado'}\n"
+        f"🎯 TP: {_fmt(tp)}\n"
+        f"🛡️ SL: {_fmt(sl)}\n\n"
+        f"🔔 Monitoreando TP/SL automáticamente"
+    )
+
+
 def cmd_rastrear(texto_completo: str) -> str:
     """Registra una señal manual en manual_signals.json para que el copier la monitoree.
     Uso: /rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32
@@ -8569,7 +8690,12 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "• `/logs` — Últimas líneas del log\n"
             "• `/briefing` — Enviar briefing al grupo"
         )
-    # 📌 /rastrear — Registra señal manual para monitoreo TP/SL
+    # 📡 /señal — Publica señal manual al canal VIP + registra para monitoreo TP/SL
+    if t.startswith("/senal") or t.startswith("/señal") or t.startswith("señal ") or t.startswith("senal "):
+        if not es_admin: return "⛔ Solo administradores pueden publicar señales."
+        return cmd_senal_manual(texto)
+
+    # 📌 /rastrear — Registra señal manual para monitoreo TP/SL (sin publicar)
     if t.startswith("/rastrear") or t.startswith("rastrear "):
         if not es_admin: return "⛔ Solo administradores pueden registrar señales."
         return cmd_rastrear(texto)
