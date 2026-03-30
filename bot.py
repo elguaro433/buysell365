@@ -6830,8 +6830,15 @@ def cmd_senal_manual(texto_completo: str) -> str:
     _mapa_pares = {
         "XAUUSD": "XAUUSD", "ORO": "XAUUSD", "GOLD": "XAUUSD",
         "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "USDJPY": "USDJPY",
-        "GBPJPY": "GBPJPY", "NASDAQ": "US100Cash", "NAS100": "US100Cash",
-        "US100": "US100Cash", "SP500": "US500Cash", "US500": "US500Cash",
+        "GBPJPY": "GBPJPY", "AUDUSD": "AUDUSD", "NZDUSD": "NZDUSD",
+        "USDCAD": "USDCAD", "USDCHF": "USDCHF", "EURJPY": "EURJPY",
+        "AUDJPY": "AUDJPY", "CADJPY": "CADJPY", "NZDJPY": "NZDJPY",
+        "GBPAUD": "GBPAUD", "GBPNZD": "GBPNZD", "AUDCAD": "AUDCAD",
+        "EURGBP": "EURGBP", "EURAUD": "EURAUD", "EURCHF": "EURCHF",
+        "AUDNZD": "AUDNZD", "CHFJPY": "CHFJPY",
+        "NASDAQ": "US100Cash", "NAS100": "US100Cash", "US100": "US100Cash",
+        "SP500": "US500Cash", "US500": "US500Cash",
+        "US30": "US30Cash", "DOW": "US30Cash",
     }
     par = None
     for alias, sym in _mapa_pares.items():
@@ -6842,8 +6849,10 @@ def cmd_senal_manual(texto_completo: str) -> str:
         return (
             "❌ Par no reconocido.\n\n"
             "Formato:\n"
-            "`/señal XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`\n\n"
-            "Pares disponibles: XAUUSD · EURUSD · GBPUSD · USDJPY · NASDAQ"
+            "`/señal GBPAUD SELL 1.93236 TP:1.91500 SL:1.93900`\n\n"
+            "Pares: XAUUSD · EURUSD · GBPUSD · GBPAUD · GBPNZD\n"
+            "       AUDUSD · USDJPY · GBPJPY · EURJPY · USDCAD\n"
+            "       USDCHF · AUDCAD · EURCHF · NASDAQ · US30"
         )
 
     # ── Detectar dirección ──
@@ -6866,8 +6875,8 @@ def cmd_senal_manual(texto_completo: str) -> str:
     tp = float(tp_m.group(1))
     sl = float(sl_m.group(1))
 
-    # ── Extraer entrada (número grande tras BUY/SELL/COMPRA/VENTA) ──
-    entry_m = _re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+(\d{3,6}\.?\d*)', upper)
+    # ── Extraer entrada (precio tras BUY/SELL — \d{1,6} cubre forex 1.XXXXX y gold 4XXX) ──
+    entry_m = _re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+(\d{1,6}\.?\d+)', upper)
     entry = float(entry_m.group(1)) if entry_m else 0.0
 
     # ── Formato del mensaje para el canal ──
