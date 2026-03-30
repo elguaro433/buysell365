@@ -164,7 +164,7 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> by
         return None
 
 
-def _send_tp_celebration(signal: dict) -> None:
+def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     """Send TP celebration to channel with chart image and rockets."""
     import requests
 
@@ -172,6 +172,7 @@ def _send_tp_celebration(signal: dict) -> None:
     pair = signal["pair"]
     entry = signal["entry"]
     tp = signal["tp"]
+    source = signal.get("source", "")
 
     def fmt(v):
         if v <= 0: return "Mercado"
@@ -179,14 +180,16 @@ def _send_tp_celebration(signal: dict) -> None:
 
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
+    src_line = f"\n📌 Señal: {source}" if source else ""
 
     msg = (
-        f"🎯🚀🚀🚀 *¡¡TP ALCANZADO!!*\n\n"
+        f"🎯 *TP ALCANZADO* ✅\n"
+        f"━━━━━━━━━━━━━━\n"
         f"{dir_emoji} *{dir_es} {pair}*\n"
-        f"📍 Entrada: {fmt(entry)}\n"
-        f"🎯 TP: {fmt(tp)} ✅\n\n"
-        f"*¡¡SEÑAL GANADORA!! 🏆*\n"
-        f"🎉🎉🎉🎉🎉"
+        f"📍 Entrada: {fmt(entry)} → TP: {fmt(tp)}"
+        f"{src_line}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🏆 *¡SEÑAL GANADORA!* 🚀"
     )
 
     chart_bytes = _fetch_chart_image(pair, direction, entry, tp)
@@ -194,19 +197,17 @@ def _send_tp_celebration(signal: dict) -> None:
     try:
         if chart_bytes:
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-            resp = requests.post(
-                url,
-                data={"chat_id": CHANNEL_ID, "caption": msg, "parse_mode": "Markdown"},
-                files={"photo": ("chart.png", chart_bytes, "image/png")},
-                timeout=20,
-            )
+            payload = {"chat_id": CHANNEL_ID, "caption": msg, "parse_mode": "Markdown"}
+            if reply_to_msg_id:
+                payload["reply_to_message_id"] = reply_to_msg_id
+            resp = requests.post(url, data=payload,
+                files={"photo": ("chart.png", chart_bytes, "image/png")}, timeout=20)
         else:
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            resp = requests.post(
-                url,
-                json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"},
-                timeout=10,
-            )
+            payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
+            if reply_to_msg_id:
+                payload["reply_to_message_id"] = reply_to_msg_id
+            resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
             log.info(f"🎉 TP CELEBRATION enviada: {dir_es} {pair}")
         else:
@@ -215,7 +216,7 @@ def _send_tp_celebration(signal: dict) -> None:
         log.warning(f"Celebration send error: {e}")
 
 
-def _send_sl_notification(signal: dict) -> None:
+def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
     """Notify channel that SL was hit."""
     import requests
 
@@ -223,22 +224,28 @@ def _send_sl_notification(signal: dict) -> None:
     pair = signal["pair"]
     entry = signal["entry"]
     sl = signal["sl"]
+    source = signal.get("source", "")
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
 
     def fmt(v):
         return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
+    src_line = f"\n📌 Señal: {source}" if source else ""
     msg = (
-        f"🔴 *SL tocado — {dir_es} {pair}*\n\n"
-        f"El mercado tocó nuestro stop loss.\n"
-        f"Capital protegido ✅\n\n"
-        f"💪 *¡La próxima va a ser ganadora!*\n"
-        f"Seguimos con la misma disciplina 🎯"
+        f"🛑 *STOP LOSS* — {dir_emoji} {dir_es} {pair}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📍 Entrada: {fmt(entry)} → SL: {fmt(sl)}"
+        f"{src_line}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🛡️ Capital protegido. Seguimos 💪"
     )
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+        payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
+        if reply_to_msg_id:
+            payload["reply_to_message_id"] = reply_to_msg_id
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
         log.warning(f"SL notification error: {e}")
 
@@ -279,7 +286,7 @@ async def _monitor_tp_loop() -> None:
 
             # Auto-expire after 48h to avoid zombie tracking
             if age_hours > 48:
-                to_resolve.append((sig_id, signal, "expired"))
+                to_resolve.append((sig_id, sdata, "expired"))
                 continue
 
             price = _get_current_price(pair)
@@ -290,20 +297,22 @@ async def _monitor_tp_loop() -> None:
             sl_hit = (direction == "BUY" and price <= sl) or (direction == "SELL" and price >= sl)
 
             if tp_hit:
-                to_resolve.append((sig_id, signal, "tp"))
+                to_resolve.append((sig_id, sdata, "tp"))
             elif sl_hit:
-                to_resolve.append((sig_id, signal, "sl"))
+                to_resolve.append((sig_id, sdata, "sl"))
 
-        for sig_id, signal, result in to_resolve:
+        for sig_id, sdata_resolved, result in to_resolve:
+            signal   = sdata_resolved["signal"] if isinstance(sdata_resolved, dict) and "signal" in sdata_resolved else sdata_resolved
+            _reply_id = signals_copy.get(sig_id, {}).get("telegram_msg_id") if isinstance(signals_copy.get(sig_id), dict) else None
             with _signals_lock:
                 _open_signals.pop(sig_id, None)
             _resolved_signals.add(sig_id)  # No volver a cargar del JSON
             if result == "tp":
                 log.info(f"🎯 TP ALCANZADO: {signal['direction']} {signal['pair']}")
-                _send_tp_celebration(signal)
+                _send_tp_celebration(signal, reply_to_msg_id=_reply_id)
             elif result == "sl":
                 log.info(f"🛡️ SL alcanzado: {signal['direction']} {signal['pair']}")
-                _send_sl_notification(signal)
+                _send_sl_notification(signal, reply_to_msg_id=_reply_id)
 
 
 # === PARSER ===
@@ -873,12 +882,18 @@ def send_to_channel(signal, executed, detail):
         }, timeout=10)
         if resp.status_code == 200:
             log.info(f"📡 ENVIADO AL CANAL: {dir_es} {pair_display} ({source})")
-            # Registrar señal para seguimiento TP/SL (solo si tiene precios válidos)
-            if signal["tp"] > 0 and signal["sl"] > 0:
+            # Guardar message_id para citarlo en notificaciones de TP/SL
+            _canal_msg_id = resp.json().get("result", {}).get("message_id")
+            # Registrar señal para seguimiento TP/SL
+            if signal["sl"] > 0:
                 sig_id = f"{pair}_{int(time.time())}"
                 with _signals_lock:
-                    _open_signals[sig_id] = {"signal": signal, "sent_at": time.time()}
-                log.info(f"🎯 Señal registrada para seguimiento: {sig_id}")
+                    _open_signals[sig_id] = {
+                        "signal": signal,
+                        "sent_at": time.time(),
+                        "telegram_msg_id": _canal_msg_id,  # Para reply en TP/SL
+                    }
+                log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
         else:
             log.warning(f"📡 Error canal: {resp.status_code} {resp.text[:100]}")
     except Exception as e:

@@ -1545,10 +1545,11 @@ def escapar_markdown(texto: str) -> str:
         texto = texto.replace(ch, f'\\{ch}')
     return texto
 
-def enviar_telegram(mensaje: str, destino: str = None, teclado: dict = None):
+def enviar_telegram(mensaje: str, destino: str = None, teclado: dict = None, reply_to: int = None):
     """Envía mensaje al canal de Telegram con reintentos y rate limiting global.
        Si el mensaje supera 4096 caracteres, lo divide en fragmentos.
-       Serializa envíos via lock para no exceder 22 msgs/sec (anti-429)."""
+       Serializa envíos via lock para no exceder 22 msgs/sec (anti-429).
+       reply_to: message_id al que responder (cita la señal original)."""
     global _ultimo_envio_tg
     chat_id = destino or CHANNEL_ID
     url     = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -1579,6 +1580,8 @@ def enviar_telegram(mensaje: str, destino: str = None, teclado: dict = None):
     }
     if teclado:
         payload["reply_markup"] = teclado
+    if reply_to:
+        payload["reply_to_message_id"] = reply_to
 
     for intento in range(3):
         try:
@@ -13263,7 +13266,9 @@ def revisar_niveles_operaciones():
             # ruta_img = generar_grafico_operacion(df, ticker, tipo, op['entrada'], precio_salida, tag, niveles=op) if df is not None else None
 
             # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP)
-            enviar_canal(msg)
+            # reply_to_message_id: cita la señal original para que se vea de qué trade es
+            _reply_msg_id = op.get('telegram_msg_id')
+            enviar_canal(msg, reply_to=_reply_msg_id)
 
             # 2. 📢 Enviar VICTORIAS al grupo público (marketing)
             if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
@@ -14004,7 +14009,12 @@ def analizar_activo(nombre, ticker):
                 [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
                  {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
             ]}
-            enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_xm_btn_senal)
+            _msg_canal_id = enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_xm_btn_senal)
+            # Guardar message_id para citar la señal original en TP/SL
+            if _msg_canal_id and op_id:
+                with _lock_ops:
+                    if op_id in operaciones_activas:
+                        operaciones_activas[op_id]['telegram_msg_id'] = _msg_canal_id
 
             # 🚨 NOTIFICACIÓN FOMO AL GRUPO
             notificar_fomo_grupo(nombre, tipo)
