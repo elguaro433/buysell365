@@ -4213,9 +4213,8 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 #  MENSAJES DE CIERRE
 # ============================================================
 
-def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None):
+def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
     f_ = lambda v: fmt(v, ticker)
-    emoji_nivel = {"TP1": "1⃣", "TP2": "2⃣", "TP3": "🏁"}.get(nivel_tp, "✅")
     txt_dur = ""
     if duracion_seg:
         m = int(duracion_seg // 60)
@@ -4224,17 +4223,26 @@ def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="
         txt_dur = f"\n⏱️ Duración: {h}h {m}m" if h > 0 else f"\n⏱️ Duración: {m}m"
     txt_perc = f"  (+{perc_profit:.2f}%)" if perc_profit is not None else ""
     tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
+    # Fuente legible
+    _fuente_map = {
+        'BuySell365_AI': '🤖 Scalper Bot', 'scalper': '🤖 Scalper Bot',
+        'SureShotFX': '📡 SureShotFX', 'Learn2Trade': '📊 Learn2Trade',
+        'FXPremiere': '🔔 FXPremiere', 'GoldForexMarket': '🥇 Gold Forex',
+        'webhook': '📲 Webhook', 'manual': '👤 Manual',
+    }
+    txt_fuente = _fuente_map.get(fuente, f'📌 {fuente}') if fuente else '🤖 Scalper Bot'
+    txt_real = '✅ Real MT5' if mt5_real else '🔵 Virtual'
     return (
-        f"✅ *{nivel_tp} ALCANZADO* — {nombre}\n"
+        f"🎯 *{nivel_tp} ALCANZADO* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{tipo_emoji}\n"
-        f"{emoji_nivel} *+{pips:.1f} {unidad_medida(ticker)}*{txt_perc}\n"
+        f"{tipo_emoji}  *+{pips:.1f} {unidad_medida(ticker)}*{txt_perc}\n"
         f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`"
         + (txt_dur if txt_dur else "") +
+        f"\n📌 Señal: {txt_fuente}  |  {txt_real}"
         f"\n━━━━━━━━━━━━━━"
     )
 
-def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker):
+def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
     cat = get_categoria(ticker)
     pips_abs = abs(pips)
     if cat == "crypto":
@@ -4245,13 +4253,21 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker):
         p_txt = f"{pips_abs:.1f} pts"
     f_ = lambda v: fmt(v, ticker)
     cabecera = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
-
+    _fuente_map = {
+        'BuySell365_AI': '🤖 Scalper Bot', 'scalper': '🤖 Scalper Bot',
+        'SureShotFX': '📡 SureShotFX', 'Learn2Trade': '📊 Learn2Trade',
+        'FXPremiere': '🔔 FXPremiere', 'GoldForexMarket': '🥇 Gold Forex',
+        'webhook': '📲 Webhook', 'manual': '👤 Manual',
+    }
+    txt_fuente = _fuente_map.get(fuente, f'📌 {fuente}') if fuente else '🤖 Scalper Bot'
+    txt_real = '✅ Real MT5' if mt5_real else '🔵 Virtual'
     return (
         f"🛑 *STOP LOSS* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{cabecera}  *−{p_txt}*\n"
         f"📍 Entrada `{f_(entrada)}`  →  Cierre `{f_(salida)}`\n"
-        f"━━━━━━━━━━━━━━"
+        f"📌 Señal: {txt_fuente}  |  {txt_real}"
+        f"\n━━━━━━━━━━━━━━"
     )
 
 def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
@@ -13151,18 +13167,20 @@ def revisar_niveles_operaciones():
                 sl_pips = abs(calcular_pips(op['entrada'], op['sl'], ticker))
                 _riesgo_op = op.get('riesgo_usado', RIESGO_POR_TRADE)
 
+                _fuente_op   = op.get('estrategia', 'BuySell365_AI')
+                _mt5_real_op = op.get('mt5_ejecutado', False)
                 if toca_tp1:
                     precio_salida = precio_mon  # Precio real de mercado (no teórico TP1)
                     pips = calcular_pips(op['entrada'], precio_mon, ticker, tipo)
                     perc_gain = (_riesgo_op * (pips / sl_pips) * 100) if sl_pips > 0 else 0
-                    msg = mensaje_tp_alcanzado(nombre, tipo, op['entrada'], op['tp1'], pips, ticker, "TP1", duracion, perc_gain)
+                    msg = mensaje_tp_alcanzado(nombre, tipo, op['entrada'], op['tp1'], pips, ticker, "TP1", duracion, perc_gain, fuente=_fuente_op, mt5_real=_mt5_real_op)
                     tag = "TP1"
                     resultado = "WIN"
                 elif sl_alcanzado:
                     precio_salida = precio_mon
                     pips = calcular_pips(op['entrada'], precio_mon, ticker, tipo)
                     perc_gain = (_riesgo_op * (pips / sl_pips) * 100) if sl_pips > 0 else 0
-                    msg = mensaje_sl_tocado(nombre, tipo, op['entrada'], precio_mon, pips, ticker)
+                    msg = mensaje_sl_tocado(nombre, tipo, op['entrada'], precio_mon, pips, ticker, fuente=_fuente_op, mt5_real=_mt5_real_op)
                     tag = "SL"
                     resultado = "LOSS"
                 else:  # Auto-close 24h
