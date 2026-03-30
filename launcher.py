@@ -2868,9 +2868,21 @@ class ManagementConsole:
             username = info.get("username", "")
             display_name = f"{nombre} (@{username})" if username else nombre
             inicio = info.get("inicio", "--")[:10]
-            expira_str = info.get("expira", "")
+            expira_raw = info.get("expira", "")
             monto = info.get("monto_pagado", 0)
             monto_str = f"${monto}" if monto else "Trial"
+
+            # Normalizar expira: puede ser int (Unix timestamp) o str ISO
+            if isinstance(expira_raw, (int, float)):
+                if expira_raw >= 9999999990:
+                    expira_str = "2099-12-31T00:00:00"
+                else:
+                    try:
+                        expira_str = datetime.fromtimestamp(expira_raw).isoformat()
+                    except Exception:
+                        expira_str = "2099-12-31T00:00:00"
+            else:
+                expira_str = str(expira_raw)
 
             dias_rest = "--"
             try:
@@ -2880,6 +2892,10 @@ class ManagementConsole:
                     estado_txt = "Expirado"
                     tag = "expirado"
                     dias_rest = f"{delta.days}d"
+                elif delta.days > 9000:
+                    estado_txt = "Activo"
+                    tag = "activo"
+                    dias_rest = "♾️ Permanente"
                 elif delta.days <= 2:
                     estado_txt = "Por vencer"
                     tag = "por_vencer"
@@ -2891,9 +2907,9 @@ class ManagementConsole:
                     dias_rest = f"{delta.days}d"
                 expira_show = expira_str[:10]
             except Exception:
-                estado_txt = "--"
-                tag = "neutral"
-                expira_show = expira_str[:10] if expira_str else "--"
+                estado_txt = "Activo"
+                tag = "activo"
+                expira_show = str(expira_raw)[:10] if expira_raw else "--"
 
             self._vip_subs_tree.insert("", "end",
                                        values=(display_name, inicio, expira_show,
