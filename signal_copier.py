@@ -1077,21 +1077,35 @@ async def main():
 
 
 if __name__ == "__main__":
-    import sys
-    # Lock file para evitar múltiples instancias
+    import sys, time as _time_lock
     _lock_file = Path(__file__).parent / ".copier.lock"
+    _my_pid = os.getpid()
+
+    # ── Verificación robusta: buscar TODOS los procesos signal_copier.py corriendo ──
     try:
+        import psutil as _psutil_lock
+        _otros = [
+            p.pid for p in _psutil_lock.process_iter(['pid', 'cmdline'])
+            if p.pid != _my_pid
+            and 'signal_copier' in ' '.join(p.info.get('cmdline') or [])
+        ]
+        if _otros:
+            log.warning(f"📡 Otra instancia del copier corriendo (PIDs={_otros}). Saliendo.")
+            sys.exit(0)
+    except ImportError:
+        # Fallback: usar lock file
         if _lock_file.exists():
-            # Check if the PID in the lock file is still running
             try:
                 old_pid = int(_lock_file.read_text().strip())
-                import psutil
-                if psutil.pid_exists(old_pid):
-                    log.warning(f"📡 Otra instancia del copier corriendo (PID={old_pid}). Saliendo.")
+                import psutil as _ps2
+                if _ps2.pid_exists(old_pid) and old_pid != _my_pid:
+                    log.warning(f"📡 Otra instancia (PID={old_pid}). Saliendo.")
                     sys.exit(0)
-            except (ImportError, ValueError):
-                pass  # psutil not installed or invalid PID — continue
-        _lock_file.write_text(str(os.getpid()))
+            except Exception:
+                pass
+
+    _lock_file.write_text(str(_my_pid))
+    try:
         asyncio.run(main())
     except KeyboardInterrupt:
         log.info("📡 Signal Copier detenido por usuario")
