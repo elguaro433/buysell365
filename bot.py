@@ -14776,9 +14776,9 @@ def loop_vip_check():
     # para evitar reenvío al reiniciar el bot fuera de horario.
     _init_hora = ahora().replace(tzinfo=None)
     _init_hoy  = _init_hora.strftime("%Y-%m-%d")
-    if _init_hora.hour >= BRIEFING_HORA + 2:   # > 09:00 → briefing de hoy ya pasó
+    if _init_hora.hour >= BRIEFING_HORA:        # >= 7:00 → briefing de hoy ya pasó (evita reenvío al reiniciar)
         _ultimo_briefing_diario = _init_hoy
-    if _init_hora.hour >= CIERRE_HORA + 1:     # > 23:00 → cierre de hoy ya pasó
+    if _init_hora.hour >= CIERRE_HORA:         # >= 22:00 → cierre de hoy ya pasó (evita reenvío al reiniciar)
         _ultimo_cierre_diario   = _init_hoy
 
     while True:
