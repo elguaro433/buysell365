@@ -288,7 +288,10 @@ async def _monitor_tp_loop() -> None:
             if price is None:
                 continue
 
-            tp_hit = (direction == "BUY" and price >= tp) or (direction == "SELL" and price <= tp)
+            # BUG FIX: si TP=0 (abierto/desconocido), NO verificar TP hit — price>=0 siempre True
+            tp_hit = False
+            if tp > 0:
+                tp_hit = (direction == "BUY" and price >= tp) or (direction == "SELL" and price <= tp)
             sl_hit = (direction == "BUY" and price <= sl) or (direction == "SELL" and price >= sl)
 
             if tp_hit:
@@ -367,7 +370,7 @@ def parse_signal(text, chat_title=""):
         source = "SureShotFX"
     elif "learn" in chat_lower or "l2t" in text_lower:
         source = "Learn2Trade"
-    elif "fxpremiere" in chat_lower or "fxpremiere" in text_lower or "goldSignals" in chat_title:
+    elif "fxpremiere" in chat_lower or "fxpremiere" in text_lower or "goldsignals" in chat_lower:
         source = "FXPremiere"
     elif "gold forex" in chat_lower:
         source = "GoldForexMarket"
@@ -814,7 +817,27 @@ def send_to_channel(signal, executed, detail):
     import requests
 
     if signal["type"] == "update":
-        return  # Solo señales de apertura
+        # Notificar actualizaciones importantes al canal VIP
+        _action = signal.get("action", "")
+        _pair = signal.get("pair", "")
+        _src = signal.get("source", "Aliado")
+        _action_labels = {
+            "close_half":       f"⚡ *CERRAR MITAD* — {_pair}\n📡 Fuente: {_src}",
+            "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair}\n📡 Fuente: {_src}",
+            "full_close":       f"🔒 *CERRAR COMPLETAMENTE* — {_pair}\n📡 Fuente: {_src}",
+            "move_sl_to_entry": f"🛡️ *MOVER SL A ENTRADA* — {_pair}\n📡 Fuente: {_src}",
+            "sl_hit":           f"🛑 *SL ALCANZADO* — {_pair}\n📡 Fuente: {_src}",
+            "tp_hit":           f"✅ *TP ALCANZADO* — {_pair}\n📡 Fuente: {_src}",
+        }
+        _msg = _action_labels.get(_action)
+        if _msg:
+            try:
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                requests.post(url, json={"chat_id": CHANNEL_ID, "text": _msg, "parse_mode": "Markdown"}, timeout=10)
+                log.info(f"📢 Update notificado al canal: {_action} {_pair}")
+            except Exception as _e:
+                log.warning(f"Error enviando update al canal: {_e}")
+        return
 
     direction  = signal["direction"]
     pair       = signal["pair"]
@@ -865,6 +888,12 @@ def send_to_channel(signal, executed, detail):
         f"🎯 TP: {tp_display}",
         f"🛡️ SL: {fmt(sl)}",
     ]
+
+    # Añadir comentario IA si está disponible (evaluado antes de llamar a esta función)
+    ia_comment = signal.get("ia_comment", "")
+    if ia_comment:
+        lines.append(f"")
+        lines.append(f"🤖 _{ia_comment}_")
 
     msg = "\n".join(lines)
 
@@ -938,7 +967,7 @@ async def main():
     # Keywords para auto-descubrir canales de señales
     AUTO_DISCOVER_KEYWORDS = [
         "sureshot", "learn2trade", "learn 2 trade",
-        "fxpremiere", "fx premiere", "goldSignals", "gold signals",
+        "fxpremiere", "fx premiere", "goldsignals", "gold signals",
         "anabelsignals", "anabel signals", "forex signals", "forexsignals",
         "nasdaq vip", "vip signals", "signal vip",
         "gold forex market", "gold forex",  # GOLD FOREX MARKET (@Jerry77446)
@@ -1122,11 +1151,16 @@ async def main():
         # Auto-agregar canales que coincidan con keywords de señales
         _es_canal = hasattr(dialog.entity, 'broadcast') or hasattr(dialog.entity, 'megagroup')
         _match = any(kw in title_lower for kw in AUTO_DISCOVER_KEYWORDS)
-        if _match and _es_canal and dialog.id not in ALLOWED_CHANNEL_IDS:
-            ALLOWED_CHANNEL_IDS.add(dialog.id)
-            log.info(f"📡 AUTO-AGREGADO: {dialog.title} (ID: {dialog.id})")
-        if dialog.id in ALLOWED_CHANNEL_IDS:
-            log.info(f"📡 Monitoreando: {dialog.title} (ID: {dialog.id})")
+        # BUG FIX: Telethon iter_dialogs devuelve IDs positivos para canales,
+        # pero event.chat_id es negativo (-100XXXXXXXXXX). Normalizar al formato negativo.
+        _raw_id = dialog.id
+        _norm_id = int(f"-100{_raw_id}") if _raw_id > 0 else _raw_id
+        _already = _norm_id in ALLOWED_CHANNEL_IDS or _raw_id in ALLOWED_CHANNEL_IDS
+        if _match and _es_canal and not _already:
+            ALLOWED_CHANNEL_IDS.add(_norm_id)
+            log.info(f"📡 AUTO-AGREGADO: {dialog.title} (ID: {_norm_id})")
+        if _norm_id in ALLOWED_CHANNEL_IDS or _raw_id in ALLOWED_CHANNEL_IDS:
+            log.info(f"📡 Monitoreando: {dialog.title} (ID: {_norm_id})")
 
     # Update event handlers with ALL channels (incluyendo auto-descubiertos)
     # FIX: re-registrar AMBOS handlers — antes solo se actualizaba NewMessage, no MessageEdited
