@@ -587,8 +587,8 @@ TWELVE_DATA_MAP = {
 # ORO → XAUUSD=X (spot forex, igual a XM) en lugar de GC=F (futuros COMEX)
 # El análisis técnico (velas 15m) sigue usando GC=F para el historial.
 YF_PRICE_TICKER = {
-    'NQ=F':     'NQ=F',       # NASDAQ futuros
-    'ES=F':     'ES=F',       # S&P 500 futuros
+    'NQ=F':     '^NDX',       # NASDAQ-100 index (spot, ~igual a US100Cash XM, sin prima de futuros)
+    'ES=F':     '^GSPC',      # S&P 500 index (spot, ~igual a US500Cash XM)
     'EURUSD=X': 'EURUSD=X',   # EUR/USD spot forex
 }
 
@@ -1316,10 +1316,12 @@ def obtener_cotizacion(ticker):
         return result
 
     # === 3. Yahoo Finance Chart API v8 ===
-    p, a = _yf_chart_api(ticker)
+    # Usar ticker mapeado (^NDX para NASDAQ, ^GSPC para SP500) para evitar prima de futuros
+    _yf_mapped = YF_PRICE_TICKER.get(ticker, ticker)
+    p, a = _yf_chart_api(_yf_mapped)
     if p:
         result = {'precio': p, 'apertura': a or p,
-                  'ts': time.time(), 'fuente': 'Yahoo Finance RT ⚠️'}
+                  'ts': time.time(), 'fuente': f'Yahoo Finance ({_yf_mapped})'}
         _FUENTES_PRECIO[ticker] = result
         return result
 
@@ -4689,18 +4691,16 @@ def cmd_analisis(activo_raw: str):
             lote = calcular_lote_sugerido(CAPITAL_USUARIO, RIESGO_POR_TRADE, precio, niveles['sl'], ticker)
 
             senal_txt = (
-                f"\n🚨 *SEÑAL ACTIVA: {tipo_txt}*\n"
-                f"   {barra_confianza(score)}\n\n"
-                "   *Confluencia técnica:*\n"
-                f"   {razones_resumen}\n\n"
-                f"   🛑 SL:  {f_(niveles['sl'])}\n"
-                f"   1️⃣ TP1: {f_(niveles['tp1'])}  (R:R {rr1:.1f}:1)\n"
-                f"   2️⃣ TP2: {f_(niveles['tp2'])}  (R:R {rr2:.1f}:1)\n"
-                f"   3️⃣ TP3: {f_(niveles['tp3'])}  (R:R {rr3:.1f}:1)\n\n"
-                f"   💼 Lote sugerido (${CAPITAL_USUARIO:,.0f} al 1%): *{lote}*\n"
+                f"\n🚨 *SEÑAL ACTIVA: {tipo_txt}*  {barra_confianza(score)}\n\n"
+                f"   🛑 SL:  `{f_(niveles['sl'])}`\n"
+                f"   1️⃣ TP1: `{f_(niveles['tp1'])}`  (R:R {rr1:.1f}:1)\n"
+                f"   2️⃣ TP2: `{f_(niveles['tp2'])}`  (R:R {rr2:.1f}:1)\n"
+                f"   3️⃣ TP3: `{f_(niveles['tp3'])}`  (R:R {rr3:.1f}:1)\n\n"
+                f"   _{razones_resumen}_\n"
             )
         else:
-            senal_txt = f"\n⏸️ *Sin señal activa*\n   {razones[0] if razones else 'Esperando confirmación'}\n"
+            _razon_principal = razones[0] if razones else 'Esperando confirmación'
+            senal_txt = f"\n⏸️ *Sin señal activa*  —  _{_razon_principal}_\n"
 
         # ── TENDENCIA MULTI-TEMPORAL ────────────────────────
         tendencia_15m = "📈 Alcista" if ind['ema9'] > ind['ema20'] > ind['ema50'] else ("📉 Bajista" if ind['ema9'] < ind['ema20'] < ind['ema50'] else "➡️ Mixta")
@@ -4782,37 +4782,29 @@ def cmd_analisis(activo_raw: str):
             veredicto = "⚖️ *PRONÓSTICO: NEUTRO — Consolidación en rango*"
 
         _estado_mercado = "🔴 MERCADO CERRADO" if _mercado_cerrado else sesion_txt
-        _precio_label = "Último precio" if _mercado_cerrado else "Precio"
+        _precio_label = "Último" if _mercado_cerrado else "Precio"
+        _fuente_precio = cot.get('fuente', '') if cot else 'yfinance'
+        _rsi_txt = '🔴 OB' if ind['rsi'] > 70 else ('🟢 OS' if ind['rsi'] < 30 else '⚪')
+        _macd_dir = '🟢 ↑' if ind['macd'] > ind['signal'] else '🔴 ↓'
+        _precio_macro = "sobre" if precio > ind['ema200'] else "bajo"
+
+        # Indicador de fuente solo si no es MT5 (MT5 = precio exacto XM)
+        _fuente_tag = "" if "MT5" in _fuente_precio else f"  _(≈ {_fuente_precio})_"
 
         return (
-            f"🔬 *AUDITORÍA DE MERCADO PREMIUM*\n"
-            f"━━━━━━━━━━\n"
-            f"{CATEGORIA_EMOJI[cat]} *{nombre}*  •  {_estado_mercado}\n"
-            f"💵 {_precio_label}: *{f_(precio)}*\n\n"
+            f"📊 *{nombre}*  •  {_estado_mercado}\n"
+            f"💵 {_precio_label}: *{f_(precio)}*{_fuente_tag}\n\n"
             f"{veredicto}\n"
-            f"{div_txt}{patron_txt}\n\n"
-            f"🧠 *INTELIGENCIA ARTIFICIAL:*\n"
-            f"   {ml_txt}\n\n"
-            f"🗣️ *LECTURA DEL MERCADO:*\n"
-            f"_{estado_vol}. {estado_macro}. El precio está {estado_sr}. {fuerza}._\n"
+            f"{div_txt}{patron_txt}"
             f"{senal_txt}\n"
             "━━━━━━━━━━\n"
-            "📊 *MÉTRICAS CLAVE*\n"
-            f"   ⚡ RSI(14): *{ind['rsi']:.1f}*  {'🔴 Sobrecomprado' if ind['rsi'] > 70 else ('🟢 Sobrevendido' if ind['rsi'] < 30 else '⚪ Neutral')}\n"
-            f"   🎢 ADX: *{ind['adx']:.1f}*  │  DI+ {ind['di_plus']:.1f}  DI- {ind['di_minus']:.1f}\n"
-            f"   📊 MACD: {'🟢 Alcista' if ind['macd'] > ind['signal'] else '🔴 Bajista'}  (Hist: {ind['macd_hist']:.5g})\n"
-            f"   📉 Stoch: K={ind['stoch_k']:.0f} D={ind['stoch_d']:.0f}  {'🔴 OB' if ind['stoch_k'] > 80 else ('🟢 OS' if ind['stoch_k'] < 20 else '⚪')}\n"
-            f"   📐 Bollinger: {bb_txt}\n"
-            f"   ⚖️ Volumen: {ind['vol_ratio']:.1f}x media\n"
-            f"   🛡️ ATR(14): {f_(ind['atr'])}\n\n"
-            "📈 *TENDENCIA MULTI-TEMPORAL*\n"
-            f"   15min: {tendencia_15m}\n"
-            f"   1H:    {tendencia_1h}\n"
-            f"   4H:    {tendencia_4h}\n\n"
-            "🏛️ *NIVELES CLAVE*\n"
-            f"   🟢 Soporte:     {f_(ind['soporte'])} ({ind['dist_soporte']:.2f}%)\n"
-            f"   🔴 Resistencia: {f_(ind['resistencia'])} ({ind['dist_resistencia']:.2f}%)\n"
-            f"   📏 EMA200:      {f_(ind['ema200'])}\n"
+            f"⚡ RSI: *{ind['rsi']:.0f}* {_rsi_txt}  │  MACD: {_macd_dir}  │  ADX: *{ind['adx']:.0f}*\n"
+            f"📈 15m: {tendencia_15m}  │  1H: {tendencia_1h}  │  4H: {tendencia_4h}\n\n"
+            "🏛️ *Niveles clave*\n"
+            f"   🟢 Soporte:    {f_(ind['soporte'])}\n"
+            f"   🔴 Resistencia: {f_(ind['resistencia'])}\n"
+            f"   📏 EMA200:     {f_(ind['ema200'])}  _(precio {_precio_macro} la media)_\n\n"
+            f"🧠 IA: {ml_txt}\n"
         )
 
     except Exception as e:
