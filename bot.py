@@ -3237,7 +3237,7 @@ def _ejecutar_senal_manual(senal: dict, chat_id: str, nombre_admin: str = "Admin
     ind_mock = {'estrategia': 'manual', 'confianza_total': 100}
     msg_canal = mensaje_nueva_senal(nombre, ticker, tipo, entrada, niveles, ind_mock, 5, [], fuente="Manual", premium=True, nivel_senal="PREMIUM")
     enviar_canal(msg_canal, teclado={"inline_keyboard": [
-        [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+        [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
          {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
     ]})
 
@@ -5072,7 +5072,7 @@ def cmd_broker():
         "   🔑 Código: *6CTHK*\n\n"
         "👇 Pulsa el botón — son 2 minutos:",
         {"inline_keyboard": [
-            [{"text": "🎁 Abrir Cuenta + Bono 100% hasta $100", "url": "https://affs.click/jhA2x"}],
+            [{"text": "🎁 Abrir Cuenta + Bono 100% hasta $100", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}],
             [{"text": "📱 Descargar App XM", "url": "https://affs.click/dy3cG"}],
             [{"text": "🤖 Activar Copy Trading", "callback_data": "copy_info"}],
         ]}
@@ -8500,7 +8500,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             f"🛡️ SL: {fmt(sl)}"
         )
         _xm_teclado = {"inline_keyboard": [
-            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
              {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
         ]}
 
@@ -8651,7 +8651,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 "inline_keyboard": [
                     [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
-                    [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                    [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
                      {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
                 ]
@@ -8682,7 +8682,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             start_botones = {
                 "inline_keyboard": [
                     [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
                      {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
@@ -8759,7 +8759,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                      {"text": "📉 Resumen Semanal",   "callback_data": "/semana"}],
                     [{"text": "⏰ Horarios",           "callback_data": "/horarios"},
                      {"text": "📌 Estado del Bot",    "callback_data": "/estado"}],
-                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
                      {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                 ]}
@@ -8890,7 +8890,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 [{"text": "💬 Hablar con el Bot", "url": "https://t.me/Andoperandobot?start=grupo"}],
                 [{"text": "🔍 Análisis de Mercado", "callback_data": "/analisis_eurusd"},
                  {"text": "💎 Ver Planes VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
                  {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                 [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
             ]
@@ -8991,7 +8991,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "👇 Pulsa el botón para activarlo ahora:",
             {"inline_keyboard": [
                 [{"text": "🚀 ACTIVAR COPY TRADING AHORA", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
-                [{"text": "🏦 Abrir Cuenta XM con Código 6CTHK", "url": "https://affs.click/jhA2x"}],
+                [{"text": "🏦 Abrir Cuenta XM con Código 6CTHK", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}],
                 [{"text": "📊 Ver Rendimiento en Vivo", "url": "https://buysell365.pro"}],
                 [{"text": "💎 Canal VIP — Señales", "callback_data": "vip_pagar_usdt"}],
             ]}
@@ -12723,7 +12723,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         # Enviar a Telegram (solo en horario)
         enviar_canal(msg, teclado={"inline_keyboard": [
-            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
              {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
         ]})
 
@@ -14075,7 +14075,7 @@ def analizar_activo(nombre, ticker):
             guardar_estado()
             _skip_razon_display = _skip_mt5_razon if _skip_mt5 else ""
             _xm_btn_senal = {"inline_keyboard": [
-                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
                  {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
             ]}
             _msg_canal_id = enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_xm_btn_senal)
@@ -15782,7 +15782,7 @@ def loop_polling():
                                              {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
                                             [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
                                              {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
-                                            [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://affs.click/jhA2x"},
+                                            [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
                                              {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                                             [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                                         ]

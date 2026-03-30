@@ -1071,7 +1071,7 @@ if('serviceWorker' in navigator){{
       </div>
     </div>
   </div>
-    <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker<small>&#127873; Bono 100% hasta $100</small></a>
+    <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker<small>&#127873; Bono 100% hasta $100</small></a>
   <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()">
     <span></span><span></span><span></span>
   </button>
@@ -1227,7 +1227,7 @@ if('serviceWorker' in navigator){{
         <li style="color:#00e676" data-i18n="pricing.cp8">&#129302; Totalmente autom\u00e1tico \u2014 sin experiencia requerida</li>
       </ul>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
-        <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(255,215,0,.35);transition:all .3s;line-height:1.3">
+        <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(255,215,0,.35);transition:all .3s;line-height:1.3">
           &#127873; Abrir Cuenta XM<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Bono 100% hasta $100</span>
         </a>
         <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(0,230,118,.4);transition:all .3s;line-height:1.3">
@@ -1259,7 +1259,7 @@ if('serviceWorker' in navigator){{
   <div class="xm-section-code">
     Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b>
   </div><br>
-  <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-section-cta">
+  <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-section-cta">
     &#128640; Abrir Cuenta Real &mdash; Gratis
   </a>
   <div class="xm-section-note">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
@@ -2153,7 +2153,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                     <a onclick="setLang('fr')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1eb\U0001f1f7 Fran\u00e7ais</a>
                 </div>
             </div>
-            <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-hdr-btn" title="Abre tu cuenta en XM — broker recomendado">
+            <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-hdr-btn" title="Abre tu cuenta en XM — broker recomendado">
                 &#127974; <span class="xm-btn-text">XM Broker</span>
             </a>
             <div class="live-badge"><div class="pulse"></div><span data-i18n="dash.live">{'EN VIVO' if is_alive else 'OFFLINE'}</span> &mdash; {now_str}</div>
@@ -2290,7 +2290,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <span class="xm-pill">&#128241; App iOS &amp; Android</span>
         </div>
         <div class="xm-code" data-i18n="xm.code">Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b></div><br>
-        <a href="https://affs.click/jhA2x" target="_blank" rel="noopener" class="xm-cta">
+        <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-cta">
             &#128640; Abrir Cuenta Real &mdash; Gratis
         </a>
         <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px">Trading implica riesgo. Capital en riesgo.</div>
