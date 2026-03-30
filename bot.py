@@ -565,9 +565,11 @@ DASHBOARD_URL  = os.getenv("DASHBOARD_URL", "https://buysell365.pro/dashboard").
 TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_KEY", "").strip()
 
 # Mapa de tickers internos → símbolos Twelve Data
+# NOTA: IXIC no existe en Twelve Data; SPX requiere plan Grow ($29/mes).
+# Usamos NDX (NASDAQ-100 index) y SPY (ETF S&P500) disponibles en plan Basic gratuito.
 TWELVE_DATA_MAP = {
-    'NQ=F':     'IXIC',       # NASDAQ Composite index
-    'ES=F':     'SPX',        # S&P 500 index
+    'NQ=F':     'NDX',        # NASDAQ-100 index (plan Basic gratuito)
+    'ES=F':     'SPY',        # S&P 500 ETF — equivale al índice, plan gratuito
     'EURUSD=X': 'EUR/USD',    # Euro/Dólar
 }
 
