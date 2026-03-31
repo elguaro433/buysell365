@@ -93,6 +93,12 @@ _pending_entry: dict = {}   # { msg_id: signal } — señales publicadas sin pre
 _pending_entry_lock = threading.Lock()
 _published_msg_ids: set = set()  # msg_ids ya publicados como señal completa (evita duplicar en edit)
 
+# === BUFFER 30s para señales sin entry ===
+# { msg_id → {"signal": dict, "executed": bool, "detail": str, "timer": asyncio.TimerHandle|None} }
+_buffered_signals: dict = {}
+_buffered_lock = threading.Lock()
+BUFFER_WAIT_SECONDS = 30
+
 
 def _normalize_twelve_symbol(pair: str) -> str:
     """Convierte símbolo interno → formato Twelve Data (XAU/USD, EUR/USD, etc.)."""
@@ -156,47 +162,63 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> by
         if "values" not in data:
             return None
         values = data["values"][::-1]  # oldest → newest
+        opens  = [float(v["open"])  for v in values]
         closes = [float(v["close"]) for v in values]
-        highs = [float(v["high"]) for v in values]
-        lows = [float(v["low"]) for v in values]
+        highs  = [float(v["high"])  for v in values]
+        lows   = [float(v["low"])   for v in values]
         n = len(closes)
 
-        # ── Colores pro ──
-        BG = "#0d1117"
-        GRID = "#1a1f2e"
-        TEXT = "#c9d1d9"
-        GREEN = "#00d26a"
-        RED = "#ff4757"
+        # ── Colores estilo TradingView dark ──
+        BG = "#131722"
+        GRID = "#1e222d"
+        TEXT = "#787b86"
+        CANDLE_GREEN = "#26a69a"
+        CANDLE_RED   = "#ef5350"
         GOLD = "#ffd700"
-        ENTRY_COLOR = "#58a6ff"
-        TP_COLOR = GREEN if direction == "BUY" else RED
+        ENTRY_COLOR = "#2962ff"
+        WICK_GREEN = "#26a69a"
+        WICK_RED   = "#ef5350"
 
         fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
         ax.set_facecolor(BG)
 
-        # Área de precio (fill between high/low)
-        x = list(range(n))
-        ax.fill_between(x, lows, highs, alpha=0.08, color=TP_COLOR)
+        # ── Velas japonesas ──
+        candle_width = 0.6
+        wick_width = 1.2
+        for i in range(n):
+            o, c, h, l = opens[i], closes[i], highs[i], lows[i]
+            is_bull = c >= o
+            color = CANDLE_GREEN if is_bull else CANDLE_RED
+            wick_color = WICK_GREEN if is_bull else WICK_RED
 
-        # Línea de precio principal (gruesa, con gradiente simulado)
-        ax.plot(x, closes, color=TP_COLOR, linewidth=2.5, solid_capstyle="round", zorder=5)
+            # Mecha (high-low)
+            ax.plot([i, i], [l, h], color=wick_color, linewidth=wick_width, solid_capstyle="round", zorder=3)
 
-        # TP line — gruesa y prominente
-        ax.axhline(y=tp, color=GOLD, linestyle="-", linewidth=2, alpha=0.9, zorder=4)
-        ax.text(n - 1, tp, f"  TP {tp:.2f}", color=GOLD, fontsize=11, fontweight="bold",
-                va="center", ha="left", zorder=6)
+            # Cuerpo de la vela
+            body_bottom = min(o, c)
+            body_height = abs(c - o) or (h - l) * 0.01  # mínimo visible para doji
+            rect = plt.Rectangle((i - candle_width / 2, body_bottom), candle_width, body_height,
+                                 facecolor=color, edgecolor=color, linewidth=0.5, zorder=4)
+            ax.add_patch(rect)
 
-        # Entry line
+        # ── TP line — prominente ──
+        ax.axhline(y=tp, color=GOLD, linestyle="-", linewidth=2, alpha=0.9, zorder=5)
+        ax.text(n + 0.5, tp, f" TP {tp:.2f}", color=GOLD, fontsize=11, fontweight="bold",
+                va="center", ha="left", zorder=6,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor=GOLD, edgecolor="none", alpha=0.15))
+
+        # ── Entry line ──
         if entry > 0:
-            ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=1.5, alpha=0.7, zorder=4)
-            ax.text(n - 1, entry, f"  Entrada {entry:.2f}", color=ENTRY_COLOR, fontsize=10,
-                    va="center", ha="left", zorder=6)
+            ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=1.5, alpha=0.8, zorder=5)
+            ax.text(n + 0.5, entry, f" Entry {entry:.2f}", color=ENTRY_COLOR, fontsize=10,
+                    va="center", ha="left", zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor=ENTRY_COLOR, edgecolor="none", alpha=0.15))
 
-        # Zona de profit (fill entre entry y TP)
+        # ── Zona de profit (fill entre entry y TP) ──
         if entry > 0 and tp > 0:
             y_min = min(entry, tp)
             y_max = max(entry, tp)
-            ax.axhspan(y_min, y_max, alpha=0.07, color=GOLD, zorder=1)
+            ax.axhspan(y_min, y_max, alpha=0.06, color=GOLD, zorder=1)
 
         # Calcular pips ganados
         pips_won = abs(tp - entry) if entry > 0 else 0
@@ -215,15 +237,15 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> by
         ax.set_title(title, color=GOLD, fontsize=14, fontweight="bold", pad=15,
                      fontfamily="sans-serif")
 
-        # Grid y ejes limpios
-        ax.grid(True, alpha=0.1, color=TEXT, linestyle="-")
+        # Grid estilo TradingView
+        ax.grid(True, alpha=0.08, color=TEXT, linestyle="-", linewidth=0.5)
         ax.tick_params(colors=TEXT, labelsize=9)
-        ax.set_xlim(-1, n + 6)  # Espacio para labels
+        ax.set_xlim(-1, n + 7)  # Espacio para labels
         for spine in ax.spines.values():
             spine.set_visible(False)
 
         # Watermark
-        fig.text(0.98, 0.02, "BuySell365 Pro", fontsize=8, color="#333344",
+        fig.text(0.98, 0.02, "BuySell365 Pro", fontsize=8, color="#2a2e39",
                  ha="right", va="bottom", fontstyle="italic")
 
         plt.tight_layout()
@@ -930,6 +952,24 @@ NO digas si aprobar o rechazar. Solo el análisis."""
 
 
 # === TELEGRAM BOT SEND ===
+async def _publish_buffered(msg_id: int) -> None:
+    """Publica una señal buffered después de 30s si no llegó edición con entry."""
+    with _buffered_lock:
+        buf = _buffered_signals.pop(msg_id, None)
+    if buf is None:
+        return  # Ya fue publicada por edit_handler
+    signal = buf["signal"]
+    log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — publicando con 'Precio de Mercado'")
+    tg_msg_id = send_to_channel(signal, buf["executed"], buf["detail"])
+    _published_msg_ids.add(msg_id)
+    # Registrar como pending_entry con el telegram_msg_id para poder EDITAR si llega el precio real
+    if signal.get("entry", 0) == 0:
+        sig_copy = signal.copy()
+        sig_copy["_tg_msg_id"] = tg_msg_id  # ID del mensaje en nuestro canal (para editarlo)
+        with _pending_entry_lock:
+            _pending_entry[msg_id] = sig_copy
+
+
 def send_to_channel(signal, executed, detail):
     """Envía señales al canal BuySell365 en formato español profesional."""
     import requests
@@ -1066,10 +1106,12 @@ def send_to_channel(signal, executed, detail):
                         "telegram_msg_id": _canal_msg_id,  # Para reply en TP/SL
                     }
                 log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
+            return _canal_msg_id
         else:
             log.warning(f"📡 Error canal: {resp.status_code} {resp.text[:100]}")
     except Exception as e:
         log.warning(f"Error sending to channel: {e}")
+    return None
 
 
 # === MAIN USERBOT ===
@@ -1176,17 +1218,27 @@ async def main():
                     executed, detail = execute_in_mt5(signal)
                     log.info(f"📡 MT5: {'✅' if executed else '❌'} {detail}")
 
-                # Send to BuySell365 channel (siempre activo)
-                send_to_channel(signal, executed, detail)
-
                 # Registrar msg_id para manejar ediciones futuras
                 msg_id = event.message.id
-                if msg_id:
-                    _published_msg_ids.add(msg_id)
-                    if signal.get("entry", 0) == 0:
-                        with _pending_entry_lock:
-                            _pending_entry[msg_id] = signal.copy()
-                        log.info(f"⏳ Señal sin entrada registrada (msg_id={msg_id}) — esperando edición con precio real")
+
+                if signal.get("entry", 0) == 0 and msg_id:
+                    # ── BUFFER 30s: NO publicar aún, esperar edición con precio real ──
+                    with _buffered_lock:
+                        _buffered_signals[msg_id] = {
+                            "signal": signal.copy(),
+                            "executed": executed,
+                            "detail": detail,
+                        }
+                    log.info(f"⏳ Señal sin entrada en buffer (msg_id={msg_id}) — esperando 30s por edición con precio")
+
+                    # Programar publicación fallback a los 30s
+                    loop = asyncio.get_event_loop()
+                    loop.call_later(BUFFER_WAIT_SECONDS, lambda mid=msg_id: asyncio.ensure_future(_publish_buffered(mid)))
+                else:
+                    # Señal con entry → publicar inmediatamente
+                    send_to_channel(signal, executed, detail)
+                    if msg_id:
+                        _published_msg_ids.add(msg_id)
 
             elif signal["type"] == "update":
                 # ── Updates de posiciones (cerrar, mover SL) ──
@@ -1232,11 +1284,30 @@ async def main():
                 if v <= 0: return "—"
                 return f"{v:.5f}".rstrip('0').rstrip('.') if v < 100 else f"{v:.2f}"
 
-            # ── CASO A: señal ya publicada sin precio de entrada ─────────────
-            with _pending_entry_lock:
-                _is_pending = msg_id in _pending_entry
+            # ── CASO A-BUFFER: señal aún en buffer de 30s (no publicada) ──────
+            with _buffered_lock:
+                _is_buffered = msg_id in _buffered_signals
 
-            if _is_pending:
+            if _is_buffered:
+                signal = parse_signal(text, chat_title=chat_title)
+                if not signal or signal.get("entry", 0) <= 0:
+                    return  # La edición no añadió precio de entrada — ignorar
+
+                # Extraer del buffer y publicar 1 solo mensaje completo
+                with _buffered_lock:
+                    buf = _buffered_signals.pop(msg_id, None)
+                if buf:
+                    # Usar la señal actualizada con entry real
+                    log.info(f"✏️ Edición recibida dentro de 30s (msg_id={msg_id}) — publicando señal completa con entry={signal.get('entry')}")
+                    send_to_channel(signal, buf["executed"], buf["detail"])
+                    _published_msg_ids.add(msg_id)
+                return
+
+            # ── CASO A: señal ya publicada con "Precio de Mercado" → EDITAR mensaje existente ──
+            with _pending_entry_lock:
+                _pending_sig = _pending_entry.get(msg_id)
+
+            if _pending_sig:
                 signal = parse_signal(text, chat_title=chat_title)
                 if not signal or signal.get("entry", 0) <= 0:
                     return  # La edición no añadió precio de entrada — ignorar
@@ -1247,30 +1318,61 @@ async def main():
                 dir_emoji = "🟢" if direction == "BUY" else "🔴"
                 dir_es = "COMPRA" if direction == "BUY" else "VENTA"
 
+                # Nombre display del par
+                _display_special = {
+                    "GOLD": "XAU/USD", "US100Cash": "NASDAQ", "US500Cash": "S&P 500",
+                    "US30Cash": "DOW 30", "GER40Cash": "DAX 40", "BRENT": "BRENT",
+                }
+                if pair in _display_special:
+                    pair_display = _display_special[pair]
+                elif len(pair) == 6 and pair.isalpha():
+                    pair_display = f"{pair[:3]}/{pair[3:]}"
+                else:
+                    pair_display = pair
+
+                # Reconstruir el mensaje completo (mismo formato que send_to_channel)
+                tp_display = fmt(signal.get('tp', 0)) if signal.get('tp', 0) > 0 else "Abierto"
                 msg = (
-                    f"✏️ *Actualización de señal*\n\n"
-                    f"{dir_emoji} *{dir_es} {pair}*\n\n"
-                    f"📍 Entrada confirmada: *{fmt(entry)}*\n"
-                    f"🎯 TP: {fmt(signal.get('tp', 0))}\n"
+                    f"{dir_emoji} *{dir_es} {pair_display}*\n\n"
+                    f"📍 Entrada: {fmt(entry)}\n"
+                    f"🎯 TP: {tp_display}\n"
                     f"🛡️ SL: {fmt(signal.get('sl', 0))}"
                 )
-                url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                resp = requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
-                if resp.status_code == 200:
-                    log.info(f"✏️ Entrada confirmada publicada: {dir_es} {pair} @ {entry}")
-                    _published_msg_ids.add(msg_id)
-                    # Actualizar entry en _open_signals para que el monitor TP/SL use el precio real
-                    with _signals_lock:
-                        for _sid, _sdata in _open_signals.items():
-                            _sig = _sdata.get("signal", {})
-                            if _sig.get("pair") == pair and _sig.get("direction") == direction and _sig.get("entry", 0) == 0:
-                                _sig["entry"] = entry
-                                _sig["sl"] = signal.get("sl", _sig.get("sl", 0))
-                                _sig["tp"] = signal.get("tp", _sig.get("tp", 0))
-                                log.info(f"✏️ _open_signals actualizado: {_sid} entry={entry}")
-                                break
+
+                # EDITAR el mensaje existente en nuestro canal (no enviar uno nuevo)
+                _tg_msg_id = _pending_sig.get("_tg_msg_id")
+                if _tg_msg_id:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
+                    resp = requests.post(url, json={
+                        "chat_id": CHANNEL_ID,
+                        "message_id": _tg_msg_id,
+                        "text": msg,
+                        "parse_mode": "Markdown",
+                    }, timeout=10)
+                    if resp.status_code == 200:
+                        log.info(f"✏️ Mensaje EDITADO con entrada real: {dir_es} {pair_display} @ {entry} (tg_msg={_tg_msg_id})")
+                    else:
+                        log.warning(f"✏️ Error editando mensaje (tg_msg={_tg_msg_id}): {resp.status_code} — enviando nuevo")
+                        # Fallback: enviar mensaje nuevo si editar falla
+                        url2 = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                        requests.post(url2, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
                 else:
-                    log.warning(f"✏️ Error publicando actualización: {resp.status_code}")
+                    # Sin _tg_msg_id (no debería pasar, pero fallback seguro)
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                    requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+                    log.info(f"✏️ Entrada confirmada (nuevo msg): {dir_es} {pair_display} @ {entry}")
+
+                _published_msg_ids.add(msg_id)
+                # Actualizar entry en _open_signals para que el monitor TP/SL use el precio real
+                with _signals_lock:
+                    for _sid, _sdata in _open_signals.items():
+                        _sig = _sdata.get("signal", {})
+                        if _sig.get("pair") == pair and _sig.get("direction") == direction and _sig.get("entry", 0) == 0:
+                            _sig["entry"] = entry
+                            _sig["sl"] = signal.get("sl", _sig.get("sl", 0))
+                            _sig["tp"] = signal.get("tp", _sig.get("tp", 0))
+                            log.info(f"✏️ _open_signals actualizado: {_sid} entry={entry}")
+                            break
                 with _pending_entry_lock:
                     _pending_entry.pop(msg_id, None)
                 return

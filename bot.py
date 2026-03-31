@@ -12980,7 +12980,7 @@ def enviar_briefing_matutino():
     _ia_outlook = ""
     try:
         _ia_outlook = _ia_responder(
-            "Dame un outlook de 2 líneas para hoy: EUR/USD, NASDAQ, S&P 500. Menciona niveles clave y qué sesión será más activa.",
+            "Dame una perspectiva de 2 líneas para hoy en español: EUR/USD, NASDAQ, S&P 500. Menciona niveles clave y qué sesión será más activa. No uses palabras en inglés.",
             "Canal VIP"
         ) or ""
     except Exception:
@@ -12995,7 +12995,7 @@ def enviar_briefing_matutino():
         _saludo_emoji, _saludo = "🌙", "BUENAS NOCHES"
 
     lineas = [
-        f"{_saludo_emoji} *{_saludo} — BRIEFING* {ahora().strftime('%d/%m/%Y')} | {hora}\n"
+        f"{_saludo_emoji} *{_saludo} — RESUMEN* {ahora().strftime('%d/%m/%Y')} | {hora}\n"
         f"━━━━━━━━━━━━━━━━━━━━"
     ]
 
@@ -13024,7 +13024,7 @@ def enviar_briefing_matutino():
         lineas.append("⚪ *Neutros:*")
         lineas.extend(_neutros)
 
-    lineas.append(f"\n😱 Fear & Greed: *{fg}/100*")
+    lineas.append(f"\n😱 *Miedo y Codicia:* {fg}/100")
 
     if noticias_hoy:
         lineas.append("\n📰 *Noticias Alto Impacto:*")
@@ -13033,7 +13033,7 @@ def enviar_briefing_matutino():
         lineas.append("\n📰 Sin noticias de alto impacto hoy")
 
     if _ia_outlook:
-        lineas.append(f"\n💡 *IA Outlook:*\n{_ia_outlook[:300]}")
+        lineas.append(f"\n💡 *Perspectiva IA:*\n{_ia_outlook[:300]}")
 
     # Operaciones activas overnight
     with _lock_ops:
@@ -13041,9 +13041,6 @@ def enviar_briefing_matutino():
     if n_activas > 0:
         lineas.append(f"\n🔔 *{n_activas} operaciones activas* desde ayer")
 
-    lineas.append(
-        f"\n⚙️ Modo: *{MODO_RIESGO.upper()}* | Score min: {get_min_score_efectivo()}/5"
-    )
     lineas.append("━━━━━━━━━━━━━━━━━━━━")
 
     enviar_canal("\n".join(lineas))
