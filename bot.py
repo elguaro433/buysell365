@@ -14788,8 +14788,10 @@ def loop_vip_check():
             hoy_str_check = ahora_check.strftime("%Y-%m-%d")
             es_finde = ahora_check.weekday() >= 5
 
-            if not es_finde and (ahora_check.hour > REPORTE_HORA or (ahora_check.hour == REPORTE_HORA and ahora_check.minute >= REPORTE_MINUTO)) and _ultimo_reporte_diario != hoy_str_check:
-                _generar_reporte_diario()
+            # Reporte diario DESACTIVADO — mostrar pérdidas al canal VIP asusta suscriptores
+            # if not es_finde and (ahora_check.hour > REPORTE_HORA or (ahora_check.hour == REPORTE_HORA and ahora_check.minute >= REPORTE_MINUTO)) and _ultimo_reporte_diario != hoy_str_check:
+            #     _generar_reporte_diario()
+            pass  # Placeholder para mantener indentación
 
             # 0b. ☀️ BRIEFING MATUTINO AL CANAL VIP (7:00 AM L-V)
             if not es_finde and (ahora_check.hour > BRIEFING_HORA or (ahora_check.hour == BRIEFING_HORA and ahora_check.minute >= BRIEFING_MINUTO)) and _ultimo_briefing_diario != hoy_str_check:
