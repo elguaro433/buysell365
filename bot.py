@@ -13444,10 +13444,10 @@ def revisar_niveles_operaciones():
                 else:
                     enviar_grupo(_msg_grupo, incluir_promo=False, auto_delete=0)
             
-            # Limpiar archivo de imagen generado
-            if ruta_img and os.path.exists(ruta_img):
-                try: os.remove(ruta_img)
-                except Exception: pass
+            # Limpiar archivo de imagen generado (variable eliminada — charts usan bytes en memoria)
+            # if ruta_img and os.path.exists(ruta_img):
+            #     try: os.remove(ruta_img)
+            #     except Exception: pass
                 
             guardar_estado()
             continue
@@ -14108,7 +14108,7 @@ def analizar_activo(nombre, ticker):
 
             # ✅ TODOS LOS CHECKS PASADOS — RESERVAR SLOT (atómico con checks)
             _senal_reciente[_base_symbol] = time.time()  # BUG-3: Marcar señal reciente
-            op_id = f"{ticker}_{int(time.time())}"
+            op_id = f"{ticker}_{int(time.time() * 1000)}"  # Milliseconds to avoid collision
             operaciones_activas[op_id] = {
                 'ticker': ticker, 'nombre': nombre, 'tipo': tipo, 'entrada': precio,
                 'tp1': niveles['tp1'], 'tp2': niveles['tp2'], 'tp3': niveles['tp3'], 'sl': niveles['sl'],
@@ -14176,11 +14176,12 @@ def analizar_activo(nombre, ticker):
                  {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
             ]}
             _msg_canal_id = enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_xm_btn_senal)
-            # Guardar message_id para citar la señal original en TP/SL
-            if _msg_canal_id and op_id:
+            # Guardar message_id INMEDIATAMENTE para que TP/SL haga reply correcto
+            if op_id:
                 with _lock_ops:
                     if op_id in operaciones_activas:
-                        operaciones_activas[op_id]['telegram_msg_id'] = _msg_canal_id
+                        operaciones_activas[op_id]['telegram_msg_id'] = _msg_canal_id or 0
+                        operaciones_activas[op_id]['_reservado'] = False
 
             # 🚨 FOMO desactivado — solo TP ganadores van al grupo como publicidad
             # notificar_fomo_grupo(nombre, tipo)

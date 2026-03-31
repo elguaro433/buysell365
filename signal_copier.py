@@ -94,7 +94,7 @@ _pending_entry_lock = threading.Lock()
 _published_msg_ids: set = set()  # msg_ids ya publicados como señal completa (evita duplicar en edit)
 
 # === BUFFER 30s para señales sin entry ===
-# { msg_id → {"signal": dict, "executed": bool, "detail": str, "timer": asyncio.TimerHandle|None} }
+# { msg_id → {"signal": dict, "executed": bool, "detail": str, "task": asyncio.Task|None} }
 _buffered_signals: dict = {}
 _buffered_lock = threading.Lock()
 BUFFER_WAIT_SECONDS = 30
@@ -390,6 +390,16 @@ async def _monitor_tp_loop() -> None:
                             log.info(f"📌 Señal manual cargada: {_ms.get('direction')} {_ms.get('pair')} TP:{_ms.get('tp')} SL:{_ms.get('sl')}")
         except Exception as _e_manual:
             log.warning(f"Error leyendo manual_signals.json: {_e_manual}")
+
+        # ── Limpieza de _pending_entry antiguos (>10 min) para evitar memory leak ──
+        _now = time.time()
+        with _pending_entry_lock:
+            _stale_ids = [mid for mid, sig in _pending_entry.items()
+                          if _now - sig.get("_buffered_at", _now) > 600]
+            for mid in _stale_ids:
+                _pending_entry.pop(mid, None)
+            if _stale_ids:
+                log.info(f"🧹 Limpieza: {len(_stale_ids)} pending_entry antiguos eliminados")
 
         with _signals_lock:
             signals_copy = dict(_open_signals)
@@ -954,10 +964,14 @@ NO digas si aprobar o rechazar. Solo el análisis."""
 # === TELEGRAM BOT SEND ===
 async def _publish_buffered(msg_id: int) -> None:
     """Publica una señal buffered después de 30s si no llegó edición con entry."""
+    try:
+        await asyncio.sleep(BUFFER_WAIT_SECONDS)
+    except asyncio.CancelledError:
+        return  # Edit llegó antes de 30s — cancelado correctamente
     with _buffered_lock:
         buf = _buffered_signals.pop(msg_id, None)
     if buf is None:
-        return  # Ya fue publicada por edit_handler
+        return  # Ya fue publicada por edit_handler (doble seguridad)
     signal = buf["signal"]
     log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — publicando con 'Precio de Mercado'")
     tg_msg_id = send_to_channel(signal, buf["executed"], buf["detail"])
@@ -966,6 +980,7 @@ async def _publish_buffered(msg_id: int) -> None:
     if signal.get("entry", 0) == 0:
         sig_copy = signal.copy()
         sig_copy["_tg_msg_id"] = tg_msg_id  # ID del mensaje en nuestro canal (para editarlo)
+        sig_copy["_buffered_at"] = time.time()
         with _pending_entry_lock:
             _pending_entry[msg_id] = sig_copy
 
@@ -1008,11 +1023,13 @@ def send_to_channel(signal, executed, detail):
                 _payload = {"chat_id": CHANNEL_ID, "text": _msg, "parse_mode": "Markdown"}
                 if _reply_id:
                     _payload["reply_to_message_id"] = _reply_id
-                requests.post(url, json=_payload, timeout=10)
+                _resp_upd = requests.post(url, json=_payload, timeout=10)
                 log.info(f"📢 Update notificado al canal: {_action} {_pair_d} (reply_to={_reply_id})")
+                if _resp_upd.status_code == 200:
+                    return _resp_upd.json().get("result", {}).get("message_id")
             except Exception as _e:
                 log.warning(f"Error enviando update al canal: {_e}")
-        return
+        return None
 
     direction  = signal["direction"]
     pair       = signal["pair"]
@@ -1189,13 +1206,15 @@ async def main():
 
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
-            # ── Deduplicación: evitar procesar la misma señal 2 veces en <5 min ──
+            # ── Deduplicación: evitar misma señal del MISMO canal 2 veces en <5 min ──
+            # Usa pair+direction+source para no bloquear señales legítimas de canales diferentes
             if signal["type"] == "new_signal":
-                _dedup_key = f"{signal['pair']}_{signal['direction']}_{signal.get('sl',0)}"
+                _source = signal.get("source", chat_title)
+                _dedup_key = f"{signal['pair']}_{signal['direction']}_{_source}"
                 with _signals_lock:
                     for _sid, _sdata in _open_signals.items():
                         _s = _sdata.get("signal", {})
-                        _existing_key = f"{_s.get('pair','')}_{_s.get('direction','')}_{_s.get('sl',0)}"
+                        _existing_key = f"{_s.get('pair','')}_{_s.get('direction','')}_{_s.get('source','')}"
                         if _existing_key == _dedup_key and (time.time() - _sdata.get("sent_at", 0)) < 300:
                             log.info(f"⏭️ Señal duplicada ignorada: {_dedup_key} (ya existe en últimos 5 min)")
                             return
@@ -1223,17 +1242,15 @@ async def main():
 
                 if signal.get("entry", 0) == 0 and msg_id:
                     # ── BUFFER 30s: NO publicar aún, esperar edición con precio real ──
+                    _buf_task = asyncio.create_task(_publish_buffered(msg_id))
                     with _buffered_lock:
                         _buffered_signals[msg_id] = {
                             "signal": signal.copy(),
                             "executed": executed,
                             "detail": detail,
+                            "task": _buf_task,
                         }
                     log.info(f"⏳ Señal sin entrada en buffer (msg_id={msg_id}) — esperando 30s por edición con precio")
-
-                    # Programar publicación fallback a los 30s
-                    loop = asyncio.get_event_loop()
-                    loop.call_later(BUFFER_WAIT_SECONDS, lambda mid=msg_id: asyncio.ensure_future(_publish_buffered(mid)))
                 else:
                     # Señal con entry → publicar inmediatamente
                     send_to_channel(signal, executed, detail)
@@ -1293,10 +1310,14 @@ async def main():
                 if not signal or signal.get("entry", 0) <= 0:
                     return  # La edición no añadió precio de entrada — ignorar
 
-                # Extraer del buffer y publicar 1 solo mensaje completo
+                # Extraer del buffer, CANCELAR el timer, y publicar 1 solo mensaje completo
                 with _buffered_lock:
                     buf = _buffered_signals.pop(msg_id, None)
                 if buf:
+                    # Cancelar el task de 30s para que no publique duplicado
+                    _task = buf.get("task")
+                    if _task and not _task.done():
+                        _task.cancel()
                     # Usar la señal actualizada con entry real
                     log.info(f"✏️ Edición recibida dentro de 30s (msg_id={msg_id}) — publicando señal completa con entry={signal.get('entry')}")
                     send_to_channel(signal, buf["executed"], buf["detail"])
