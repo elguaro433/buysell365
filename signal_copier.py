@@ -1034,12 +1034,23 @@ def send_to_channel(signal, executed, detail):
 
     msg = "\n".join(lines)
 
+    # Botones de afiliado XM — aparecen debajo de cada señal nueva
+    _xm_buttons = {
+        "inline_keyboard": [
+            [
+                {"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
+                {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+            ]
+        ]
+    }
+
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
         resp = requests.post(url, json={
             "chat_id": CHANNEL_ID,
             "text": msg,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "reply_markup": _xm_buttons,
         }, timeout=10)
         if resp.status_code == 200:
             log.info(f"📡 ENVIADO AL CANAL: {dir_es} {pair_display} ({source})")
