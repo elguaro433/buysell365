@@ -1654,6 +1654,21 @@ def enviar_canal_foto(photo_bytes: bytes, caption: str, reply_to: int = None):
         logger.warning(f"Error enviando foto al canal: {_e}")
     return None
 
+def _enviar_grupo_foto(photo_bytes: bytes, caption: str):
+    """📸 Envía foto con caption al grupo público (para TP celebrations)."""
+    try:
+        import requests as _req_gfoto
+        target = GROUP_ID if GROUP_ID else CHANNEL_ID
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        payload = {"chat_id": target, "caption": caption, "parse_mode": "Markdown"}
+        resp = _req_gfoto.post(url, data=payload,
+            files={"photo": ("chart.png", photo_bytes, "image/png")}, timeout=20)
+        if resp.status_code == 200:
+            return resp.json().get("result", {}).get("message_id")
+    except Exception as _e:
+        logger.warning(f"Error enviando foto al grupo: {_e}")
+    return None
+
 def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 300, **kwargs):
     """👥 ALERTAS TÉCNICAS: Envía logs, ejecuciones y alertas de sistema al grupo.
        Añade automáticamente un tag de publicidad VIP para incentivar ventas.
@@ -13386,32 +13401,48 @@ def revisar_niveles_operaciones():
             else:
                 print(f"ℹ️ {nombre}: Señal solo Telegram (no MT5) — no hay posición que cerrar")
             
-            # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP)
+            # 1. 💎 Enviar resultado al CANAL PRIVADO (VIP) — solo texto, sin gráfico
             _reply_msg_id = op.get('telegram_msg_id')
+            enviar_canal(msg, reply_to=_reply_msg_id)
 
-            # Para WINs: intentar generar gráfico y enviar como foto
-            _chart_sent = False
-            if resultado == "WIN":
+            # 2. 📢 Enviar VICTORIAS al grupo público (marketing + gráfico + promo)
+            if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
+                _unidad = unidad_medida(ticker)
+                _tp_label = "TP1" if toca_tp1 else "TP"
+
+                # Generar gráfico de velas japonesas para el grupo
+                _chart = None
                 try:
                     from signal_copier import _fetch_chart_image
                     _direction = "BUY" if tipo == "COMPRA" else "SELL"
                     _chart = _fetch_chart_image(ticker.replace("=X","").replace("=F",""), _direction, op['entrada'], precio_salida)
-                    if _chart:
-                        enviar_canal_foto(_chart, msg, reply_to=_reply_msg_id)
-                        _chart_sent = True
                 except Exception as _e_chart:
                     logger.debug(f"Chart TP generation skipped: {_e_chart}")
 
-            if not _chart_sent:
-                enviar_canal(msg, reply_to=_reply_msg_id)
+                # Mensaje de victoria motivante para el grupo
+                _promos_tp = [
+                    f"\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
+                    f"\n\n🤖 *Activa el Copy Trading*\nCopia estas operaciones automáticamente en tu cuenta.\n👉 Escribe */vip* para activarlo",
+                    f"\n\n🔥 *Otra victoria más del equipo*\nNo te quedes fuera, únete al VIP.\n👉 Escribe */vip* y empieza hoy",
+                    f"\n\n📈 *Resultados reales, sin trucos*\nSeñales en vivo con entrada, TP y SL exactos.\n👉 Escribe */vip* para unirte",
+                    f"\n\n🚀 *Trading profesional al alcance de todos*\nCopy Trading automático 24/7 en tu cuenta.\n👉 Escribe */vip* para empezar",
+                ]
 
-            # 2. 📢 Enviar VICTORIAS al grupo público (marketing)
-            if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
-                enviar_grupo(
-                    f"✅ *{'TP1' if toca_tp1 else 'WIN'}* — {nombre}\n"
-                    f"+{pips:.1f} {unidad_medida(ticker)}",
-                    incluir_promo=True
+                _msg_grupo = (
+                    f"✅ *{_tp_label} ALCANZADO* — {nombre}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{'🟢' if tipo == 'COMPRA' else '🔴'} {tipo}\n"
+                    f"📍 Entrada: {op['entrada']:.2f}\n"
+                    f"🎯 TP: {precio_salida:.2f}\n"
+                    f"💰 *+{pips:.1f} {_unidad}*"
+                    f"{random.choice(_promos_tp)}"
                 )
+
+                if _chart:
+                    # Enviar con gráfico al grupo
+                    _enviar_grupo_foto(_chart, _msg_grupo)
+                else:
+                    enviar_grupo(_msg_grupo, incluir_promo=False, auto_delete=0)
             
             # Limpiar archivo de imagen generado
             if ruta_img and os.path.exists(ruta_img):
