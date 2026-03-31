@@ -1430,9 +1430,9 @@ def fmt(v: float, ticker: str) -> str:
             return f"{v:.3f}"
         return f"{v:.5f}"
     
-    # Futuros / Índices: 2 decimales es el estándar para NQ, ES
+    # Futuros / Índices: 2 decimales sin comas (mismo formato que copier)
     if ticker in ("ES=F", "NQ=F"):
-        return f"{v:,.2f}"
+        return f"{v:.2f}"
     
     # Fallback: intentar detectar si es un valor pequeño para usar más precisión
     if abs(v) < 10:
@@ -4267,9 +4267,9 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     return (
         f"{cabecera}\n"
         f"\n"
-        f"📍 Entrada: `{f_(precio)}`\n"
-        f"🎯 TP: `{f_(niveles['tp1'])}`\n"
-        f"🛡️ SL: `{f_(niveles['sl'])}`"
+        f"📍 Entrada: {f_(precio)}\n"
+        f"🎯 TP: {f_(niveles['tp1'])}\n"
+        f"🛡️ SL: {f_(niveles['sl'])}"
     )
 
 
@@ -14554,19 +14554,21 @@ def loop_publicidad_grupo():
                 {"text": "🌐 Web", "url": "https://buysell365.pro"}
             ]]}
         ),
-        # 2 — Señales VIP con ejemplo real de señal
+        # 2 — Señales VIP con ejemplo (marcado como ejemplo)
         (
             "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📡 Recibe alertas profesionales al instante:\n\n"
-            "🟢 COMPRA — EUR/USD\n"
-            "📍 Entrada: `1.0845`\n"
-            "🎯 TP: `1.0910`  ·  🛡️ SL: `1.0800`\n\n"
-            "✅ Análisis IA multi-timeframe\n"
-            "✅ EUR/USD, NASDAQ, S&P 500, Oro, Crypto y más\n"
-            "✅ Alertas en tiempo real — nunca pierdas una señal\n"
-            "🤖 *Bot asistente personal incluido*\n\n"
-            "👇 *Únete al canal VIP ahora*",
+            "Asi se ven nuestras senales VIP:\n\n"
+            "🟢 *COMPRA — EUR/USD*\n"
+            "📍 Entrada: 1.0845\n"
+            "🎯 TP: 1.0910\n"
+            "🛡️ SL: 1.0800\n"
+            "_(Ejemplo ilustrativo, no es una senal activa)_\n\n"
+            "✅ Entrada, TP y SL exactos en cada senal\n"
+            "✅ EUR/USD, NASDAQ, Oro, S&P 500 y mas\n"
+            "✅ Alertas en tiempo real al instante\n"
+            "🤖 Copy Trading automatico disponible\n\n"
+            "👇 *Escribe /vip para unirte*",
             {"inline_keyboard": [[
                 {"text": "💎 UNIRME AL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
             ], [
