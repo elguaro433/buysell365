@@ -12728,9 +12728,9 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                 estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 0) - 1)
             return
 
-        # 🛡️ ANTI-DUPLICADO MT5 WEBHOOK (solo afecta ejecución MT5, NO bloquea señal)
-        _wh_skip_mt5 = False
-        _wh_skip_mt5_razon = ""
+        # ══ MT5 DESACTIVADO — Solo Telegram (evaluacion) ══
+        _wh_skip_mt5 = True
+        _wh_skip_mt5_razon = "Solo Telegram (evaluacion)"
         if tiene_posicion_mt5(ticker_yf):
             _wh_skip_mt5 = True
             _wh_skip_mt5_razon = f"Ya tiene posición abierta en MT5"
@@ -13896,8 +13896,10 @@ def analizar_activo(nombre, ticker):
 
         # 🛡️ ANTI-CONTRADICCIÓN MT5: Verificar dirección real en MT5
         # NOTA: Si MT5 bloquea, la señal SIGUE enviándose a Telegram (usuarios VIP la reciben)
-        _skip_mt5 = False  # Flag: True = no ejecutar en MT5, pero SÍ enviar señal
-        _skip_mt5_razon = ""
+        # ══ MT5 DESACTIVADO — Solo generar y publicar señales en Telegram ══
+        # Para reactivar MT5: cambiar a _skip_mt5 = False
+        _skip_mt5 = True
+        _skip_mt5_razon = "Solo Telegram (evaluacion)"
         _dir_mt5 = obtener_direccion_mt5(ticker)
         if _dir_mt5:
             _tipo_mt5 = "COMPRA" if _dir_mt5 == "BUY" else "VENTA"
