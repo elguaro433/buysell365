@@ -2513,12 +2513,13 @@ def evaluar_senal_profesional(ind, ticker=""):
     if not ind:
         return None, 0, []
 
-    # [5] CIRCUIT BREAKER GLOBAL: bloquear si está activo
-    try:
-        if _circuit_breaker_check():
-            return None, 0, ["🚨 Circuit Breaker activo — trading pausado"]
-    except Exception:
-        pass
+    # [5] CIRCUIT BREAKER GLOBAL: DESACTIVADO por el usuario
+    # Las señales deben fluir siempre, sin pausas
+    # try:
+    #     if _circuit_breaker_check():
+    #         return None, 0, ["🚨 Circuit Breaker activo — trading pausado"]
+    # except Exception:
+    #     pass
 
     # 📉 EUR/USD: backtest mostró 24.7% WR — solo permitir score 5 (divergencia)
     # Este filtro se aplica AQUÍ para que el backtest también lo capture
@@ -13709,14 +13710,14 @@ def analizar_activo(nombre, ticker):
 
         precio = precio_mon
 
-        # ── 🛑 CIRCUIT BREAKER: pausa 1h tras 4 pérdidas consecutivas ──
-        # FIX 2026-03-20: 2→4 pérdidas (2 era demasiado agresivo, bloqueaba todo el día)
-        _racha = _calcular_racha_perdidas_actual()
-        if _racha >= 4:
-            _last_loss_time = _get_last_loss_time()
-            if _last_loss_time and (time.time() - _last_loss_time) < 3600:
-                logger.info(f"🛑 CIRCUIT BREAKER: {nombre} — {_racha} pérdidas seguidas, pausa 1h")
-                return
+        # ── 🛑 CIRCUIT BREAKER: DESACTIVADO por el usuario ──
+        # Las señales deben fluir siempre, sin pausas
+        # _racha = _calcular_racha_perdidas_actual()
+        # if _racha >= 4:
+        #     _last_loss_time = _get_last_loss_time()
+        #     if _last_loss_time and (time.time() - _last_loss_time) < 3600:
+        #         logger.info(f"🛑 CIRCUIT BREAKER: {nombre} — {_racha} pérdidas seguidas, pausa 1h")
+        #         return
 
         # ── 🚨 FILTRO DE NOTICIAS (ANTES de generar señales) ────────────
         # FIX 2026-03-20: 2h→1h antes (2h bloqueaba demasiado tiempo)
@@ -17269,30 +17270,25 @@ def _circuit_breaker_check():
             return False
         return True
 
-    # Check 1: P&L diario vs capital
+    # Check 1 y 2: DESACTIVADOS — el usuario quiere que el trading nunca se pause
+    # Solo loguear como informativo, sin bloquear
     capital = CAPITAL_USUARIO
     if capital > 0 and _cb_pnl_diario <= -(capital * 0.03):
+        logger.info(f"ℹ️ P&L diario: ${_cb_pnl_diario:+.2f} (>{3}% de ${capital:.0f}) — CB desactivado, trading continúa")
+
+    if _cb_perdidas_consecutivas >= 5:
+        logger.info(f"ℹ️ {_cb_perdidas_consecutivas} pérdidas consecutivas — CB desactivado, trading continúa")
+
+    # Nunca activar — siempre retornar False
+    return False
+
+    # --- Código original desactivado ---
+    if False:  # DEAD CODE
         _cb_activo = True
-        # Hasta medianoche Andorra
         _mañana = ahora().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
         _cb_hasta = _mañana.timestamp()
-        msg_cb = f"🚨 *CIRCUIT BREAKER ACTIVADO*\n📉 P&L diario: ${_cb_pnl_diario:+.2f} (>{3}% de ${capital:.0f})\n⏰ Trading pausado hasta mañana"
+        msg_cb = f"CIRCUIT BREAKER ACTIVADO"
         logger.warning(msg_cb)
-        # FIX 2026-03-19: alertas solo al admin, NO al canal VIP
-        for _admin_id in ADMIN_IDS:
-            try:
-                enviar_telegram(msg_cb, destino=_admin_id)
-            except Exception:
-                pass
-        return True
-
-    # Check 2: Pérdidas consecutivas
-    if _cb_perdidas_consecutivas >= 5:
-        _cb_activo = True
-        _cb_hasta = time.time() + 7200  # 2 horas
-        msg_cb = f"🚨 *CIRCUIT BREAKER ACTIVADO*\n📉 {_cb_perdidas_consecutivas} pérdidas consecutivas\n⏰ Trading pausado 2 horas"
-        logger.warning(msg_cb)
-        # FIX 2026-03-19: alertas solo al admin, NO al canal VIP
         for _admin_id in ADMIN_IDS:
             try:
                 enviar_telegram(msg_cb, destino=_admin_id)
