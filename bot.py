@@ -17203,6 +17203,8 @@ def _circuit_breaker_check():
     # Reset diario
     hoy = ahora().strftime("%Y-%m-%d")
     if _cb_ultimo_dia != hoy:
+        if _cb_activo:
+            logger.info(f"✅ CIRCUIT BREAKER: Reset diario (nuevo día {hoy}) — trading reactivado")
         _cb_pnl_diario = 0.0
         _cb_perdidas_consecutivas = 0
         _cb_activo = False
@@ -17211,7 +17213,14 @@ def _circuit_breaker_check():
 
     # Si ya está activo, verificar si expiró
     if _cb_activo:
-        if time.time() >= _cb_hasta:
+        _now_ts = time.time()
+        # Seguridad: si _cb_hasta es 0 o lleva >12h activo, forzar reset
+        if _cb_hasta <= 0 or (_now_ts - _cb_hasta > 43200):
+            _cb_activo = False
+            _cb_hasta = 0.0
+            logger.info("✅ CIRCUIT BREAKER: Reset forzado (estado inválido o >12h) — trading reactivado")
+            return False
+        if _now_ts >= _cb_hasta:
             _cb_activo = False
             _cb_hasta = 0.0
             logger.info("✅ CIRCUIT BREAKER: Periodo de pausa terminado — trading reactivado")
