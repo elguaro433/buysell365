@@ -78,13 +78,56 @@ MAGIC_COPIER = 20260325
 TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 
 # === TP TRACKER ===
-# _open_signals: { sig_id → {"signal": signal_dict, "sent_at": float} }
+# _open_signals: { sig_id → {"signal": signal_dict, "sent_at": float, "telegram_msg_id": int} }
 _open_signals: dict = {}
 _signals_lock = threading.Lock()
 _resolved_signals: set = set()  # sig_ids ya resueltos — no volver a cargar del JSON
 
 # Archivo de señales manuales — el admin registra señales vía /rastrear en bot.py
 MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
+# Archivo de señales abiertas — sobrevive reinicios del copier
+OPEN_SIGNALS_FILE = Path(__file__).parent / "copier_open_signals.json"
+
+
+def _save_open_signals():
+    """Guarda señales abiertas a disco para sobrevivir reinicios."""
+    try:
+        with _signals_lock:
+            data = {}
+            for sid, sdata in _open_signals.items():
+                data[sid] = {
+                    "signal": sdata["signal"],
+                    "sent_at": sdata["sent_at"],
+                    "telegram_msg_id": sdata.get("telegram_msg_id"),
+                }
+        tmp = str(OPEN_SIGNALS_FILE) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        import os
+        os.replace(tmp, OPEN_SIGNALS_FILE)
+    except Exception as e:
+        log.warning(f"Error guardando open_signals: {e}")
+
+
+def _load_open_signals():
+    """Carga señales abiertas desde disco al arrancar."""
+    try:
+        if OPEN_SIGNALS_FILE.exists():
+            with open(OPEN_SIGNALS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            loaded = 0
+            with _signals_lock:
+                for sid, sdata in data.items():
+                    if sid not in _open_signals and sid not in _resolved_signals:
+                        # Solo cargar señales de menos de 48h
+                        age = (time.time() - sdata.get("sent_at", 0)) / 3600
+                        if age < 48:
+                            _open_signals[sid] = sdata
+                            loaded += 1
+            if loaded:
+                log.info(f"📂 {loaded} señales abiertas cargadas desde disco (sobrevivieron reinicio)")
+    except Exception as e:
+        log.warning(f"Error cargando open_signals: {e}")
 
 # === EDIT TRACKER ===
 # Mensajes reenviados SIN precio de entrada (entry=0) → esperar edición del canal original
@@ -469,6 +512,7 @@ async def _monitor_tp_loop() -> None:
             with _signals_lock:
                 _open_signals.pop(sig_id, None)
             _resolved_signals.add(sig_id)  # No volver a cargar del JSON
+            _save_open_signals()  # Actualizar disco
             if result == "tp":
                 log.info(f"🎯 TP ALCANZADO: {signal['direction']} {signal['pair']}")
                 _send_tp_celebration(signal, reply_to_msg_id=_reply_id)
@@ -1134,6 +1178,7 @@ def send_to_channel(signal, executed, detail):
                             "telegram_msg_id": _canal_msg_id,
                         }
                     log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
+                    _save_open_signals()  # Persistir a disco
                 return _canal_msg_id
             elif resp.status_code == 429:
                 _retry_after = resp.json().get("parameters", {}).get("retry_after", 3)
@@ -1346,6 +1391,9 @@ async def main():
     log.info("📡 Signal Copier iniciando...")
     log.info(f"📡 API ID: {API_ID}")
     log.info(f"📡 Phone: {PHONE}")
+
+    # Cargar señales abiertas de la sesión anterior (sobreviven reinicios)
+    _load_open_signals()
 
     await client.start(phone=PHONE)
 
