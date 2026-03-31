@@ -1832,12 +1832,15 @@ def fijar_web_en_canal_y_grupo():
 # ============================================================
 
 def get_col(df, prefijo):
-    """Busca columna por prefijo de forma segura"""
+    """Busca columna por prefijo de forma segura. Retorna Series de ceros si no encuentra."""
+    if df is None or df.empty:
+        return pd.Series([0.0])
     cols = [c for c in df.columns if str(c).startswith(prefijo)]
     if cols: return df[cols[0]]
     cols = [c for c in df.columns if prefijo in str(c)]
     if cols: return df[cols[0]]
-    raise KeyError(f"No se encontró columna '{prefijo}'")
+    logger.debug(f"get_col: columna '{prefijo}' no encontrada en {list(df.columns)}")
+    return pd.Series([0.0] * len(df), index=df.index)  # Safe fallback
 
 # ============================================================
 #  GRÁFICOS DE MUESTRA PARA TELEGRAM
@@ -6705,6 +6708,7 @@ def _otorgar_acceso_vip(user_id: str, nombre: str, username: str = "", monto: fl
             "monto_pagado": monto,
             "tx_id": tx_id,
             "invite_link": invite_link,
+            "entrada_confirmada": True,  # Pago directo = acceso inmediato
         }
     guardar_estado()
 
@@ -9544,10 +9548,12 @@ def index_web():
                 _rt = _json_stats.load(_f)
 
         if _rt:
-            # Datos en tiempo real desde monitor_real.py
-            _wr    = _rt["stats_historico"]["wr"]  or _rt["stats_hoy"]["wr"] or 71.4
-            _total = _rt["stats_historico"]["total"] or _rt["stats_hoy"]["total"]
-            _pips  = _rt["stats_historico"]["pips"]  or _rt["stats_hoy"]["pips"]
+            # Datos en tiempo real desde monitor_real.py (safe access)
+            _sh = _rt.get("stats_historico", {})
+            _sy = _rt.get("stats_hoy", {})
+            _wr    = _sh.get("wr") or _sy.get("wr") or 71.4
+            _total = _sh.get("total") or _sy.get("total") or 0
+            _pips  = _sh.get("pips") or _sy.get("pips") or 0
             _n_ops = len(_rt.get("posiciones_abiertas", []))
         else:
             # Fallback: SOLO historial_real.json (datos reales MT5)
@@ -13222,16 +13228,24 @@ def revisar_niveles_operaciones():
         if op.get('_reservado', False):
             continue  # Skip reservas incompletas (webhook en proceso)
         ticker = op['ticker']
-        if ticker not in precios_rt: continue
+        if ticker not in precios_rt:
+            logger.warning(f"⚠️ Sin precio para {ticker} — TP/SL no verificado este ciclo")
+            continue
 
-        precio_mon = precios_rt[ticker]['precio']
+        precio_mon = precios_rt[ticker].get('precio')
+        if not precio_mon or precio_mon <= 0:
+            logger.warning(f"⚠️ Precio inválido para {ticker}: {precio_mon} — saltando ciclo")
+            continue
         nombre = op['nombre']
-        tipo = op['tipo']
+        tipo = op['tipo'].upper()
         # 🔧 Normalizar BUY/SELL (webhook) → COMPRA/VENTA (scanner)
-        if tipo.upper() in ("BUY", "LONG"):
+        if tipo in ("BUY", "LONG"):
             tipo = "COMPRA"
-        elif tipo.upper() in ("SELL", "SHORT"):
+        elif tipo in ("SELL", "SHORT"):
             tipo = "VENTA"
+        elif tipo not in ("COMPRA", "VENTA"):
+            logger.error(f"❌ Tipo desconocido: {op['tipo']} para {ticker} — forzando COMPRA")
+            tipo = "COMPRA"
         tp1_hit = op.get('tp1_hit', False)
         tp2_hit = op.get('tp2_hit', False)
 
@@ -14151,9 +14165,11 @@ def analizar_activo(nombre, ticker):
         mt5_ejecutado = False
         _activo_ticket_mt5 = None
         if MT5_AVAILABLE and AUTO_TRADING and not _skip_mt5:
-            mt5_ok = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, _riesgo, precio, niveles['sl'], niveles['tp1'], es_premium=_es_premium)
+            _mt5_result = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, _riesgo, precio, niveles['sl'], niveles['tp1'], es_premium=_es_premium)
+            mt5_ok = bool(_mt5_result)
             if mt5_ok:
                 mt5_ejecutado = True
+                _activo_ticket_mt5 = _mt5_result if isinstance(_mt5_result, int) else None
                 _activo_ticket_mt5 = mt5_ok if isinstance(mt5_ok, int) else None
 
         # Actualizar reserva con resultados MT5 o limpiar si falló
@@ -14470,26 +14486,30 @@ def loop_publicidad_grupo():
 
     # ── Persistencia de IDs en disco (sobrevive reinicios) ──────────────
     _PUB_STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pub_state.json")
+    _pub_state_lock = threading.Lock()
 
     def _cargar_estado():
         try:
-            if os.path.exists(_PUB_STATE):
-                with open(_PUB_STATE, encoding="utf-8") as _f:
-                    return json.loads(_f.read())
+            with _pub_state_lock:
+                if os.path.exists(_PUB_STATE):
+                    with open(_PUB_STATE, encoding="utf-8") as _f:
+                        return json.loads(_f.read())
         except Exception:
             pass
         return {}
 
     def _guardar_estado(data: dict):
         try:
-            # Preservar keys existentes (canal loop escribe al mismo archivo)
-            _existing = {}
-            if os.path.exists(_PUB_STATE):
-                with open(_PUB_STATE, encoding="utf-8") as _f:
-                    _existing = json.loads(_f.read())
-            _existing.update(data)
-            with open(_PUB_STATE, "w", encoding="utf-8") as _f:
-                _f.write(json.dumps(_existing, ensure_ascii=False))
+            with _pub_state_lock:
+                _existing = {}
+                if os.path.exists(_PUB_STATE):
+                    with open(_PUB_STATE, encoding="utf-8") as _f:
+                        _existing = json.loads(_f.read())
+                _existing.update(data)
+                _tmp = _PUB_STATE + ".tmp"
+                with open(_tmp, "w", encoding="utf-8") as _f:
+                    _f.write(json.dumps(_existing, ensure_ascii=False))
+                os.replace(_tmp, _PUB_STATE)  # Atomic write
         except Exception:
             pass
 
