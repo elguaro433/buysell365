@@ -879,10 +879,21 @@ def send_to_channel(signal, executed, detail):
         }
         _msg = _action_labels.get(_action)
         if _msg:
+            # Buscar la señal original del mismo par para hacer reply (referencia visual)
+            _reply_id = None
+            with _signals_lock:
+                for _sid, _sdata in _open_signals.items():
+                    _s = _sdata.get("signal", {})
+                    if _s.get("pair") == _pair or _s.get("mt5_symbol") == _pair:
+                        _reply_id = _sdata.get("telegram_msg_id")
+                        break
             try:
                 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                requests.post(url, json={"chat_id": CHANNEL_ID, "text": _msg, "parse_mode": "Markdown"}, timeout=10)
-                log.info(f"📢 Update notificado al canal: {_action} {_pair}")
+                _payload = {"chat_id": CHANNEL_ID, "text": _msg, "parse_mode": "Markdown"}
+                if _reply_id:
+                    _payload["reply_to_message_id"] = _reply_id
+                requests.post(url, json=_payload, timeout=10)
+                log.info(f"📢 Update notificado al canal: {_action} {_pair_d} (reply_to={_reply_id})")
             except Exception as _e:
                 log.warning(f"Error enviando update al canal: {_e}")
         return
