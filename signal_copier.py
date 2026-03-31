@@ -115,22 +115,56 @@ def _normalize_twelve_symbol(pair: str) -> str:
 
 
 def _get_current_price(pair: str) -> float | None:
-    """Fetch current price via Twelve Data API. Returns float or None."""
-    if not TWELVE_KEY:
-        return None
-    symbol = _normalize_twelve_symbol(pair)
+    """Fetch current price via yfinance (gratis, sin límite).
+    Twelve Data se reserva SOLO para gráficos de velas.
+    """
+    _yf_map = {
+        "GOLD": "GC=F", "XAUUSD": "GC=F",
+        "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
+        "GBPJPY": "GBPJPY=X", "AUDCAD": "AUDCAD=X", "USDCAD": "USDCAD=X",
+        "EURCHF": "EURCHF=X", "GBPAUD": "GBPAUD=X", "EURJPY": "EURJPY=X",
+        "NZDUSD": "NZDUSD=X", "AUDUSD": "AUDUSD=X",
+        "US100Cash": "NQ=F", "US500Cash": "ES=F", "US30Cash": "YM=F",
+        "NAS100": "NQ=F", "BRENT": "BZ=F",
+    }
+    yf_ticker = _yf_map.get(pair)
+    if not yf_ticker:
+        if len(pair) == 6 and pair.isalpha():
+            yf_ticker = f"{pair}=X"
+        else:
+            yf_ticker = pair
+
     try:
-        import requests
-        resp = requests.get(
-            "https://api.twelvedata.com/price",
-            params={"symbol": symbol, "apikey": TWELVE_KEY},
-            timeout=8,
-        )
-        data = resp.json()
-        val = float(data.get("price", 0) or 0)
-        return val if val > 0 else None
+        import yfinance as yf
+        tk = yf.Ticker(yf_ticker)
+        info = tk.fast_info
+        val = getattr(info, 'last_price', None)
+        if val and val > 0:
+            return float(val)
+        # Fallback: history
+        data = tk.history(period="1d", interval="5m")
+        if data is not None and not data.empty:
+            val = float(data["Close"].iloc[-1])
+            return val if val > 0 else None
     except Exception:
-        return None
+        pass
+
+    # Fallback final: Twelve Data (gasta 1 crédito)
+    if TWELVE_KEY:
+        try:
+            import requests
+            symbol = _normalize_twelve_symbol(pair)
+            resp = requests.get(
+                "https://api.twelvedata.com/price",
+                params={"symbol": symbol, "apikey": TWELVE_KEY},
+                timeout=8,
+            )
+            data = resp.json()
+            val = float(data.get("price", 0) or 0)
+            return val if val > 0 else None
+        except Exception:
+            pass
+    return None
 
 
 def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> bytes | None:
@@ -974,7 +1008,14 @@ async def _publish_buffered(msg_id: int) -> None:
     if buf is None:
         return  # Ya fue publicada por edit_handler (doble seguridad)
     signal = buf["signal"]
-    log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — publicando con 'Precio de Mercado'")
+    # Intentar obtener precio actual en vez de "Precio de Mercado"
+    if signal.get("entry", 0) == 0:
+        _live_price = _get_current_price(signal.get("pair", ""))
+        if _live_price and _live_price > 0:
+            signal["entry"] = _live_price
+            log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — usando precio actual: {_live_price}")
+        else:
+            log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — publicando con 'Precio de Mercado'")
     tg_msg_id = send_to_channel(signal, buf["executed"], buf["detail"])
     _published_msg_ids.add(msg_id)
     # Registrar como pending_entry con el telegram_msg_id para poder EDITAR si llega el precio real
