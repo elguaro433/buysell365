@@ -12814,8 +12814,8 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
                 })
         guardar_estado()
 
-        # 🚨 NOTIFICACIÓN FOMO AL GRUPO (sin revelar niveles VIP)
-        notificar_fomo_grupo(nombre_activo, direccion)
+        # 🚨 FOMO desactivado — solo TP ganadores van al grupo como publicidad
+        # notificar_fomo_grupo(nombre_activo, direccion)
         _mt5_tag = " [MT5 ✅]" if mt5_ejecutado else f" [Solo Telegram — {_wh_skip_mt5_razon}]"
         logger.info(f"✅ Webhook señal PUBLICADA: {nombre_activo} {direccion} (Score: {score}){_mt5_tag}")
         return
@@ -14182,8 +14182,8 @@ def analizar_activo(nombre, ticker):
                     if op_id in operaciones_activas:
                         operaciones_activas[op_id]['telegram_msg_id'] = _msg_canal_id
 
-            # 🚨 NOTIFICACIÓN FOMO AL GRUPO
-            notificar_fomo_grupo(nombre, tipo)
+            # 🚨 FOMO desactivado — solo TP ganadores van al grupo como publicidad
+            # notificar_fomo_grupo(nombre, tipo)
 
             _mt5_tag = " [MT5 ✅]" if mt5_ejecutado else f" [Solo Telegram — {_skip_mt5_razon}]" if _skip_mt5 else " [Sin MT5]"
             _nivel_log = f" ⭐{_nivel_senal}" if _es_premium else f" 📊{_nivel_senal}"
@@ -17924,8 +17924,9 @@ def _arrancar_interno():
     _iniciar_hilo("polling",    loop_polling)
     _iniciar_hilo("health",     loop_health_check)
     _iniciar_hilo("vip",        loop_vip_check)
-    _iniciar_hilo("publicidad", loop_publicidad_grupo)
-    _iniciar_hilo("publicidad_canal", loop_publicidad_canal)
+    # Publicidad automática DESACTIVADA — solo TP ganadores sirven como publicidad
+    # _iniciar_hilo("publicidad", loop_publicidad_grupo)
+    # _iniciar_hilo("publicidad_canal", loop_publicidad_canal)
     if MT5_AVAILABLE:
         _iniciar_hilo("mt5_real_sync", loop_sync_mt5_real)
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
