@@ -1297,22 +1297,19 @@ async def main():
                 # Registrar msg_id para manejar ediciones futuras
                 msg_id = event.message.id
 
-                if signal.get("entry", 0) == 0 and msg_id:
-                    # ── BUFFER 30s: NO publicar aún, esperar edición con precio real ──
-                    _buf_task = asyncio.create_task(_publish_buffered(msg_id))
-                    with _buffered_lock:
-                        _buffered_signals[msg_id] = {
-                            "signal": signal.copy(),
-                            "executed": executed,
-                            "detail": detail,
-                            "task": _buf_task,
-                        }
-                    log.info(f"⏳ Señal sin entrada en buffer (msg_id={msg_id}) — esperando 30s por edición con precio")
-                else:
-                    # Señal con entry → publicar inmediatamente
-                    send_to_channel(signal, executed, detail)
-                    if msg_id:
-                        _published_msg_ids.add(msg_id)
+                if signal.get("entry", 0) == 0:
+                    # Sin precio de entrada → buscar precio actual y publicar de una
+                    _live = _get_current_price(signal.get("pair", ""))
+                    if _live and _live > 0:
+                        signal["entry"] = round(_live, 5 if _live < 100 else 2)
+                        log.info(f"📍 Sin entry en señal — usando precio actual: {signal['entry']}")
+                    else:
+                        log.info(f"📍 Sin entry y sin precio disponible — publicando con 'Precio de Mercado'")
+
+                # Publicar inmediatamente (con o sin precio)
+                send_to_channel(signal, executed, detail)
+                if msg_id:
+                    _published_msg_ids.add(msg_id)
 
             elif signal["type"] == "update":
                 # ── Updates de posiciones (cerrar, mover SL) ──
@@ -1358,102 +1355,8 @@ async def main():
                 if v <= 0: return "—"
                 return f"{v:.5f}".rstrip('0').rstrip('.') if v < 100 else f"{v:.2f}"
 
-            # ── CASO A-BUFFER: señal aún en buffer de 30s (no publicada) ──────
-            with _buffered_lock:
-                _is_buffered = msg_id in _buffered_signals
-
-            if _is_buffered:
-                signal = parse_signal(text, chat_title=chat_title)
-                if not signal or signal.get("entry", 0) <= 0:
-                    return  # La edición no añadió precio de entrada — ignorar
-
-                # Extraer del buffer, CANCELAR el timer, y publicar 1 solo mensaje completo
-                with _buffered_lock:
-                    buf = _buffered_signals.pop(msg_id, None)
-                if buf:
-                    # Cancelar el task de 30s para que no publique duplicado
-                    _task = buf.get("task")
-                    if _task and not _task.done():
-                        _task.cancel()
-                    # Usar la señal actualizada con entry real
-                    log.info(f"✏️ Edición recibida dentro de 30s (msg_id={msg_id}) — publicando señal completa con entry={signal.get('entry')}")
-                    send_to_channel(signal, buf["executed"], buf["detail"])
-                    _published_msg_ids.add(msg_id)
-                return
-
-            # ── CASO A: señal ya publicada con "Precio de Mercado" → EDITAR mensaje existente ──
-            with _pending_entry_lock:
-                _pending_sig = _pending_entry.get(msg_id)
-
-            if _pending_sig:
-                signal = parse_signal(text, chat_title=chat_title)
-                if not signal or signal.get("entry", 0) <= 0:
-                    return  # La edición no añadió precio de entrada — ignorar
-
-                pair = signal.get("pair", "")
-                direction = signal.get("direction", "")
-                entry = signal.get("entry", 0)
-                dir_emoji = "🟢" if direction == "BUY" else "🔴"
-                dir_es = "COMPRA" if direction == "BUY" else "VENTA"
-
-                # Nombre display del par
-                _display_special = {
-                    "GOLD": "XAU/USD", "US100Cash": "NASDAQ", "US500Cash": "S&P 500",
-                    "US30Cash": "DOW 30", "GER40Cash": "DAX 40", "BRENT": "BRENT",
-                }
-                if pair in _display_special:
-                    pair_display = _display_special[pair]
-                elif len(pair) == 6 and pair.isalpha():
-                    pair_display = f"{pair[:3]}/{pair[3:]}"
-                else:
-                    pair_display = pair
-
-                # Reconstruir el mensaje completo (mismo formato que send_to_channel)
-                tp_display = fmt(signal.get('tp', 0)) if signal.get('tp', 0) > 0 else "Abierto"
-                msg = (
-                    f"{dir_emoji} *{dir_es} {pair_display}*\n\n"
-                    f"📍 Entrada: {fmt(entry)}\n"
-                    f"🎯 TP: {tp_display}\n"
-                    f"🛡️ SL: {fmt(signal.get('sl', 0))}"
-                )
-
-                # EDITAR el mensaje existente en nuestro canal (no enviar uno nuevo)
-                _tg_msg_id = _pending_sig.get("_tg_msg_id")
-                if _tg_msg_id:
-                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
-                    resp = requests.post(url, json={
-                        "chat_id": CHANNEL_ID,
-                        "message_id": _tg_msg_id,
-                        "text": msg,
-                        "parse_mode": "Markdown",
-                    }, timeout=10)
-                    if resp.status_code == 200:
-                        log.info(f"✏️ Mensaje EDITADO con entrada real: {dir_es} {pair_display} @ {entry} (tg_msg={_tg_msg_id})")
-                    else:
-                        log.warning(f"✏️ Error editando mensaje (tg_msg={_tg_msg_id}): {resp.status_code} — enviando nuevo")
-                        # Fallback: enviar mensaje nuevo si editar falla
-                        url2 = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                        requests.post(url2, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
-                else:
-                    # Sin _tg_msg_id (no debería pasar, pero fallback seguro)
-                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                    requests.post(url, json={"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
-                    log.info(f"✏️ Entrada confirmada (nuevo msg): {dir_es} {pair_display} @ {entry}")
-
-                _published_msg_ids.add(msg_id)
-                # Actualizar entry en _open_signals para que el monitor TP/SL use el precio real
-                with _signals_lock:
-                    for _sid, _sdata in _open_signals.items():
-                        _sig = _sdata.get("signal", {})
-                        if _sig.get("pair") == pair and _sig.get("direction") == direction and _sig.get("entry", 0) == 0:
-                            _sig["entry"] = entry
-                            _sig["sl"] = signal.get("sl", _sig.get("sl", 0))
-                            _sig["tp"] = signal.get("tp", _sig.get("tp", 0))
-                            log.info(f"✏️ _open_signals actualizado: {_sid} entry={entry}")
-                            break
-                with _pending_entry_lock:
-                    _pending_entry.pop(msg_id, None)
-                return
+            # Ya no hay buffer — las señales se publican de inmediato con precio actual
+            # Solo queda Case B: señal nueva capturada vía edición
 
             # ── CASO B: mensaje NO estaba en _pending_entry ni en _published ──
             # El mensaje original no se pudo parsear (ej: SureShotFX envió sin SL/TP)
