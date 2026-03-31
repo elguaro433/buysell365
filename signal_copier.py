@@ -128,19 +128,28 @@ def _get_current_price(pair: str) -> float | None:
 
 
 def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> bytes | None:
-    """Generate mini-chart using Twelve Data + matplotlib. Returns PNG bytes or None."""
+    """Generate professional TP chart using Twelve Data + matplotlib."""
     if not TWELVE_KEY:
         return None
     symbol = _normalize_twelve_symbol(pair)
+    # Display pair bonito
+    if pair in ("GOLD", "XAUUSD"):
+        pair_d = "XAU/USD"
+    elif len(pair) == 6 and pair.isalpha():
+        pair_d = f"{pair[:3]}/{pair[3:]}"
+    else:
+        pair_d = pair
     try:
         import requests
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib.patches import FancyBboxPatch
+        import numpy as np
 
         resp = requests.get(
             "https://api.twelvedata.com/time_series",
-            params={"symbol": symbol, "interval": "15min", "outputsize": 40, "apikey": TWELVE_KEY},
+            params={"symbol": symbol, "interval": "15min", "outputsize": 50, "apikey": TWELVE_KEY},
             timeout=15,
         )
         data = resp.json()
@@ -148,25 +157,78 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float) -> by
             return None
         values = data["values"][::-1]  # oldest → newest
         closes = [float(v["close"]) for v in values]
+        highs = [float(v["high"]) for v in values]
+        lows = [float(v["low"]) for v in values]
+        n = len(closes)
 
-        fig, ax = plt.subplots(figsize=(8, 4), facecolor="#0d1117")
-        ax.set_facecolor("#0d1117")
-        color_line = "#00ff88" if direction == "BUY" else "#ff4466"
-        ax.plot(closes, color=color_line, linewidth=2)
-        ax.axhline(y=tp, color="#00ff00", linestyle="--", linewidth=1.5, label=f"TP {tp:.2f}")
+        # ── Colores pro ──
+        BG = "#0d1117"
+        GRID = "#1a1f2e"
+        TEXT = "#c9d1d9"
+        GREEN = "#00d26a"
+        RED = "#ff4757"
+        GOLD = "#ffd700"
+        ENTRY_COLOR = "#58a6ff"
+        TP_COLOR = GREEN if direction == "BUY" else RED
+
+        fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
+        ax.set_facecolor(BG)
+
+        # Área de precio (fill between high/low)
+        x = list(range(n))
+        ax.fill_between(x, lows, highs, alpha=0.08, color=TP_COLOR)
+
+        # Línea de precio principal (gruesa, con gradiente simulado)
+        ax.plot(x, closes, color=TP_COLOR, linewidth=2.5, solid_capstyle="round", zorder=5)
+
+        # TP line — gruesa y prominente
+        ax.axhline(y=tp, color=GOLD, linestyle="-", linewidth=2, alpha=0.9, zorder=4)
+        ax.text(n - 1, tp, f"  TP {tp:.2f}", color=GOLD, fontsize=11, fontweight="bold",
+                va="center", ha="left", zorder=6)
+
+        # Entry line
         if entry > 0:
-            ax.axhline(y=entry, color="#aaaaaa", linestyle=":", linewidth=1, label=f"Entrada {entry:.2f}")
-        dir_es = "COMPRA" if direction == "BUY" else "VENTA"
-        ax.set_title(f"🎯 TP ALCANZADO — {dir_es} {pair}", color="white",
-                     fontsize=12, fontweight="bold", pad=10)
-        ax.tick_params(colors="#888888")
-        for spine in ax.spines.values():
-            spine.set_color("#333333")
-        ax.legend(facecolor="#1a1a2e", labelcolor="white", fontsize=9, framealpha=0.7)
-        plt.tight_layout()
+            ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=1.5, alpha=0.7, zorder=4)
+            ax.text(n - 1, entry, f"  Entrada {entry:.2f}", color=ENTRY_COLOR, fontsize=10,
+                    va="center", ha="left", zorder=6)
 
+        # Zona de profit (fill entre entry y TP)
+        if entry > 0 and tp > 0:
+            y_min = min(entry, tp)
+            y_max = max(entry, tp)
+            ax.axhspan(y_min, y_max, alpha=0.07, color=GOLD, zorder=1)
+
+        # Calcular pips ganados
+        pips_won = abs(tp - entry) if entry > 0 else 0
+        if pair in ("GOLD", "XAUUSD"):
+            pips_label = f"+{pips_won:.0f} pips" if pips_won >= 1 else f"+{pips_won:.1f} pips"
+        elif entry >= 100:
+            pips_label = f"+{pips_won:.1f} pts"
+        else:
+            pips_label = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
+
+        # Título con pips
+        dir_es = "COMPRA" if direction == "BUY" else "VENTA"
+        title = f"✅ TP ALCANZADO — {dir_es} {pair_d}"
+        if pips_label:
+            title += f"  |  {pips_label}"
+        ax.set_title(title, color=GOLD, fontsize=14, fontweight="bold", pad=15,
+                     fontfamily="sans-serif")
+
+        # Grid y ejes limpios
+        ax.grid(True, alpha=0.1, color=TEXT, linestyle="-")
+        ax.tick_params(colors=TEXT, labelsize=9)
+        ax.set_xlim(-1, n + 6)  # Espacio para labels
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        # Watermark
+        fig.text(0.98, 0.02, "BuySell365 Pro", fontsize=8, color="#333344",
+                 ha="right", va="bottom", fontstyle="italic")
+
+        plt.tight_layout()
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=120, facecolor="#0d1117")
+        plt.savefig(buf, format="png", dpi=150, facecolor=BG, bbox_inches="tight")
         plt.close(fig)
         buf.seek(0)
         return buf.read()
@@ -199,12 +261,26 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
 
+    # Calcular pips ganados
+    pips_won = abs(tp - entry) if entry > 0 and tp > 0 else 0
+    if pair in ("GOLD", "XAUUSD"):
+        pips_str = f"+{pips_won:.0f} pips" if pips_won >= 1 else ""
+    elif entry >= 100:
+        pips_str = f"+{pips_won:.1f} pts" if pips_won > 0 else ""
+    else:
+        pips_str = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
+
+    pips_line = f"\n💰 Ganancia: *{pips_str}*" if pips_str else ""
+
     msg = (
-        f"✅ *TP ALCANZADO* — {pair_d}\n"
+        f"🎯🎯🎯 *TP ALCANZADO* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{dir_emoji} *{dir_es}*\n"
-        f"📍 Entrada: {fmt(entry)} → TP: {fmt(tp)}\n"
-        f"━━━━━━━━━━━━━━"
+        f"{dir_emoji} *{dir_es} {pair_d}*\n\n"
+        f"📍 Entrada: {fmt(entry)}\n"
+        f"✅ TP: {fmt(tp)}"
+        f"{pips_line}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🚀 _Otra victoria para el canal VIP_"
     )
 
     chart_bytes = _fetch_chart_image(pair, direction, entry, tp)
