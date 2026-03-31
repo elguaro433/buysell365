@@ -608,6 +608,7 @@ TWELVE_DATA_MAP = {
 # ORO → XAUUSD=X (spot forex, igual a XM) en lugar de GC=F (futuros COMEX)
 # El análisis técnico (velas 15m) sigue usando GC=F para el historial.
 YF_PRICE_TICKER = {
+    'GC=F':     'GC=F',       # GOLD futuros (proxy para XAUUSD — spot difiere ~$5-20)
     'NQ=F':     '^NDX',       # NASDAQ-100 index (spot, ~igual a US100Cash XM, sin prima de futuros)
     'ES=F':     '^GSPC',      # S&P 500 index (spot, ~igual a US500Cash XM)
     'EURUSD=X': 'EURUSD=X',   # EUR/USD spot forex
@@ -924,14 +925,15 @@ def cargar_estado():
 # ============================================================
 
 ACTIVOS = {
-    # FOREX — pares propios del scanner
-    "EUR/USD":      "EURUSD=X",
-    "AUD/CAD":      "AUDCAD=X",
-    "EUR/CHF":      "EURCHF=X",
-    "USD/CAD":      "USDCAD=X",
-    # ÍNDICES
+    # Solo GOLD y NASDAQ — pares prioritarios
+    "GOLD":         "GC=F",
     "NASDAQ":       "NQ=F",
-    "S&P 500":      "ES=F",
+    # Desactivados (evaluacion):
+    # "EUR/USD":      "EURUSD=X",
+    # "AUD/CAD":      "AUDCAD=X",
+    # "EUR/CHF":      "EURCHF=X",
+    # "USD/CAD":      "USDCAD=X",
+    # "S&P 500":      "ES=F",
 }
 
 # Mapa de palabras clave simplificado
