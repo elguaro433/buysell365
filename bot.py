@@ -17924,9 +17924,8 @@ def _arrancar_interno():
     _iniciar_hilo("polling",    loop_polling)
     _iniciar_hilo("health",     loop_health_check)
     _iniciar_hilo("vip",        loop_vip_check)
-    # Publicidad automática DESACTIVADA — solo TP ganadores sirven como publicidad
-    # _iniciar_hilo("publicidad", loop_publicidad_grupo)
-    # _iniciar_hilo("publicidad_canal", loop_publicidad_canal)
+    _iniciar_hilo("publicidad", loop_publicidad_grupo)       # 5 modelos cada 2h al grupo — ACTIVO
+    # _iniciar_hilo("publicidad_canal", loop_publicidad_canal)  # publicidad al canal — DESACTIVADO
     if MT5_AVAILABLE:
         _iniciar_hilo("mt5_real_sync", loop_sync_mt5_real)
     # 📡 SIGNAL COPIER — escucha canales VIP de Telegram con Telethon
