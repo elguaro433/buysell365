@@ -13419,23 +13419,31 @@ def revisar_niveles_operaciones():
             else:
                 print(f"ℹ️ {nombre}: Señal solo Telegram (no MT5) — no hay posición que cerrar")
             
-            # 1. 💎 Enviar resultado al CANAL PRIVADO (VIP) — solo texto, sin gráfico
+            # Generar gráfico de velas japonesas (se usa en canal VIP y grupo)
             _reply_msg_id = op.get('telegram_msg_id')
-            enviar_canal(msg, reply_to=_reply_msg_id)
+            _chart = None
+            if resultado == "WIN" and pips > 0:
+                try:
+                    from signal_copier import _fetch_chart_image
+                    _direction = "BUY" if tipo == "COMPRA" else "SELL"
+                    _chart = _fetch_chart_image(ticker.replace("=X","").replace("=F",""), _direction, op['entrada'], precio_salida)
+                    if _chart:
+                        logger.info(f"📊 Gráfico TP generado para {nombre}")
+                    else:
+                        logger.warning(f"📊 Gráfico TP no disponible para {nombre} (API sin créditos o error)")
+                except Exception as _e_chart:
+                    logger.warning(f"📊 Chart TP error: {_e_chart}")
+
+            # 1. 💎 Enviar resultado al CANAL PRIVADO (VIP) — con gráfico si hay
+            if _chart and resultado == "WIN":
+                enviar_canal_foto(_chart, msg, reply_to=_reply_msg_id)
+            else:
+                enviar_canal(msg, reply_to=_reply_msg_id)
 
             # 2. 📢 Enviar VICTORIAS al grupo público (marketing + gráfico + promo)
             if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
                 _unidad = unidad_medida(ticker)
                 _tp_label = "TP1" if toca_tp1 else "TP"
-
-                # Generar gráfico de velas japonesas para el grupo
-                _chart = None
-                try:
-                    from signal_copier import _fetch_chart_image
-                    _direction = "BUY" if tipo == "COMPRA" else "SELL"
-                    _chart = _fetch_chart_image(ticker.replace("=X","").replace("=F",""), _direction, op['entrada'], precio_salida)
-                except Exception as _e_chart:
-                    logger.debug(f"Chart TP generation skipped: {_e_chart}")
 
                 # Mensaje de victoria motivante para el grupo
                 _promos_tp = [
