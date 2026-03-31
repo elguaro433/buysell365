@@ -93,11 +93,7 @@ _pending_entry: dict = {}   # { msg_id: signal } — señales publicadas sin pre
 _pending_entry_lock = threading.Lock()
 _published_msg_ids: set = set()  # msg_ids ya publicados como señal completa (evita duplicar en edit)
 
-# === BUFFER 30s para señales sin entry ===
-# { msg_id → {"signal": dict, "executed": bool, "detail": str, "task": asyncio.Task|None} }
-_buffered_signals: dict = {}
-_buffered_lock = threading.Lock()
-BUFFER_WAIT_SECONDS = 30
+# (Buffer 30s eliminado — señales se publican de inmediato con precio actual)
 
 
 def _normalize_twelve_symbol(pair: str) -> str:
@@ -997,36 +993,6 @@ NO digas si aprobar o rechazar. Solo el análisis."""
 
 
 # === TELEGRAM BOT SEND ===
-async def _publish_buffered(msg_id: int) -> None:
-    """Publica una señal buffered después de 30s si no llegó edición con entry."""
-    try:
-        await asyncio.sleep(BUFFER_WAIT_SECONDS)
-    except asyncio.CancelledError:
-        return  # Edit llegó antes de 30s — cancelado correctamente
-    with _buffered_lock:
-        buf = _buffered_signals.pop(msg_id, None)
-    if buf is None:
-        return  # Ya fue publicada por edit_handler (doble seguridad)
-    signal = buf["signal"]
-    # Intentar obtener precio actual en vez de "Precio de Mercado"
-    if signal.get("entry", 0) == 0:
-        _live_price = _get_current_price(signal.get("pair", ""))
-        if _live_price and _live_price > 0:
-            signal["entry"] = _live_price
-            log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — usando precio actual: {_live_price}")
-        else:
-            log.info(f"⏳ Buffer expirado (msg_id={msg_id}) — publicando con 'Precio de Mercado'")
-    tg_msg_id = send_to_channel(signal, buf["executed"], buf["detail"])
-    _published_msg_ids.add(msg_id)
-    # Registrar como pending_entry con el telegram_msg_id para poder EDITAR si llega el precio real
-    if signal.get("entry", 0) == 0:
-        sig_copy = signal.copy()
-        sig_copy["_tg_msg_id"] = tg_msg_id  # ID del mensaje en nuestro canal (para editarlo)
-        sig_copy["_buffered_at"] = time.time()
-        with _pending_entry_lock:
-            _pending_entry[msg_id] = sig_copy
-
-
 def send_to_channel(signal, executed, detail):
     """Envía señales al canal BuySell365 en formato español profesional."""
     import requests
