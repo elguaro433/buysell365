@@ -1638,6 +1638,22 @@ def enviar_canal(mensaje: str, **kwargs):
     """📢 SEÑALES Y SALIDAS: Envía solo señales, TP y SL al canal principal."""
     return enviar_telegram(mensaje, destino=CHANNEL_ID, **kwargs)
 
+def enviar_canal_foto(photo_bytes: bytes, caption: str, reply_to: int = None):
+    """📸 Envía foto con caption al canal VIP (para gráficos de TP)."""
+    try:
+        import requests as _req_photo
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+        payload = {"chat_id": CHANNEL_ID, "caption": caption, "parse_mode": "Markdown"}
+        if reply_to:
+            payload["reply_to_message_id"] = reply_to
+        resp = _req_photo.post(url, data=payload,
+            files={"photo": ("chart.png", photo_bytes, "image/png")}, timeout=20)
+        if resp.status_code == 200:
+            return resp.json().get("result", {}).get("message_id")
+    except Exception as _e:
+        logger.warning(f"Error enviando foto al canal: {_e}")
+    return None
+
 def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 300, **kwargs):
     """👥 ALERTAS TÉCNICAS: Envía logs, ejecuciones y alertas de sistema al grupo.
        Añade automáticamente un tag de publicidad VIP para incentivar ventas.
@@ -4241,12 +4257,29 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
     f_ = lambda v: fmt(v, ticker)
     tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
+    _unidad = unidad_medida(ticker)
+    _pips_str = f"+{pips:.1f} {_unidad}"
+
+    # Duración legible
+    _dur_str = ""
+    if duracion_seg and duracion_seg > 0:
+        _h = int(duracion_seg // 3600)
+        _m = int((duracion_seg % 3600) // 60)
+        if _h > 0:
+            _dur_str = f"\n⏱ Duración: {_h}h {_m}m"
+        else:
+            _dur_str = f"\n⏱ Duración: {_m}m"
+
     return (
-        f"✅ *{nivel_tp} ALCANZADO* — {nombre}\n"
+        f"🎯🎯🎯 *{nivel_tp} ALCANZADO* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{tipo_emoji}  *+{pips:.1f} {unidad_medida(ticker)}*\n"
-        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
-        f"━━━━━━━━━━━━━━"
+        f"{tipo_emoji}  — {nombre}\n\n"
+        f"📍 Entrada: {f_(entrada)}\n"
+        f"✅ Cierre: {f_(salida)}\n"
+        f"💰 *Ganancia: {_pips_str}*"
+        f"{_dur_str}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🚀 _Otra victoria para el canal VIP_"
     )
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
@@ -13355,14 +13388,24 @@ def revisar_niveles_operaciones():
             else:
                 print(f"ℹ️ {nombre}: Señal solo Telegram (no MT5) — no hay posición que cerrar")
             
-            ruta_img = None  # Gráfico desactivado (inicializado para evitar NameError)
-            # Gráfico desactivado — hace el mensaje muy largo
-            # ruta_img = generar_grafico_operacion(df, ticker, tipo, op['entrada'], precio_salida, tag, niveles=op) if df is not None else None
-
             # 1. 💎 SIEMPRE enviar al CANAL PRIVADO (VIP)
-            # reply_to_message_id: cita la señal original para que se vea de qué trade es
             _reply_msg_id = op.get('telegram_msg_id')
-            enviar_canal(msg, reply_to=_reply_msg_id)
+
+            # Para WINs: intentar generar gráfico y enviar como foto
+            _chart_sent = False
+            if resultado == "WIN":
+                try:
+                    from signal_copier import _fetch_chart_image
+                    _direction = "BUY" if tipo == "COMPRA" else "SELL"
+                    _chart = _fetch_chart_image(ticker.replace("=X","").replace("=F",""), _direction, op['entrada'], precio_salida)
+                    if _chart:
+                        enviar_canal_foto(_chart, msg, reply_to=_reply_msg_id)
+                        _chart_sent = True
+                except Exception as _e_chart:
+                    logger.debug(f"Chart TP generation skipped: {_e_chart}")
+
+            if not _chart_sent:
+                enviar_canal(msg, reply_to=_reply_msg_id)
 
             # 2. 📢 Enviar VICTORIAS al grupo público (marketing)
             if GROUP_ID and GROUP_ID != CHANNEL_ID and resultado == "WIN" and pips > 0:
