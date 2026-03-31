@@ -370,10 +370,10 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
 
 
 async def _monitor_tp_loop() -> None:
-    """Async background loop — checks every 60s if any tracked signal hit TP or SL."""
-    log.info("🎯 Monitor TP/SL loop iniciado")
+    """Async background loop — checks every 30s if any tracked signal hit TP or SL."""
+    log.info("🎯 Monitor TP/SL loop iniciado (intervalo: 30s)")
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(30)  # 30s para no perder TP/SL en mercados volátiles
 
         # ── Cargar señales manuales del admin (manual_signals.json) ──
         try:
@@ -695,6 +695,7 @@ def parse_signal(text, chat_title=""):
         "style":      style,
         "source":     source,
         "raw":        text[:300],
+        "timestamp":  time.time(),
     }
 
 
@@ -1102,32 +1103,47 @@ def send_to_channel(signal, executed, detail):
     }
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    try:
-        resp = requests.post(url, json={
-            "chat_id": CHANNEL_ID,
-            "text": msg,
-            "parse_mode": "Markdown",
-            "reply_markup": _xm_buttons,
-        }, timeout=10)
-        if resp.status_code == 200:
-            log.info(f"📡 ENVIADO AL CANAL: {dir_es} {pair_display} ({source})")
-            # Guardar message_id para citarlo en notificaciones de TP/SL
-            _canal_msg_id = resp.json().get("result", {}).get("message_id")
-            # Registrar señal para seguimiento TP/SL
-            if signal["sl"] > 0:
-                sig_id = f"{pair}_{int(time.time())}"
-                with _signals_lock:
-                    _open_signals[sig_id] = {
-                        "signal": signal,
-                        "sent_at": time.time(),
-                        "telegram_msg_id": _canal_msg_id,  # Para reply en TP/SL
-                    }
-                log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
-            return _canal_msg_id
-        else:
-            log.warning(f"📡 Error canal: {resp.status_code} {resp.text[:100]}")
-    except Exception as e:
-        log.warning(f"Error sending to channel: {e}")
+    _payload = {
+        "chat_id": CHANNEL_ID,
+        "text": msg,
+        "parse_mode": "Markdown",
+        "reply_markup": _xm_buttons,
+    }
+
+    # Retry hasta 3 veces con backoff
+    for _intento in range(3):
+        try:
+            resp = requests.post(url, json=_payload, timeout=10)
+            if resp.status_code == 200:
+                log.info(f"📡 ENVIADO AL CANAL: {dir_es} {pair_display} ({source})")
+                _canal_msg_id = resp.json().get("result", {}).get("message_id")
+                # Registrar señal para seguimiento TP/SL
+                if signal["sl"] > 0:
+                    sig_id = f"{pair}_{int(time.time())}"
+                    with _signals_lock:
+                        _open_signals[sig_id] = {
+                            "signal": signal,
+                            "sent_at": time.time(),
+                            "telegram_msg_id": _canal_msg_id,
+                        }
+                    log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
+                return _canal_msg_id
+            elif resp.status_code == 429:
+                _retry_after = resp.json().get("parameters", {}).get("retry_after", 3)
+                log.warning(f"📡 Rate-limited, esperando {_retry_after}s...")
+                time.sleep(_retry_after)
+            elif resp.status_code == 400 and "parse" in resp.text.lower():
+                log.warning(f"📡 Markdown inválido, reintentando sin formato...")
+                _payload.pop("parse_mode", None)
+            else:
+                log.warning(f"📡 Error canal (intento {_intento+1}/3): {resp.status_code} {resp.text[:100]}")
+                if _intento < 2:
+                    time.sleep(1)
+        except Exception as e:
+            log.warning(f"📡 Error enviando (intento {_intento+1}/3): {e}")
+            if _intento < 2:
+                time.sleep(1)
+    log.error(f"📡 FALLO TOTAL: no se pudo enviar señal {dir_es} {pair_display} tras 3 intentos")
     return None
 
 

@@ -1630,7 +1630,10 @@ def enviar_telegram(mensaje: str, destino: str = None, teclado: dict = None, rep
                 continue
             break
         except Exception as e:
-            if intento == 2: logger.error(f"❌ Fallo crítico Telegram: {e}")
+            if intento >= 1:
+                logger.warning(f"⚠️ Telegram intento {intento+1}/3 fallido: {e}")
+            if intento == 2:
+                logger.error(f"❌ Fallo crítico Telegram tras 3 intentos: {e}")
             time.sleep(1)
     return None
 
@@ -2639,9 +2642,10 @@ def evaluar_senal_profesional(ind, ticker=""):
     # ── HELPER: verificar el cuerpo de la vela ──
     open_p = ind.get('open', ind['precio'])
     cuerpo_pct = abs(open_p - ind['precio']) / max(ind['atr'], 1e-10)
-    # Nasdaq permite velas más pequeñas porque tiene más volumen; Oro requiere cuerpo real.
-    umbral_cuerpo = 0.05 if ticker == "NQ=F" else 0.08 # Extremadamente relajado
-    
+    # Umbral de cuerpo de vela por activo — Oro necesita más confirmación, NASDAQ es más rápido
+    _umbral_map = {"NQ=F": 0.05, "ES=F": 0.06, "GOLD": 0.12, "XAUUSD=X": 0.12}
+    umbral_cuerpo = _umbral_map.get(ticker, 0.10)
+
     vela_con_cuerpo = cuerpo_pct >= umbral_cuerpo
     
     if not vela_con_cuerpo:
