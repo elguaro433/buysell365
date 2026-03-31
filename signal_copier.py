@@ -183,7 +183,14 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     pair = signal["pair"]
     entry = signal["entry"]
     tp = signal["tp"]
-    source = signal.get("source", "")
+
+    # Display pair bonito
+    if pair in ("GOLD", "XAUUSD"):
+        pair_d = "XAU/USD"
+    elif len(pair) == 6 and pair.isalpha():
+        pair_d = f"{pair[:3]}/{pair[3:]}"
+    else:
+        pair_d = pair
 
     def fmt(v):
         if v <= 0: return "Mercado"
@@ -193,7 +200,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
 
     msg = (
-        f"✅ *TP ALCANZADO* — {pair}\n"
+        f"✅ *TP ALCANZADO* — {pair_d}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{dir_emoji} *{dir_es}*\n"
         f"📍 Entrada: {fmt(entry)} → TP: {fmt(tp)}\n"
@@ -232,7 +239,15 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
     pair = signal["pair"]
     entry = signal["entry"]
     sl = signal["sl"]
-    source = signal.get("source", "")
+
+    # Display pair bonito
+    if pair in ("GOLD", "XAUUSD"):
+        pair_d = "XAU/USD"
+    elif len(pair) == 6 and pair.isalpha():
+        pair_d = f"{pair[:3]}/{pair[3:]}"
+    else:
+        pair_d = pair
+
     dir_es = "COMPRA" if direction == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
 
@@ -240,7 +255,7 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
         return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
     msg = (
-        f"🛑 *STOP LOSS* — {pair}\n"
+        f"🛑 *STOP LOSS* — {pair_d}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{dir_emoji} *{dir_es}*\n"
         f"📍 Entrada: {fmt(entry)} → SL: {fmt(sl)}\n"
@@ -847,14 +862,20 @@ def send_to_channel(signal, executed, detail):
         # Notificar actualizaciones importantes al canal VIP
         _action = signal.get("action", "")
         _pair = signal.get("pair", "")
-        _src = signal.get("source", "Aliado")
+        # Display pair con / para forex (XAUUSD → XAU/USD)
+        if _pair in ("GOLD", "XAUUSD"):
+            _pair_d = "XAU/USD"
+        elif len(_pair) == 6 and _pair.isalpha():
+            _pair_d = f"{_pair[:3]}/{_pair[3:]}"
+        else:
+            _pair_d = _pair
         _action_labels = {
-            "close_half":       f"⚡ *CERRAR MITAD* — {_pair}\n📡 Fuente: {_src}",
-            "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair}\n📡 Fuente: {_src}",
-            "full_close":       f"🔒 *CERRAR COMPLETAMENTE* — {_pair}\n📡 Fuente: {_src}",
-            "move_sl_to_entry": f"🛡️ *MOVER SL A ENTRADA* — {_pair}\n📡 Fuente: {_src}",
-            "sl_hit":           f"🛑 *SL ALCANZADO* — {_pair}\n📡 Fuente: {_src}",
-            "tp_hit":           f"✅ *TP ALCANZADO* — {_pair}\n📡 Fuente: {_src}",
+            "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}",
+            "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}",
+            "full_close":       f"🔒 *CERRAR COMPLETAMENTE* — {_pair_d}",
+            "move_sl_to_entry": f"🛡️ *MOVER SL A ENTRADA* — {_pair_d}",
+            "sl_hit":           f"🛑 *SL ALCANZADO* — {_pair_d}",
+            "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
         }
         _msg = _action_labels.get(_action)
         if _msg:
