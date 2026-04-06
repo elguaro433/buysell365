@@ -113,11 +113,17 @@ def _is_bot_ua(ua):
 
 # Cache de geolocalización por IP (evita llamadas repetidas)
 _geo_cache = {}
+_GEO_CACHE_MAX = 5000  # Límite para evitar memory leak
 
 def _geolocate_ip(ip):
     """Obtiene país y ciudad de una IP usando ip-api.com (gratis, 45 req/min)."""
     if ip in _geo_cache:
         return _geo_cache[ip]
+    # Evitar crecimiento ilimitado del cache
+    if len(_geo_cache) >= _GEO_CACHE_MAX:
+        # Eliminar las primeras 1000 entradas (las más antiguas)
+        for old_key in list(_geo_cache.keys())[:1000]:
+            del _geo_cache[old_key]
     try:
         import requests as _req
         resp = _req.get(f"http://ip-api.com/json/{ip}?fields=status,country,countryCode,city,regionName",
@@ -276,18 +282,28 @@ _load_store()
 #  HELPER FUNCTIONS
 # ============================================================
 def _check_api_auth():
-    """Check API key authentication."""
+    """Check API key authentication.
+    NOTA: El Referer se usa solo como conveniencia para peticiones del propio dashboard
+    (navegador del mismo dominio). Para APIs externas siempre se exige API key.
+    El Referer es fácil de falsificar, pero aquí solo protege endpoints de lectura
+    del dashboard que ya son públicos visualmente.
+    """
     if not API_SECRET_KEY:
         return True
-    referer = request.headers.get("Referer", "")
-    if referer:
-        from urllib.parse import urlparse
-        ref_host = urlparse(referer).hostname or ""
-        req_host = request.host.split(":")[0] if request.host else ""
-        if ref_host == req_host:
-            return True
+    # Primero intentar API key (método seguro)
     key = request.args.get("key", "") or request.headers.get("X-API-Key", "")
-    return hmac.compare_digest(str(key), str(API_SECRET_KEY))
+    if key and hmac.compare_digest(str(key), str(API_SECRET_KEY)):
+        return True
+    # Fallback: permitir peticiones del propio sitio (solo GET del dashboard)
+    if request.method == "GET":
+        referer = request.headers.get("Referer", "")
+        if referer:
+            from urllib.parse import urlparse
+            ref_host = urlparse(referer).hostname or ""
+            req_host = request.host.split(":")[0] if request.host else ""
+            if ref_host == req_host:
+                return True
+    return False
 
 def _ahora():
     """Current time in CET timezone."""
@@ -300,9 +316,17 @@ def _ahora():
 _rate_limit_web = {}
 _RATE_LIMIT_MAX = 30
 _RATE_LIMIT_WINDOW = 60
+_rate_limit_last_cleanup = 0
 
 def _check_rate_limit(ip, max_req=_RATE_LIMIT_MAX, window=_RATE_LIMIT_WINDOW):
+    global _rate_limit_last_cleanup
     now = time.time()
+    # Limpieza periódica cada 5 minutos para evitar memory leak
+    if now - _rate_limit_last_cleanup > 300:
+        stale = [k for k, v in _rate_limit_web.items() if not v or (now - v[-1]) > window]
+        for k in stale:
+            del _rate_limit_web[k]
+        _rate_limit_last_cleanup = now
     if ip not in _rate_limit_web:
         _rate_limit_web[ip] = []
     _rate_limit_web[ip] = [t for t in _rate_limit_web[ip] if now - t < window]
@@ -1840,8 +1864,8 @@ def dashboard_visual():
     rr = round(avg_win / avg_loss, 2) if avg_loss > 0 else 0
     now = _ahora()
     now_str = now.strftime("%H:%M:%S CET")
-    hoy_str = now.strftime("%Y-%m-%d")
-    senales_hoy = sum(1 for h in hist if h.get('fecha', '').startswith(hoy_str))
+    hoy_str = now.strftime("%d/%m/%Y")
+    senales_hoy = sum(1 for h in hist if h.get('fecha', '') == hoy_str)
     pips_color = "#00e676" if pips_total >= 0 else "#ff3b30"
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
     wr_color = '#00d4aa' if winrate >= 60 else ('#f0b90b' if winrate >= 45 else '#ff3b30')

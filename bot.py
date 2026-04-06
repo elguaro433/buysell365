@@ -119,6 +119,8 @@ for _noisy in (
     "yfinance", "yfinance.base", "yfinance.utils",
     "yfinance.cache", "yfinance.scrapers.history",
     "peewee",  # ORM interno que usa yfinance para su cache SQLite
+    "matplotlib", "matplotlib.font_manager", "matplotlib.ticker",  # Cientos de líneas DEBUG de fuentes
+    "PIL", "PIL.PngImagePlugin",  # Pillow debug al generar gráficos
 ):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 _file_handler.addFilter(_CategoryFilter())   # También en el handler → cubre urllib3, requests, etc.
@@ -258,10 +260,11 @@ def _kill_switch_activo() -> bool:
     elif not _fecha_stats_diarias:
         _fecha_stats_diarias = hoy
 
-    # Verificar límite de pérdidas diarias
-    _perdidas_hoy = int(estadisticas_diarias.get("perdidas", 0))
-    _pips_perdidos = float(estadisticas_diarias.get("pips_perdidos", 0.0))
-    _pips_ganados  = float(estadisticas_diarias.get("pips_ganados", 0.0))
+    # FIX: Leer stats dentro del lock para snapshot consistente
+    with _lock_ops:
+        _perdidas_hoy = int(estadisticas_diarias.get("perdidas", 0))
+        _pips_perdidos = float(estadisticas_diarias.get("pips_perdidos", 0.0))
+        _pips_ganados  = float(estadisticas_diarias.get("pips_ganados", 0.0))
     # Límite 1: más de 15 pérdidas en un día
     if _perdidas_hoy >= 15:
         logger.warning(f"🚨 KILL SWITCH: {_perdidas_hoy} pérdidas hoy — bot pausado")
@@ -472,23 +475,59 @@ if sys.platform == 'win32':
 
 # ── MAPA METATRADER 5 XM (Fuente Primaria Absoluta para Windows) ─────
 MT5_TICKER_MAP = {
+    # ── ÍNDICES (XM usa sufijo "Cash") ──────────────────────────────
     'NQ=F':       'US100Cash',
     'NASDAQ':     'US100Cash',
     'NAS100':     'US100Cash',
     'US100':      'US100Cash',
     'NQ1!':       'US100Cash',
-    'ES=F':     'US500Cash',
-    'SP500':     'US500Cash',
-    'SPX500USD': 'US500Cash',
-    'SP500USD':  'US500Cash',
-    'EURUSD=X': 'EURUSD',
-    'EURUSD':   'EURUSD',
-    # Scalper Fibonacci pairs
-    'AUDCAD':   'AUDCAD',
-    'EURCHF':   'EURCHF',
-    'USDCAD':   'USDCAD',
-    'GBPUSD':   'GBPUSD',
-    'GBPUSD=X': 'GBPUSD',
+    'US100Cash':  'US100Cash',
+    'ES=F':       'US500Cash',
+    'SP500':      'US500Cash',
+    'SPX500USD':  'US500Cash',
+    'SP500USD':   'US500Cash',
+    'US500Cash':  'US500Cash',
+    'YM=F':       'US30Cash',
+    'US30Cash':   'US30Cash',
+    'DOW30':      'US30Cash',
+    # ── ORO — en XM el símbolo es "GOLD" (no XAUUSD) ────────────────
+    # CRÍTICO: sin este mapeo, cae a yfinance GC=F (+$30 prima) → TP/SL falsos
+    'XAUUSD=X':  'GOLD',
+    'GOLD':      'GOLD',
+    'XAUUSD':    'GOLD',
+    'GC=F':      'GOLD',
+    # ── FOREX — todos los pares con formato yfinance (=X) y sin sufijo ──
+    # EUR
+    'EURUSD=X':  'EURUSD',   'EURUSD':  'EURUSD',
+    'EURJPY=X':  'EURJPY',   'EURJPY':  'EURJPY',
+    'EURCHF=X':  'EURCHF',   'EURCHF':  'EURCHF',
+    'EURGBP=X':  'EURGBP',   'EURGBP':  'EURGBP',
+    'EURAUD=X':  'EURAUD',   'EURAUD':  'EURAUD',
+    'EURCAD=X':  'EURCAD',   'EURCAD':  'EURCAD',
+    'EURNZD=X':  'EURNZD',   'EURNZD':  'EURNZD',
+    # GBP
+    'GBPUSD=X':  'GBPUSD',   'GBPUSD':  'GBPUSD',
+    'GBPJPY=X':  'GBPJPY',   'GBPJPY':  'GBPJPY',
+    'GBPAUD=X':  'GBPAUD',   'GBPAUD':  'GBPAUD',
+    'GBPCAD=X':  'GBPCAD',   'GBPCAD':  'GBPCAD',
+    'GBPNZD=X':  'GBPNZD',   'GBPNZD':  'GBPNZD',
+    'GBPCHF=X':  'GBPCHF',   'GBPCHF':  'GBPCHF',
+    # USD
+    'USDJPY=X':  'USDJPY',   'USDJPY':  'USDJPY',
+    'USDCAD=X':  'USDCAD',   'USDCAD':  'USDCAD',
+    'USDCHF=X':  'USDCHF',   'USDCHF':  'USDCHF',
+    # AUD
+    'AUDUSD=X':  'AUDUSD',   'AUDUSD':  'AUDUSD',
+    'AUDCAD=X':  'AUDCAD',   'AUDCAD':  'AUDCAD',
+    'AUDJPY=X':  'AUDJPY',   'AUDJPY':  'AUDJPY',
+    'AUDNZD=X':  'AUDNZD',   'AUDNZD':  'AUDNZD',
+    'AUDCHF=X':  'AUDCHF',   'AUDCHF':  'AUDCHF',
+    # NZD / CAD / CHF / JPY
+    'NZDUSD=X':  'NZDUSD',   'NZDUSD':  'NZDUSD',
+    'NZDJPY=X':  'NZDJPY',   'NZDJPY':  'NZDJPY',
+    'NZDCAD=X':  'NZDCAD',   'NZDCAD':  'NZDCAD',
+    'CADJPY=X':  'CADJPY',   'CADJPY':  'CADJPY',
+    'CHFJPY=X':  'CHFJPY',   'CHFJPY':  'CHFJPY',
 }
 
 # Mapa inverso: MT5/webhook ticker → yfinance ticker (para cooldown consistente)
@@ -598,9 +637,35 @@ _twelve_data_exhausted_until: float = 0.0   # epoch; 0 = no bloqueado
 # NOTA: IXIC no existe en Twelve Data; SPX requiere plan Grow ($29/mes).
 # Usamos NDX (NASDAQ-100 index) y SPY (ETF S&P500) disponibles en plan Basic gratuito.
 TWELVE_DATA_MAP = {
-    'NQ=F':     'NDX',        # NASDAQ-100 index (plan Basic gratuito)
-    'ES=F':     'SPY',        # S&P 500 ETF — equivale al índice, plan gratuito
-    'EURUSD=X': 'EUR/USD',    # Euro/Dólar
+    # Índices
+    'NQ=F':       'NDX',       # NASDAQ-100
+    'ES=F':       'SPY',       # S&P 500 ETF
+    'US100Cash':  'NDX',
+    'US500Cash':  'SPY',
+    'YM=F':       'DIA',       # DOW 30 ETF
+    'US30Cash':   'DIA',
+    # ORO — precio spot (igual a XM), no futuros COMEX
+    'XAUUSD=X':  'XAU/USD',
+    'XAUUSD':    'XAU/USD',
+    'GOLD':      'XAU/USD',
+    'GC=F':      'XAU/USD',
+    # Forex principal
+    'EURUSD=X':  'EUR/USD',   'EURUSD':  'EUR/USD',
+    'GBPUSD=X':  'GBP/USD',   'GBPUSD':  'GBP/USD',
+    'USDJPY=X':  'USD/JPY',   'USDJPY':  'USD/JPY',
+    'GBPJPY=X':  'GBP/JPY',   'GBPJPY':  'GBP/JPY',
+    'EURJPY=X':  'EUR/JPY',   'EURJPY':  'EUR/JPY',
+    'EURCHF=X':  'EUR/CHF',   'EURCHF':  'EUR/CHF',
+    'AUDUSD=X':  'AUD/USD',   'AUDUSD':  'AUD/USD',
+    'AUDCAD=X':  'AUD/CAD',   'AUDCAD':  'AUD/CAD',
+    'USDCAD=X':  'USD/CAD',   'USDCAD':  'USD/CAD',
+    'NZDUSD=X':  'NZD/USD',   'NZDUSD':  'NZD/USD',
+    'GBPAUD=X':  'GBP/AUD',   'GBPAUD':  'GBP/AUD',
+    'GBPNZD=X':  'GBP/NZD',   'GBPNZD':  'GBP/NZD',
+    'GBPCHF=X':  'GBP/CHF',   'GBPCHF':  'GBP/CHF',
+    'USDCHF=X':  'USD/CHF',   'USDCHF':  'USD/CHF',
+    'CADJPY=X':  'CAD/JPY',   'CADJPY':  'CAD/JPY',
+    'CHFJPY=X':  'CHF/JPY',   'CHFJPY':  'CHF/JPY',
 }
 
 # ── MAPA DE TICKERS PARA PRECIO EN VIVO (yfinance) ─────────────────────────
@@ -608,10 +673,17 @@ TWELVE_DATA_MAP = {
 # ORO → XAUUSD=X (spot forex, igual a XM) en lugar de GC=F (futuros COMEX)
 # El análisis técnico (velas 15m) sigue usando GC=F para el historial.
 YF_PRICE_TICKER = {
-    'GC=F':     'GC=F',       # GOLD futuros (proxy para XAUUSD — spot difiere ~$5-20)
-    'NQ=F':     '^NDX',       # NASDAQ-100 index (spot, ~igual a US100Cash XM, sin prima de futuros)
-    'ES=F':     '^GSPC',      # S&P 500 index (spot, ~igual a US500Cash XM)
-    'EURUSD=X': 'EURUSD=X',   # EUR/USD spot forex
+    # Índices: remap futuros → índice spot para evitar prima de futuros
+    'NQ=F':     '^NDX',       # NASDAQ-100 index spot (~igual a US100Cash XM)
+    'ES=F':     '^GSPC',      # S&P 500 index spot (~igual a US500Cash XM)
+    'YM=F':     '^DJI',       # DOW 30 index spot
+    # ORO: usar XAUUSD=X (spot Yahoo Finance) — GC=F tiene +$30 de prima → falsos TP/SL
+    'GC=F':     'XAUUSD=X',
+    # Forex: pass-through (ya son spot)
+    'EURUSD=X': 'EURUSD=X',
+    'GBPUSD=X': 'GBPUSD=X',
+    'USDJPY=X': 'USDJPY=X',
+    'GBPJPY=X': 'GBPJPY=X',
 }
 
 # ── CALENDARIO DE FESTIVOS (Mercado Cerrado) ─────────────────────────
@@ -737,12 +809,25 @@ def cargar_estado():
     """Carga el estado previo del bot con validaciones de tipo."""
     global operaciones_activas, historial_operaciones, estadisticas_diarias, alertas_precio, MODO_RIESGO, activos_desactivados, CAPITAL_USUARIO, directorio_usuarios, suscripciones_vip, pagos_pendientes_vip, _vip_monto_counter, _vip_trials_usados, _depositos_procesados_vip, _trial_intentos, _codigos_invitacion, _ultimo_reporte_diario, _fecha_stats_diarias
     try:
-        if os.path.exists(ESTADO_FILE):
-            with open(ESTADO_FILE, encoding="utf-8") as f:
-                data = json.load(f)
-            
-            if isinstance(data, dict):
-                with _lock_ops:
+        _estado_loaded = False
+        # FIX: Intentar cargar estado.json, si está corrupto usar backup
+        for _estado_src in [ESTADO_FILE, f"{ESTADO_FILE}.bak"]:
+            if not os.path.exists(_estado_src):
+                continue
+            try:
+                with open(_estado_src, encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    _estado_loaded = True
+                    if _estado_src.endswith(".bak"):
+                        logger.warning(f"⚠️ estado.json corrupto — cargado desde backup ({_estado_src})")
+                    break
+            except (json.JSONDecodeError, ValueError) as e_json:
+                logger.warning(f"⚠️ {_estado_src} corrupto: {e_json} — intentando backup...")
+                continue
+
+        if _estado_loaded and isinstance(data, dict):
+            with _lock_ops:
                     CAPITAL_USUARIO = data.get("capital_usuario", 1000.0)
                     # Cargar modo de riesgo primero
                     modo = data.get("modo_riesgo") or data.get("MODO_RIESGO")
@@ -867,54 +952,49 @@ def cargar_estado():
                                     parts = k_str.split("|", 1)
                                     _cooldown_cierres[(parts[0], parts[1])] = ts_val
 
-                print(f"📂 Estado cargado: {len(operaciones_activas)} ops activas, {len(historial_operaciones)} en historial, {len(suscripciones_vip)} VIPs, {len(_trial_intentos)} trial intentos, {len(_codigos_invitacion)} codigos.")
-                
-                # 🧹 LIMPIEZA RADICAL DE DATOS CORRUPTOS (Glitches de Billones)
-                # Bajamos el umbral a 50k pips para atrapar el glitch actual de 213k.
-                glitch_pips_threshold = 50000 
-                
-                # Creamos lista limpia
-                hist_limpio = [h for h in historial_operaciones if abs(h.get('pips', 0)) < glitch_pips_threshold]
-                
-                # Si el historial cambió o las estadísticas diarias son absurdas
-                p_g = estadisticas_diarias.get("pips_ganados", 0)
-                p_p = estadisticas_diarias.get("pips_perdidos", 0)
+                    print(f"📂 Estado cargado: {len(operaciones_activas)} ops activas, {len(historial_operaciones)} en historial, {len(suscripciones_vip)} VIPs, {len(_trial_intentos)} trial intentos, {len(_codigos_invitacion)} codigos.")
 
-                if len(hist_limpio) < len(historial_operaciones) or abs(p_g) > glitch_pips_threshold or abs(p_p) > glitch_pips_threshold:
-                    logger.warning(f"🚨 EXORCISMO DE DATOS: Detectados pips absurdos. Eliminando {len(historial_operaciones) - len(hist_limpio)} entradas corruptas.")
+                    # 🧹 LIMPIEZA RADICAL DE DATOS CORRUPTOS (Glitches de Billones)
+                    # 500k: captura glitches reales (millones), sin afectar trades normales de Oro/NASDAQ
+                    glitch_pips_threshold = 500000
 
-                    historial_operaciones.clear()
-                    historial_operaciones.extend(hist_limpio)
+                    # Creamos lista limpia
+                    hist_limpio = [h for h in historial_operaciones if abs(h.get('pips', 0)) < glitch_pips_threshold]
 
-                    # Resetear estadísticas y recalcular SOLO operaciones de HOY
-                    estadisticas_diarias.update({"ganadas": 0, "perdidas": 0, "pips_ganados": 0.0, "pips_perdidos": 0.0})
-                    _hoy_recalc = ahora().strftime("%Y-%m-%d")
-                    for h in historial_operaciones:
-                        try:
-                            # Solo contar operaciones de hoy
-                            _h_ts = h.get('timestamp', 0)
-                            if _h_ts:
-                                from datetime import datetime as _dt_rc
-                                _h_fecha = _dt_rc.fromtimestamp(_h_ts).strftime("%Y-%m-%d")
-                                if _h_fecha != _hoy_recalc:
-                                    continue
-                            else:
-                                continue  # Sin timestamp → no contar
-                            if h.get('resultado') == 'WIN':
-                                estadisticas_diarias['ganadas'] += 1
-                                estadisticas_diarias['pips_ganados'] += float(h.get('pips', 0))
-                            else:
-                                estadisticas_diarias['perdidas'] += 1
-                                estadisticas_diarias['pips_perdidos'] += abs(float(h.get('pips', 0)))
-                        except Exception: continue
+                    # Si el historial cambió o las estadísticas diarias son absurdas
+                    p_g = estadisticas_diarias.get("pips_ganados", 0)
+                    p_p = estadisticas_diarias.get("pips_perdidos", 0)
 
-                    guardar_estado()
-                    print(f"✅ Sistema purificado. Stats recalculadas solo para hoy ({_hoy_recalc}).")
+                    if len(hist_limpio) < len(historial_operaciones) or abs(p_g) > glitch_pips_threshold or abs(p_p) > glitch_pips_threshold:
+                        logger.warning(f"🚨 EXORCISMO DE DATOS: Detectados pips absurdos. Eliminando {len(historial_operaciones) - len(hist_limpio)} entradas corruptas.")
 
-            else:
-                print("⚠️ Archivo de estado tiene un formato inválido.")
-                with _lock_ops:
-                    operaciones_activas.clear()
+                        historial_operaciones.clear()
+                        historial_operaciones.extend(hist_limpio)
+
+                        # Resetear estadísticas y recalcular SOLO operaciones de HOY
+                        estadisticas_diarias.update({"ganadas": 0, "perdidas": 0, "pips_ganados": 0.0, "pips_perdidos": 0.0})
+                        _hoy_recalc = ahora().strftime("%Y-%m-%d")
+                        for h in historial_operaciones:
+                            try:
+                                # Solo contar operaciones de hoy
+                                _h_ts = h.get('timestamp', 0)
+                                if _h_ts:
+                                    from datetime import datetime as _dt_rc
+                                    _h_fecha = _dt_rc.fromtimestamp(_h_ts).strftime("%Y-%m-%d")
+                                    if _h_fecha != _hoy_recalc:
+                                        continue
+                                else:
+                                    continue  # Sin timestamp → no contar
+                                if h.get('resultado') == 'WIN':
+                                    estadisticas_diarias['ganadas'] += 1
+                                    estadisticas_diarias['pips_ganados'] += float(h.get('pips', 0))
+                                else:
+                                    estadisticas_diarias['perdidas'] += 1
+                                    estadisticas_diarias['pips_perdidos'] += abs(float(h.get('pips', 0)))
+                            except Exception: continue
+
+                        guardar_estado()
+                        print(f"✅ Sistema purificado. Stats recalculadas solo para hoy ({_hoy_recalc}).")
     except Exception as e:
         print(f"⚠️ Error cargando estado: {e}")
         with _lock_ops:
@@ -926,7 +1006,7 @@ def cargar_estado():
 
 ACTIVOS = {
     # Solo GOLD y NASDAQ — pares prioritarios
-    "GOLD":         "GC=F",
+    "GOLD":         "XAUUSD=X",
     "NASDAQ":       "NQ=F",
     # Desactivados (evaluacion):
     # "EUR/USD":      "EURUSD=X",
@@ -1392,9 +1472,12 @@ def obtener_precio_actual(ticker, df_fallback=None):
 
 def get_categoria(ticker):
     t = ticker.upper() if ticker else ""
+    # ORO primero — XAUUSD=X contiene "=X" pero NO es forex, es commodity
+    if t in ("XAUUSD=X", "XAUUSD", "GOLD", "GC=F", "GC"):
+        return "futuros"
     if "=X" in t or t in ("EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCHF", "USDCAD", "NZDUSD"):
         return "forex"
-    if "=F" in t or t.startswith("^") or t in ("US100CASH", "US500CASH", "GOLD", "XAUUSD", "NAS100", "US100", "US500"):
+    if "=F" in t or t.startswith("^") or t in ("US100CASH", "US500CASH", "NAS100", "US100", "US500"):
         return "futuros"
     return "accion"
 
@@ -2572,8 +2655,8 @@ def evaluar_senal_profesional(ind, ticker=""):
     if regimen == "TRANSICIÓN" and adx_val < 12:
         return None, 0, [f"⚠️ Transición extrema (ADX {adx_val:.1f}<12)"]
 
-    # Bloqueo de Volatilidad Extrema
-    _vol_min_extrema = (_prof["premium"].get("vol_min_extrema", 0.3) if (_prof and _prof.get("premium", {}).get("enabled")) else 0.3)
+    # Bloqueo de Volatilidad Extrema — usa vol_min_extrema del perfil (default 0.05 para no bloquear futuros)
+    _vol_min_extrema = (_prof["premium"].get("vol_min_extrema", 0.05) if (_prof and _prof.get("premium", {}).get("enabled")) else 0.05)
     if regimen == "VOLATILIDAD" and ind.get('vol_ratio', 1) < _vol_min_extrema:
         return None, 0, [f"⚠️ Volatilidad extrema sin volumen institucional (vol={ind.get('vol_ratio',0):.1f}x < {_vol_min_extrema}x)"]
 
@@ -2645,7 +2728,7 @@ def evaluar_senal_profesional(ind, ticker=""):
     open_p = ind.get('open', ind['precio'])
     cuerpo_pct = abs(open_p - ind['precio']) / max(ind['atr'], 1e-10)
     # Umbral de cuerpo de vela por activo — Oro necesita más confirmación, NASDAQ es más rápido
-    _umbral_map = {"NQ=F": 0.05, "ES=F": 0.06, "GOLD": 0.12, "XAUUSD=X": 0.12}
+    _umbral_map = {"NQ=F": 0.05, "ES=F": 0.06, "GC=F": 0.12, "GOLD": 0.12, "XAUUSD=X": 0.12}
     umbral_cuerpo = _umbral_map.get(ticker, 0.10)
 
     vela_con_cuerpo = cuerpo_pct >= umbral_cuerpo
@@ -2854,12 +2937,12 @@ def evaluar_senal_profesional(ind, ticker=""):
     _rsi = ind.get('rsi', 50)
     _vol = ind.get('vol_ratio', 0)
 
-    # Momentum BUY: EMA20 > EMA50, MACD > Signal, ADX > 20 (tendencia activa), RSI 40-65
+    # Momentum BUY: EMA20 > EMA50, MACD > Signal, ADX > 20 (tendencia activa), RSI 40-rsi_ob
     if (_ema20 > _ema50
         and _macd > _signal_line
         and _adx >= 20
-        and 40 < _rsi < 65
-        and _vol >= 0.3
+        and 40 < _rsi < rsi_ob
+        and _vol >= 0.05
         and ind['precio'] > _ema50
         and vela_con_cuerpo):
         _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
@@ -2873,12 +2956,12 @@ def evaluar_senal_profesional(ind, ticker=""):
             ]
             return "COMPRA", 3, razones
 
-    # Momentum SELL: EMA20 < EMA50, MACD < Signal, ADX > 20, RSI 35-60
+    # Momentum SELL: EMA20 < EMA50, MACD < Signal, ADX > 20, RSI rsi_os-60
     if (_ema20 < _ema50
         and _macd < _signal_line
         and _adx >= 20
-        and 35 < _rsi < 60
-        and _vol >= 0.3
+        and rsi_os < _rsi < 60
+        and _vol >= 0.05
         and ind['precio'] < _ema50
         and vela_con_cuerpo):
         _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
@@ -3435,7 +3518,7 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
         if acc_info:
             margin_free = acc_info.margin_free
             # Estimar margen requerido (precio * contract * lote / leverage)
-            _leverage = acc_info.leverage or 888
+            _leverage = min(max(acc_info.leverage or 100, 1), 500)  # FIX: Clamped 1-500 (antes default 888)
             _margin_est = (price * symbol_info.trade_contract_size * lote_val) / _leverage
             if _margin_est > margin_free * 0.8:  # No usar más del 80% del margen libre
                 # Reducir lote para que quepa en el margen
@@ -3520,8 +3603,9 @@ def ejecutar_orden_mt5(ticker, tipo, capital, riesgo_pct, entrada, sl, tp1, es_p
         if not _spread_aceptable(ticker):
             logger.warning(f"🔴 SPREAD EXCESIVO: {mt5_ticker} — spread > 2x promedio histórico → orden cancelada")
             return False
-    except Exception:
-        pass  # Si falla la verificación, continuar con la validación normal
+    except Exception as e_spread:
+        # FIX: Loguear el error pero continuar (la validación estática de spread sigue abajo)
+        logger.warning(f"⚠️ Error en _spread_aceptable({ticker}): {e_spread} — usando validación estática")
 
     # Validar spread una sola vez antes de ejecutar en cualquier cuenta
     with _lock_mt5:
@@ -10952,7 +11036,6 @@ def dashboard_visual():
                 _rt = _jd.load(_f)
     except Exception:
         _rt = None
-
     # --- Estadísticas globales (prioridad: mt5_realtime → historial_real → memoria) ---
     _hist_real_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
     _hist_all = []
@@ -13324,8 +13407,11 @@ def revisar_niveles_operaciones():
         # Cierre definitivo — TP1, SL, o Auto-cierre 24h (sin cierre anticipado por tiempo)
         if toca_tp1 or sl_alcanzado or (_edad_op > TIEMPO_AUTOCIERRE):
             df = descargar_datos_seguro(ticker)
+            # FIX: Verificar ANTES del lock para evitar continue dentro del with (riesgo de lógica rota)
+            if op_id not in operaciones_activas:
+                continue
             with _lock_ops:
-                if op_id not in operaciones_activas: continue
+                if op_id not in operaciones_activas: continue  # Double-check dentro del lock
                 duracion = time.time() - op.get('timestamp', time.time())
                 sl_pips = abs(calcular_pips(op['entrada'], op['sl'], ticker))
                 _riesgo_op = op.get('riesgo_usado', RIESGO_POR_TRADE)
@@ -13754,16 +13840,19 @@ def analizar_activo(nombre, ticker):
                 elif "JPY" not in ticker and (precio_mon < 0.5 or precio_mon > 2.0): es_precio_valido = False
             if ticker == "NQ=F" and (precio_mon < 15000 or precio_mon > 40000): es_precio_valido = False
             if ticker == "ES=F" and (precio_mon < 4000 or precio_mon > 12000): es_precio_valido = False
+            # ORO: spot XAUUSD=X (~1500-8000 rango razonable)
+            if ticker == "XAUUSD=X" and (precio_mon < 1500 or precio_mon > 8000): es_precio_valido = False
             if es_precio_valido:
                 break
             else:
                 logger.warning(f"🔄 Reintentando {nombre} ({intento+1}/3)... Glitch detectado: {precio_mon}")
                 time.sleep(2)
         
-        if df is not None and not es_precio_valido:
-             logger.error(f"❌ Glitch persistente | Activo: {nombre} | Ticker: {ticker} | Precio: {precio_mon}")
-             return
-        
+        # FIX: Abortar si precio inválido tras 3 reintentos (antes continuaba con datos corruptos)
+        if not es_precio_valido:
+            logger.error(f"❌ Glitch persistente | Activo: {nombre} | Ticker: {ticker} | Precio: {precio_mon} — ABORTANDO análisis")
+            return
+
         if df is None or df.empty:
             return
 
@@ -13797,10 +13886,11 @@ def analizar_activo(nombre, ticker):
             logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
             return
 
-        # 🔴 FILTRO DURO VOLUMEN: vol < 0.2x = mercado muerto, no operar
+        # 🔴 FILTRO DURO VOLUMEN: vol < 0.05x = mercado completamente muerto
+        # Umbral bajo para no bloquear futuros (GC=F, NQ=F) con volumen reducido fuera de horas
         _vol_r = ind.get('vol_ratio', 1.0)
-        if _vol_r < 0.2:
-            logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.5x) — señal descartada")
+        if _vol_r < 0.05:
+            logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.05x) — señal descartada")
             return
 
         # [4] CONFIRMACIÓN INTER-MERCADO: +1 al score si el activo correlacionado confirma
@@ -14033,8 +14123,8 @@ def analizar_activo(nombre, ticker):
             mtf_ok = confirmar_tendencia_1h(ticker, tipo, rsi=ind.get('rsi', 50))
             if mtf_ok:
                 votos_favor += 15
-        except Exception:
-            pass
+        except Exception as e_mtf:
+            logger.warning(f"⚠️ confirmar_tendencia_1h({ticker}) falló: {e_mtf} — 15 votos MTF perdidos")
         peso_total += 15
         # Penalización si MTF 4H está en contra (pero no bloquea)
         if not _mtf_4h_ok:
@@ -14076,9 +14166,10 @@ def analizar_activo(nombre, ticker):
 
         # ⭐ CLASIFICACIÓN DE SEÑALES — Premium vs Standard
         # FIX 2026-03-27: 70%→50% confianza premium, permitir STANDARD (score≥3, conf≥40%)
+        # FIX 2026-03-31: score=3 usa umbral 25% (mismo que MULTI-IA) — evita descartar Momentum válido
         # Con ML bypass=0, 70% era casi imposible de alcanzar → 0 señales en 2 días
         _es_premium = (score >= 4 and confianza_total >= 50)
-        _es_standard = (score >= 3 and confianza_total >= 40)
+        _es_standard = (score >= 3 and confianza_total >= (25 if score <= 3 else 40))
 
         if _es_premium:
             _nivel_senal = "PREMIUM"
@@ -15053,8 +15144,10 @@ def _actualizar_capital_desde_mt5():
     try:
         equity = _obtener_capital_real_mt5()
         if equity > 0 and abs(equity - CAPITAL_USUARIO) >= 0.01:
-            _old = CAPITAL_USUARIO
-            CAPITAL_USUARIO = equity
+            # FIX: Actualizar dentro del lock para evitar race condition con otros hilos
+            with _lock_ops:
+                _old = CAPITAL_USUARIO
+                CAPITAL_USUARIO = equity
             # Guardar en estado.json para que el launcher lo lea en tiempo real
             guardar_estado()
             # Log solo cada 10 min o si cambio > $5
@@ -15194,6 +15287,8 @@ def loop_sync_mt5_real():
         "EURUSD": 0.0001, "AUDUSD": 0.0001,    # Forex: 1 pip = 0.0001
         "AUDCAD": 0.0001, "EURCHF": 0.0001,
         "USDCAD": 0.0001, "GBPUSD": 0.0001,
+        "XAUUSD": 0.01,                         # GOLD: 1 pip = 0.01 (=$0.01 por unidad)
+        "GOLD": 0.01,                           # Alias GOLD
     }
     _NOMBRE = {
         "EURUSD": "EUR/USD",
@@ -17023,14 +17118,24 @@ PAR_PROFILES = {
         "news": {"currencies": ["EUR", "USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
-    # ━━━━ US100 (NASDAQ) — NY session 13:30-20:30 UTC (09:30-16:30 ET) ━━━━
+    # ━━━━ XAUUSD (GOLD) — London + NY session, tendencia alcista fuerte ━━━━
+    "XAUUSD": {
+        "identity": {"mt5": "XAUUSD", "yf": "GC=F", "display": "GOLD", "category": "materia_prima", "currencies": ["XAU", "USD"], "pip_size": 0.01},
+        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 75, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.5, "vol_min_extrema": 0.05, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
+        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 3.0},
+        "time_filter": {"best_hours_utc": [(7, 22)], "peak_hours_utc": [(8, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "news": {"currencies": ["XAU", "USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
+    },
+    # ━━━━ US100 (NASDAQ) — NY session 13:30-21:45 UTC (futuros NQ=F) ━━━━
     # Tendencia alcista → COMPRA | Tendencia bajista → VENTA | Neutral → bloqueado
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 65, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.7, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 78, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.5, "vol_min_extrema": 0.05, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
         "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 20.0},
-        "time_filter": {"best_hours_utc": [(13, 21)], "peak_hours_utc": [(13, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "time_filter": {"best_hours_utc": [(13, 22)], "peak_hours_utc": [(13, 17)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
         "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
     },
@@ -17327,13 +17432,14 @@ def _circuit_breaker_check():
     # Si ya está activo, verificar si expiró
     if _cb_activo:
         _now_ts = time.time()
-        # Seguridad: si _cb_hasta es 0 o lleva >12h activo, forzar reset
-        if _cb_hasta <= 0 or (_now_ts - _cb_hasta > 43200):
+        # Seguridad: si _cb_hasta es 0 o inválido, forzar reset
+        if _cb_hasta <= 0:
             _cb_activo = False
             _cb_hasta = 0.0
-            logger.info("✅ CIRCUIT BREAKER: Reset forzado (estado inválido o >12h) — trading reactivado")
+            logger.info("✅ CIRCUIT BREAKER: Reset forzado (estado inválido) — trading reactivado")
             return False
-        if _now_ts >= _cb_hasta:
+        # FIX: Verificar si el tiempo actual superó la expiración O si lleva >12h activo
+        if _now_ts >= _cb_hasta or (_now_ts - (_cb_hasta - 86400)) > 43200:
             _cb_activo = False
             _cb_hasta = 0.0
             logger.info("✅ CIRCUIT BREAKER: Periodo de pausa terminado — trading reactivado")
@@ -17859,9 +17965,9 @@ def _arrancar_interno():
             _instance_lock = _kernel32.CreateMutexW(None, True, _mutex_name)
             _last_err = _kernel32.GetLastError()
             if _last_err == 183:  # ERROR_ALREADY_EXISTS
-                log_sistema("❌ Ya hay otra instancia del bot corriendo (Windows Mutex detectado).", "error")
-                print("❌ Ya hay otra instancia del bot corriendo (Windows Mutex detectado).")
-                sys.exit(1)
+                log_sistema("✅ Bot ya en ejecución (Mutex detectado) — esta instancia sale, la original sigue activa.", "info")
+                print("✅ Bot ya en ejecución — instancia original activa, esta sale.")
+                sys.exit(0)
             print(f"🔒 Mutex Windows adquirido (PID {os.getpid()}) — instancia única garantizada.")
         except Exception as _e:
             print(f"⚠️ No se pudo crear mutex Windows: {_e} — continuando sin protección multi-instancia.")
@@ -18299,18 +18405,23 @@ if __name__ == "__main__":
                     print("⚠️ HTTPS deshabilitado — dashboard solo HTTP")
                     srv_https = None
 
-        # C-04 FIX: Proteger contra crash HTTPS
+        # C-04 FIX: Proteger contra crash HTTPS (con límite de reintentos)
         if srv_https:
-            while True:
+            _https_retries = 0
+            _HTTPS_MAX_RETRIES = 10  # FIX: Máximo 10 reintentos para no bloquear el bot infinitamente
+            while _https_retries < _HTTPS_MAX_RETRIES:
                 try:
                     srv_https.run()  # Bloqueante en hilo principal
+                    break  # Si termina normalmente, salir
                 except Exception as e_https:
-                    logger.error(f"🛑 HTTPS server crashed: {e_https} — reiniciando en 30s...")
+                    _https_retries += 1
+                    _wait = min(30 * _https_retries, 300)  # Backoff: 30s, 60s, ... hasta 5min max
+                    logger.error(f"🛑 HTTPS server crashed ({_https_retries}/{_HTTPS_MAX_RETRIES}): {e_https} — reiniciando en {_wait}s...")
                     try:
-                        enviar_grupo(f"🛑 *ALERTA*: Servidor HTTPS cayó: {str(e_https)[:100]}. Reiniciando...")
+                        enviar_grupo(f"🛑 *ALERTA*: Servidor HTTPS cayó: {str(e_https)[:100]}. Reinicio {_https_retries}/{_HTTPS_MAX_RETRIES}...")
                     except Exception:
                         pass
-                    time.sleep(30)
+                    time.sleep(_wait)
                     try:
                         srv_https = create_server(app, host="0.0.0.0", port=_https_port, url_scheme="https", threads=4)
                         ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -18318,8 +18429,10 @@ if __name__ == "__main__":
                         ssl_ctx.load_cert_chain(ssl_cert, ssl_key)
                         srv_https.socket = ssl_ctx.wrap_socket(srv_https.socket, server_side=True)
                     except Exception as e_ssl:
-                        logger.error(f"🛑 No se pudo recrear HTTPS: {e_ssl} — reintentando en 60s...")
-                        time.sleep(60)
+                        logger.error(f"🛑 No se pudo recrear HTTPS ({_https_retries}/{_HTTPS_MAX_RETRIES}): {e_ssl}")
+            if _https_retries >= _HTTPS_MAX_RETRIES:
+                logger.error("🛑 HTTPS: Máximo de reintentos alcanzado — continuando sin HTTPS")
+                print("⚠️ HTTPS deshabilitado tras 10 fallos — bot continúa solo con HTTP")
         else:
             # Sin HTTPS: mantener el proceso vivo con el hilo principal
             print("⏳ Bot corriendo sin HTTPS (modo local). Ctrl+C para detener.")
