@@ -17,6 +17,7 @@ PHONE = os.getenv("TG_PHONE", "")
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "0"))
 GROUP_ID = os.getenv("GROUP_ID", "").strip()  # FIX 2026-04-07: Para celebrar TPs en el grupo público
+ADMIN_ID = os.getenv("USER_ID_1", "").strip()  # Admin para reportes privados diarios
 
 SESSION_FILE = str(Path(__file__).parent / "signal_copier_session")
 
@@ -141,6 +142,11 @@ _recently_sent: dict = {}
 # FIX 2026-04-08: Anti-duplicado para TP/SL notifications
 # { "PAIR_DIRECTION_tp/sl": timestamp } — evita doble SL HIT / TP HIT
 _recently_notified: dict = {}
+
+# === DAILY RESULTS TRACKER (para reportes de mediodía y tarde) ===
+# Lista de dicts: {"pair": str, "direction": str, "entry": float, "tp": float, "pips_str": str, "result": "tp"|"sl", "time": float}
+_daily_results: list = []
+_daily_results_lock = threading.Lock()
 
 # Archivo de señales manuales — el admin registra señales vía /rastrear en bot.py
 MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
@@ -652,6 +658,231 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
         log.warning(f"SL notification error: {e}")
 
 
+def _record_daily_result(signal: dict, result: str) -> None:
+    """Registra un TP o SL en el tracker diario para los reportes del grupo."""
+    pair = signal.get("pair", "?")
+    direction = signal.get("direction", "?")
+    entry = signal.get("entry", 0) or 0
+    tp = signal.get("_tp_final", signal.get("tp", 0)) or 0
+    sl = signal.get("sl", 0) or 0
+
+    if result == "tp":
+        pips_raw = abs(tp - entry) if entry > 0 and tp > 0 else 0
+    else:
+        pips_raw = abs(sl - entry) if entry > 0 and sl > 0 else 0
+
+    # Formatear pips según activo
+    if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
+        pips_str = f"{pips_raw:.0f} pts"
+        pips_numeric = pips_raw
+    elif "JPY" in pair.upper():
+        pips_str = f"{pips_raw * 100:.0f} pips"
+        pips_numeric = pips_raw * 100
+    elif entry >= 100:
+        pips_str = f"{pips_raw:.1f} pts"
+        pips_numeric = pips_raw
+    else:
+        pips_str = f"{pips_raw * 10000:.0f} pips"
+        pips_numeric = pips_raw * 10000
+
+    record = {
+        "pair": pair,
+        "pair_display": _get_display_pair(pair),
+        "direction": direction,
+        "entry": entry,
+        "tp": tp,
+        "sl": sl,
+        "pips_str": pips_str,
+        "pips_numeric": pips_numeric,
+        "result": result,
+        "time": time.time(),
+    }
+    with _daily_results_lock:
+        _daily_results.append(record)
+    log.info(f"📊 Daily tracker: +1 {result.upper()} {pair} ({pips_str}) — total hoy: {len(_daily_results)}")
+
+
+def _build_promo_report(hora_label: str) -> str | None:
+    """Construye el mensaje de reporte promocional para el grupo público.
+    Retorna None si no hay TPs que reportar."""
+    from datetime import datetime
+    import pytz
+    tz = pytz.timezone("Europe/Andorra")
+    hoy = datetime.now(tz).strftime("%d/%m/%Y")
+
+    with _daily_results_lock:
+        # Solo resultados de hoy (por si acaso hay remanentes)
+        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
+        results = [r for r in _daily_results if r["time"] >= today_start]
+
+    tps = [r for r in results if r["result"] == "tp"]
+    sls = [r for r in results if r["result"] == "sl"]
+
+    if not tps:
+        return None  # No hay TPs — no publicar
+
+    # Agrupar pips por tipo (GOLD=pts, indices=pts, forex=pips)
+    gold_pts = sum(r["pips_numeric"] for r in tps if r["pair"] in ("GOLD", "XAUUSD", "XAUUSD=X"))
+    index_pts = sum(r["pips_numeric"] for r in tps if r["pair"] not in ("GOLD", "XAUUSD", "XAUUSD=X") and r["entry"] >= 100)
+    forex_pips = sum(r["pips_numeric"] for r in tps if r["pair"] not in ("GOLD", "XAUUSD", "XAUUSD=X") and r["entry"] < 100)
+
+    # Detalle de cada TP
+    tp_lines = ""
+    for r in tps:
+        dir_emoji = "🟢" if r["direction"] == "BUY" else "🔴"
+        tp_lines += f"  {dir_emoji} {r['pair_display']} — *+{r['pips_str']}*\n"
+
+    # Resumen de puntos/pips
+    resumen_parts = []
+    if gold_pts > 0:
+        resumen_parts.append(f"🥇 GOLD: *+{gold_pts:.0f} pts*")
+    if index_pts > 0:
+        resumen_parts.append(f"📈 Indices: *+{index_pts:.1f} pts*")
+    if forex_pips > 0:
+        resumen_parts.append(f"💱 Forex: *+{forex_pips:.0f} pips*")
+    resumen = "\n".join(resumen_parts)
+
+    wr = len(tps) / (len(tps) + len(sls)) * 100 if (tps or sls) else 0
+
+    msg = (
+        f"📊📊📊 *REPORTE {hora_label}* 📊📊📊\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 {hoy}\n\n"
+        f"🎯 *{len(tps)} TP{'s' if len(tps) != 1 else ''} ganado{'s' if len(tps) != 1 else ''}*"
+    )
+    if sls:
+        msg += f"  |  🛑 {len(sls)} SL{'s' if len(sls) != 1 else ''}"
+    msg += f"  |  ✅ *{wr:.0f}% Win Rate*\n\n"
+
+    msg += f"*Señales exitosas:*\n{tp_lines}\n"
+    msg += f"{resumen}\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━\n\n"
+    msg += (
+        f"💎 *¿Quieres recibir estas señales en tiempo real?*\n"
+        f"Únete al canal VIP y copia estas operaciones.\n\n"
+        f"👉 Escribe */vip* para más info\n"
+        f"🤖 O activa el *Copy Trading* automático\n\n"
+        f"_BuySell365 Pro — Resultados reales, verificados en MT5_"
+    )
+    return msg
+
+
+async def _loop_promo_reportes() -> None:
+    """Loop que envía reportes promocionales al grupo público a las 12:00 y 17:00 hora Andorra."""
+    import requests
+    from datetime import datetime
+    import pytz
+    tz = pytz.timezone("Europe/Andorra")
+
+    _sent_today: dict = {}  # {"12": "2026-04-08", "17": "2026-04-08"}
+
+    _promo_buttons = json.dumps({
+        "inline_keyboard": [
+            [
+                {"text": "🤖 Empezar Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+            ],
+            [
+                {"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
+            ]
+        ]
+    })
+
+    while True:
+        try:
+            now = datetime.now(tz)
+            hoy_str = now.strftime("%Y-%m-%d")
+            hora = now.hour
+            minuto = now.minute
+
+            # Reset tracker a medianoche
+            if hora == 0 and minuto < 2:
+                with _daily_results_lock:
+                    if _daily_results:
+                        log.info(f"🔄 Reset daily tracker: {len(_daily_results)} resultados del día anterior")
+                        _daily_results.clear()
+                _sent_today.clear()
+
+            # 12:00 — Reporte de mañana
+            if hora == 12 and minuto < 5 and _sent_today.get("12") != hoy_str:
+                _sent_today["12"] = hoy_str
+                msg = _build_promo_report("DE MAÑANA")
+                if msg and GROUP_ID:
+                    try:
+                        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                        payload = {"chat_id": GROUP_ID, "text": msg, "parse_mode": "Markdown", "reply_markup": _promo_buttons}
+                        resp = requests.post(url, json=payload, timeout=10)
+                        if resp.status_code == 200:
+                            log.info("📢 Reporte mediodía enviado al grupo")
+                        else:
+                            log.warning(f"Reporte mediodía error: {resp.status_code}")
+                    except Exception as e:
+                        log.warning(f"Reporte mediodía error: {e}")
+                elif not msg:
+                    log.info("📢 Reporte mediodía: sin TPs aún, no se envía")
+
+            # 17:00 — Reporte de tarde
+            if hora == 17 and minuto < 5 and _sent_today.get("17") != hoy_str:
+                _sent_today["17"] = hoy_str
+                msg = _build_promo_report("DE TARDE")
+                if msg and GROUP_ID:
+                    try:
+                        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                        payload = {"chat_id": GROUP_ID, "text": msg, "parse_mode": "Markdown", "reply_markup": _promo_buttons}
+                        resp = requests.post(url, json=payload, timeout=10)
+                        if resp.status_code == 200:
+                            log.info("📢 Reporte tarde enviado al grupo")
+                        else:
+                            log.warning(f"Reporte tarde error: {resp.status_code}")
+                    except Exception as e:
+                        log.warning(f"Reporte tarde error: {e}")
+                elif not msg:
+                    log.info("📢 Reporte tarde: sin TPs aún, no se envía")
+
+            # 22:00 — Reporte privado al admin (resumen del día)
+            if hora == 22 and minuto < 5 and _sent_today.get("22") != hoy_str:
+                _sent_today["22"] = hoy_str
+                if ADMIN_ID:
+                    with _daily_results_lock:
+                        today_start = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
+                        results = [r for r in _daily_results if r["time"] >= today_start]
+                    tps = [r for r in results if r["result"] == "tp"]
+                    sls = [r for r in results if r["result"] == "sl"]
+                    with _signals_lock:
+                        abiertas = len(_open_signals)
+                    _admin_msg = (
+                        f"📋 *Copier — Resumen del día*\n"
+                        f"📅 {hoy_str}\n\n"
+                        f"🎯 TPs: *{len(tps)}*\n"
+                        f"🛑 SLs: *{len(sls)}*\n"
+                        f"📡 Señales abiertas: *{abiertas}*\n"
+                    )
+                    if tps:
+                        _total_lines = ""
+                        for r in tps:
+                            _total_lines += f"  ✅ {r['pair_display']} +{r['pips_str']}\n"
+                        _admin_msg += f"\n*Detalle TPs:*\n{_total_lines}"
+                    if sls:
+                        _sl_lines = ""
+                        for r in sls:
+                            _sl_lines += f"  ❌ {r['pair_display']} -{r['pips_str']}\n"
+                        _admin_msg += f"\n*Detalle SLs:*\n{_sl_lines}"
+                    try:
+                        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                        payload = {"chat_id": ADMIN_ID, "text": _admin_msg, "parse_mode": "Markdown"}
+                        resp = requests.post(url, json=payload, timeout=10)
+                        if resp.status_code == 200:
+                            log.info("📋 Reporte admin enviado")
+                        else:
+                            log.warning(f"Reporte admin error: {resp.status_code}")
+                    except Exception as e:
+                        log.warning(f"Reporte admin error: {e}")
+
+        except Exception as e:
+            log.warning(f"Error en loop promo reportes: {e}")
+
+        await asyncio.sleep(60)  # Revisar cada minuto
+
+
 async def _monitor_tp_loop() -> None:
     """Async background loop — checks every 30s if any tracked signal hit TP or SL."""
     log.info("🎯 Monitor TP/SL loop iniciado (intervalo: 30s)")
@@ -776,6 +1007,9 @@ async def _monitor_tp_loop() -> None:
                 else:
                     log.info(f"🛑 Llamando _send_sl_notification para {signal.get('pair','?')} entry={_entry}")
                     _send_sl_notification(signal, reply_to_msg_id=_reply_id)
+
+                # Registrar resultado para reportes diarios del grupo
+                _record_daily_result(signal, result)
 
 
 # === PARSER ===
@@ -1969,6 +2203,8 @@ async def main():
 
     # Iniciar monitor TP/SL en background
     asyncio.ensure_future(_monitor_tp_loop())
+    # Iniciar reportes promocionales (12:00 y 17:00 hora Andorra)
+    asyncio.ensure_future(_loop_promo_reportes())
 
     log.info("📡 Signal Copier ACTIVO — escuchando todos los canales VIP...")
     await client.run_until_disconnected()
