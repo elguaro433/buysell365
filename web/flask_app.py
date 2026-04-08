@@ -855,8 +855,9 @@ body{{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);over
 .hero-buttons{{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}}
 .btn{{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;border-radius:12px;font-size:15px;font-weight:600;
   text-decoration:none;transition:all 0.3s ease;cursor:pointer;border:none}}
-.btn-primary{{background:linear-gradient(135deg,#00ffcc,#00d4aa,#00b894);color:#060a12;box-shadow:0 4px 30px rgba(0,255,204,0.5),0 0 60px rgba(0,255,204,0.15);font-weight:800}}
+.btn-primary{{background:linear-gradient(135deg,#00ffcc,#00d4aa,#00b894);color:#060a12;box-shadow:0 4px 30px rgba(0,255,204,0.5),0 0 60px rgba(0,255,204,0.15);font-weight:800;animation:ctaGlow 2.5s ease-in-out infinite}}
 .btn-primary:hover{{transform:translateY(-3px);box-shadow:0 8px 50px rgba(0,255,204,0.7),0 0 80px rgba(0,255,204,0.2)}}
+@keyframes ctaGlow{{0%,100%{{box-shadow:0 4px 30px rgba(0,255,204,0.5),0 0 60px rgba(0,255,204,0.15)}}50%{{box-shadow:0 4px 40px rgba(0,255,204,0.7),0 0 80px rgba(0,255,204,0.3)}}}}
 .btn-secondary{{background:rgba(255,255,255,0.08);color:var(--text);border:1px solid rgba(255,255,255,0.18)}}
 .btn-secondary:hover{{background:rgba(255,255,255,0.14);transform:translateY(-3px);border-color:rgba(0,255,204,0.4);box-shadow:0 4px 20px rgba(0,255,204,0.1)}}
 
@@ -882,8 +883,8 @@ section{{padding:60px 20px}}
 /* ═══ FEATURES ═══ */
 .features{{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 30%,var(--bg2) 70%,var(--bg) 100%)}}
 .features-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto}}
-.feature-card{{background:linear-gradient(145deg,rgba(22,32,53,0.9),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:30px;transition:all 0.4s ease;box-shadow:0 4px 24px rgba(0,0,0,0.3)}}
-.feature-card:hover{{transform:translateY(-8px);border-color:rgba(0,255,204,0.5);box-shadow:0 12px 50px rgba(0,255,204,0.15),0 4px 20px rgba(0,0,0,0.4)}}
+.feature-card{{background:linear-gradient(145deg,rgba(22,32,53,0.9),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:30px;transition:all 0.4s ease;box-shadow:0 4px 24px rgba(0,0,0,0.3);transform-style:preserve-3d;perspective:800px}}
+.feature-card:hover{{transform:translateY(-8px) rotateX(4deg) rotateY(-2deg);border-color:rgba(0,255,204,0.5);box-shadow:0 12px 50px rgba(0,255,204,0.15),0 4px 20px rgba(0,0,0,0.4),0 0 30px rgba(0,255,204,0.08)}}
 .feature-icon{{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px}}
 .feature-icon.green{{background:rgba(0,212,170,0.18);box-shadow:0 0 16px rgba(0,212,170,0.2)}}
 .feature-icon.blue{{background:rgba(59,130,246,0.18);box-shadow:0 0 16px rgba(59,130,246,0.2)}}
@@ -914,8 +915,8 @@ section{{padding:60px 20px}}
 .pricing::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:2px;background:linear-gradient(90deg,transparent,#00ffcc,#fbbf24,#00ffcc,transparent);border-radius:2px}}
 .pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;max-width:1200px;margin:0 auto}}
 @media(max-width:900px){{.pricing-cards{{grid-template-columns:1fr!important}}}}
-.price-card{{background:linear-gradient(160deg,rgba(22,32,53,0.97),rgba(14,22,40,0.97));border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 32px;text-align:center;position:relative;transition:all .4s ease;backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}}
-.price-card:hover{{transform:translateY(-12px) scale(1.02);box-shadow:0 28px 70px rgba(0,0,0,.5)}}
+.price-card{{background:linear-gradient(160deg,rgba(22,32,53,0.97),rgba(14,22,40,0.97));border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 32px;text-align:center;position:relative;transition:all .4s ease;backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.3);transform-style:preserve-3d;perspective:1000px}}
+.price-card:hover{{transform:translateY(-12px) scale(1.02) rotateX(3deg);box-shadow:0 28px 70px rgba(0,0,0,.5),0 0 40px rgba(0,255,204,0.06)}}
 .price-card.featured{{border-color:var(--gold);box-shadow:0 0 60px rgba(251,191,36,0.2),0 0 120px rgba(251,191,36,0.08)}}
 .price-badge{{position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),#00b894);
   color:#060a12;padding:8px 28px;border-radius:24px;font-size:14px;font-weight:900;white-space:nowrap;letter-spacing:0.5px;box-shadow:0 4px 20px rgba(0,255,204,0.3)}}
@@ -1022,7 +1023,7 @@ section{{padding:60px 20px}}
 
 
 /* ═══ FADE-IN ANIMATIONS ═══ */
-.fade-in{{opacity:1;transform:none}}
+.fade-in{{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease-out,transform 0.7s ease-out}}
 .fade-in.visible{{opacity:1;transform:none}}
 
 /* ═══ RESPONSIVE ═══ */
@@ -1093,8 +1094,8 @@ if('serviceWorker' in navigator){{
 </head>
 <body>
 
-<!-- MATRIX RAIN BACKGROUND -->
-<canvas id="matrixCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.04"></canvas>
+<!-- FLOATING EMOJI PARTICLES BACKGROUND -->
+<canvas id="particlesCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.12"></canvas>
 
 <!-- NAV -->
 <nav class="nav">
@@ -1143,17 +1144,17 @@ if('serviceWorker' in navigator){{
 <section class="hero">
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-vars='{{"ops":"{n_ops}"}}'>{'Bot activo' if is_alive else 'Dashboard Online'} \u2014 {n_ops} operaciones en vivo</span></div>
-    <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/5</span></h1>
-    <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
+    <h1 data-i18n="hero.title">\U0001f4b0 Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f916 Nuestro bot trabaja por ti, 24/5</span></h1>
+    <p data-i18n="hero.subtitle">\U0001f3af El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. \U0001f48e Sin experiencia requerida.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f680 Empezar Ahora</a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
       <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Telegram</span></a>
     </div>
-    <div class="stats-bar">
-      <div class="stat-item"><div class="stat-value">{wr}%</div><div class="stat-label" data-i18n="stats.winrate">WIN RATE</div></div>
-      <div class="stat-item"><div class="stat-value blue">{total}+</div><div class="stat-label" data-i18n="stats.signals">SE\u00d1ALES GENERADAS</div></div>
-      <div class="stat-item"><div class="stat-value gold">{pips:+,.0f}</div><div class="stat-label" data-i18n="stats.pips">PIPS ACUMULADOS</div></div>
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item"><div class="stat-value" id="counterWr" data-target="{wr}">0%</div><div class="stat-label" data-i18n="stats.winrate">WIN RATE</div></div>
+      <div class="stat-item"><div class="stat-value blue" id="counterTotal" data-target="{total}">0+</div><div class="stat-label" data-i18n="stats.signals">SE\u00d1ALES GENERADAS</div></div>
+      <div class="stat-item"><div class="stat-value gold" id="counterPips" data-target="{pips:.0f}">0</div><div class="stat-label" data-i18n="stats.pips">PIPS ACUMULADOS</div></div>
       <div class="stat-item"><div class="stat-value purple">24/5</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
     </div>
 
@@ -1207,7 +1208,7 @@ if('serviceWorker' in navigator){{
   </div>
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
     <div class="price-card" style="border:1px solid rgba(77,159,255,0.3);box-shadow:0 0 30px rgba(77,159,255,0.1)">
-      <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">Comunidad</div>
+      <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">\U0001f4ac Comunidad</div>
       <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:2rem" data-i18n="pricing.free">Acceso Libre</div>
       <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
@@ -1220,7 +1221,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="price-card featured" style="border:2px solid #fbbf24;box-shadow:0 0 50px rgba(251,191,36,0.3),0 0 100px rgba(251,191,36,0.1);transform:scale(1.04)">
       <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
-      <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">VIP Pro</div>
+      <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">\U0001f451 VIP Pro \U0001f4b0</div>
       <div class="price-amount" style="font-size:3.8rem;text-shadow:0 0 30px rgba(255,255,255,0.1)">
         <span class="old">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
@@ -1239,7 +1240,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="price-card" style="position:relative;border:2px solid #00ffcc;box-shadow:0 0 50px rgba(0,255,204,0.25),0 0 100px rgba(0,255,204,0.08)">
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00ffcc);box-shadow:0 0 30px rgba(0,255,204,.7);animation:glowPulse 3s infinite;font-size:15px;padding:10px 32px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
-      <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">Copy Trading</div>
+      <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">\U0001f680 Copy Trading \U0001f4b8</div>
       <div class="price-amount" style="font-size:2rem;color:#00ffcc;font-weight:900;text-shadow:0 0 30px rgba(0,255,204,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
       <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Tu cuenta MT5 replica autom\u00e1ticamente nuestras operaciones con XM \u2014 el broker m\u00e1s usado del mundo</p>
       <ul class="price-list" style="color:#e0e0e0">
@@ -1295,7 +1296,7 @@ if('serviceWorker' in navigator){{
 <!-- HOW IT WORKS -->
 <section class="fade-in" id="how-it-works" style="padding:60px 20px">
   <div class="section-title" style="margin-bottom:32px">
-    <h2>\U0001f680 <span data-i18n="how.title">C\u00f3mo Funciona</span></h2>
+    <h2>\U0001f680 <span data-i18n="how.title">\U0001f4b8 C\u00f3mo Funciona</span></h2>
     <p data-i18n="how.subtitle">En 3 simples pasos empiezas a recibir se\u00f1ales</p>
   </div>
   <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:24px;max-width:1000px;margin:0 auto">
@@ -1323,7 +1324,7 @@ if('serviceWorker' in navigator){{
 <!-- FEATURES -->
 <section class="features fade-in" id="features" style="padding:40px 20px">
   <div class="section-title" style="margin-bottom:24px">
-    <h2>\U0001f9e0 <span data-i18n="features.title">Tecnolog\u00eda Institucional</span></h2>
+    <h2>\U0001f9e0 <span data-i18n="features.title">\U0001f4b0 Tecnolog\u00eda Institucional \U0001f916</span></h2>
   </div>
   <div class="features-grid" style="gap:16px">
     <div class="feature-card" style="padding:20px">
@@ -1597,8 +1598,8 @@ if('serviceWorker' in navigator){{
 
 <!-- CTA -->
 <section class="cta fade-in" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
-  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Empieza a Operar con IA</span></h2>
-  <p style="font-size:1.1rem">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
+  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f4b0 Empieza a Operar con IA \U0001f916</span></h2>
+  <p style="font-size:1.1rem">\U0001f48e Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras. \U0001f4b5</p>
   <div class="hero-buttons">
     <a href="#pricing" class="btn btn-primary">\U0001f451 Ver Planes</a>
     <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-secondary" style="border-color:rgba(0,230,118,0.3);color:#00e676">&#128640; Copy Trading</a>
@@ -1634,31 +1635,53 @@ if('serviceWorker' in navigator){{
 
 <script>
 // ═══════════════════════════════════════════════
-//  MATRIX RAIN — Binary 0/1 falling effect
+//  FLOATING EMOJI PARTICLES — 💰💎🤖📈🎯
 // ═══════════════════════════════════════════════
 (function(){{
-  const c = document.getElementById('matrixCanvas');
+  const c = document.getElementById('particlesCanvas');
   if(!c) return;
   const ctx = c.getContext('2d');
-  let W, H, cols, drops;
-  function resize(){{
-    W = c.width = window.innerWidth;
-    H = c.height = window.innerHeight;
-    cols = Math.floor(W / 18);
-    drops = Array(cols).fill(0).map(()=>Math.random()*H/18|0);
-  }}
+  const emojis = ['\U0001f4b0','\U0001f48e','\U0001f916','\U0001f4c8','\U0001f3af','\U0001f4b5','\U0001f4b8','\U0001f9e0','\u2728','\U0001f680'];
+  let W, H, particles = [];
+  const MAX = Math.min(35, Math.floor(window.innerWidth / 40));
+  function resize(){{ W = c.width = window.innerWidth; H = c.height = window.innerHeight; }}
   resize();
   window.addEventListener('resize', resize);
+  function spawn(){{
+    return {{
+      x: Math.random() * W,
+      y: H + 20 + Math.random() * 40,
+      vy: -(0.3 + Math.random() * 0.6),
+      vx: (Math.random() - 0.5) * 0.3,
+      size: 14 + Math.random() * 10,
+      emoji: emojis[Math.random() * emojis.length | 0],
+      alpha: 0.15 + Math.random() * 0.35,
+      rot: Math.random() * 6.28,
+      vr: (Math.random() - 0.5) * 0.01
+    }};
+  }}
+  for(let i = 0; i < MAX; i++){{
+    const p = spawn();
+    p.y = Math.random() * H;
+    particles.push(p);
+  }}
   function draw(){{
-    ctx.fillStyle = 'rgba(8,11,15,.06)';
-    ctx.fillRect(0,0,W,H);
-    ctx.fillStyle = '#00d4aa';
-    ctx.font = '14px monospace';
-    for(let i=0;i<cols;i++){{
-      const ch = Math.random()>.5?'1':'0';
-      ctx.fillText(ch, i*18, drops[i]*18);
-      if(drops[i]*18>H && Math.random()>.975) drops[i]=0;
-      drops[i]++;
+    ctx.clearRect(0, 0, W, H);
+    for(let i = particles.length - 1; i >= 0; i--){{
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      if(p.y < -30){{ particles[i] = spawn(); continue; }}
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = p.alpha;
+      ctx.font = p.size + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.emoji, 0, 0);
+      ctx.restore();
     }}
     requestAnimationFrame(draw);
   }}
@@ -1823,6 +1846,45 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){{
       else nav.classList.remove('scrolled');
     }}
   }});
+}})();
+
+// ═══════════════════════════════════════════════
+//  ANIMATED COUNTERS — Stats Bar count-up
+// ═══════════════════════════════════════════════
+(function(){{
+  let fired = false;
+  function animateCounter(el, target, suffix){{
+    const dur = 1800;
+    const start = performance.now();
+    function tick(now){{
+      const p = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      const val = Math.round(ease * target);
+      if(suffix === '%') el.textContent = val + '%';
+      else if(suffix === '+') el.textContent = val.toLocaleString() + '+';
+      else el.textContent = (target >= 0 ? '+' : '') + val.toLocaleString();
+      if(p < 1) requestAnimationFrame(tick);
+    }}
+    requestAnimationFrame(tick);
+  }}
+  const bar = document.getElementById('statsBar');
+  if(!bar) return;
+  const obs = new IntersectionObserver(function(entries){{
+    if(entries[0].isIntersecting && !fired){{
+      fired = true;
+      const wr = document.getElementById('counterWr');
+      const tot = document.getElementById('counterTotal');
+      const pips = document.getElementById('counterPips');
+      if(wr) animateCounter(wr, parseInt(wr.getAttribute('data-target')), '%');
+      if(tot) animateCounter(tot, parseInt(tot.getAttribute('data-target')), '+');
+      if(pips){{
+        const pv = parseInt(pips.getAttribute('data-target').replace(/[+,]/g,''));
+        animateCounter(pips, pv, 'pips');
+      }}
+      obs.disconnect();
+    }}
+  }}, {{threshold: 0.3}});
+  obs.observe(bar);
 }})();
 
 // countdown removed
