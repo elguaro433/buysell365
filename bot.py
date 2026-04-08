@@ -386,7 +386,8 @@ mt5_pausado           = False   # Si True: escáner y Telegram siguen, pero MT5 
 mt5_solo_premium      = False   # Si True: MT5 solo ejecuta señales PREMIUM (💎 score≥4 + conf≥40%)
 _CMD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".bot.cmd")
 _cache_ind: dict[str, dict]            = {}   # {ticker: ind} del último escaneo
-directorio_usuarios: dict[str, dict]   = {}   # {user_id: {"nombre": str, "username": str}}
+directorio_usuarios: dict[str, dict]   = {}   # {user_id: {"nombre": str, "username": str}} — max 50000
+_MAX_DIRECTORIO = 50000
 
 # ── NUEVAS VARIABLES GLOBALES ─────────────────────────────────
 
@@ -6327,16 +6328,17 @@ def cmd_vip(user_id: str = None):
         "✅ Soporte directo con el admin\n\n"
     )
 
-    # Precio
+    # Precio — mostrar € y USDT desde el inicio
+    _usdt_aprox = _eur_a_usdt(precio)
     if pi["en_descuento"]:
         texto += (
             f"🔥 *OFERTA DE LANZAMIENTO — 50% OFF*\n"
-            f"💰 ~{M}{pi['precio_regular']}~ → *{M}{precio}/mes*\n"
+            f"💰 ~{M}{pi['precio_regular']}~ → *{M}{precio}/mes* (~{_usdt_aprox:.0f} USDT)\n"
             f"⏰ _Oferta hasta {VIP_DESCUENTO_HASTA}_\n"
             f"📅 _Quedan {pi['dias_restantes_desc']} dias_\n\n"
         )
     else:
-        texto += f"💰 *{M}{precio}/mes* — Suscripcion mensual\n\n"
+        texto += f"💰 *{M}{precio}/mes* (~{_usdt_aprox:.0f} USDT) — Suscripcion mensual\n\n"
 
     # Términos compactos
     texto += (
@@ -8704,9 +8706,9 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             )
             start_botones = {
                 "inline_keyboard": [
+                    [{"text": "🤖 Copy Trading GRATIS — Tu cuenta opera sola", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
                     [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                     {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}],
                     [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
                 ]
@@ -11837,6 +11839,15 @@ def limpiar_caches_memoria():
     except Exception:
         pass
     try:
+        # Limitar directorio_usuarios a _MAX_DIRECTORIO entradas
+        if len(directorio_usuarios) > _MAX_DIRECTORIO:
+            _excess = len(directorio_usuarios) - _MAX_DIRECTORIO + 1000
+            _keys_to_remove = list(directorio_usuarios.keys())[:_excess]
+            for _k in _keys_to_remove:
+                directorio_usuarios.pop(_k, None)
+    except Exception:
+        pass
+    try:
         # Limpiar cache de miembros viejos (>10 min)
         if '_cache_miembros' in globals():
             old_keys = [k for k, v in _cache_miembros.items() if (isinstance(v, tuple) and ahora_ts - v[0] > 600) or (isinstance(v, dict) and ahora_ts - v.get('ts', 0) > 600)]
@@ -14520,7 +14531,7 @@ def loop_publicidad_grupo():
                 {"text": "🤖 ACTIVAR COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
                 {"text": "💎 Ver Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
-                {"text": "🌐 Web", "url": "https://buysell365.pro"}
+                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
             ]]}
         ),
         # 2 — Señales VIP con ejemplo (marcado como ejemplo)
@@ -14542,7 +14553,7 @@ def loop_publicidad_grupo():
                 {"text": "💎 UNIRME AL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
             ], [
                 {"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-                {"text": "🌐 Web", "url": "https://buysell365.pro"}
+                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
             ]]}
         ),
         # 3 — Copy Trading XM: 3 pasos (broker regulado)
@@ -14560,7 +14571,7 @@ def loop_publicidad_grupo():
                 {"text": "🚀 ENTRAR AL COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
                 {"text": "💎 Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
-                {"text": "🌐 Web", "url": "https://buysell365.pro"}
+                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
             ]]}
         ),
         # 4 — Combo VIP + Copy Trading
@@ -14581,6 +14592,7 @@ def loop_publicidad_grupo():
                 {"text": "🤖 COPY TRADING", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
                 {"text": "💎 CANAL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
             ], [
+                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"},
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
         ),
@@ -14599,7 +14611,7 @@ def loop_publicidad_grupo():
                 {"text": "📊 VER ESTRATEGIA EN XM", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}
             ], [
                 {"text": "💎 Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
-                {"text": "🌐 Web", "url": "https://buysell365.pro"}
+                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
             ]]}
         ),
     ]
@@ -15303,7 +15315,8 @@ def loop_escaneo():
         time.sleep(INTERVALO_ESCANEO)
 
 
-_cooldown_bienvenida: dict = {}  # {user_id: timestamp} — evitar spam de bienvenida
+_cooldown_bienvenida: dict = {}  # {user_id: timestamp} — evitar spam de bienvenida (max 5000 entries)
+_MAX_COOLDOWN_ENTRIES = 5000
 
 def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     """Redirige al usuario al chat privado con menú completo de ayuda.
@@ -15317,6 +15330,11 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     if user_id in _cooldown_bienvenida and (_ahora - _cooldown_bienvenida[user_id]) < 600:
         return False  # Indica que NO se envió (cooldown activo)
     _cooldown_bienvenida[user_id] = _ahora
+    # Limitar tamaño del dict — si supera el máximo, purgar los más viejos
+    if len(_cooldown_bienvenida) > _MAX_COOLDOWN_ENTRIES:
+        _sorted = sorted(_cooldown_bienvenida.items(), key=lambda x: x[1])
+        for _k, _ in _sorted[:len(_cooldown_bienvenida) - _MAX_COOLDOWN_ENTRIES + 500]:
+            _cooldown_bienvenida.pop(_k, None)
 
     # ── Menú completo para el chat PRIVADO (grupo público) ──
     menu_privado = (
@@ -15326,11 +15344,12 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         f"En el grupo solo se publican señales y análisis — "
         f"aquí en privado te atiendo a ti directamente.\n\n"
         f"━━ *¿Qué ofrecemos?* ━━\n\n"
+        f"🤖 *Copy Trading XM — GRATIS* 🔥\n"
+        f"   Tu cuenta opera sola. Sin mensualidad.\n"
+        f"   Pagas solo si ganas. Escribe /copy\n\n"
         f"💎 *Canal VIP* — Señales con Entry, SL y TP exactos\n"
-        f"   EUR/USD · NASDAQ · S&P 500 · ORO · Forex · Índices\n"
+        f"   GOLD · NASDAQ · EUR/USD · Forex · Índices\n"
         f"   Análisis con IA · Alertas en tiempo real\n\n"
-        f"🤖 *Copy Trading XM* — Tu cuenta opera sola\n"
-        f"   Sin pantallas. Sin estrés. Comisión solo sobre ganancias.\n\n"
         f"📊 *Dashboard en vivo* — buysell365.pro\n"
         f"   Stats, posiciones abiertas, historial de señales\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -15338,8 +15357,8 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     )
     markup_privado = {
         "inline_keyboard": [
-            [{"text": "💎 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
-            [{"text": "🤖 Copy Trading en XM (gratis)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+            [{"text": "🤖 Copy Trading GRATIS — Tu cuenta opera sola", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
+            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
             [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
             [{"text": "⏰ Horarios de Mercado", "callback_data": "/horarios"}, {"text": "📈 Resumen Hoy", "callback_data": "/resumen"}],
             [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
@@ -15391,7 +15410,7 @@ _RATE_LIMIT_VENTANA = 30  # ventana en segundos
 
 # 🧵 THREAD POOL para procesamiento de comandos — los comandos pesados
 # (/analisis, /precios, /tendencia) no bloquean el loop de polling
-_pool_comandos = ThreadPoolExecutor(max_workers=8, thread_name_prefix="cmd")
+_pool_comandos = ThreadPoolExecutor(max_workers=16, thread_name_prefix="cmd")
 
 def _check_rate_limit(user_id: str) -> bool:
     """Retorna True si el usuario excede el rate limit. False = OK."""
@@ -15456,6 +15475,7 @@ def loop_polling():
             {"command": "analisis", "description": "Análisis técnico de un activo"},
             {"command": "sentimiento", "description": "Fear & Greed index"},
             {"command": "vip", "description": "Acceso VIP premium"},
+            {"command": "copy", "description": "🤖 Copy Trading en XM (gratis)"},
             {"command": "web", "description": "Dashboard web en vivo"},
             {"command": "broker", "description": "🏦 Broker recomendado XM"},
             {"command": "ayuda", "description": "Lista de comandos"},
@@ -15569,25 +15589,22 @@ def loop_polling():
                         # ── Callback VIP: PASO 1 — Mostrar Términos (sin método de pago aún) ──
                         if texto == "vip_pagar_usdt":
                             pi_p = _vip_precio_info()
+                            _usdt_p = _eur_a_usdt(pi_p['precio'])
+                            _admin_clean_p = ADMIN_USER.replace("@", "")
+                            _precio_p = pi_p['precio']
                             _dm_pago = enviar_telegram(
-                                f"📋 *TÉRMINOS DE SUSCRIPCIÓN VIP*\n"
+                                f"💰 *SUSCRIPCIÓN VIP — BuySell365 Pro*\n"
                                 f"━━━━━━━━━━\n\n"
-                                f"💰 Precio: *{pi_p['precio']}{VIP_MONEDA}/mes*\n"
-                                f"📆 Pago único mensual\n\n"
-                                f"📜 *Condiciones:*\n"
-                                f"• Servicio de señales educativas.\n"
-                                f"  _No es asesoría financiera._\n"
-                                f"• El usuario es responsable de\n"
-                                f"  sus decisiones de trading.\n"
-                                f"• *No hay reembolsos* una vez\n"
-                                f"  confirmado el pago.\n"
-                                f"• Acceso por 30 días desde el pago.\n\n"
-                                f"👇 *Al pulsar ACEPTO confirmas estos términos\n"
-                                f"y podrás elegir tu método de pago:*",
+                                f"💰 Precio: *{_precio_p}{VIP_MONEDA}/mes* (~{_usdt_p:.0f} USDT)\n"
+                                f"📆 Pago único mensual · Acceso 30 días\n\n"
+                                f"📜 _Al pagar aceptas: servicio educativo,_\n"
+                                f"_no asesoría financiera. Sin reembolsos._\n"
+                                f"_[Términos completos](https://buysell365.pro/terminos)_\n\n"
+                                f"👇 *Elige tu método de pago:*",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "✅ ACEPTO — ELEGIR MÉTODO DE PAGO", "callback_data": "vip_aceptar_terminos"}],
-                                    [{"text": "📜 Leer Términos completos", "url": "https://buysell365.pro/terminos"}],
+                                    [{"text": "💰 PAGAR CON BINANCE (USDT) — Activación inmediata ⚡", "callback_data": "vip_pagar_confirmar"}],
+                                    [{"text": "💬 Otro método — Hablar con Admin", "url": f"https://t.me/{_admin_clean_p}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{_precio_p:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}],
                                     [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
                                 ]}
                             )
@@ -15604,25 +15621,11 @@ def loop_polling():
                                     programar_borrado(chat_id, _aviso_dm_p, 30)  # 30s
                             continue
 
-                        # ── Callback VIP: PASO 2 — Términos aceptados → elegir método ──
+                        # ── Callback VIP: legacy vip_aceptar_terminos → redirigir a pago directo ──
                         if texto == "vip_aceptar_terminos":
-                            pi_p = _vip_precio_info()
-                            _admin_clean_p = ADMIN_USER.replace("@", "")
-                            _precio_p = pi_p['precio']
-                            _botones_metodo = {"inline_keyboard": [
-                                [{"text": "💰 PAGAR CON BINANCE (USDT/Crypto)", "callback_data": "vip_pagar_confirmar"}],
-                                [{"text": "💬 Otro método — Hablar con Admin", "url": f"https://t.me/{_admin_clean_p}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{_precio_p:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}],
-                                [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
-                            ]}
-                            enviar_telegram(
-                                f"✅ *Términos aceptados*\n\n"
-                                f"💰 Precio: *{_precio_p}{VIP_MONEDA}/mes*\n\n"
-                                f"Elige tu método de pago:\n\n"
-                                f"• 💰 *USDT/Binance* — activación inmediata ⚡\n"
-                                f"• 💬 *Otro método* — el admin te gestiona el pago",
-                                user_id,
-                                teclado=_botones_metodo
-                            )
+                            nombre_cb = escapar_markdown(from_user.get("first_name", "Trader"))
+                            username_cb = from_user.get("username", "")
+                            _mostrar_instrucciones_pago(user_id, user_id, nombre_cb, username_cb, fallback_chat=_fallback_dest)
                             continue
 
                         # ── Callback VIP: PASO 3 — Instrucciones USDT Binance ──
@@ -15895,10 +15898,12 @@ def loop_polling():
                                     )
                                     _botones_vip = {
                                         "inline_keyboard": [
-                                            [{"text": "🔍 Análisis EUR/USD", "callback_data": "/analisis_eurusd"},
-                                             {"text": "🔍 Análisis NASDAQ", "callback_data": "/analisis_nasdaq"}],
-                                            [{"text": "🔍 Análisis S&P 500", "callback_data": "/analisis_sp500"},
-                                             {"text": "🔍 Análisis ORO", "callback_data": "/analisis_xauusd"}],
+                                            [{"text": "🥇 Análisis GOLD", "callback_data": "/analisis_xauusd"},
+                                             {"text": "📈 Análisis NASDAQ", "callback_data": "/analisis_nasdaq"}],
+                                            [{"text": "💱 Análisis EUR/USD", "callback_data": "/analisis_eurusd"},
+                                             {"text": "💱 Análisis GBP/USD", "callback_data": "/analisis_gbpusd"}],
+                                            [{"text": "📊 Análisis S&P 500", "callback_data": "/analisis_sp500"},
+                                             {"text": "💱 Análisis EUR/JPY", "callback_data": "/analisis_eurjpy"}],
                                             [{"text": "📡 Señales Activas", "callback_data": "/activas"},
                                              {"text": "📈 Resumen del Día", "callback_data": "/resumen"}],
                                             [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
