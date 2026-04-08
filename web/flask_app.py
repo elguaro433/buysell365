@@ -710,6 +710,28 @@ def index_web():
     pips = round(sum(float(h.get('pips', 0)) for h in hist), 1)
     _raw_profit = round(sum(float(h.get('profit_mt5', 0) or 0) for h in hist), 2)
     profit_str = ("+$" if _raw_profit >= 0 else "-$") + f"{abs(_raw_profit):,.2f}"
+
+    # FIX 2026-04-08: Generar tabla hero dinámica — últimos 3 trades ganadores
+    _recent_wins = [h for h in reversed(hist) if float(h.get('profit_mt5', 0) or 0) > 0][:3]
+    _hero_rows = ""
+    for _rw in _recent_wins:
+        _rw_fecha = _rw.get("fecha", "")
+        _rw_nombre = _rw.get("nombre", "GOLD")
+        _rw_tipo = _rw.get("tipo", "COMPRA")
+        _rw_entry = float(_rw.get("entrada", 0))
+        _rw_profit = float(_rw.get("profit_mt5", 0) or 0)
+        _rw_color = "#00ffc8" if _rw_tipo == "COMPRA" else "#ff3b30"
+        _rw_tipo_en = "BUY" if _rw_tipo == "COMPRA" else "SELL"
+        _rw_entry_fmt = f"{_rw_entry:,.2f}"
+        _hero_rows += (
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
+            f'<td style="padding:6px 8px;color:#8b9fc4">{_rw_fecha}</td>'
+            f'<td style="padding:6px 8px;font-weight:700;color:#fff">{_rw_nombre}</td>'
+            f'<td style="padding:6px 8px"><span style="color:{_rw_color}">&#9679;</span> {_rw_tipo_en}</td>'
+            f'<td style="padding:6px 8px;font-family:monospace">{_rw_entry_fmt}</td>'
+            f'<td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+${_rw_profit:,.2f}</td>'
+            f'</tr>'
+        )
     n_ops = sum(1 for op in _store.get("operaciones_activas", {}).values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
     activos = _store.get("assets_count", 6)
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
@@ -1168,27 +1190,7 @@ if('serviceWorker' in navigator){{
           <td style="padding:5px 8px">Tipo</td><td style="padding:5px 8px">Entrada</td>
           <td style="padding:5px 8px;text-align:right">P&amp;L</td>
         </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-          <td style="padding:6px 8px;color:#8b9fc4">27/03/2026</td>
-          <td style="padding:6px 8px;font-weight:700;color:#fff">ORO</td>
-          <td style="padding:6px 8px"><span style="color:#00ffc8">&#9679;</span> COMPRA</td>
-          <td style="padding:6px 8px;font-family:monospace">4,456.61</td>
-          <td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+$222.50</td>
-        </tr>
-        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-          <td style="padding:6px 8px;color:#8b9fc4">26/03/2026</td>
-          <td style="padding:6px 8px;font-weight:700;color:#fff">NASDAQ 100</td>
-          <td style="padding:6px 8px"><span style="color:#00ffc8">&#9679;</span> COMPRA</td>
-          <td style="padding:6px 8px;font-family:monospace">19,847.30</td>
-          <td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+$38.20</td>
-        </tr>
-        <tr>
-          <td style="padding:6px 8px;color:#8b9fc4">26/03/2026</td>
-          <td style="padding:6px 8px;font-weight:700;color:#fff">EUR/USD</td>
-          <td style="padding:6px 8px"><span style="color:#ff3b30">&#9679;</span> VENTA</td>
-          <td style="padding:6px 8px;font-family:monospace">1.07843</td>
-          <td style="padding:6px 8px;text-align:right;color:#00e676;font-weight:700">+$12.40</td>
-        </tr>
+        {_hero_rows}
       </table>
       <div style="text-align:center;margin-top:12px">
         <a href="/dashboard" style="font-size:11px;color:#00ffc8;text-decoration:none">&#128202; Ver dashboard completo en vivo &rarr;</a>
