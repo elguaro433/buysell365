@@ -1144,8 +1144,8 @@ if('serviceWorker' in navigator){{
 <section class="hero">
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-vars='{{"ops":"{n_ops}"}}'>{'Bot activo' if is_alive else 'Dashboard Online'} \u2014 {n_ops} operaciones en vivo</span></div>
-    <h1 data-i18n="hero.title">\U0001f4b0 Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f916 Nuestro bot trabaja por ti, 24/5</span></h1>
-    <p data-i18n="hero.subtitle">\U0001f3af El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. \U0001f48e Sin experiencia requerida.</p>
+    <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/5</span></h1>
+    <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f680 Empezar Ahora</a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
@@ -1208,7 +1208,7 @@ if('serviceWorker' in navigator){{
   </div>
   <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
     <div class="price-card" style="border:1px solid rgba(77,159,255,0.3);box-shadow:0 0 30px rgba(77,159,255,0.1)">
-      <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">\U0001f4ac Comunidad</div>
+      <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">Comunidad</div>
       <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:2rem" data-i18n="pricing.free">Acceso Libre</div>
       <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
@@ -1221,7 +1221,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="price-card featured" style="border:2px solid #fbbf24;box-shadow:0 0 50px rgba(251,191,36,0.3),0 0 100px rgba(251,191,36,0.1);transform:scale(1.04)">
       <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
-      <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">\U0001f451 VIP Pro \U0001f4b0</div>
+      <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">VIP Pro</div>
       <div class="price-amount" style="font-size:3.8rem;text-shadow:0 0 30px rgba(255,255,255,0.1)">
         <span class="old">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
@@ -1240,7 +1240,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="price-card" style="position:relative;border:2px solid #00ffcc;box-shadow:0 0 50px rgba(0,255,204,0.25),0 0 100px rgba(0,255,204,0.08)">
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00ffcc);box-shadow:0 0 30px rgba(0,255,204,.7);animation:glowPulse 3s infinite;font-size:15px;padding:10px 32px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
-      <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">\U0001f680 Copy Trading \U0001f4b8</div>
+      <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">Copy Trading</div>
       <div class="price-amount" style="font-size:2rem;color:#00ffcc;font-weight:900;text-shadow:0 0 30px rgba(0,255,204,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
       <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Tu cuenta MT5 replica autom\u00e1ticamente nuestras operaciones con XM \u2014 el broker m\u00e1s usado del mundo</p>
       <ul class="price-list" style="color:#e0e0e0">
@@ -1296,7 +1296,7 @@ if('serviceWorker' in navigator){{
 <!-- HOW IT WORKS -->
 <section class="fade-in" id="how-it-works" style="padding:60px 20px">
   <div class="section-title" style="margin-bottom:32px">
-    <h2>\U0001f680 <span data-i18n="how.title">\U0001f4b8 C\u00f3mo Funciona</span></h2>
+    <h2>\U0001f680 <span data-i18n="how.title">C\u00f3mo Funciona</span></h2>
     <p data-i18n="how.subtitle">En 3 simples pasos empiezas a recibir se\u00f1ales</p>
   </div>
   <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:24px;max-width:1000px;margin:0 auto">
@@ -1324,7 +1324,7 @@ if('serviceWorker' in navigator){{
 <!-- FEATURES -->
 <section class="features fade-in" id="features" style="padding:40px 20px">
   <div class="section-title" style="margin-bottom:24px">
-    <h2>\U0001f9e0 <span data-i18n="features.title">\U0001f4b0 Tecnolog\u00eda Institucional \U0001f916</span></h2>
+    <h2>\U0001f9e0 <span data-i18n="features.title">Tecnolog\u00eda Institucional</span></h2>
   </div>
   <div class="features-grid" style="gap:16px">
     <div class="feature-card" style="padding:20px">
@@ -1598,8 +1598,8 @@ if('serviceWorker' in navigator){{
 
 <!-- CTA -->
 <section class="cta fade-in" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
-  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">\U0001f4b0 Empieza a Operar con IA \U0001f916</span></h2>
-  <p style="font-size:1.1rem">\U0001f48e Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras. \U0001f4b5</p>
+  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Empieza a Operar con IA</span></h2>
+  <p style="font-size:1.1rem">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
   <div class="hero-buttons">
     <a href="#pricing" class="btn btn-primary">\U0001f451 Ver Planes</a>
     <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-secondary" style="border-color:rgba(0,230,118,0.3);color:#00e676">&#128640; Copy Trading</a>
