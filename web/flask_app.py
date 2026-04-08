@@ -857,7 +857,7 @@ body{{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);over
   text-decoration:none;transition:all 0.3s ease;cursor:pointer;border:none}}
 .btn-primary{{background:linear-gradient(135deg,#00ffcc,#00d4aa,#00b894);color:#060a12;box-shadow:0 4px 30px rgba(0,255,204,0.5),0 0 60px rgba(0,255,204,0.15);font-weight:800;animation:ctaGlow 2.5s ease-in-out infinite}}
 .btn-primary:hover{{transform:translateY(-3px);box-shadow:0 8px 50px rgba(0,255,204,0.7),0 0 80px rgba(0,255,204,0.2)}}
-@keyframes ctaGlow{{0%,100%{{box-shadow:0 4px 30px rgba(0,255,204,0.5),0 0 60px rgba(0,255,204,0.15)}}50%{{box-shadow:0 4px 40px rgba(0,255,204,0.7),0 0 80px rgba(0,255,204,0.3)}}}}
+@keyframes ctaGlow{{0%,100%{{box-shadow:0 4px 30px rgba(0,255,204,0.5),0 0 60px rgba(0,255,204,0.15)}}50%{{box-shadow:0 6px 50px rgba(0,255,204,0.85),0 0 100px rgba(0,255,204,0.4)}}}}
 .btn-secondary{{background:rgba(255,255,255,0.08);color:var(--text);border:1px solid rgba(255,255,255,0.18)}}
 .btn-secondary:hover{{background:rgba(255,255,255,0.14);transform:translateY(-3px);border-color:rgba(0,255,204,0.4);box-shadow:0 4px 20px rgba(0,255,204,0.1)}}
 
@@ -883,8 +883,8 @@ section{{padding:60px 20px}}
 /* ═══ FEATURES ═══ */
 .features{{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 30%,var(--bg2) 70%,var(--bg) 100%)}}
 .features-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto}}
-.feature-card{{background:linear-gradient(145deg,rgba(22,32,53,0.9),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:30px;transition:all 0.4s ease;box-shadow:0 4px 24px rgba(0,0,0,0.3);transform-style:preserve-3d;perspective:800px}}
-.feature-card:hover{{transform:translateY(-8px) rotateX(4deg) rotateY(-2deg);border-color:rgba(0,255,204,0.5);box-shadow:0 12px 50px rgba(0,255,204,0.15),0 4px 20px rgba(0,0,0,0.4),0 0 30px rgba(0,255,204,0.08)}}
+.feature-card{{background:linear-gradient(145deg,rgba(22,32,53,0.9),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:30px;transition:all 0.5s cubic-bezier(.25,.8,.25,1);box-shadow:0 4px 24px rgba(0,0,0,0.3)}}
+.feature-card:hover{{transform:translateY(-12px) scale(1.04);border-color:rgba(0,255,204,0.6);box-shadow:0 20px 60px rgba(0,255,204,0.25),0 0 40px rgba(0,255,204,0.15),0 4px 20px rgba(0,0,0,0.4);background:linear-gradient(145deg,rgba(0,255,204,0.08),rgba(22,32,53,0.95))}}
 .feature-icon{{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px}}
 .feature-icon.green{{background:rgba(0,212,170,0.18);box-shadow:0 0 16px rgba(0,212,170,0.2)}}
 .feature-icon.blue{{background:rgba(59,130,246,0.18);box-shadow:0 0 16px rgba(59,130,246,0.2)}}
@@ -915,8 +915,8 @@ section{{padding:60px 20px}}
 .pricing::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:2px;background:linear-gradient(90deg,transparent,#00ffcc,#fbbf24,#00ffcc,transparent);border-radius:2px}}
 .pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;max-width:1200px;margin:0 auto}}
 @media(max-width:900px){{.pricing-cards{{grid-template-columns:1fr!important}}}}
-.price-card{{background:linear-gradient(160deg,rgba(22,32,53,0.97),rgba(14,22,40,0.97));border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 32px;text-align:center;position:relative;transition:all .4s ease;backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.3);transform-style:preserve-3d;perspective:1000px}}
-.price-card:hover{{transform:translateY(-12px) scale(1.02) rotateX(3deg);box-shadow:0 28px 70px rgba(0,0,0,.5),0 0 40px rgba(0,255,204,0.06)}}
+.price-card{{background:linear-gradient(160deg,rgba(22,32,53,0.97),rgba(14,22,40,0.97));border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 32px;text-align:center;position:relative;transition:all .5s cubic-bezier(.25,.8,.25,1);backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}}
+.price-card:hover{{transform:translateY(-14px) scale(1.03);box-shadow:0 28px 70px rgba(0,0,0,.5),0 0 50px rgba(0,255,204,0.15),0 0 80px rgba(0,255,204,0.08);border-color:rgba(0,255,204,0.4)}}
 .price-card.featured{{border-color:var(--gold);box-shadow:0 0 60px rgba(251,191,36,0.2),0 0 120px rgba(251,191,36,0.08)}}
 .price-badge{{position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--green),#00b894);
   color:#060a12;padding:8px 28px;border-radius:24px;font-size:14px;font-weight:900;white-space:nowrap;letter-spacing:0.5px;box-shadow:0 4px 20px rgba(0,255,204,0.3)}}
@@ -1095,7 +1095,7 @@ if('serviceWorker' in navigator){{
 <body>
 
 <!-- FLOATING EMOJI PARTICLES BACKGROUND -->
-<canvas id="particlesCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.12"></canvas>
+<canvas id="particlesCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.18"></canvas>
 
 <!-- NAV -->
 <nav class="nav">
