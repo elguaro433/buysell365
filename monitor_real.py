@@ -8,6 +8,7 @@ BuySell365 — Monitor cuenta REAL XM (88849791)
 - SOLO LECTURA — nunca ejecuta órdenes
 """
 import os, time, json, logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -30,7 +31,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [MONITOR_REAL] %(message)s",
     handlers=[
-        logging.FileHandler(_log_dir / "monitor_real.log", encoding="utf-8"),
+        RotatingFileHandler(_log_dir / "monitor_real.log", encoding="utf-8",
+                            maxBytes=5 * 1024 * 1024, backupCount=3),
         logging.StreamHandler(),
     ],
 )

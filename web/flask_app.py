@@ -2152,7 +2152,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 .xm-cta:hover{{box-shadow:0 6px 24px rgba(255,215,0,.5);transform:translateY(-2px)}}
 @media(max-width:480px){{.xm-btn-text{{display:none}}}}
 </style>
-<script>setTimeout(()=>location.reload(),30000);</script>
+<!-- Auto-reload removido: el polling JS (setInterval) ya actualiza los datos sin recargar -->
 </head>
 <body>
 <canvas id="matrix-canvas"></canvas>

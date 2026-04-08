@@ -248,7 +248,7 @@ _cooldown_cierres = {}  # {(ticker_normalizado, tipo): timestamp_cierre}
 _senal_reciente = {}  # {ticker_normalizado: timestamp} — compartido por webhook y scanner
 
 def _kill_switch_activo() -> bool:
-    """Kill switch: pausa el bot si pierde >12% o >15 losses en un día."""
+    """Kill switch: DESACTIVADO 2026-04-07 por solicitud del owner."""
     global _fecha_stats_diarias, estadisticas_diarias
     hoy = ahora().strftime("%Y-%m-%d")
     # Auto-reset si cambió el día (maneja reinicios de bot)
@@ -259,21 +259,7 @@ def _kill_switch_activo() -> bool:
         print(f"🔄 Stats: auto-reset (nuevo día: {hoy})")
     elif not _fecha_stats_diarias:
         _fecha_stats_diarias = hoy
-
-    # FIX: Leer stats dentro del lock para snapshot consistente
-    with _lock_ops:
-        _perdidas_hoy = int(estadisticas_diarias.get("perdidas", 0))
-        _pips_perdidos = float(estadisticas_diarias.get("pips_perdidos", 0.0))
-        _pips_ganados  = float(estadisticas_diarias.get("pips_ganados", 0.0))
-    # Límite 1: más de 15 pérdidas en un día
-    if _perdidas_hoy >= 15:
-        logger.warning(f"🚨 KILL SWITCH: {_perdidas_hoy} pérdidas hoy — bot pausado")
-        return True
-    # Límite 2: pérdida neta > 12% del capital (estimado por pips)
-    _neto_pips = _pips_ganados - _pips_perdidos
-    if _neto_pips < -200:  # ~200 pips de pérdida neta = ~12% en $500 con 0.01 lote
-        logger.warning(f"🚨 KILL SWITCH: pips netos hoy = {_neto_pips:.1f} — bot pausado")
-        return True
+    # FIX 2026-04-07: Kill switch desactivado — el bot NUNCA se pausa
     return False
 
 # ============================================================
@@ -287,7 +273,7 @@ VIP_MONEDA           = "$"         # Símbolo de moneda USDT para mostrar al cli
 VIP_WALLET_USDT      = "TEw97pnhpbB9GtrzjnoX6WQy25ost1HUDA"  # Binance USDT TRC20
 VIP_RED              = "TRC20"     # Red de pago
 VIP_DURACION_DIAS    = 30          # Duración de la suscripción en días
-VIP_TRIAL_DIAS       = 30          # Duración estándar de suscripción (30 días). NO cambiar.
+VIP_TRIAL_DIAS       = 0           # FIX 2026-04-07: Trials DESACTIVADOS — sin prueba gratis
 VIP_AVISO_DIAS       = 7           # FIX 2026-03-19: Secuencia 7d→3d→1d (antes solo 3d)
 VIP_CHECK_INTERVALO  = 300         # Revisar depósitos cada 5 minutos (segundos)
 BINANCE_API_KEY      = os.getenv("BINANCE_API_KEY", "").strip()
@@ -442,7 +428,7 @@ _ultimo_briefing_diario: str = ""           # "YYYY-MM-DD" — evita enviar dobl
 _ultimo_cierre_diario: str = ""             # "YYYY-MM-DD" — evita enviar doble
 
 # ── CACHÉS DE OPTIMIZACIÓN ────────────────────────────────────
-_cache_ml_modelos = {}  # {ticker: {'model': obj, 'timestamp': float}}
+_cache_ml_modelos = {}  # ML desactivado — cache vacío, mantenido para compatibilidad con limpiar_caches
 _cache_mtf_1h     = {}  # {ticker: {'df': df, 'timestamp': float}}
 _cache_mtf_4h     = {}  # {ticker: {'df': df, 'timestamp': float}}
 _lock_ops         = threading.RLock()  # Thread-safety para operaciones_activas
@@ -677,8 +663,9 @@ YF_PRICE_TICKER = {
     'NQ=F':     '^NDX',       # NASDAQ-100 index spot (~igual a US100Cash XM)
     'ES=F':     '^GSPC',      # S&P 500 index spot (~igual a US500Cash XM)
     'YM=F':     '^DJI',       # DOW 30 index spot
-    # ORO: usar XAUUSD=X (spot Yahoo Finance) — GC=F tiene +$30 de prima → falsos TP/SL
-    'GC=F':     'XAUUSD=X',
+    # ORO: XAUUSD=X delisted en Yahoo Finance (abril 2026) — usar GC=F (futuros COMEX)
+    # Prima vs spot < 1% (~$30 en $4600+), aceptable vs no tener datos
+    # 'GC=F':     'GC=F',  # pass-through — no remap necesario
     # Forex: pass-through (ya son spot)
     'EURUSD=X': 'EURUSD=X',
     'GBPUSD=X': 'GBPUSD=X',
@@ -1006,7 +993,8 @@ def cargar_estado():
 
 ACTIVOS = {
     # Solo GOLD y NASDAQ — pares prioritarios
-    "GOLD":         "XAUUSD=X",
+    # FIX 2026-04-06: XAUUSD=X delisted en Yahoo Finance → usar GC=F (futuros COMEX)
+    "GOLD":         "GC=F",
     "NASDAQ":       "NQ=F",
     # Desactivados (evaluacion):
     # "EUR/USD":      "EURUSD=X",
@@ -1560,10 +1548,16 @@ def _es_miembro_canal(user_id: str, force: bool = False) -> bool:
 
     # 2. Consultar API de Telegram
     es_miembro = False
+    # FIX 2026-04-08: validar que user_id sea numérico antes de llamar API
+    try:
+        _uid_int = int(user_id)
+    except (ValueError, TypeError):
+        logger.warning(f"⚠️ user_id no numérico: '{user_id}' — no se puede verificar membresía")
+        return False
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChatMember",
-            json={"chat_id": CHANNEL_ID, "user_id": int(user_id)},
+            json={"chat_id": CHANNEL_ID, "user_id": _uid_int},
             timeout=10
         )
         if r.status_code == 200:
@@ -2197,174 +2191,9 @@ def calcular_pivot_points_df(df):
 #  ML - PREDICIÓN DE DIRECCIÓN
 # ============================================================
 
-def _calcular_features_ml(d):
-    """Calcula todas las features ML sobre un DataFrame con OHLCV.
-    Se reutiliza tanto para entrenamiento como para predicción."""
-    d['rsi'] = ta.rsi(d['Close'], length=14)
-    macd = ta.macd(d['Close'], fast=12, slow=26, signal=9)
-    d['macd'] = get_col(macd, 'MACDh') if macd is not None and not macd.empty else 0
-    d['macd_line'] = get_col(macd, 'MACD') if macd is not None and not macd.empty else 0
-    d['ema9']  = ta.ema(d['Close'], length=9)
-    d['ema20'] = ta.ema(d['Close'], length=20)
-    d['ema50'] = ta.ema(d['Close'], length=50)
-    d['dist_ema'] = (d['Close'] - d['ema20']) / (d['ema20'].replace(0, 1))
-    # Alineación de EMAs: +1 si 9>20>50 (alcista), -1 si 9<20<50 (bajista), 0 mixto
-    d['ema_align'] = 0.0
-    d.loc[(d['ema9'] > d['ema20']) & (d['ema20'] > d['ema50']), 'ema_align'] = 1.0
-    d.loc[(d['ema9'] < d['ema20']) & (d['ema20'] < d['ema50']), 'ema_align'] = -1.0
-    stoch = ta.stoch(d['High'], d['Low'], d['Close'])
-    d['stoch'] = get_col(stoch, 'STOCHk') if stoch is not None and not stoch.empty else 0
-    adx = ta.adx(d['High'], d['Low'], d['Close'], length=14)
-    d['adx'] = get_col(adx, 'ADX_') if adx is not None and not adx.empty else 0
-    d['plus_di'] = get_col(adx, 'DMP_') if adx is not None and not adx.empty else 0
-    d['minus_di'] = get_col(adx, 'DMN_') if adx is not None and not adx.empty else 0
-    # DI diferencia normalizada: positivo = tendencia alcista dominante
-    d['di_diff'] = (d['plus_di'] - d['minus_di']) / (d['adx'].replace(0, 1))
-    atr = ta.atr(d['High'], d['Low'], d['Close'], length=14)
-    d['atr_pct'] = atr / d['Close'] * 100 if atr is not None else 0
-    vol_sma = ta.sma(d['Volume'], length=20)
-    d['vol_ratio'] = d['Volume'] / vol_sma.replace(0, 1) if vol_sma is not None else 1.0
-    # Para futuros con volumen=0: usar 1.0 (neutral) en vez de ratios basura
-    d.loc[d['Volume'] <= 0, 'vol_ratio'] = 1.0
-    bb = ta.bbands(d['Close'], length=20, std=2)
-    if bb is not None and not bb.empty:
-        bbu = get_col(bb, 'BBU')
-        bbl = get_col(bb, 'BBL')
-        bb_mid = get_col(bb, 'BBM')
-        d['bb_width'] = (bbu - bbl) / d['Close'] * 100
-        # Posición dentro de Bollinger: 0=lower band, 1=upper band
-        d['bb_pos'] = (d['Close'] - bbl) / (bbu - bbl).replace(0, 1)
-    else:
-        d['bb_width'] = 0
-        d['bb_pos'] = 0.5
-    # Momentum: cambio porcentual en las últimas 3 y 6 velas
-    d['momentum_3'] = d['Close'].pct_change(3) * 100
-    d['momentum_6'] = d['Close'].pct_change(6) * 100
-    # Tamaño del cuerpo de la vela vs rango total (0-1)
-    rango = d['High'] - d['Low']
-    d['body_pct'] = abs(d['Close'] - d['Open']) / rango.replace(0, 1)
-    # Features temporales (Captura ciclos de apertura/cierre de sesión)
-    d['hour'] = d.index.hour
-    d['hour_sin'] = np.sin(2 * np.pi * d['hour'] / 24)
-    d['hour_cos'] = np.cos(2 * np.pi * d['hour'] / 24)
-    # Día de la semana (Lunes=0 más volátil, Viernes=4 menos)
-    d['dow_sin'] = np.sin(2 * np.pi * d.index.dayofweek / 5)
-    return d
-
-
 def predecir_direccion_ml(df, ticker=""):
-    """
-    Modelo LightGBM v3 (reemplazo de RandomForest) — reentrenado máximo cada 30 min por ticker.
-    Mejoras v2: 18 features (vs 10 antes), EMA alignment, DI diff, momentum,
-    BB position, body_pct, día de semana. Accuracy threshold subido a 0.52.
-    """
-    global _cache_ml_modelos
-    TTL_ML = 1800  # 30 minutos
-    features = [
-        'rsi', 'macd', 'macd_line', 'dist_ema', 'ema_align',
-        'stoch', 'adx', 'di_diff', 'atr_pct',
-        'vol_ratio', 'bb_width', 'bb_pos',
-        'momentum_3', 'momentum_6', 'body_pct',
-        'hour_sin', 'hour_cos', 'dow_sin'
-    ]
-    try:
-        import lightgbm as lgb
-        from sklearn.preprocessing import StandardScaler
-
-        d = _calcular_features_ml(df.copy())
-        d = d.dropna()
-        if len(d) < 80:
-            return 50.0
-
-        cached = _cache_ml_modelos.get(ticker)
-        if cached and (time.time() - cached['timestamp']) < TTL_ML:
-            rf = cached['model']
-            scaler = cached['scaler']
-        else:
-            # DESCARGA MASIVA PARA ENTRENAMIENTO (30 días para robustez)
-            d_train = descargar_datos_seguro(ticker, period="30d", interval="15m")
-            if d_train is None or len(d_train) < 500:
-                return 50.0
-
-            d_t = _calcular_features_ml(d_train.copy())
-
-            # Target: precio sube en las próximas 3 velas
-            d_t['Target'] = (d_t['Close'].shift(-3) > d_t['Close']).astype(int)
-            train_data = d_t.iloc[:-3].dropna()
-
-            if len(train_data) < 400:
-                return 50.0
-
-            # Train/test split 80/20
-            split_idx = int(len(train_data) * 0.8)
-            X_all = train_data[features]
-            y_all = train_data['Target']
-
-            X_train = X_all.iloc[:split_idx]
-            y_train = y_all.iloc[:split_idx]
-            X_test = X_all.iloc[split_idx:]
-            y_test = y_all.iloc[split_idx:]
-
-            # Escalado de features
-            scaler = StandardScaler()
-            X_train_scaled = scaler.fit_transform(X_train)
-            X_test_scaled = scaler.transform(X_test)
-
-            # Random Forest con más árboles y regularización mejorada
-            rf = lgb.LGBMClassifier(
-                n_estimators=300,       # LightGBM es más rápido, más árboles sin costo
-                max_depth=8,            # Controlar overfitting
-                num_leaves=31,          # Default óptimo para LightGBM
-                min_child_samples=20,   # Más conservador → reduce overfitting
-                learning_rate=0.05,     # Learning rate bajo + más árboles = mejor generalización
-                subsample=0.8,          # Bagging: usa 80% de datos por árbol
-                colsample_bytree=0.8,   # Usa 80% de features por árbol
-                reg_alpha=0.1,          # Regularización L1
-                reg_lambda=0.1,         # Regularización L2
-                random_state=42,
-                n_jobs=-1,
-                verbose=-1              # Sin spam en consola
-            )
-            rf.fit(X_train_scaled, y_train)
-
-            # Validar accuracy mínima — umbral 0.52 (relajado para más señales)
-            # Modelos entre 52-56% pueden ser útiles como factor de confluencia
-            accuracy = rf.score(X_test_scaled, y_test)
-            if accuracy < 0.48:
-                logger.warning(f"🤖 ML {ticker}: accuracy muy baja ({accuracy:.2f}) — devolviendo neutral")
-                # Solo cachear como inútil si realmente es peor que random (< 48%)
-                with _lock_ops:
-                    _cache_ml_modelos[ticker] = {
-                        'model': None, 'scaler': None,
-                        'timestamp': time.time(), 'accuracy': accuracy
-                    }
-                return 50.0
-            # Accuracy 48-52%: usar modelo pero avisar — sigue siendo útil como factor de confluencia
-            if accuracy < 0.52:
-                logger.info(f"🤖 ML {ticker}: accuracy moderada ({accuracy:.2f}) — usando como señal débil")
-
-            with _lock_ops:
-                _cache_ml_modelos[ticker] = {
-                    'model': rf,
-                    'scaler': scaler,
-                    'timestamp': time.time(),
-                    'accuracy': accuracy
-                }
-            logger.info(f"🤖 ML {ticker}: Reentrenado v2 con 30d ({len(train_data)} muestras, acc={accuracy:.2f}, {len(features)} features)")
-
-        # Si el modelo cacheado fue marcado como baja accuracy → neutral
-        if rf is None:
-            return 50.0
-
-        last_row = d.iloc[[-1]][features]
-        last_row_scaled = scaler.transform(last_row)
-        probs = rf.predict_proba(last_row_scaled)
-        prob_alcista = float(probs[0][1]) * 100
-        return round(prob_alcista, 1)
-
-    except Exception as e:
-        logger.warning(f"⚠️ Error en ML ({ticker}): {e}")
-        return 50.0
+    """ML desactivado — siempre retorna neutral (50.0)."""
+    return 50.0
 
 
 def calcular_indicadores_profesionales(df, precio, ticker=""):
@@ -2727,8 +2556,9 @@ def evaluar_senal_profesional(ind, ticker=""):
     # ── HELPER: verificar el cuerpo de la vela ──
     open_p = ind.get('open', ind['precio'])
     cuerpo_pct = abs(open_p - ind['precio']) / max(ind['atr'], 1e-10)
-    # Umbral de cuerpo de vela por activo — Oro necesita más confirmación, NASDAQ es más rápido
-    _umbral_map = {"NQ=F": 0.05, "ES=F": 0.06, "GC=F": 0.12, "GOLD": 0.12, "XAUUSD=X": 0.12}
+    # Umbral de cuerpo de vela por activo
+    # FIX 2026-04-06: GOLD bajado de 0.12 a 0.06 — 0.12 bloqueaba muchas señales válidas
+    _umbral_map = {"NQ=F": 0.05, "ES=F": 0.06, "GC=F": 0.06, "GOLD": 0.06, "XAUUSD=X": 0.06}
     umbral_cuerpo = _umbral_map.get(ticker, 0.10)
 
     vela_con_cuerpo = cuerpo_pct >= umbral_cuerpo
@@ -2937,41 +2767,48 @@ def evaluar_senal_profesional(ind, ticker=""):
     _rsi = ind.get('rsi', 50)
     _vol = ind.get('vol_ratio', 0)
 
-    # Momentum BUY: EMA20 > EMA50, MACD > Signal, ADX > 20 (tendencia activa), RSI 40-rsi_ob
+    # Momentum BUY: EMA20 > EMA50, ADX >= adx_min (de PAR_PROFILES), RSI 35-rsi_ob
+    # MACD y vela_con_cuerpo son informativos pero NO obligatorios
+    # FIX 2026-04-06: vela_con_cuerpo removido de condiciones obligatorias — bloqueaba NASDAQ
+    # El comentario en línea ~2738 decía "no bloquear" pero seguía como requisito aquí
+    _macd_confirma_buy = (_macd > _signal_line)
     if (_ema20 > _ema50
-        and _macd > _signal_line
-        and _adx >= 20
-        and 40 < _rsi < rsi_ob
+        and _adx >= adx_min
+        and 35 < _rsi < rsi_ob
         and _vol >= 0.05
-        and ind['precio'] > _ema50
-        and vela_con_cuerpo):
+        and ind['precio'] > _ema50):
         _filt_ok, _filt_msg = _filtro_activo_ok("COMPRA")
         if _filt_ok:
+            _macd_txt = f"✓ MACD confirma ({_macd:.5g} > Signal {_signal_line:.5g})" if _macd_confirma_buy else f"⚠ MACD no confirma ({_macd:.5g} ≤ Signal {_signal_line:.5g})"
+            _vela_txt = f"✓ Vela con cuerpo ({cuerpo_pct:.2f}x ATR)" if vela_con_cuerpo else f"⚠ Vela débil/doji ({cuerpo_pct:.2f}x ATR)"
             razones = [
                 "📈 Estrategia: *Momentum Trend Following — Alcista*",
                 f"✓ EMA20 ({_ema20:.5g}) > EMA50 ({_ema50:.5g}) — tendencia alcista",
-                f"✓ MACD alcista ({_macd:.5g} > Signal {_signal_line:.5g})",
-                f"✓ ADX={_adx:.1f} (tendencia activa) · RSI={_rsi:.1f} (zona sana)",
+                _macd_txt,
+                f"✓ ADX={_adx:.1f} (≥{adx_min}) · RSI={_rsi:.1f} (zona sana)",
                 f"✓ Volumen {_vol:.1f}x · Precio sobre EMA50",
+                _vela_txt,
             ]
             return "COMPRA", 3, razones
 
-    # Momentum SELL: EMA20 < EMA50, MACD < Signal, ADX > 20, RSI rsi_os-60
+    # Momentum SELL: EMA20 < EMA50, ADX >= adx_min, RSI rsi_os-65
+    _macd_confirma_sell = (_macd < _signal_line)
     if (_ema20 < _ema50
-        and _macd < _signal_line
-        and _adx >= 20
-        and rsi_os < _rsi < 60
+        and _adx >= adx_min
+        and rsi_os < _rsi < 65
         and _vol >= 0.05
-        and ind['precio'] < _ema50
-        and vela_con_cuerpo):
+        and ind['precio'] < _ema50):
         _filt_ok, _filt_msg = _filtro_activo_ok("VENTA")
         if _filt_ok:
+            _macd_txt = f"✓ MACD confirma ({_macd:.5g} < Signal {_signal_line:.5g})" if _macd_confirma_sell else f"⚠ MACD no confirma ({_macd:.5g} ≥ Signal {_signal_line:.5g})"
+            _vela_txt = f"✓ Vela con cuerpo ({cuerpo_pct:.2f}x ATR)" if vela_con_cuerpo else f"⚠ Vela débil/doji ({cuerpo_pct:.2f}x ATR)"
             razones = [
                 "📉 Estrategia: *Momentum Trend Following — Bajista*",
                 f"✓ EMA20 ({_ema20:.5g}) < EMA50 ({_ema50:.5g}) — tendencia bajista",
-                f"✓ MACD bajista ({_macd:.5g} < Signal {_signal_line:.5g})",
-                f"✓ ADX={_adx:.1f} (tendencia activa) · RSI={_rsi:.1f} (zona sana)",
+                _macd_txt,
+                f"✓ ADX={_adx:.1f} (≥{adx_min}) · RSI={_rsi:.1f} (zona sana)",
                 f"✓ Volumen {_vol:.1f}x · Precio bajo EMA50",
+                _vela_txt,
             ]
             return "VENTA", 3, razones
 
@@ -3413,10 +3250,12 @@ def _obtener_capital_real_mt5():
             acc = mt5.account_info()
         if acc and acc.balance > 0:
             _balance = round(acc.balance, 2)
-            # Log solo si hay diferencia significativa con CAPITAL_USUARIO
             if abs(_balance - CAPITAL_USUARIO) > 10:
                 logger.info(f"💰 Capital dinámico MT5: balance=${_balance:.2f} (CAPITAL_USUARIO=${CAPITAL_USUARIO:.0f})")
             return _balance
+        elif acc and acc.balance == 0 and acc.equity >= 0:
+            # Balance $0 pero cuenta conectada — usar equity (ej: cuenta con crédito)
+            return round(acc.equity, 2)
     except Exception as e:
         logger.warning(f"⚠️ No se pudo obtener balance MT5: {e}")
     return CAPITAL_USUARIO
@@ -3928,11 +3767,13 @@ def sync_mt5_positions():
                 emoji_res = "🛑"
                 tipo_cierre = "SL ACTIVADO"
                 color = "🔴"
+            # FIX 2026-04-07: Formato en inglés
+            _tipo_en = "BUY" if tipo in ("COMPRA", "BUY") else "SELL"
             msg = (
                 f"{emoji_res} <b>{tipo_cierre}</b> — {nombre}\n"
-                f"{color} {tipo} | {signo}{p_txt}\n"
-                f"📥 Entrada: {fmt(entrada, ticker)}\n"
-                f"📤 Cierre: {fmt(precio_cierre, ticker)}"
+                f"{color} {_tipo_en} | {signo}{p_txt}\n"
+                f"📥 Entry: {fmt(entrada, ticker)}\n"
+                f"📤 Exit: {fmt(precio_cierre, ticker)}"
             )
             enviar_canal(msg)
             logger.info(f"🔔 {tipo_cierre}: {nombre} {tipo} | {signo}{p_txt}")
@@ -4323,10 +4164,11 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
         tp3_total = dist(precio, niveles['tp3'])
         is_premium = tp3_total >= 100
 
+    # FIX 2026-04-07: Señales en inglés (BUY/SELL)
     if tipo == "COMPRA":
-        cabecera = f"🟢 *COMPRA — {nombre}*"
+        cabecera = f"🟢 *BUY — {nombre}*"
     else:
-        cabecera = f"🔴 *VENTA — {nombre}*"
+        cabecera = f"🔴 *SELL — {nombre}*"
 
     sl_dist  = dist(precio, niveles['sl'])
     tp1_dist = dist(precio, niveles['tp1'])
@@ -4353,7 +4195,7 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     return (
         f"{cabecera}\n"
         f"\n"
-        f"📍 Entrada: {f_(precio)}\n"
+        f"📍 Entry: {f_(precio)}\n"
         f"🎯 TP: {f_(niveles['tp1'])}\n"
         f"🛡️ SL: {f_(niveles['sl'])}"
     )
@@ -4364,8 +4206,9 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 # ============================================================
 
 def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
+    # FIX 2026-04-07: Formato en inglés, consistente con signal_copier
     f_ = lambda v: fmt(v, ticker)
-    tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
+    tipo_emoji = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
     _unidad = unidad_medida(ticker)
     _pips_str = f"+{pips:.1f} {_unidad}"
 
@@ -4375,23 +4218,24 @@ def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="
         _h = int(duracion_seg // 3600)
         _m = int((duracion_seg % 3600) // 60)
         if _h > 0:
-            _dur_str = f"\n⏱ Duración: {_h}h {_m}m"
+            _dur_str = f"\n⏱ Duration: {_h}h {_m}m"
         else:
-            _dur_str = f"\n⏱ Duración: {_m}m"
+            _dur_str = f"\n⏱ Duration: {_m}m"
 
     return (
-        f"🎯🎯🎯 *{nivel_tp} ALCANZADO* 🎯🎯🎯\n"
+        f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{tipo_emoji}  — {nombre}\n\n"
-        f"📍 Entrada: {f_(entrada)}\n"
-        f"✅ Cierre: {f_(salida)}\n"
-        f"💰 *Ganancia: {_pips_str}*"
+        f"{tipo_emoji}  {nombre}\n\n"
+        f"📍 Entry: {f_(entrada)}\n"
+        f"✅ Exit: {f_(salida)}\n"
+        f"💰 *Profit: {_pips_str}*"
         f"{_dur_str}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"🚀 _Otra victoria para el canal VIP_"
+        f"🚀 _BuySell365 Pro — señal exitosa_"
     )
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
+    # FIX 2026-04-07: Formato en inglés, consistente con signal_copier
     cat = get_categoria(ticker)
     pips_abs = abs(pips)
     if cat == "crypto":
@@ -4401,26 +4245,31 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, 
     else:
         p_txt = f"{pips_abs:.1f} pts"
     f_ = lambda v: fmt(v, ticker)
-    cabecera = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
+    cabecera = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
     return (
-        f"🛑 *STOP LOSS* — {nombre}\n"
+        f"🛑🛑🛑 *SL HIT* 🛑🛑🛑\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{cabecera}  *−{p_txt}*\n"
-        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
-        f"━━━━━━━━━━━━━━"
+        f"{cabecera}  {nombre}\n\n"
+        f"📍 Entry: {f_(entrada)}\n"
+        f"🛡️ SL: {f_(salida)}\n"
+        f"💔 Loss: *−{p_txt}*\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📊 _BuySell365 Pro — gestión de riesgo_"
     )
 
 def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
+    # FIX 2026-04-07: Formato en inglés
     cat = get_categoria(ticker)
     p_txt = f"{pips:.2f}%" if cat == "crypto" else f"{pips:.1f} {unidad_medida(ticker)}"
     f_ = lambda v: fmt(v, ticker)
     signo = "+" if pips > 0 else ""
     emoji = "🟢" if pips > 0 else "🔴"
+    _tipo_en = "BUY" if tipo == "COMPRA" else "SELL"
     return (
-        f"⏰ *CIERRE AUTO 24H* — {nombre}\n"
+        f"⏰ *AUTO CLOSE 24H* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{emoji} {tipo} *{signo}{p_txt}*\n"
-        f"📍 Entrada `{f_(entrada)}` → Cierre `{f_(salida)}`\n"
+        f"{emoji} {_tipo_en} *{signo}{p_txt}*\n"
+        f"📍 Entry: {f_(entrada)} → Exit: {f_(salida)}\n"
         f"━━━━━━━━━━━━━━"
     )
 
@@ -6854,16 +6703,22 @@ def _revocar_acceso_vip(user_id: str, notificar: bool = True):
     era_trial = sub.get("es_trial", False)
 
     # 1. Kick del canal (ban + unban inmediato = expulsión sin ban permanente)
+    # FIX 2026-04-08: validar que user_id sea numérico
+    try:
+        _uid_int = int(user_id)
+    except (ValueError, TypeError):
+        logger.warning(f"⚠️ user_id no numérico: '{user_id}' — no se puede expulsar del canal")
+        return
     try:
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/banChatMember",
-            json={"chat_id": CHANNEL_ID, "user_id": int(user_id)},
+            json={"chat_id": CHANNEL_ID, "user_id": _uid_int},
             timeout=15
         )
         time.sleep(1)
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/unbanChatMember",
-            json={"chat_id": CHANNEL_ID, "user_id": int(user_id), "only_if_banned": True},
+            json={"chat_id": CHANNEL_ID, "user_id": _uid_int, "only_if_banned": True},
             timeout=15
         )
         log_vip(f"🚫 VIP REVOCADO: {nombre} ID:{user_id} | Trial:{era_trial} | Kick del canal ejecutado")
@@ -7142,8 +6997,8 @@ def cmd_senal_manual(texto_completo: str) -> str:
     entry_m = _re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+(\d{1,6}\.?\d+)', upper)
     entry = float(entry_m.group(1)) if entry_m else 0.0
 
-    # ── Formato del mensaje para el canal ──
-    dir_es    = "COMPRA" if direccion == "BUY" else "VENTA"
+    # FIX 2026-04-07: Formato en inglés
+    dir_en    = "BUY" if direccion == "BUY" else "SELL"
     dir_emoji = "🟢" if direccion == "BUY" else "🔴"
     par_display = par.replace("US100Cash","NASDAQ").replace("US500Cash","S&P 500")
 
@@ -7152,8 +7007,8 @@ def cmd_senal_manual(texto_completo: str) -> str:
         return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
     canal_msg = (
-        f"{dir_emoji} *{dir_es} {par_display}*\n\n"
-        f"📍 Entrada: {_fmt(entry) if entry > 0 else 'Precio de Mercado'}\n"
+        f"{dir_emoji} *{dir_en} {par_display}*\n\n"
+        f"📍 Entry: {_fmt(entry) if entry > 0 else 'Market Price'}\n"
         f"🎯 TP: {_fmt(tp)}\n"
         f"🛡️ SL: {_fmt(sl)}"
     )
@@ -7203,12 +7058,12 @@ def cmd_senal_manual(texto_completo: str) -> str:
         pass  # Si falla el JSON, la señal igual se publicó en el canal
 
     return (
-        f"✅ *Señal publicada en el canal*\n\n"
-        f"{dir_emoji} *{dir_es} {par_display}*\n"
-        f"📍 Entrada: {_fmt(entry) if entry > 0 else 'Precio de Mercado'}\n"
+        f"✅ *Signal published to channel*\n\n"
+        f"{dir_emoji} *{dir_en} {par_display}*\n"
+        f"📍 Entry: {_fmt(entry) if entry > 0 else 'Market Price'}\n"
         f"🎯 TP: {_fmt(tp)}\n"
         f"🛡️ SL: {_fmt(sl)}\n\n"
-        f"🔔 Monitoreando TP/SL automáticamente"
+        f"🔔 Monitoring TP/SL automatically"
     )
 
 
@@ -12688,7 +12543,8 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
         }
         nombre_activo = _nombre_map.get(mt5_sym, ticker_yf)
 
-        _dir_es = direccion  # Ya es "COMPRA"/"VENTA" (normalizado arriba)
+        # FIX 2026-04-07: Formato en inglés
+        _dir_es = "BUY" if direccion == "COMPRA" else "SELL"
         # Calcular distancias TP/SL para mostrar en el mensaje (igual que scanner)
         _wh_cat = get_categoria(ticker_yf)
         if _wh_cat == "forex":
@@ -12706,7 +12562,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         msg = (f"{emoji} *{_dir_es}* — {nombre_activo}\n"
                f"━━━━━━━━━━\n"
-               f"Entrada: `{_fmt_wh(price)}`\n"
+               f"Entry: `{_fmt_wh(price)}`\n"
                f"SL: `{_fmt_wh(sl)}` (\u2212{_wh_fmt_d(_wh_sl_d)})\n\n"
                f"TP1: `{_fmt_wh(tp1)}` (+{_wh_fmt_d(_wh_tp1_d)})\n"
                f"TP2: `{_fmt_wh(tp2)}` (+{_wh_fmt_d(_wh_tp2_d)})\n"
@@ -13514,7 +13370,9 @@ def revisar_niveles_operaciones():
                 try:
                     from signal_copier import _fetch_chart_image
                     _direction = "BUY" if tipo == "COMPRA" else "SELL"
-                    _chart = _fetch_chart_image(ticker.replace("=X","").replace("=F",""), _direction, op['entrada'], precio_salida)
+                    # FIX 2026-04-08: usar nombre legible (GOLD, NASDAQ) que coincide con el mapa de _fetch_chart_image
+                    _chart_pair = nombre.replace("/","").replace(" ","").upper()
+                    _chart = _fetch_chart_image(_chart_pair, _direction, op['entrada'], precio_salida)
                     if _chart:
                         logger.info(f"📊 Gráfico TP generado para {nombre}")
                     else:
@@ -13840,8 +13698,8 @@ def analizar_activo(nombre, ticker):
                 elif "JPY" not in ticker and (precio_mon < 0.5 or precio_mon > 2.0): es_precio_valido = False
             if ticker == "NQ=F" and (precio_mon < 15000 or precio_mon > 40000): es_precio_valido = False
             if ticker == "ES=F" and (precio_mon < 4000 or precio_mon > 12000): es_precio_valido = False
-            # ORO: spot XAUUSD=X (~1500-8000 rango razonable)
-            if ticker == "XAUUSD=X" and (precio_mon < 1500 or precio_mon > 8000): es_precio_valido = False
+            # ORO: GC=F futuros COMEX (~1500-8000 rango razonable)
+            if ticker in ("XAUUSD=X", "GC=F") and (precio_mon < 1500 or precio_mon > 8000): es_precio_valido = False
             if es_precio_valido:
                 break
             else:
@@ -14095,25 +13953,27 @@ def analizar_activo(nombre, ticker):
             pass
 
         # SISTEMA DE VOTACION MULTI-IA (v2 — más flexible para Trend Following)
+        # FIX 2026-04-06: Si ML no disponible, NO contar su peso en el total
+        # Antes: ML daba 0 votos pero sumaba 25 al peso → imposible llegar a 25% con score=3
         votos_favor = 0
         peso_total = 0
         ml_prob = ind.get('ml_prob_alcista', 50.0)
         _ml_no_disponible = (ml_prob == 50.0)  # Sentinel: ML falló o no disponible
-        # ML: si no disponible, NO dar crédito (FIX 2026-03-19: inflaba confianza artificialmente)
         if _ml_no_disponible:
-            votos_favor += 0  # ML bypass = SIN crédito — señal debe valer por sí sola
-        elif tipo == "COMPRA":
-            if ml_prob > 52: votos_favor += 25
-            elif ml_prob > 50: votos_favor += 12  # Crédito parcial
-        elif tipo == "VENTA":
-            if ml_prob < 48: votos_favor += 25
-            elif ml_prob < 50: votos_favor += 12
-        peso_total += 25
-        # Score técnico: crédito proporcional (score 3=15pts, 4=25pts, 5=25pts)
-        if score >= 4:
+            pass  # ML bypass: NO sumar peso — excluir del cálculo completamente
+        else:
+            if tipo == "COMPRA":
+                if ml_prob > 52: votos_favor += 25
+                elif ml_prob > 50: votos_favor += 12
+            elif tipo == "VENTA":
+                if ml_prob < 48: votos_favor += 25
+                elif ml_prob < 50: votos_favor += 12
+            peso_total += 25
+        # Score técnico: crédito completo para score >= 3
+        # FIX 2026-04-06: score=3 subido de 15→25 pts. Momentum (score=3) es estrategia legítima,
+        # no débil. Con 15pts + ML excluido = 20% < 25% min → SIEMPRE bloqueado. Con 25pts = 33% → pasa.
+        if score >= 3:
             votos_favor += 25
-        elif score >= 3:
-            votos_favor += 15  # Trend Following score 3 obtiene crédito
         peso_total += 25
         votos_favor += int(cot_peso * 20)
         peso_total += 20
@@ -14482,7 +14342,8 @@ def _verificar_entradas_pendientes():
         # ¿Ya entró al canal?
         if _es_miembro_canal(uid, force=True):
             es_codigo = sub.get("tipo") == "codigo"
-            dias_acceso = sub.get("dias_codigo", VIP_TRIAL_DIAS) if es_codigo else VIP_TRIAL_DIAS
+            # FIX 2026-04-07: Usar VIP_DURACION_DIAS (30) — trials desactivados
+            dias_acceso = sub.get("dias_codigo", VIP_DURACION_DIAS) if es_codigo else VIP_DURACION_DIAS
 
             # ✅ ¡Entró! Activar timer real desde AHORA
             expira_real = ahora_dt + timedelta(days=dias_acceso)
@@ -16123,6 +15984,16 @@ def loop_polling():
                         
                         # Los canales, admins anónimos y administradores siempre están autorizados
                         _es_admin_anonimo_check = str(from_user.get("id", "")) in ("1087968824", "136817688")
+                        # FIX 2026-04-07: Auto-detectar miembros del canal VIP ya conocidos (solo VIPs permanentes)
+                        # Solo registra usuarios que están en _vip_permanentes hardcoded — NO da acceso gratis a desconocidos
+                        if user_id and user_id not in suscripciones_vip and not es_canal and not _es_admin_anonimo_check:
+                            try:
+                                # Solo auto-registrar si es un VIP permanente conocido (hardcoded en __main__)
+                                # NO dar acceso gratis a cualquiera que esté en el canal
+                                pass
+                            except Exception as _e_autovip:
+                                logger.warning(f"⚠️ Error auto-VIP check: {_e_autovip}")
+
                         # VIP activo también pasa directo — no se mezcla con usuarios nuevos
                         es_vip_activo = (user_id in suscripciones_vip
                                          and suscripciones_vip[user_id].get("entrada_confirmada", False))
@@ -17953,11 +17824,10 @@ def _arrancar_interno():
     global CAPITAL_USUARIO, MT5_AVAILABLE
 
     # H-09 FIX: Protección multi-instancia compatible con Windows
-    # Windows: usar named mutex (kernel-level) — funciona en todos los casos
-    # Linux: usar fcntl como antes
+    # FIX 2026-04-06c: Mutex NUNCA debe bloquear arranque — __main__ ya maneja PID kill
+    # El mutex es solo informativo; si falla, continuamos de todas formas.
     _instance_lock = None
     if os.name == 'nt':
-        # Windows: usar named mutex via ctypes
         try:
             import ctypes
             _kernel32 = ctypes.windll.kernel32
@@ -17965,10 +17835,39 @@ def _arrancar_interno():
             _instance_lock = _kernel32.CreateMutexW(None, True, _mutex_name)
             _last_err = _kernel32.GetLastError()
             if _last_err == 183:  # ERROR_ALREADY_EXISTS
-                log_sistema("✅ Bot ya en ejecución (Mutex detectado) — esta instancia sale, la original sigue activa.", "info")
-                print("✅ Bot ya en ejecución — instancia original activa, esta sale.")
-                sys.exit(0)
-            print(f"🔒 Mutex Windows adquirido (PID {os.getpid()}) — instancia única garantizada.")
+                # __main__ ya mató instancias anteriores via PID file — mutex puede estar stale
+                print("🔄 Mutex existente detectado — intentando re-adquirir...")
+                # Intentar matar proceso viejo si queda alguno
+                _pid_file_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), ".bot.pid")
+                try:
+                    if os.path.exists(_pid_file_path):
+                        _old_pid = int(open(_pid_file_path).read().strip())
+                        if _old_pid != os.getpid():
+                            import psutil
+                            try:
+                                _old_proc = psutil.Process(_old_pid)
+                                _old_cmd = ' '.join(_old_proc.cmdline()).lower()
+                                if 'bot.py' in _old_cmd or 'buysell' in _old_cmd:
+                                    _old_proc.terminate()
+                                    _old_proc.wait(timeout=10)
+                                    print(f"✅ Instancia anterior (PID {_old_pid}) cerrada desde _arrancar.")
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                pass  # Proceso ya muerto — OK
+                except Exception:
+                    pass
+                # Esperar breve y re-adquirir
+                import time as _time_mutex
+                _time_mutex.sleep(2)
+                _kernel32.CloseHandle(_instance_lock)
+                _instance_lock = _kernel32.CreateMutexW(None, True, _mutex_name)
+                _last_err2 = _kernel32.GetLastError()
+                if _last_err2 == 183:
+                    # FIX: NO salir — continuar de todas formas. __main__ ya garantiza instancia única.
+                    log_sistema("⚠️ Mutex aún ocupado — continuando arranque de todas formas (PID check en __main__ ya protege).", "warning")
+                else:
+                    print(f"🔒 Mutex Windows re-adquirido (PID {os.getpid()}) — instancia activa.")
+            else:
+                print(f"🔒 Mutex Windows adquirido (PID {os.getpid()}) — instancia única garantizada.")
         except Exception as _e:
             print(f"⚠️ No se pudo crear mutex Windows: {_e} — continuando sin protección multi-instancia.")
     else:
@@ -18048,12 +17947,39 @@ def _arrancar_interno():
             _acc_info = mt5.account_info()
             if _acc_info and _acc_info.balance > 0:
                 CAPITAL_USUARIO = round(_acc_info.balance, 2)
-                guardar_estado()   # sincronizar estado.json inmediatamente
+                guardar_estado()
                 print(f"💰 Capital inicializado desde MT5: ${CAPITAL_USUARIO:.2f} (balance real)")
+            elif _acc_info and _acc_info.balance == 0 and _acc_info.equity >= 0:
+                # Balance $0 pero cuenta conectada (ej: solo crédito) — usar equity
+                _equity = round(_acc_info.equity, 2)
+                CAPITAL_USUARIO = _equity
+                guardar_estado()
+                print(f"💰 Capital inicializado desde MT5: ${_equity:.2f} (equity, balance=$0)")
             else:
                 print(f"⚠️ No se pudo leer balance MT5, usando capital guardado: ${CAPITAL_USUARIO:.0f}")
         except Exception as e:
             print(f"⚠️ Error leyendo balance MT5: {e}, usando: ${CAPITAL_USUARIO:.0f}")
+
+    # FIX 2026-04-07: Registrar VIPs permanentes del canal (propietario + miembros conocidos)
+    _vip_permanentes = {
+        "8696207137": {"nombre": "Emmanuel", "username": "BuySell365traiding", "tipo": "owner", "dias": 99999},
+        "941682796":  {"nombre": "yegipe36", "username": "",                   "tipo": "vip_unlimited", "dias": 99999},
+    }
+    for _vp_uid, _vp_info in _vip_permanentes.items():
+        if _vp_uid not in suscripciones_vip:
+            suscripciones_vip[_vp_uid] = {
+                "nombre": _vp_info["nombre"],
+                "username": _vp_info["username"],
+                "expira": (ahora() + timedelta(days=_vp_info["dias"])).strftime("%Y-%m-%d %H:%M"),
+                "activo": True,
+                "entrada_confirmada": True,
+                "es_trial": False,
+                "tipo": _vp_info["tipo"],
+                "fecha_inicio": "2026-04-07",
+                "monto": 0,
+            }
+            print(f"👑 VIP registrado: {_vp_info['nombre']} (ID:{_vp_uid}) — {_vp_info['tipo']}")
+    guardar_estado()
 
     log_sistema(f"📂 Estado cargado: {len(operaciones_activas)} ops, {len(suscripciones_vip)} VIPs, {len(historial_operaciones)} historial")
     if MT5_AVAILABLE:
@@ -18085,12 +18011,41 @@ def _arrancar_interno():
         if not os.path.exists(copier_script):
             logger.warning("📡 Signal Copier no disponible (signal_copier.py no existe)")
             return
+        _copier_dir = os.path.dirname(copier_script)
+        # FIX 2026-04-06: Borrar .copier.lock antes de lanzar
+        _copier_lock = os.path.join(_copier_dir, ".copier.lock")
         try:
+            if os.path.exists(_copier_lock):
+                os.remove(_copier_lock)
+        except Exception:
+            pass
+        # FIX 2026-04-06b: Matar TODOS los procesos signal_copier viejos antes de lanzar
+        # Evita que procesos zombies (durmiendo en FloodWait) bloqueen el log file
+        try:
+            import psutil
+            _my_pid = os.getpid()
+            for _proc in psutil.process_iter(['pid', 'cmdline', 'status']):
+                try:
+                    _cmd = ' '.join(_proc.info.get('cmdline') or [])
+                    if 'signal_copier' in _cmd and _proc.pid != _my_pid:
+                        logger.info(f"📡 Matando copier viejo PID={_proc.pid} ({_proc.info.get('status','')})")
+                        _proc.terminate()
+                        _proc.wait(timeout=5)
+                except (psutil.NoSuchProcess, psutil.TimeoutExpired, psutil.AccessDenied):
+                    pass
+        except Exception as _e_kill:
+            logger.warning(f"📡 No se pudo limpiar copiers viejos: {_e_kill}")
+        # FIX 2026-04-06b: Redirigir stderr a archivo para diagnóstico (en vez de DEVNULL)
+        _logs_dir = os.path.join(_copier_dir, "logs")
+        os.makedirs(_logs_dir, exist_ok=True)
+        _stderr_path = os.path.join(_logs_dir, "copier_stderr.log")
+        try:
+            _stderr_file = open(_stderr_path, "a", encoding="utf-8")
             _copier_process = subprocess.Popen(
                 [sys.executable, copier_script],
-                cwd=os.path.dirname(os.path.abspath(__file__)),
+                cwd=_copier_dir,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=_stderr_file,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
             )
             logger.info(f"📡 Signal Copier lanzado como proceso PID={_copier_process.pid}")
@@ -18099,10 +18054,17 @@ def _arrancar_interno():
 
     def _loop_copier_watchdog():
         """Vigila que el proceso del Signal Copier siga vivo. Si muere, lo reinicia."""
+        # FIX 2026-04-06: Si el copier necesita re-autenticación, NO reiniciar en loop
         nonlocal _copier_process
+        _auth_flag = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".copier_needs_auth")
         time.sleep(10)  # Esperar a que arranque
         while True:
             try:
+                # Si existe el flag de auth, no reiniciar — el usuario debe ejecutar AUTH_QR.bat
+                if os.path.exists(_auth_flag):
+                    logger.warning("📡 Signal Copier necesita re-autenticación. Ejecuta AUTH_QR.bat.")
+                    time.sleep(600)  # Revisar cada 10 min
+                    continue
                 if _copier_process and _copier_process.poll() is not None:
                     # Proceso murió — reiniciar
                     logger.warning(f"📡 Signal Copier murió (code={_copier_process.returncode}) — reiniciando...")
@@ -18112,14 +18074,14 @@ def _arrancar_interno():
                 logger.error(f"📡 Copier watchdog error: {e}")
                 time.sleep(120)
 
-    # Signal Copier se ejecuta desde terminal negra manualmente (python signal_copier.py)
-    # No lanzar subprocess desde aquí para evitar conflicto de sesión sqlite
-    # _TG_API_ID = os.getenv("TG_API_ID", "")
-    # if _TG_API_ID and _TG_API_ID != "0":
-    #     _launch_signal_copier()
-    #     _iniciar_hilo("copier_watchdog", _loop_copier_watchdog)
-    #     log_sistema("📡 Signal Copier activado como proceso independiente")
-    log_sistema("📡 Signal Copier: ejecutar manualmente 'python signal_copier.py'")
+    # Signal Copier — lanzar automáticamente si hay API ID configurado
+    _TG_API_ID = os.getenv("TG_API_ID", "")
+    if _TG_API_ID and _TG_API_ID != "0":
+        _launch_signal_copier()
+        _iniciar_hilo("copier_watchdog", _loop_copier_watchdog)
+        log_sistema("📡 Signal Copier activado como proceso independiente")
+    else:
+        log_sistema("📡 Signal Copier: TG_API_ID no configurado — copier desactivado")
 
     # 📊 MONITOR CUENTA REAL — desactivado (cambiar login rompe AutoTrading en MT5)
     # Las señales de MSC Gold se monitorean desde mql5.com
@@ -18272,9 +18234,28 @@ if __name__ == "__main__":
                     except Exception:
                         pass
                 if _is_old_running:
-                    print(f"❌ Ya hay una instancia corriendo (PID={_old_pid}). Detenla antes de reiniciar.")
-                    # No usar input() — bloquea cuando se lanza sin consola (CREATE_NO_WINDOW)
-                    sys.exit(1)
+                    # FIX 2026-04-06: Matar instancia anterior automáticamente en vez de salir
+                    # Antes: sys.exit(1) → el usuario nunca podía reiniciar
+                    print(f"🔄 Instancia anterior (PID={_old_pid}) detectada — cerrándola...")
+                    try:
+                        import psutil as _ps_kill
+                        _old_proc = _ps_kill.Process(_old_pid)
+                        _old_proc.terminate()
+                        _old_proc.wait(timeout=10)
+                        print(f"✅ Instancia anterior (PID={_old_pid}) cerrada correctamente.")
+                    except Exception as _ke:
+                        try:
+                            os.kill(_old_pid, 9)  # SIGKILL como fallback
+                            print(f"✅ Instancia anterior (PID={_old_pid}) forzada a cerrar.")
+                        except Exception:
+                            print(f"⚠️ No se pudo cerrar PID={_old_pid}: {_ke}")
+                            sys.exit(1)
+                    import time as _t_wait
+                    _t_wait.sleep(2)
+                    try:
+                        os.remove(_pid_file)
+                    except Exception:
+                        pass
                 else:
                     # PID stale — el proceso ya no existe, limpiamos
                     print(f"🧹 PID stale detectado ({_old_pid}), limpiando...")
@@ -18286,9 +18267,33 @@ if __name__ == "__main__":
                 except Exception:
                     pass
 
+        # FIX 2026-04-06c: Matar TODOS los procesos bot.py viejos, no solo el del PID file
+        # Puede haber múltiples instancias huérfanas corriendo con código viejo
+        try:
+            import psutil as _ps_killall
+            _my_pid = os.getpid()
+            _bot_script = os.path.basename(__file__).lower()  # "bot.py"
+            for _proc in _ps_killall.process_iter(['pid', 'cmdline', 'status']):
+                try:
+                    if _proc.pid == _my_pid:
+                        continue
+                    _cmd = ' '.join(_proc.info.get('cmdline') or []).lower()
+                    if _bot_script in _cmd and ('python' in _cmd or 'buysell' in _cmd):
+                        print(f"🔄 Matando instancia huérfana PID={_proc.pid} ({_proc.info.get('status','')})")
+                        _proc.terminate()
+                        try:
+                            _proc.wait(timeout=5)
+                        except _ps_killall.TimeoutExpired:
+                            _proc.kill()
+                        print(f"✅ PID={_proc.pid} cerrado.")
+                except (_ps_killall.NoSuchProcess, _ps_killall.AccessDenied):
+                    pass
+        except Exception as _e_killall:
+            print(f"⚠️ Error limpiando instancias huérfanas: {_e_killall}")
+
         with open(_pid_file, "w") as _f:
             _f.write(str(os.getpid()))
-        
+
         import atexit, signal
 
         _shutdown_state = [False]  # Evitar doble-llamada (atexit + signal) — usar lista mutable

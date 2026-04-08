@@ -3,7 +3,7 @@ services:
     name: compraventa365
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn flask_app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4
+    startCommand: gunicorn flask_app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
     envVars:
       - key: SYNC_SECRET
         sync: false
