@@ -4280,11 +4280,11 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
     h = int(horas)
     m = int((horas % 1) * 60)
     dur = f"{h}h {m}m" if h > 0 else f"{m}m"
-    tipo_txt = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
+    tipo_txt = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
     return (
         f"🔒 *PROFIT LOCK* — {nombre}\n"
         f"{tipo_txt} +{p_txt}\n"
-        f"Entrada {f_(entrada)} → Cierre {f_(salida)} | {dur}"
+        f"Entry {f_(entrada)} → Close {f_(salida)} | {dur}"
     )
 
 # ============================================================
@@ -13400,13 +13400,18 @@ def revisar_niveles_operaciones():
                     f"\n\n🚀 *Trading profesional al alcance de todos*\nCopy Trading automático 24/7 en tu cuenta.\n👉 Escribe */vip* para empezar",
                 ]
 
+                # FIX 2026-04-08: Formato consistente con signal_copier (inglés, con guión)
+                _dir_label = "BUY" if tipo == "COMPRA" else "SELL"
+                _dir_emoji = "🟢" if tipo == "COMPRA" else "🔴"
                 _msg_grupo = (
-                    f"✅ *{_tp_label} ALCANZADO* — {nombre}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"{'🟢' if tipo == 'COMPRA' else '🔴'} {tipo}\n"
-                    f"📍 Entrada: {op['entrada']:.2f}\n"
-                    f"🎯 TP: {precio_salida:.2f}\n"
-                    f"💰 *+{pips:.1f} {_unidad}*"
+                    f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"{_dir_emoji} *{_dir_label} — {nombre}*\n\n"
+                    f"📍 Entry: {op['entrada']:.2f}\n"
+                    f"✅ TP: {precio_salida:.2f}\n"
+                    f"💰 *Profit: +{pips:.1f} {_unidad}*\n"
+                    f"━━━━━━━━━━━━━━\n"
+                    f"🚀 _BuySell365 Pro — señal exitosa_"
                     f"{random.choice(_promos_tp)}"
                 )
 
@@ -14523,14 +14528,14 @@ def loop_publicidad_grupo():
             "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "Asi se ven nuestras senales VIP:\n\n"
-            "🟢 *COMPRA — EUR/USD*\n"
-            "📍 Entrada: 1.0845\n"
-            "🎯 TP: 1.0910\n"
-            "🛡️ SL: 1.0800\n"
+            "🟢 *BUY — XAUUSD*\n"
+            "📍 Entry: 4750.00\n"
+            "🎯 TP: 4790.00\n"
+            "🛡️ SL: 4720.00\n"
             "_(Ejemplo ilustrativo, no es una senal activa)_\n\n"
-            "✅ Entrada, TP y SL exactos en cada senal\n"
-            "✅ EUR/USD, NASDAQ, Oro, S&P 500 y mas\n"
-            "✅ Alertas en tiempo real al instante\n"
+            "✅ Entry, TP y SL exactos en cada senal\n"
+            "✅ GOLD (XAUUSD) y NASDAQ en tiempo real\n"
+            "✅ Alertas instantaneas al canal VIP\n"
             "🤖 Copy Trading automatico disponible\n\n"
             "👇 *Escribe /vip para unirte*",
             {"inline_keyboard": [[

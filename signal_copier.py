@@ -138,6 +138,9 @@ _resolved_signals: set = set()  # sig_ids ya resueltos — no volver a cargar de
 # FIX 2026-04-07: Cache anti-duplicados — persiste incluso después de TP/SL resolution
 # { "PAIR_DIRECTION_ENTRY": timestamp_sent }
 _recently_sent: dict = {}
+# FIX 2026-04-08: Anti-duplicado para TP/SL notifications
+# { "PAIR_DIRECTION_tp/sl": timestamp } — evita doble SL HIT / TP HIT
+_recently_notified: dict = {}
 
 # Archivo de señales manuales — el admin registra señales vía /rastrear en bot.py
 MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
@@ -478,7 +481,8 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     direction = signal["direction"]
     pair = signal["pair"]
     entry = signal["entry"]
-    tp = signal["tp"]
+    # FIX 2026-04-08: Usar TP final (el más alto/bajo) para calcular profit real
+    tp = signal.get("_tp_final", signal["tp"]) or signal["tp"]
     pair_d = _get_display_pair(pair)
 
     fmt = lambda v: fmt_price(v, zero_label="Market")
@@ -486,7 +490,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     dir_label = direction.upper()  # BUY/SELL sin traducir
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
 
-    # Calcular pips ganados
+    # Calcular pips ganados con el TP final
     pips_won = abs(tp - entry) if entry > 0 and tp > 0 else 0
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         pips_str = f"+{pips_won:.0f} pts" if pips_won >= 1 else ""
@@ -508,24 +512,27 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     tp5 = signal.get("tp5", 0) or 0
     has_multi_tp = any(t > 0 for t in [tp2, tp3, tp4, tp5])
 
+    # FIX 2026-04-08: Marcar TODOS los TPs como ✅ (precio alcanzó el TP final)
+    _tp1_val = signal.get("tp", 0) or 0
     tp_lines = ""
     if has_multi_tp:
-        tp_lines += f"\n✅ TP1: {fmt(tp)}"
+        if _tp1_val > 0:
+            tp_lines += f"\n✅ TP1: {fmt(_tp1_val)}"
         if tp2 > 0:
-            tp_lines += f"\n🎯 TP2: {fmt(tp2)}"
+            tp_lines += f"\n✅ TP2: {fmt(tp2)}"
         if tp3 > 0:
-            tp_lines += f"\n🎯 TP3: {fmt(tp3)}"
+            tp_lines += f"\n✅ TP3: {fmt(tp3)}"
         if tp4 > 0:
-            tp_lines += f"\n🎯 TP4: {fmt(tp4)}"
+            tp_lines += f"\n✅ TP4: {fmt(tp4)}"
         if tp5 > 0:
-            tp_lines += f"\n🎯 TP5: {fmt(tp5)}"
+            tp_lines += f"\n✅ TP5: {fmt(tp5)}"
     else:
         tp_lines = f"\n✅ TP: {fmt(tp)}"
 
     msg = (
         f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{dir_emoji} *{dir_label} {pair_d}*\n\n"
+        f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
         f"📍 Entry: {fmt(entry)}"
         f"{tp_lines}"
         f"{pips_line}\n"
@@ -568,7 +575,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
         _msg_grupo = (
             f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
             f"━━━━━━━━━━━━━━\n"
-            f"{dir_emoji} *{dir_label} {pair_d}*\n\n"
+            f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
             f"📍 Entry: {fmt(entry)}"
             f"{tp_lines}"
             f"{pips_line}\n"
@@ -622,7 +629,7 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
     msg = (
         f"🛑🛑🛑 *SL HIT* 🛑🛑🛑\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{dir_emoji} *{dir_label} {pair_d}*\n\n"
+        f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
         f"📍 Entry: {fmt(entry)}\n"
         f"🛡️ SL: {fmt(sl)}"
         f"{loss_line}\n"
@@ -697,10 +704,25 @@ async def _monitor_tp_loop() -> None:
         for sig_id, sdata in signals_copy.items():
             signal = sdata["signal"]
             direction = signal["direction"]
-            tp = signal["tp"]
             sl = signal["sl"]
             pair = signal["pair"]
             age_hours = (time.time() - sdata["sent_at"]) / 3600
+
+            # FIX 2026-04-08: Rastrear el TP MÁS ALTO de la señal, no solo TP1
+            # Así celebramos el profit real, no +2 pts de un TP1 scalper
+            _tp1 = signal.get("tp", 0) or 0
+            _tp2 = signal.get("tp2", 0) or 0
+            _tp3 = signal.get("tp3", 0) or 0
+            _tp4 = signal.get("tp4", 0) or 0
+            _tp5 = signal.get("tp5", 0) or 0
+            _all_tps = [t for t in [_tp5, _tp4, _tp3, _tp2, _tp1] if t > 0]
+            if direction == "BUY":
+                tp = max(_all_tps) if _all_tps else 0  # TP más alto para BUY
+            else:
+                tp = min(_all_tps) if _all_tps else 0  # TP más bajo para SELL
+
+            # Actualizar el signal con el TP final para que la celebración muestre el profit correcto
+            signal["_tp_final"] = tp
 
             # Auto-expire after 48h to avoid zombie tracking
             if age_hours > 48:
@@ -731,6 +753,17 @@ async def _monitor_tp_loop() -> None:
             _save_open_signals()  # Actualizar disco
 
             if result in ("tp", "sl"):
+                # FIX 2026-04-08: Anti-duplicado TP/SL — no enviar 2 veces
+                _notif_key = f"{signal.get('pair','')}_{signal.get('direction','')}_{result}"
+                _prev_notif = _recently_notified.get(_notif_key, 0)
+                if _prev_notif and (time.time() - _prev_notif) < 300:  # 5 min cooldown
+                    log.info(f"🔕 {result.upper()} duplicado ignorado: {_notif_key} (notificado hace {time.time()-_prev_notif:.0f}s)")
+                    continue
+                _recently_notified[_notif_key] = time.time()
+                # Cleanup entradas viejas (>30 min) para no acumular memoria
+                _now_notif = time.time()
+                _recently_notified.update({k: v for k, v in _recently_notified.items() if _now_notif - v < 1800})
+
                 # REGLA: No anunciar si no hay precio de entrada válido
                 _entry = signal.get('entry', 0) or 0
                 if _entry <= 0:
@@ -1432,14 +1465,15 @@ def send_to_channel(signal, executed, detail):
     tp5 = signal.get("tp5", 0) or 0
     has_multi_tp = any(t > 0 for t in [tp2, tp3, tp4, tp5])
     tp_label = "TP1" if has_multi_tp else "TP"
-    tp_display = fmt(tp) if tp > 0 else "Open"
 
     lines = [
-        f"{dir_emoji} *{dir_label} {pair_display}*",
+        f"{dir_emoji} *{dir_label} — {pair_display}*",
         f"",
         f"📍 Entry: {entry_display}",
-        f"🎯 {tp_label}: {tp_display}",
     ]
+    # FIX 2026-04-08: No mostrar "TP: Open" — si no hay TP válido, omitir línea
+    if tp > 0:
+        lines.append(f"🎯 {tp_label}: {fmt(tp)}")
     if tp2 > 0:
         lines.append(f"🎯 TP2: {fmt(tp2)}")
     if tp3 > 0:
@@ -1462,33 +1496,14 @@ def send_to_channel(signal, executed, detail):
     _xm_buttons = {
         "inline_keyboard": [
             [
-                {"text": "🎁 Open XM Account — 100% Bonus", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                {"text": "🤖 Copy Trading (I have an account)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
+                {"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
+                {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
             ]
         ]
     }
 
-    # ── Generar y enviar gráfico antes del texto ──
-    _chart_msg_id = None
-    try:
-        _chart_tp = tp if tp > 0 else (signal.get("tp2", 0) or 0)
-        if entry > 0 and _chart_tp > 0:
-            _chart_title = f"{'🟢' if direction == 'BUY' else '🔴'} {direction.upper()} {_get_display_pair(pair)}"
-            _chart_bytes = _fetch_chart_image(pair, direction, entry, _chart_tp, title_override=_chart_title)
-            if _chart_bytes:
-                _photo_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-                _photo_resp = requests.post(_photo_url, data={
-                    "chat_id": CHANNEL_ID,
-                    "caption": f"{dir_emoji} {dir_label} {pair_display} — Entry: {fmt(entry)}",
-                    "parse_mode": "Markdown",
-                }, files={"photo": ("chart.png", _chart_bytes, "image/png")}, timeout=15)
-                if _photo_resp.status_code == 200:
-                    _chart_msg_id = _photo_resp.json().get("result", {}).get("message_id")
-                    log.info(f"📊 Chart enviado para señal {dir_label} {pair_display}")
-                else:
-                    log.warning(f"📊 Error enviando chart: {_photo_resp.status_code}")
-    except Exception as _e_chart:
-        log.warning(f"📊 Chart generation/send error: {_e_chart}")
+    # FIX 2026-04-08: Gráfica SOLO en TP/SL HIT, NO en señales nuevas
+    # Las señales nuevas solo llevan texto + botones XM
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     _payload = {
@@ -1644,8 +1659,10 @@ async def main():
         "Anabelsignals08",            # AnabelSignals — XAUUSD/Gold
         "Jerry77446",                 # GOLD FOREX MARKET — XAUUSD/Gold señales VIP
     ]
-    # Sin filtros — todas las señales de todos los activos se reenvían al canal VIP
-    CHANNEL_ASSET_FILTER = {}  # Vacío = sin restricción por activo
+    # FIX 2026-04-08: Solo GOLD y NASDAQ — bloquear US30, forex, crypto, etc.
+    # Lista global de pares permitidos (aplica a TODOS los canales)
+    ALLOWED_PAIRS = {"GOLD", "XAUUSD", "XAUUSD=X", "ORO",
+                     "NAS100", "NASDAQ", "NASDAQ100", "US100", "US100Cash", "NQ"}
 
     # Resolver usernames → se hace DESPUÉS de client.start() (ver más abajo)
     _username_to_id = {}
@@ -1687,12 +1704,14 @@ async def main():
             # Parse the signal
             signal = parse_signal(text, chat_title=chat_title)
 
-            # Aplicar filtro de activo por canal (ej: forexsignalstrialgroup_00 solo XAUUSD)
-            if signal and _chan_uname in CHANNEL_ASSET_FILTER:
-                _allowed_assets = CHANNEL_ASSET_FILTER[_chan_uname]
-                if signal.get("pair") not in _allowed_assets and signal.get("mt5_symbol") not in _allowed_assets:
-                    log.info(f"⏭️ Señal ignorada ({signal['pair']}) — canal {_chan_uname} solo acepta {_allowed_assets}")
+            # FIX 2026-04-08: Filtro GLOBAL — solo GOLD y NASDAQ
+            if signal and signal["type"] == "new_signal":
+                _sig_pair = (signal.get("pair") or "").upper()
+                _sig_mt5 = (signal.get("mt5_symbol") or "").upper()
+                if _sig_pair not in ALLOWED_PAIRS and _sig_mt5 not in ALLOWED_PAIRS:
+                    log.info(f"⏭️ Señal ignorada ({_sig_pair}) — solo permitidos: GOLD, NASDAQ")
                     return
+            # Updates (close_half, sl_hit, tp_hit) se filtran más abajo por _open_signals
             if not signal:
                 return
 
