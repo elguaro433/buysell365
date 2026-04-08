@@ -1626,6 +1626,7 @@ if('serviceWorker' in navigator){{
   </div>
   <p data-i18n="footer.rights">\u00a9 2026 BuySell365 Pro. Todos los derechos reservados.</p>
   <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)">BuySell365 Pro &mdash; Trading con Inteligencia Artificial</p>
+  <p style="margin-top:4px;font-size:0.7rem;color:#4a5568">Creador: Emmanuel Diaz</p>
   <p style="margin-top:8px;font-size:0.7rem;color:#4a5568">
     \u26a0\ufe0f <span data-i18n="footer.disclaimer">Trading con riesgo. Rendimientos pasados no garantizan resultados futuros. Opera bajo tu propia responsabilidad.</span>
   </p>
@@ -2330,6 +2331,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         <p style="margin-top:8px;font-size:0.7rem;color:#888;max-width:700px;margin-left:auto;margin-right:auto">
             &#9888; <strong data-i18n="dash.footer_legal_title">Aviso legal:</strong> <span data-i18n="dash.footer_legal">BuySell365 Pro es una herramienta de an&aacute;lisis t&eacute;cnico automatizado con fines informativos y educativos. No constituye asesor&iacute;a financiera, recomendaci&oacute;n de inversi&oacute;n ni oferta de servicios regulados. Operar en mercados financieros conlleva riesgo de p&eacute;rdida de capital. Resultados pasados no garantizan resultados futuros. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n.</span>
         </p>
+        <p style="margin-top:6px;font-size:0.65rem;color:#666">Creador: Emmanuel Diaz</p>
     </div>
 
 </div>
@@ -3088,8 +3090,8 @@ a{{color:var(--green);text-decoration:none}}
 
 <section class="about-hero">
   <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px">&#9989; CUENTA REAL MT5 XM &mdash; RESULTADOS VERIFICADOS</div>
-  <h1>La historia detr\u00e1s del<br><span>bot que trabaja mientras duermes</span></h1>
-  <p>Somos traders reales, no actores. Construimos BuySell365 porque necesit\u00e1bamos una soluci\u00f3n que realmente funcionara. Estos son nuestros resultados reales verificados en XM MT5.</p>
+  <h1>Trading automatizado en<br><span>GOLD y NASDAQ con IA</span></h1>
+  <p>Creado por Emmanuel Diaz, trader real operando con cuenta verificada en XM MT5. BuySell365 Pro combina IA propia + se\u00f1ales de canales VIP internacionales para operar GOLD (XAUUSD) y NASDAQ (NAS100) las 24 horas.</p>
 </section>
 
 <div class="about-stats">
@@ -3101,9 +3103,9 @@ a{{color:var(--green);text-decoration:none}}
 
 <section class="about-section">
   <h2><span class="emoji">&#128065;</span>Nuestra Historia Real</h2>
-  <p>Somos traders reales que llevan a\u00f1os operando forex e \u00edndices. Como la mayor\u00eda, empezamos cometiendo los mismos errores: dejar correr las p\u00e9rdidas, cortar las ganancias, y operar por emoci\u00f3n.</p>
-  <p>La soluci\u00f3n no fue un curso ni un gur\u00fa. Fue la <strong>automatizaci\u00f3n</strong>. Con experiencia en programaci\u00f3n, dise\u00f1amos un bot de IA que analiza el mercado cada 3 minutos \u2014 sin emociones, sin fatiga, sin sesgos.</p>
-  <p>BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>nosotros mismos usamos</strong> para operar en una cuenta real verificada en XM MT5.</p>
+  <p>Mi nombre es <strong>Emmanuel Diaz</strong>, trader retail desde Andorra. Como muchos, empec\u00e9 cometiendo los errores cl\u00e1sicos: dejar correr las p\u00e9rdidas, cortar las ganancias, y operar por emoci\u00f3n.</p>
+  <p>La soluci\u00f3n fue la <strong>automatizaci\u00f3n</strong>. Dise\u00f1\u00e9 un bot de IA que analiza GOLD y NASDAQ cada 3 minutos \u2014 sin emociones, sin fatiga. Adem\u00e1s, integr\u00e9 un <strong>Signal Copier</strong> que replica se\u00f1ales de canales VIP internacionales verificados.</p>
+  <p>BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>yo mismo uso</strong> para operar en mi cuenta real verificada en XM MT5. Todos los resultados son p\u00fablicos en el <a href="/dashboard" style="color:#00d4aa">dashboard</a>.</p>
 
   <h2 style="margin-top:40px"><span class="emoji">&#128336;</span>Cronolog\u00eda del Proyecto</h2>
   <div class="timeline">
@@ -3116,14 +3118,14 @@ a{{color:var(--green);text-decoration:none}}
     <div class="tl-item">
       <div class="tl-dot"></div>
       <div class="tl-date">Marzo 2026</div>
-      <div class="tl-title">Cuenta real XM en MT5 — Resultados verificados</div>
-      <div class="tl-text">Primer per\u00edodo de operaci\u00f3n real: {total_ops} operaciones cerradas, {wr}% de acierto. Sin ocultar ni una sola operaci\u00f3n perdedora.</div>
+      <div class="tl-title">Cuenta real XM en MT5 — Lanzamiento VIP</div>
+      <div class="tl-text">Apertura de cuenta real, canal VIP en Telegram, Copy Trading activo, y dashboard p\u00fablico con resultados en tiempo real.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot"></div>
-      <div class="tl-date">Marzo 2026</div>
-      <div class="tl-title">Lanzamiento BuySell365 Pro</div>
-      <div class="tl-text">Apertura del canal VIP en Telegram, Copy Trading activo, y este dashboard p\u00fablico donde cualquiera puede ver los resultados en tiempo real.</div>
+      <div class="tl-date">Abril 2026</div>
+      <div class="tl-title">Signal Copier + Foco en GOLD y NASDAQ</div>
+      <div class="tl-text">{total_ops}+ operaciones cerradas, {wr}% win rate. Integraci\u00f3n de Signal Copier con canales VIP internacionales. Especializaci\u00f3n en GOLD y NASDAQ.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot" style="background:var(--gold)"></div>
@@ -3180,6 +3182,7 @@ a{{color:var(--green);text-decoration:none}}
   <a href="/privacidad">Privacidad</a>
   <a href="mailto:soporte@buysell365.pro">soporte@buysell365.pro</a>
   <p style="margin-top:12px">\u00a9 2026 BuySell365 Pro &mdash; Todos los derechos reservados</p>
+  <p style="margin-top:6px;font-size:0.75rem;color:#8b949e">Creador: Emmanuel Diaz</p>
 </footer>
 </body>
 </html>"""
@@ -3201,7 +3204,9 @@ def pagina_terminos():
 <h2>7. Disponibilidad</h2><p>Trabajamos para mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida. Puede haber pausas por mantenimiento o actualizaciones.</p>
 <h2>8. Modificaciones</h2><p>Podemos actualizar estos t&eacute;rminos en cualquier momento. Los cambios se publican en esta p&aacute;gina. El uso continuado del servicio implica la aceptaci&oacute;n de los cambios.</p>
 <h2>9. Contacto</h2><p><a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a> en Telegram.</p>
-<a href="/dashboard" class="back">&larr; Volver</a></div></body></html>"""
+<a href="/dashboard" class="back">&larr; Volver</a>
+<p style="margin-top:30px;font-size:0.75rem;color:#8b949e;text-align:center">&copy; 2026 BuySell365 Pro &mdash; Creador: Emmanuel Diaz</p>
+</div></body></html>"""
 
 @app.route("/privacidad")
 def pagina_privacidad():
@@ -3217,7 +3222,9 @@ def pagina_privacidad():
 <h2>4. Almacenamiento y Seguridad</h2><ul><li>Servidor privado con acceso restringido.</li><li>Comunicaci&oacute;n web cifrada con HTTPS.</li><li>Datos en formato JSON en el servidor, sin base de datos externa.</li><li>No compartimos tus datos con terceros.</li></ul>
 <h2>5. Tus Derechos</h2><p>Tienes derecho a acceso, rectificaci&oacute;n, eliminaci&oacute;n y portabilidad de tus datos. Contacta: <a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a></p>
 <h2>6. Cookies y Analytics</h2><p>Esta web usa Google Analytics (gtag.js) para medir el tr&aacute;fico de forma an&oacute;nima. Google Analytics puede usar cookies propias. No usamos tracking de publicidad ni vendemos datos. Puedes desactivar Google Analytics desde la configuraci&oacute;n de tu navegador.</p>
-<a href="/dashboard" class="back">&larr; Volver</a></div></body></html>"""
+<a href="/dashboard" class="back">&larr; Volver</a>
+<p style="margin-top:30px;font-size:0.75rem;color:#8b949e;text-align:center">&copy; 2026 BuySell365 Pro &mdash; Creador: Emmanuel Diaz</p>
+</div></body></html>"""
 
 @app.route("/login")
 def redirect_to_home():
