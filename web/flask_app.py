@@ -1095,7 +1095,7 @@ if('serviceWorker' in navigator){{
 <body>
 
 <!-- FLOATING EMOJI PARTICLES BACKGROUND -->
-<canvas id="particlesCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.18"></canvas>
+<canvas id="particlesCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.55"></canvas>
 
 <!-- NAV -->
 <nav class="nav">
@@ -1643,7 +1643,7 @@ if('serviceWorker' in navigator){{
   const ctx = c.getContext('2d');
   const emojis = ['\U0001f4b0','\U0001f48e','\U0001f916','\U0001f4c8','\U0001f3af','\U0001f4b5','\U0001f4b8','\U0001f9e0','\u2728','\U0001f680'];
   let W, H, particles = [];
-  const MAX = Math.min(35, Math.floor(window.innerWidth / 40));
+  const MAX = Math.min(50, Math.floor(window.innerWidth / 28));
   function resize(){{ W = c.width = window.innerWidth; H = c.height = window.innerHeight; }}
   resize();
   window.addEventListener('resize', resize);
@@ -1651,13 +1651,13 @@ if('serviceWorker' in navigator){{
     return {{
       x: Math.random() * W,
       y: H + 20 + Math.random() * 40,
-      vy: -(0.3 + Math.random() * 0.6),
-      vx: (Math.random() - 0.5) * 0.3,
-      size: 14 + Math.random() * 10,
+      vy: -(0.4 + Math.random() * 0.8),
+      vx: (Math.random() - 0.5) * 0.4,
+      size: 22 + Math.random() * 18,
       emoji: emojis[Math.random() * emojis.length | 0],
-      alpha: 0.15 + Math.random() * 0.35,
+      alpha: 0.4 + Math.random() * 0.5,
       rot: Math.random() * 6.28,
-      vr: (Math.random() - 0.5) * 0.01
+      vr: (Math.random() - 0.5) * 0.015
     }};
   }}
   for(let i = 0; i < MAX; i++){{
