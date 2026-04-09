@@ -393,12 +393,12 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         WICK_GREEN = "#26a69a"
         WICK_RED   = "#ef5350"
 
-        fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
+        fig, ax = plt.subplots(figsize=(11, 5.5), facecolor=BG)
         ax.set_facecolor(BG)
 
         # ── Velas japonesas ──
-        candle_width = 0.6
-        wick_width = 1.2
+        candle_width = 0.65
+        wick_width = 1.5
         for i in range(n):
             o, c, h, l = opens[i], closes[i], highs[i], lows[i]
             is_bull = c >= o
@@ -416,23 +416,26 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             ax.add_patch(rect)
 
         # ── TP line — prominente ──
-        ax.axhline(y=tp, color=GOLD, linestyle="-", linewidth=2, alpha=0.9, zorder=5)
-        ax.text(n + 0.5, tp, f" TP {tp:.2f}", color=GOLD, fontsize=11, fontweight="bold",
+        ax.axhline(y=tp, color=GOLD, linestyle="-", linewidth=2.5, alpha=0.95, zorder=5)
+        ax.text(n + 0.5, tp, f" TP {tp:.2f}", color="#131722", fontsize=11, fontweight="bold",
                 va="center", ha="left", zorder=6,
-                bbox=dict(boxstyle="round,pad=0.2", facecolor=GOLD, edgecolor="none", alpha=0.15))
+                bbox=dict(boxstyle="round,pad=0.3", facecolor=GOLD, edgecolor=GOLD, alpha=0.9))
 
         # ── Entry line ──
         if entry > 0:
-            ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=1.5, alpha=0.8, zorder=5)
-            ax.text(n + 0.5, entry, f" Entry {entry:.2f}", color=ENTRY_COLOR, fontsize=10,
-                    va="center", ha="left", zorder=6,
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor=ENTRY_COLOR, edgecolor="none", alpha=0.15))
+            ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=2, alpha=0.85, zorder=5)
+            ax.text(n + 0.5, entry, f" Entry {entry:.2f}", color="#ffffff", fontsize=10,
+                    fontweight="bold", va="center", ha="left", zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor=ENTRY_COLOR, edgecolor=ENTRY_COLOR, alpha=0.85))
 
         # ── Zona de profit (fill entre entry y TP) ──
         if entry > 0 and tp > 0:
             y_min = min(entry, tp)
             y_max = max(entry, tp)
-            ax.axhspan(y_min, y_max, alpha=0.06, color=GOLD, zorder=1)
+            ax.axhspan(y_min, y_max, alpha=0.10, color=GOLD, zorder=1)
+            # Bordes de la zona
+            ax.axhline(y=y_min, color=GOLD, linestyle=":", linewidth=0.5, alpha=0.3, zorder=1)
+            ax.axhline(y=y_max, color=GOLD, linestyle=":", linewidth=0.5, alpha=0.3, zorder=1)
 
         # Calcular pips ganados
         pips_won = abs(tp - entry) if entry > 0 else 0
@@ -455,7 +458,7 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             title = f"✅ TP HIT — {dir_label} {pair_d}"
             if pips_label:
                 title += f"  |  {pips_label}"
-        ax.set_title(title, color=GOLD, fontsize=14, fontweight="bold", pad=15,
+        ax.set_title(title, color=GOLD, fontsize=16, fontweight="bold", pad=18,
                      fontfamily="sans-serif")
 
         # Grid estilo TradingView
@@ -465,13 +468,18 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        # Watermark
-        fig.text(0.98, 0.02, "BuySell365 Pro", fontsize=8, color="#2a2e39",
-                 ha="right", va="bottom", fontstyle="italic")
+        # ── Watermark grande de fondo ──
+        fig.text(0.50, 0.50, "BUYSELL365 PRO", fontsize=48, color="#1e2230",
+                 ha="center", va="center", fontweight="bold", alpha=0.7,
+                 fontstyle="normal", fontfamily="sans-serif",
+                 transform=fig.transFigure, zorder=0)
+        # Watermark pequeño esquina
+        fig.text(0.98, 0.02, "buysell365.pro", fontsize=9, color="#3a3f52",
+                 ha="right", va="bottom", fontweight="bold")
 
         plt.tight_layout()
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=150, facecolor=BG, bbox_inches="tight")
+        plt.savefig(buf, format="png", dpi=180, facecolor=BG, bbox_inches="tight")
         plt.close(fig)
         buf.seek(0)
         return buf.read()
