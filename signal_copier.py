@@ -968,7 +968,26 @@ async def _monitor_tp_loop() -> None:
                 to_resolve.append((sig_id, sdata, "expired"))
                 continue
 
-            price = _get_current_price(pair)
+            # FIX 2026-04-09: Usar precio MT5 (broker real) en vez de yfinance (futuros)
+            # yfinance GC=F tiene ~20-30 pts de diferencia vs CFD de XM → falsos SL/TP
+            price = None
+            try:
+                import MetaTrader5 as _mt5_check
+                _mt5_sym_map = {
+                    "GOLD": "GOLD", "XAUUSD": "GOLD",
+                    "NAS100": "NAS100", "NASDAQ": "NAS100", "US100": "NAS100",
+                }
+                _mt5_sym = _mt5_sym_map.get(pair.upper(), pair.upper())
+                if _mt5_check.initialize():
+                    _tick = _mt5_check.symbol_info_tick(_mt5_sym)
+                    if _tick and _tick.bid > 0:
+                        price = (_tick.ask + _tick.bid) / 2
+                        log.info(f"💹 Precio MT5 {_mt5_sym}: {price:.2f}")
+            except Exception:
+                pass
+            # Fallback a yfinance solo si MT5 no disponible
+            if price is None:
+                price = _get_current_price(pair)
             if price is None:
                 continue
 
@@ -1774,91 +1793,11 @@ def send_to_channel(signal, executed, detail):
                     log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
                     _save_open_signals()  # Persistir a disco
 
-                    # ── OPCIÓN A: Registrar señal en operaciones_activas del bot ──
-                    # El bot monitorea precio y anuncia TP/SL igual que sus propias señales
-                    try:
-                        import json as _json_bot
-                        from datetime import datetime as _dt_bot
-                        from pathlib import Path as _Path_bot
-                        _estado_path = _Path_bot(__file__).parent / "estado.json"
-                        _yf_map_bot = {
-                            "GOLD": "GC=F", "XAUUSD": "GC=F",  # FIX 2026-04-07: XAUUSD=X delisted
-                            "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X",
-                            "USDJPY": "USDJPY=X", "GBPJPY": "GBPJPY=X",
-                            "AUDCAD": "AUDCAD=X", "USDCAD": "USDCAD=X",
-                            "EURCHF": "EURCHF=X", "GBPAUD": "GBPAUD=X",
-                            "EURJPY": "EURJPY=X", "NZDUSD": "NZDUSD=X",
-                            "AUDUSD": "AUDUSD=X", "GBPNZD": "GBPNZD=X",
-                            "AUDNZD": "AUDNZD=X", "GBPCAD": "GBPCAD=X",
-                            "EURCAD": "EURCAD=X", "USDCHF": "USDCHF=X",
-                            "NZDJPY": "NZDJPY=X", "CADJPY": "CADJPY=X",
-                            "GBPCHF": "GBPCHF=X", "EURGBP": "EURGBP=X",
-                            "NAS100": "NQ=F", "US100Cash": "NQ=F",
-                            "US500Cash": "ES=F", "US30Cash": "YM=F",
-                            "USOIL": "CL=F", "USOILCash": "CL=F",
-                            "BTCUSD": "BTC-USD", "BTCUSDm": "BTC-USD",
-                        }
-                        _nombre_map_bot = {
-                            "GOLD": "GOLD", "XAUUSD": "GOLD",
-                            "NAS100": "NASDAQ", "US100Cash": "NASDAQ",
-                            "US500Cash": "S&P500", "US30Cash": "DOW30",
-                            "USOIL": "USOIL", "USOILCash": "USOIL",
-                            "BTCUSD": "BTC/USD", "BTCUSDm": "BTC/USD",
-                            "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD",
-                            "USDJPY": "USD/JPY", "GBPJPY": "GBP/JPY",
-                            "AUDNZD": "AUD/NZD", "NZDJPY": "NZD/JPY",
-                            "EURCAD": "EUR/CAD", "GBPCAD": "GBP/CAD",
-                            "USDCHF": "USD/CHF", "CADJPY": "CAD/JPY",
-                        }
-                        _yf_tk = _yf_map_bot.get(pair)
-                        if not _yf_tk:
-                            _yf_tk = f"{pair}=X" if (len(pair) == 6 and pair.isalpha()) else pair
-                        _nombre_bot = _nombre_map_bot.get(pair, pair_display)
-                        _tipo_bot = "COMPRA" if direction == "BUY" else "VENTA"
-                        _tp1_bot = signal.get("tp", 0) or signal.get("tp1", 0)
-                        _tp2_bot = signal.get("tp2", 0) or 0
-                        _tp3_bot = signal.get("tp3", 0) or 0
-                        # Proyectar TP2/TP3 si no vienen en la señal
-                        if _tp1_bot > 0 and entry > 0:
-                            _dist = abs(_tp1_bot - entry)
-                            if _tp2_bot <= 0:
-                                _tp2_bot = round(_tp1_bot + _dist, 5) if _tipo_bot == "COMPRA" else round(_tp1_bot - _dist, 5)
-                            if _tp3_bot <= 0:
-                                _tp3_bot = round(_tp1_bot + 2 * _dist, 5) if _tipo_bot == "COMPRA" else round(_tp1_bot - 2 * _dist, 5)
-                        _op_id_bot = f"{_yf_tk}_{sig_id}"
-                        with open(_estado_path, "r", encoding="utf-8") as _fbot:
-                            _est_bot = _json_bot.load(_fbot)
-                        # No agregar si ya hay op abierta para este par (anti-duplicado)
-                        _base_bot = _yf_tk.replace("=X", "").replace("=F", "").upper()
-                        _ya_hay = any(
-                            v.get("ticker", "").replace("=X", "").replace("=F", "").upper() == _base_bot
-                            for v in _est_bot.get("operaciones_activas", {}).values()
-                        )
-                        if not _ya_hay and _tp1_bot > 0:
-                            _est_bot.setdefault("operaciones_activas", {})[_op_id_bot] = {
-                                "ticker": _yf_tk, "nombre": _nombre_bot, "tipo": _tipo_bot,
-                                "entrada": entry, "tp1": _tp1_bot, "tp2": _tp2_bot, "tp3": _tp3_bot,
-                                "sl": sl, "score": 3, "timestamp": time.time(),
-                                "hora": _dt_bot.now().strftime("%H:%M"),
-                                "tp1_hit": False, "tp2_hit": False,
-                                "aviso_sl_enviado": False, "trailing_activo": False,
-                                "confianza_multi_ia": 0, "confianza": 0, "confianza_score_100": 0,
-                                "estrategia": "signal_copier", "mt5_ejecutado": False,
-                                "ticket_mt5": None, "skip_mt5_razon": "Señal copiada de canal externo",
-                                "premium": False, "nivel_senal": "COPIADA", "riesgo_usado": 0,
-                                "telegram_msg_id": _canal_msg_id or 0,
-                                "fuente": source, "_reservado": False,
-                            }
-                            # Escritura atómica: tmp + replace para evitar corrupción si bot.py escribe al mismo tiempo
-                            _tmp_estado = str(_estado_path) + ".tmp"
-                            with open(_tmp_estado, "w", encoding="utf-8") as _fbot:
-                                _json_bot.dump(_est_bot, _fbot, ensure_ascii=False, indent=2)
-                            os.replace(_tmp_estado, _estado_path)
-                            log.info(f"🔗 Bot registrará TP/SL: {_nombre_bot} {_tipo_bot} entrada={entry} TP={_tp1_bot} SL={sl}")
-                        else:
-                            log.info(f"🔗 No registrado en bot: ya hay op abierta para {_base_bot}")
-                    except Exception as _e_bot:
-                        log.warning(f"⚠️ No se pudo registrar en operaciones_activas: {_e_bot}")
+                    # ── REGISTRO EN estado.json DESACTIVADO (FIX 2026-04-09) ──
+                    # Causa: doble monitor (copier + bot.py) generaba SL HIT duplicados
+                    # con valores de SL diferentes (yfinance vs MT5). Solo el copier
+                    # monitorea señales copiadas ahora.
+                    pass
 
                 return _canal_msg_id
             elif resp.status_code == 429:
@@ -1959,24 +1898,29 @@ async def main():
 
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
-            # ── Deduplicación: evitar misma señal (mismo par+dirección+precio) de CUALQUIER canal en <60 min ──
-            # FIX 2026-04-07: Doble check — _open_signals Y _recently_sent (sobrevive TP/SL resolution)
+            # ── Deduplicación: evitar misma señal de CUALQUIER canal ──
+            # FIX 2026-04-09: Doble check — por par+dirección+precio Y por par solo (cooldown 10min)
             if signal["type"] == "new_signal":
                 _entry_round = round(signal.get("entry", 0), 2)
                 _dedup_key = f"{signal['pair']}_{signal['direction']}_{_entry_round}"
-                # Check 1: _recently_sent cache (persiste incluso después de TP/SL)
+                _pair_key = f"{signal['pair']}_{signal['direction']}"
+                # Check 1: _recently_sent — mismo par+dirección+precio exacto (1h)
                 _prev_sent_time = _recently_sent.get(_dedup_key, 0)
                 if _prev_sent_time and (time.time() - _prev_sent_time) < 3600:
                     log.info(f"⏭️ Señal duplicada ignorada (cache): {_dedup_key} (enviada hace {(time.time() - _prev_sent_time):.0f}s)")
                     return
-                # Check 2: _open_signals (legacy)
+                # Check 2: cooldown por PAR+DIRECCIÓN — máx 1 señal cada 10 min del mismo par
+                _prev_pair_time = _recently_sent.get(_pair_key, 0)
+                if _prev_pair_time and (time.time() - _prev_pair_time) < 600:
+                    log.info(f"⏭️ Cooldown activo: {_pair_key} (última hace {(time.time() - _prev_pair_time):.0f}s < 600s)")
+                    return
+                # Check 3: _open_signals — ya hay señal abierta del mismo par+dirección
                 with _signals_lock:
                     for _sid, _sdata in _open_signals.items():
                         _s = _sdata.get("signal", {})
-                        _e_round = round(_s.get("entry", 0), 2)
-                        _existing_key = f"{_s.get('pair','')}_{_s.get('direction','')}_{_e_round}"
-                        if _existing_key == _dedup_key and (time.time() - _sdata.get("sent_at", 0)) < 3600:
-                            log.info(f"⏭️ Señal duplicada ignorada: {_dedup_key} (ya existe en últimos 60 min)")
+                        _existing_pair_key = f"{_s.get('pair','')}_{_s.get('direction','')}"
+                        if _existing_pair_key == _pair_key and (time.time() - _sdata.get("sent_at", 0)) < 3600:
+                            log.info(f"⏭️ Señal ignorada: ya hay {_pair_key} abierta (últimos 60 min)")
                             return
 
             # ══════════════════════════════════════════════════════════════
@@ -2020,29 +1964,35 @@ async def main():
                     else:
                         log.info(f"📍 Sin entry y sin precio disponible — publicando con 'Market Price'")
 
-                # ── Validar distancia mínima de SL antes de publicar ──
-                _entry_val = signal.get("entry", 0)
-                _sl_val = signal.get("sl", 0)
-                if _entry_val > 0 and _sl_val > 0:
-                    _sl_dist = abs(_entry_val - _sl_val)
-                    _pair_upper = signal.get("pair", "").upper()
-                    # Mínimos: GOLD/índices = 15 pts, forex = 10 pips (0.0010)
-                    if _pair_upper in ("GOLD", "XAUUSD", "XAUUSD=X", "GC=F"):
-                        _min_sl = 15.0
-                    elif _entry_val >= 100:  # Índices (NAS100, US30, etc.)
-                        _min_sl = 15.0
-                    else:  # Forex
-                        _min_sl = 0.0010
-                    if _sl_dist < _min_sl:
-                        log.warning(f"⚠️ SL demasiado cerca: {_pair_upper} entry={_entry_val} sl={_sl_val} dist={_sl_dist:.5f} (min={_min_sl}) — señal descartada")
+                # FIX 2026-04-09: Validar SL dirección DESPUÉS de obtener entry
+                _e = signal.get("entry", 0)
+                _s = signal.get("sl", 0)
+                _d = signal.get("direction", "")
+                if _e > 0 and _s > 0:
+                    # SELL: SL debe estar ARRIBA del entry | BUY: SL debe estar ABAJO
+                    if _d == "SELL" and _s < _e:
+                        log.warning(f"⚠️ SELL con SL({_s}) < entry({_e}) — señal inválida, descartando")
                         return
+                    if _d == "BUY" and _s > _e:
+                        log.warning(f"⚠️ BUY con SL({_s}) > entry({_e}) — señal inválida, descartando")
+                        return
+                    # Validar TPs absurdos (ej: TP2=200 para GOLD a 4700)
+                    for _tp_key in ("tp", "tp2", "tp3", "tp4", "tp5"):
+                        _tv = signal.get(_tp_key, 0) or 0
+                        if _tv > 0 and _e > 0:
+                            _pct = abs(_tv - _e) / _e
+                            if _pct > 0.20:  # > 20% de diferencia = basura
+                                log.warning(f"⚠️ {_tp_key}={_tv} absurdo vs entry={_e} ({_pct:.0%}) — limpiando")
+                                signal[_tp_key] = 0
 
                 # Publicar inmediatamente (con o sin precio)
                 send_to_channel(signal, executed, detail)
-                # FIX 2026-04-07: Registrar en cache anti-duplicados
+                # FIX 2026-04-09: Registrar en cache anti-duplicados + cooldown por par
                 _entry_r = round(signal.get("entry", 0), 2)
                 _dk = f"{signal['pair']}_{signal['direction']}_{_entry_r}"
+                _pk = f"{signal['pair']}_{signal['direction']}"
                 _recently_sent[_dk] = time.time()
+                _recently_sent[_pk] = time.time()  # Cooldown por par
                 # Limpiar entradas viejas (>2h) para no acumular memoria
                 _now = time.time()
                 _recently_sent.update({k: v for k, v in _recently_sent.items() if _now - v < 7200})
@@ -2050,9 +2000,9 @@ async def main():
                     _published_msg_ids.add(msg_id)
 
             elif signal["type"] == "update":
-                # ── Updates de posiciones — SOLO log interno, NO publicar al canal ──
-                # Usuario: solo quiere señales nuevas en el canal. Bot scanner maneja TP/SL.
-                log.info(f"📡 UPDATE silenciado (solo señales): {signal.get('action','?')} {signal['pair']}")
+                # ── Updates: publicar TP HIT, SL HIT y CLOSE HALF al canal VIP ──
+                log.info(f"📡 UPDATE recibido: {signal.get('action','?')} {signal['pair']}")
+                send_to_channel(signal, executed, detail)
                 # MT5 execution (si se reactiva en el futuro)
                 if MT5_EXECUTION_ENABLED:
                     executed, detail = handle_update_mt5(signal)
@@ -2102,6 +2052,13 @@ async def main():
             signal = parse_signal(text, chat_title=chat_title)
             if not signal or signal.get("type") != "new_signal":
                 return  # No es señal nueva completa — ignorar
+
+            # FIX 2026-04-09: Filtro ALLOWED_PAIRS en edit_handler (antes faltaba)
+            _sig_pair_e = (signal.get("pair") or "").upper()
+            _sig_mt5_e = (signal.get("mt5_symbol") or "").upper()
+            if _sig_pair_e not in ALLOWED_PAIRS and _sig_mt5_e not in ALLOWED_PAIRS:
+                log.info(f"⏭️ Edit ignorado ({_sig_pair_e}) — solo permitidos: GOLD, NASDAQ")
+                return
 
             # ── Deduplicación: no publicar si ya existe señal abierta del mismo par+dirección ──
             _entry_round = round(signal.get("entry", 0), 2)
