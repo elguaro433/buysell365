@@ -318,12 +318,16 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         try:
             import MetaTrader5 as _mt5_chart
             _mt5_chart_map = {
-                "GOLD": "GOLD", "XAUUSD": "GOLD",
-                "NAS100": "NAS100", "NASDAQ": "NAS100", "US100": "NAS100",
-                "US30": "US30Cash", "DOW30": "US30Cash",
+                "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
+                "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+                "US30": "US30Cash", "DOW30": "US30Cash", "DJ30": "US30Cash",
+                "US500": "US500Cash", "SP500": "US500Cash",
+                "USOIL": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
+                "BTCUSD": "BTCUSD",
             }
             _mt5_sym_chart = _mt5_chart_map.get(pair.upper(), pair.upper())
             if _mt5_chart.initialize():
+                _mt5_chart.symbol_select(_mt5_sym_chart, True)
                 _rates = _mt5_chart.copy_rates_from_pos(_mt5_sym_chart, _mt5_chart.TIMEFRAME_M15, 0, 50)
                 if _rates is not None and len(_rates) >= 10:
                     opens  = [float(r['open'])  for r in _rates]
@@ -988,21 +992,25 @@ async def _monitor_tp_loop() -> None:
                 to_resolve.append((sig_id, sdata, "expired"))
                 continue
 
-            # FIX 2026-04-09: Usar precio MT5 (broker real) en vez de yfinance (futuros)
-            # yfinance GC=F tiene ~20-30 pts de diferencia vs CFD de XM → falsos SL/TP
+            # FIX 2026-04-09: Usar precio MT5 (broker real) en vez de yfinance
             price = None
             try:
                 import MetaTrader5 as _mt5_check
                 _mt5_sym_map = {
-                    "GOLD": "GOLD", "XAUUSD": "GOLD",
-                    "NAS100": "NAS100", "NASDAQ": "NAS100", "US100": "NAS100",
+                    "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
+                    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "US100CASH": "US100Cash",
+                    "US30": "US30Cash", "DOW30": "US30Cash", "DJ30": "US30Cash", "US30CASH": "US30Cash",
+                    "US500": "US500Cash", "SP500": "US500Cash", "US500CASH": "US500Cash",
+                    "USOIL": "OILCash", "OILCASH": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
+                    "BTCUSD": "BTCUSD", "BTCUSDM": "BTCUSD",
                 }
                 _mt5_sym = _mt5_sym_map.get(pair.upper(), pair.upper())
                 if _mt5_check.initialize():
+                    _mt5_check.symbol_select(_mt5_sym, True)
                     _tick = _mt5_check.symbol_info_tick(_mt5_sym)
                     if _tick and _tick.bid > 0:
                         price = (_tick.ask + _tick.bid) / 2
-                        log.info(f"💹 Precio MT5 {_mt5_sym}: {price:.2f}")
+                        log.info(f"💹 Precio MT5 {_mt5_sym}: {price:.5f}" if price < 100 else f"💹 Precio MT5 {_mt5_sym}: {price:.2f}")
             except Exception:
                 pass
             # Fallback a yfinance solo si MT5 no disponible
