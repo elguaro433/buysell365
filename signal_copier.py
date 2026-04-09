@@ -1905,13 +1905,7 @@ async def main():
             # Parse the signal
             signal = parse_signal(text, chat_title=chat_title)
 
-            # FIX 2026-04-08: Filtro GLOBAL — solo GOLD y NASDAQ
-            if signal and signal["type"] == "new_signal":
-                _sig_pair = (signal.get("pair") or "").upper()
-                _sig_mt5 = (signal.get("mt5_symbol") or "").upper()
-                if _sig_pair not in ALLOWED_PAIRS and _sig_mt5 not in ALLOWED_PAIRS:
-                    log.info(f"⏭️ Señal ignorada ({_sig_pair}) — solo permitidos: GOLD, NASDAQ")
-                    return
+            # FIX 2026-04-09: TODAS las señales pasan — sin filtro por activo
             # Updates (close_half, sl_hit, tp_hit) se filtran más abajo por _open_signals
             if not signal:
                 return
@@ -2073,12 +2067,7 @@ async def main():
             if not signal or signal.get("type") != "new_signal":
                 return  # No es señal nueva completa — ignorar
 
-            # FIX 2026-04-09: Filtro ALLOWED_PAIRS en edit_handler (antes faltaba)
-            _sig_pair_e = (signal.get("pair") or "").upper()
-            _sig_mt5_e = (signal.get("mt5_symbol") or "").upper()
-            if _sig_pair_e not in ALLOWED_PAIRS and _sig_mt5_e not in ALLOWED_PAIRS:
-                log.info(f"⏭️ Edit ignorado ({_sig_pair_e}) — solo permitidos: GOLD, NASDAQ")
-                return
+            # FIX 2026-04-09: TODAS las señales pasan — sin filtro por activo
 
             # ── Deduplicación: no publicar si ya existe señal abierta del mismo par+dirección ──
             _entry_round = round(signal.get("entry", 0), 2)
