@@ -314,8 +314,28 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
 
         opens, closes, highs, lows = None, None, None, None
 
-        # ── Fuente 1: Twelve Data (si hay key y créditos) ──
-        if TWELVE_KEY:
+        # ── Fuente 0: MT5 (precio real del broker — PRIORIDAD) ──
+        try:
+            import MetaTrader5 as _mt5_chart
+            _mt5_chart_map = {
+                "GOLD": "GOLD", "XAUUSD": "GOLD",
+                "NAS100": "NAS100", "NASDAQ": "NAS100", "US100": "NAS100",
+                "US30": "US30Cash", "DOW30": "US30Cash",
+            }
+            _mt5_sym_chart = _mt5_chart_map.get(pair.upper(), pair.upper())
+            if _mt5_chart.initialize():
+                _rates = _mt5_chart.copy_rates_from_pos(_mt5_sym_chart, _mt5_chart.TIMEFRAME_M15, 0, 50)
+                if _rates is not None and len(_rates) >= 10:
+                    opens  = [float(r['open'])  for r in _rates]
+                    closes = [float(r['close']) for r in _rates]
+                    highs  = [float(r['high'])  for r in _rates]
+                    lows   = [float(r['low'])   for r in _rates]
+                    log.info(f"📊 Chart data from MT5 ({len(_rates)} candles) — precio real broker")
+        except Exception as _e_mt5c:
+            log.warning(f"📊 MT5 chart error: {_e_mt5c}")
+
+        # ── Fuente 1: Twelve Data (fallback si MT5 no disponible) ──
+        if opens is None and TWELVE_KEY:
             try:
                 symbol = _normalize_twelve_symbol(pair)
                 resp = requests.get(
