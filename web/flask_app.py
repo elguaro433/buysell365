@@ -2242,7 +2242,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             </a>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
-            <button class="bell-btn" id="bellBtn" onclick="window._requestNotifPermission()" title="Activar notificaciones">&#128276;<span class="bell-dot" id="bellDot"></span></button>
+            <button class="bell-btn" id="bellBtn" onclick="window._requestNotifPermission()" title="Activar notificaciones" data-i18n="dash.notifications_btn">&#128276;<span class="bell-dot" id="bellDot"></span></button>
             <div class="lang-selector" id="langSelector" style="position:relative">
                 <button class="lang-btn" onclick="toggleLangMenu()" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:18px;line-height:1"><span id="currentFlag">\U0001f1ea\U0001f1f8</span></button>
                 <div class="lang-menu" id="langMenu" style="display:none;position:absolute;top:110%;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:999;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.4)">
@@ -2264,7 +2264,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
     <!-- ALL TRADES HISTORY — FIX 2026-03-19: Transparencia total -->
     <div class="card" style="margin-bottom:24px">
-        <div class="card-title"><i>&#128200;</i> <span>Historial Completo de Operaciones</span></div>
+        <div class="card-title"><i>&#128200;</i> <span data-i18n="dash.history_title">Historial Completo de Operaciones</span></div>
         <div id="streak-banner-container"></div>
         <div class="card-title" style="margin-top:8px"><i>&#128200;</i> <span data-i18n="dash.cumulative_chart">Rendimiento Acumulado</span></div>
         <div id="cumulative-chart-container" class="cumul-chart-wrap">
@@ -2287,9 +2287,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
     <!-- WIN RATE BY PERIOD -->
     <div class="wr-period-row" id="wr-period-container">
-        <div class="wr-period-card"><div class="wr-period-label">Hoy</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
-        <div class="wr-period-card"><div class="wr-period-label">Esta Semana</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
-        <div class="wr-period-card"><div class="wr-period-label">Este Mes</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
+        <div class="wr-period-card"><div class="wr-period-label" data-i18n="dash.today_label">Hoy</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
+        <div class="wr-period-card"><div class="wr-period-label" data-i18n="dash.this_week">Esta Semana</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
+        <div class="wr-period-card"><div class="wr-period-label" data-i18n="dash.this_month">Este Mes</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
     </div>
 
     <!-- STAT CARDS -->
@@ -2306,9 +2306,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <div class="stat-sub" data-i18n="dash.winrate_sub">Porcentaje de acierto global</div>
         </div>
         <div class="stat-card accent-blue">
-            <div class="stat-label">&#128176; Beneficio Real MT5</div>
+            <div class="stat-label">&#128176; <span data-i18n="dash.real_profit">Beneficio Real MT5</span></div>
             <div class="stat-value" style="color:{profit_color}">{profit_str}</div>
-            <div class="stat-sub">Pips netos: {pips_total:+.1f} &bull; Avg ganancia: {avg_win}</div>
+            <div class="stat-sub"><span data-i18n="dash.net_pips_label">Pips netos:</span> {pips_total:+.1f} &bull; <span data-i18n="dash.avg_win_label">Avg ganancia:</span> {avg_win}</div>
         </div>
         <div class="stat-card accent-purple">
             <div class="stat-label">&#9878; <span data-i18n="dash.rr">Risk : Reward</span></div>
@@ -2319,24 +2319,24 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     <!-- FIX 2026-03-19: Drawdown y racha de pérdidas — transparencia -->
     <div class="stats-row" style="margin-top:0;margin-bottom:24px">
         <div class="stat-card" style="border-left:3px solid {dd_color}">
-            <div class="stat-label">&#128200; Max Drawdown</div>
+            <div class="stat-label">&#128200; <span data-i18n="dash.max_drawdown">Max Drawdown</span></div>
             <div class="stat-value" style="color:{dd_color}">{max_drawdown} pips</div>
-            <div class="stat-sub">Ca&iacute;da m&aacute;xima desde el pico</div>
+            <div class="stat-sub" data-i18n="dash.max_drawdown_sub">Ca&iacute;da m&aacute;xima desde el pico</div>
         </div>
         <div class="stat-card" style="border-left:3px solid #ff3b30">
-            <div class="stat-label">&#128308; Racha P&eacute;rdidas M&aacute;x</div>
+            <div class="stat-label">&#128308; <span data-i18n="dash.max_loss_streak">Racha P&eacute;rdidas M&aacute;x</span></div>
             <div class="stat-value" style="color:#ff3b30">{_max_loss_streak}</div>
-            <div class="stat-sub">P&eacute;rdidas consecutivas m&aacute;ximas</div>
+            <div class="stat-sub" data-i18n="dash.max_loss_streak_sub">P&eacute;rdidas consecutivas m&aacute;ximas</div>
         </div>
         <div class="stat-card" style="border-left:3px solid var(--primary)">
-            <div class="stat-label">&#128178; Promedio P&eacute;rdida</div>
+            <div class="stat-label">&#128178; <span data-i18n="dash.avg_loss_label">Promedio P&eacute;rdida</span></div>
             <div class="stat-value" style="color:#ff3b30">-{avg_loss}</div>
-            <div class="stat-sub">Pips promedio en p&eacute;rdidas</div>
+            <div class="stat-sub" data-i18n="dash.avg_loss_sub">Pips promedio en p&eacute;rdidas</div>
         </div>
         <div class="stat-card" style="border-left:3px solid var(--primary)">
-            <div class="stat-label">&#128176; Profit Factor</div>
+            <div class="stat-label">&#128176; <span data-i18n="dash.profit_factor">Profit Factor</span></div>
             <div class="stat-value" style="color:{'#00d4aa' if profit_factor_usd>=1.5 else ('#f0b90b' if profit_factor_usd>=1 else '#ff3b30')}">{profit_factor_usd}</div>
-            <div class="stat-sub">Ganancia bruta / P&eacute;rdida bruta (USD)</div>
+            <div class="stat-sub" data-i18n="dash.profit_factor_sub">Ganancia bruta / P&eacute;rdida bruta (USD)</div>
         </div>
     </div>
 
@@ -2346,28 +2346,28 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             <h2 style="font-size:22px" data-i18n="dash.promo_unified_title">&#128640; &Uacute;nete a BuySell365 Pro</h2>
             <p style="font-size:14px;max-width:520px;margin:8px auto 20px" data-i18n="dash.promo_unified_sub">Se&ntilde;ales de IA + Copy Trading autom&aacute;tico en tu cuenta MT5 con broker regulado XM</p>
             <div class="promo-features" style="margin-bottom:20px">
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Se&ntilde;ales con TP y SL exactos</div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Copy Trading autom\u00e1tico</div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> Broker regulado XM</div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> SL y TP autom&aacute;ticos</div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat1">Se&ntilde;ales con TP y SL exactos</span></div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat2">Copy Trading autom\u00e1tico</span></div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat3">Broker regulado XM</span></div>
+                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat4">SL y TP autom&aacute;ticos</span></div>
             </div>
             <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:16px 20px;max-width:420px;margin:0 auto 20px;text-align:left">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
                     <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#00a080);display:flex;align-items:center;justify-content:center;font-size:14px">&#129302;</div>
                     <span style="font-weight:700;font-size:13px;color:#fff">BuySell365 Pro</span>
-                    <span style="font-size:10px;color:var(--muted);margin-left:auto">ahora</span>
+                    <span style="font-size:10px;color:var(--muted);margin-left:auto" data-i18n="dash.signal_now">ahora</span>
                 </div>
                 <div style="font-size:13px;line-height:1.8">
-                    <div style="color:#ff3b30;font-weight:800">&#128308; VENTA &mdash; AUD/JPY</div>
-                    <div style="margin-top:4px">&#128205; <strong>Entrada:</strong> 110.50</div>
+                    <div style="color:#ff3b30;font-weight:800">&#128308; <span data-i18n="dash.signal_sell">VENTA</span> &mdash; AUD/JPY</div>
+                    <div style="margin-top:4px">&#128205; <strong data-i18n="dash.signal_entry">Entrada:</strong> 110.50</div>
                     <div style="color:#00e676;margin-top:2px">&#127919; <strong>TP:</strong> 106.50 &nbsp;&#128737; <span style="color:#ff6b35"><strong>SL:</strong> 112.50</span></div>
                 </div>
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
-                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; ÚNETE AL CANAL</a>
-                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="background:linear-gradient(135deg,#00c853,#00e676);border:none;padding:12px 24px">&#128640; EMPEZAR COPY TRADING</a>
+                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px"><span data-i18n="dash.cta_channel">&#128172; ÚNETE AL CANAL</span></a>
+                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="background:linear-gradient(135deg,#00c853,#00e676);border:none;padding:12px 24px"><span data-i18n="dash.cta_copy">&#128640; EMPEZAR COPY TRADING</span></a>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:12px" data-i18n="dash.promo_note">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
         </div>
     </div>
 
@@ -2383,17 +2383,17 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         <div style="font-size:14px;color:#e6edf3;font-weight:600;margin-bottom:4px" data-i18n="xm.title">Broker Recomendado</div>
         <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="xm.sub">El broker que usa BuySell365 Pro</div>
         <div class="xm-pills">
-            <span class="xm-pill">&#10003; Regulado CySEC &middot; ASIC</span>
-            <span class="xm-pill">&#128176; Dep&oacute;sito desde $5</span>
-            <span class="xm-pill">&#9889; Sin re-quotes</span>
-            <span class="xm-pill">&#128241; App iOS &amp; Android</span>
+            <span class="xm-pill" data-i18n="dash.xm_pill1">&#10003; Regulado CySEC &middot; ASIC</span>
+            <span class="xm-pill" data-i18n="dash.xm_pill2">&#128176; Dep&oacute;sito desde $5</span>
+            <span class="xm-pill" data-i18n="dash.xm_pill3">&#9889; Sin re-quotes</span>
+            <span class="xm-pill" data-i18n="dash.xm_pill4">&#128241; App iOS &amp; Android</span>
         </div>
         <div class="xm-code" data-i18n="xm.code">Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b></div><br>
         <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-cta">
-            &#128640; Abrir Cuenta Real &mdash; Gratis
+            <span data-i18n="dash.xm_cta">&#128640; Abrir Cuenta Real &mdash; Gratis</span>
         </a>
-        <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px">Trading implica riesgo. Capital en riesgo.</div>
-        <div style="font-size:10px;color:rgba(139,148,158,.35);margin-top:6px">&#128276; Enlace de afiliado: podemos recibir comisi&oacute;n si abres una cuenta en XM a trav&eacute;s de este enlace.</div>
+        <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px" data-i18n="dash.xm_risk">Trading implica riesgo. Capital en riesgo.</div>
+        <div style="font-size:10px;color:rgba(139,148,158,.35);margin-top:6px" data-i18n="dash.xm_affiliate">&#128276; Enlace de afiliado: podemos recibir comisi&oacute;n si abres una cuenta en XM a trav&eacute;s de este enlace.</div>
     </div>
 
     <!-- FOOTER -->
@@ -2507,11 +2507,11 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
           return;
         }}
         let html = '<div class="active-alert">';
-        html += '<div class="alert-header"><span style="font-size:18px">&#9889;</span> ' + ops.length + ' Operaci\u00f3n' + (ops.length > 1 ? 'es' : '') + ' Activa' + (ops.length > 1 ? 's' : '') + ' en Tiempo Real</div>';
+        html += '<div class="alert-header"><span style="font-size:18px">&#9889;</span> ' + ops.length + ' ' + (ops.length > 1 ? window._t('dash.active_ops_plural','Operaciones Activas en Tiempo Real') : window._t('dash.active_ops_singular','Operaci\u00f3n Activa en Tiempo Real')) + '</div>';
         ops.forEach(function(op){{
           const isBuy = op.tipo === 'COMPRA';
           const typeCls = isBuy ? 'buy' : 'sell';
-          const typeLabel = isBuy ? 'COMPRA' : 'VENTA';
+          const typeLabel = isBuy ? window._t('dash.buy','COMPRA') : window._t('dash.sell','VENTA');
           const prog = Math.max(0, Math.min(100, op.progreso || 0));
           const tp1Pos = 33; const tp2Pos = 66;
           const isMt5 = op.fuente === 'mt5';
@@ -2733,7 +2733,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     const visibleTrades = datFiltered.filter(function(t){{ return !_hidden[normName(t.nombre || t.ticker || '?')]; }});
     const filtered = currentFilter === 'ALL' ? visibleTrades : visibleTrades.filter(function(t){{ return normName(t.nombre || t.ticker) === currentFilter; }});
     if(!filtered || filtered.length === 0){{
-      container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No hay operaciones para este filtro.</p>';
+      container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">' + window._t('dash.no_ops_filter','No hay operaciones para este filtro.') + '</p>';
       return;
     }}
     let totalPips = 0;
@@ -2751,9 +2751,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     const pageData = sorted.slice(startIdx, startIdx + TRADES_PER_PAGE);
     let html = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
     html += '<thead><tr style="border-bottom:2px solid var(--border);color:var(--primary);text-align:left">';
-    html += '<th style="padding:10px 8px">Fecha</th><th style="padding:10px 8px">Activo</th><th style="padding:10px 8px">Tipo</th>';
-    html += '<th style="padding:10px 8px">Entrada</th><th style="padding:10px 6px">Hora</th><th style="padding:10px 8px">Salida</th>';
-    html += '<th style="padding:10px 6px">Hora</th><th style="padding:10px 8px">Pips/Pts</th>';
+    html += '<th style="padding:10px 8px" data-i18n="dash.th_date">' + window._t('dash.th_date','Fecha') + '</th><th style="padding:10px 8px" data-i18n="dash.th_asset">' + window._t('dash.th_asset','Activo') + '</th><th style="padding:10px 8px" data-i18n="dash.th_type">' + window._t('dash.th_type','Tipo') + '</th>';
+    html += '<th style="padding:10px 8px" data-i18n="dash.th_entry">' + window._t('dash.th_entry','Entrada') + '</th><th style="padding:10px 6px" data-i18n="dash.th_time">' + window._t('dash.th_time','Hora') + '</th><th style="padding:10px 8px" data-i18n="dash.th_exit">' + window._t('dash.th_exit','Salida') + '</th>';
+    html += '<th style="padding:10px 6px" data-i18n="dash.th_time_exit">' + window._t('dash.th_time','Hora') + '</th><th style="padding:10px 8px">Pips/Pts</th>';
     html += '</tr></thead><tbody>';
     pageData.forEach(function(t, i){{
       // FIX 2026-03-19: Fondo rojo sutil para losses
@@ -2882,8 +2882,8 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     const datFilteredCSV = applyDateFilter(allTrades);
     const visibleCSV = datFilteredCSV.filter(function(t){{ return !_hiddenCSV[normName(t.nombre || t.ticker || '?')]; }});
     const filteredCSV = currentFilter === 'ALL' ? visibleCSV : visibleCSV.filter(function(t){{ return normName(t.nombre || t.ticker) === currentFilter; }});
-    if(!filteredCSV.length){{ alert('No hay operaciones para exportar.'); return; }}
-    const csvHeaders = ['Fecha','Activo','Tipo','Entrada','Hora Entrada','Salida','Hora Salida','Pips/Pts'];
+    if(!filteredCSV.length){{ alert(window._t('dash.no_ops_export','No hay operaciones para exportar.')); return; }}
+    const csvHeaders = [window._t('dash.th_date','Fecha'),window._t('dash.th_asset','Activo'),window._t('dash.th_type','Tipo'),window._t('dash.th_entry','Entrada'),window._t('dash.th_time_entry','Hora Entrada'),window._t('dash.th_exit','Salida'),window._t('dash.th_time_exit_csv','Hora Salida'),'Pips/Pts'];
     const csvRows = filteredCSV.slice().reverse().map(function(t){{
       const tkrCSV = (t.ticker || '').toUpperCase();
       const decCSV = getDec(tkrCSV);
@@ -2925,7 +2925,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
       }})
       .catch(function(e){{
         const container = document.getElementById('winning-trades-container');
-        if(container) container.innerHTML = '<p style="color:var(--muted);text-align:center">Error cargando historial</p>';
+        if(container) container.innerHTML = '<p style="color:var(--muted);text-align:center">' + window._t('dash.error_loading','Error cargando historial') + '</p>';
       }});
   }}
   loadAll();
@@ -2985,12 +2985,12 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 <!-- GDPR Cookie Consent Banner -->
 <div id="bs365-cb" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#0d1117;border-top:2px solid #00e5c5;padding:16px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 30px rgba(0,0,0,.8)">
   <div style="flex:1;min-width:240px">
-    <p style="margin:0 0 4px;font-weight:700;color:#f0f6ff;font-size:.95rem">🍪 Usamos cookies</p>
-    <p style="margin:0;color:#8b9fc4;font-size:.82rem">Usamos Google Analytics para mejorar la experiencia. No vendemos datos personales. <a href="/privacidad" style="color:#00e5c5;text-decoration:underline">Política de privacidad</a></p>
+    <p style="margin:0 0 4px;font-weight:700;color:#f0f6ff;font-size:.95rem" data-i18n="dash.cookie_title">🍪 Usamos cookies</p>
+    <p style="margin:0;color:#8b9fc4;font-size:.82rem"><span data-i18n="dash.cookie_text">Usamos Google Analytics para mejorar la experiencia. No vendemos datos personales.</span> <a href="/privacidad" style="color:#00e5c5;text-decoration:underline" data-i18n="dash.cookie_policy">Política de privacidad</a></p>
   </div>
   <div style="display:flex;gap:10px;flex-shrink:0;margin-top:4px">
-    <button onclick="_declineCookies()" style="padding:10px 18px;border-radius:8px;border:1px solid #2a3045;background:transparent;color:#8b9fc4;cursor:pointer;font-size:.85rem;font-family:inherit">Solo esenciales</button>
-    <button onclick="_acceptCookies()" style="padding:10px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5c5,#00a89d);color:#000;font-weight:800;cursor:pointer;font-size:.85rem;font-family:inherit">✓ Aceptar todo</button>
+    <button onclick="_declineCookies()" style="padding:10px 18px;border-radius:8px;border:1px solid #2a3045;background:transparent;color:#8b9fc4;cursor:pointer;font-size:.85rem;font-family:inherit" data-i18n="dash.cookie_decline">Solo esenciales</button>
+    <button onclick="_acceptCookies()" style="padding:10px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5c5,#00a89d);color:#000;font-weight:800;cursor:pointer;font-size:.85rem;font-family:inherit" data-i18n="dash.cookie_accept">✓ Aceptar todo</button>
   </div>
 </div>
 <script>
