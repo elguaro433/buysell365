@@ -3113,6 +3113,13 @@ a{{color:var(--green);text-decoration:none}}
 .about-mobile-menu a{{color:#fff;font-size:1.3rem;font-weight:600;padding:10px 28px;border-radius:10px;text-decoration:none;transition:all .2s}}
 .about-mobile-menu a:hover{{background:rgba(0,212,170,.15);color:var(--green)}}
 .about-mobile-close{{position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;padding:8px;line-height:1}}
+/* LANG SELECTOR */
+.lang-selector{{position:relative}}
+.lang-btn{{background:rgba(0,212,170,.15);border:2px solid rgba(0,212,170,.5);border-radius:10px;padding:8px 14px;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;gap:6px;transition:all .2s}}
+.lang-btn:hover{{background:rgba(0,212,170,.25);border-color:rgba(0,212,170,.8);box-shadow:0 0 12px rgba(0,212,170,.3)}}
+.lang-menu{{display:none;position:absolute;top:110%;right:0;background:#0d1229;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:150px;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,0.4)}}
+.lang-menu a{{display:block;padding:10px 16px;color:#f0f6ff;text-decoration:none;font-size:0.9rem;cursor:pointer;transition:background 0.2s}}
+.lang-menu a:hover{{background:rgba(0,212,170,0.1);color:var(--green)}}
 @media(max-width:640px){{
   .nav{{padding:12px 16px}}
   .nav-links{{display:none}}
@@ -3143,10 +3150,19 @@ a{{color:var(--green);text-decoration:none}}
     <span>BuySell365 <span style="color:var(--green)">Pro</span></span>
   </a>
   <div class="nav-links">
-    <a href="/">Inicio</a>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/about" style="color:var(--green)">Qui\u00e9nes Somos</a>
+    <a href="/" data-i18n="about.nav.home">Inicio</a>
+    <a href="/dashboard" data-i18n="about.nav.dashboard">Dashboard</a>
+    <a href="/about" style="color:var(--green)" data-i18n="about.nav.about">Qui\u00e9nes Somos</a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank">Telegram</a>
+    <div class="lang-selector" id="langSelector" style="position:relative">
+      <button class="lang-btn" onclick="toggleLangMenu()"><span id="currentFlag">\U0001f1ea\U0001f1f8</span><span style="font-size:12px;color:#00d4aa;font-weight:700">\u25bc</span></button>
+      <div class="lang-menu" id="langMenu">
+        <a onclick="setLang('es')">\U0001f1ea\U0001f1f8 Espa\u00f1ol</a>
+        <a onclick="setLang('en')">\U0001f1fa\U0001f1f8 English</a>
+        <a onclick="setLang('pt')">\U0001f1e7\U0001f1f7 Portugu\u00eas</a>
+        <a onclick="setLang('fr')">\U0001f1eb\U0001f1f7 Fran\u00e7ais</a>
+      </div>
+    </div>
   </div>
   <button class="about-ham" id="aboutHam" onclick="document.getElementById('aboutMobileMenu').classList.toggle('open');this.style.display='none'" aria-label="Men\u00fa">
     <span></span><span></span><span></span>
@@ -3154,82 +3170,82 @@ a{{color:var(--green);text-decoration:none}}
 </nav>
 <div class="about-mobile-menu" id="aboutMobileMenu">
   <button class="about-mobile-close" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''">&times;</button>
-  <a href="/" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''">&#127968; Inicio</a>
-  <a href="/dashboard" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')">&#128200; Dashboard</a>
-  <a href="/about" style="color:var(--green)" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')">&#128101; Qui\u00e9nes Somos</a>
-  <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="background:linear-gradient(135deg,#00d4aa,#00b894);color:#0a0e17;font-weight:700">&#128172; Telegram</a>
+  <a href="/" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''" data-i18n="about.mobile.home">&#127968; Inicio</a>
+  <a href="/dashboard" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')" data-i18n="about.mobile.dashboard">&#128200; Dashboard</a>
+  <a href="/about" style="color:var(--green)" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')" data-i18n="about.mobile.about">&#128101; Qui\u00e9nes Somos</a>
+  <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="background:linear-gradient(135deg,#00d4aa,#00b894);color:#0a0e17;font-weight:700" data-i18n="about.mobile.telegram">&#128172; Telegram</a>
 </div>
 
 <section class="about-hero">
-  <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px">&#9989; CUENTA REAL MT5 XM &mdash; RESULTADOS VERIFICADOS</div>
-  <h1>Trading automatizado en<br><span>GOLD y NASDAQ con IA</span></h1>
-  <p>Creado por Emmanuel Diaz, trader real operando con cuenta verificada en XM MT5. BuySell365 Pro combina IA propia + se\u00f1ales de canales VIP internacionales para operar GOLD (XAUUSD) y NASDAQ (NAS100) las 24 horas.</p>
+  <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px" data-i18n="about.hero.badge">&#9989; CUENTA REAL MT5 XM &mdash; RESULTADOS VERIFICADOS</div>
+  <h1 data-i18n="about.hero.title">Trading automatizado en<br><span>GOLD y NASDAQ con IA</span></h1>
+  <p data-i18n="about.hero.subtitle">Creado por Emmanuel Diaz, trader real operando con cuenta verificada en XM MT5. BuySell365 Pro combina IA propia + se\u00f1ales de canales VIP internacionales para operar GOLD (XAUUSD) y NASDAQ (NAS100) las 24 horas.</p>
 </section>
 
 <div class="about-stats">
-  <div class="astat"><div class="astat-val">{wr}%</div><div class="astat-label">Win Rate Verificado</div></div>
-  <div class="astat"><div class="astat-val blue">{total_ops}+</div><div class="astat-label">Operaciones Cerradas</div></div>
-  <div class="astat"><div class="astat-val" style="color:#a855f7">24/5</div><div class="astat-label">Bot Activo</div></div>
-  <div class="astat"><div class="astat-val gold">MT5</div><div class="astat-label">Cuenta Real XM</div></div>
+  <div class="astat"><div class="astat-val">{wr}%</div><div class="astat-label" data-i18n="about.stats.winrate">Win Rate Verificado</div></div>
+  <div class="astat"><div class="astat-val blue">{total_ops}+</div><div class="astat-label" data-i18n="about.stats.operations">Operaciones Cerradas</div></div>
+  <div class="astat"><div class="astat-val" style="color:#a855f7">24/5</div><div class="astat-label" data-i18n="about.stats.bot_active">Bot Activo</div></div>
+  <div class="astat"><div class="astat-val gold">MT5</div><div class="astat-label" data-i18n="about.stats.real_account">Cuenta Real XM</div></div>
 </div>
 
 <section class="about-section">
-  <h2><span class="emoji">&#128065;</span>Nuestra Historia Real</h2>
-  <p>Mi nombre es <strong>Emmanuel Diaz</strong>, trader retail desde Andorra. Como muchos, empec\u00e9 cometiendo los errores cl\u00e1sicos: dejar correr las p\u00e9rdidas, cortar las ganancias, y operar por emoci\u00f3n.</p>
-  <p>La soluci\u00f3n fue la <strong>automatizaci\u00f3n</strong>. Dise\u00f1\u00e9 un bot de IA que analiza GOLD y NASDAQ cada 3 minutos \u2014 sin emociones, sin fatiga. Adem\u00e1s, integr\u00e9 un <strong>Signal Copier</strong> que replica se\u00f1ales de canales VIP internacionales verificados.</p>
-  <p>BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>yo mismo uso</strong> para operar en mi cuenta real verificada en XM MT5. Todos los resultados son p\u00fablicos en el <a href="/dashboard" style="color:#00d4aa">dashboard</a>.</p>
+  <h2 data-i18n="about.history.title"><span class="emoji">&#128065;</span>Nuestra Historia Real</h2>
+  <p data-i18n="about.history.p1">Mi nombre es <strong>Emmanuel Diaz</strong>, trader retail desde Andorra. Como muchos, empec\u00e9 cometiendo los errores cl\u00e1sicos: dejar correr las p\u00e9rdidas, cortar las ganancias, y operar por emoci\u00f3n.</p>
+  <p data-i18n="about.history.p2">La soluci\u00f3n fue la <strong>automatizaci\u00f3n</strong>. Dise\u00f1\u00e9 un bot de IA que analiza GOLD y NASDAQ cada 3 minutos \u2014 sin emociones, sin fatiga. Adem\u00e1s, integr\u00e9 un <strong>Signal Copier</strong> que replica se\u00f1ales de canales VIP internacionales verificados.</p>
+  <p data-i18n="about.history.p3">BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>yo mismo uso</strong> para operar en mi cuenta real verificada en XM MT5. Todos los resultados son p\u00fablicos en el <a href="/dashboard" style="color:#00d4aa">dashboard</a>.</p>
 
-  <h2 style="margin-top:40px"><span class="emoji">&#128336;</span>Cronolog\u00eda del Proyecto</h2>
+  <h2 style="margin-top:40px" data-i18n="about.timeline.title"><span class="emoji">&#128336;</span>Cronolog\u00eda del Proyecto</h2>
   <div class="timeline">
     <div class="tl-item">
       <div class="tl-dot"></div>
-      <div class="tl-date">Inicio 2026</div>
-      <div class="tl-title">Primeras versiones del bot</div>
-      <div class="tl-text">Desarrollo del motor de se\u00f1ales con indicadores t\u00e9cnicos e integraci\u00f3n con MT5 v\u00eda MetaTrader5 Python API.</div>
+      <div class="tl-date" data-i18n="about.timeline.t1.date">Inicio 2026</div>
+      <div class="tl-title" data-i18n="about.timeline.t1.title">Primeras versiones del bot</div>
+      <div class="tl-text" data-i18n="about.timeline.t1.text">Desarrollo del motor de se\u00f1ales con indicadores t\u00e9cnicos e integraci\u00f3n con MT5 v\u00eda MetaTrader5 Python API.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot"></div>
-      <div class="tl-date">Marzo 2026</div>
-      <div class="tl-title">Cuenta real XM en MT5 — Lanzamiento VIP</div>
-      <div class="tl-text">Apertura de cuenta real, canal VIP en Telegram, Copy Trading activo, y dashboard p\u00fablico con resultados en tiempo real.</div>
+      <div class="tl-date" data-i18n="about.timeline.t2.date">Marzo 2026</div>
+      <div class="tl-title" data-i18n="about.timeline.t2.title">Cuenta real XM en MT5 — Lanzamiento VIP</div>
+      <div class="tl-text" data-i18n="about.timeline.t2.text">Apertura de cuenta real, canal VIP en Telegram, Copy Trading activo, y dashboard p\u00fablico con resultados en tiempo real.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot"></div>
-      <div class="tl-date">Abril 2026</div>
-      <div class="tl-title">Signal Copier + Foco en GOLD y NASDAQ</div>
-      <div class="tl-text">{total_ops}+ operaciones cerradas, {wr}% win rate. Integraci\u00f3n de Signal Copier con canales VIP internacionales. Especializaci\u00f3n en GOLD y NASDAQ.</div>
+      <div class="tl-date" data-i18n="about.timeline.t3.date">Abril 2026</div>
+      <div class="tl-title" data-i18n="about.timeline.t3.title">Signal Copier + Foco en GOLD y NASDAQ</div>
+      <div class="tl-text" data-i18n="about.timeline.t3.text" data-i18n-vars='{{"ops":"{total_ops}","wr":"{wr}"}}'>{total_ops}+ operaciones cerradas, {wr}% win rate. Integraci\u00f3n de Signal Copier con canales VIP internacionales. Especializaci\u00f3n en GOLD y NASDAQ.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot" style="background:var(--gold)"></div>
-      <div class="tl-date" style="color:var(--gold)">Pr\u00f3ximo</div>
-      <div class="tl-title">Verificaci\u00f3n Myfxbook + Expansi\u00f3n</div>
-      <div class="tl-text">Integraci\u00f3n con Myfxbook para verificaci\u00f3n independiente de resultados. Escalado a m\u00e1s activos y m\u00e1s capital.</div>
+      <div class="tl-date" style="color:var(--gold)" data-i18n="about.timeline.t4.date">Pr\u00f3ximo</div>
+      <div class="tl-title" data-i18n="about.timeline.t4.title">Verificaci\u00f3n Myfxbook + Expansi\u00f3n</div>
+      <div class="tl-text" data-i18n="about.timeline.t4.text">Integraci\u00f3n con Myfxbook para verificaci\u00f3n independiente de resultados. Escalado a m\u00e1s activos y m\u00e1s capital.</div>
     </div>
   </div>
 </section>
 
 <section class="about-section" style="padding-top:0">
-  <h2><span class="emoji">&#127775;</span>Nuestros Valores</h2>
+  <h2 data-i18n="about.values.title"><span class="emoji">&#127775;</span>Nuestros Valores</h2>
   <div class="value-cards">
     <div class="vcard">
       <div class="vcard-icon">&#128202;</div>
-      <h4>Transparencia Total</h4>
-      <p>Todos los resultados son p\u00fablicos y en tiempo real. No editamos ni ocultamos operaciones perdedoras.</p>
+      <h4 data-i18n="about.values.v1.title">Transparencia Total</h4>
+      <p data-i18n="about.values.v1.text">Todos los resultados son p\u00fablicos y en tiempo real. No editamos ni ocultamos operaciones perdedoras.</p>
     </div>
     <div class="vcard">
       <div class="vcard-icon">&#129302;</div>
-      <h4>IA Real, No Marketing</h4>
-      <p>El bot analiza datos de mercado cada 3 minutos con algoritmos propios. Sin se\u00f1ales manuales ni opiniones.</p>
+      <h4 data-i18n="about.values.v2.title">IA Real, No Marketing</h4>
+      <p data-i18n="about.values.v2.text">El bot analiza datos de mercado cada 3 minutos con algoritmos propios. Sin se\u00f1ales manuales ni opiniones.</p>
     </div>
     <div class="vcard">
       <div class="vcard-icon">&#128176;</div>
-      <h4>Tu Capital es Tuyo</h4>
-      <p>Tu dinero est\u00e1 siempre en tu propia cuenta del broker. Nosotros nunca tocamos tu capital.</p>
+      <h4 data-i18n="about.values.v3.title">Tu Capital es Tuyo</h4>
+      <p data-i18n="about.values.v3.text">Tu dinero est\u00e1 siempre en tu propia cuenta del broker. Nosotros nunca tocamos tu capital.</p>
     </div>
     <div class="vcard">
       <div class="vcard-icon">&#128101;</div>
-      <h4>Comunidad Primero</h4>
-      <p>Crecemos con nuestros usuarios. Su \u00e9xito es nuestro \u00e9xito. Sin contratos ni letras peque\u00f1as.</p>
+      <h4 data-i18n="about.values.v4.title">Comunidad Primero</h4>
+      <p data-i18n="about.values.v4.text">Crecemos con nuestros usuarios. Su \u00e9xito es nuestro \u00e9xito. Sin contratos ni letras peque\u00f1as.</p>
     </div>
   </div>
 </section>
@@ -3237,25 +3253,76 @@ a{{color:var(--green);text-decoration:none}}
 <section style="padding:0 24px 60px">
   <div class="about-cta">
     <div style="font-size:2.5rem;margin-bottom:12px">&#128640;</div>
-    <h2>&#218;nete a BuySell365 Pro</h2>
-    <p>Accede al Copy Trading o a las se\u00f1ales VIP. Sin contratos, cancela cuando quieras.</p>
+    <h2 data-i18n="about.cta.title">&#218;nete a BuySell365 Pro</h2>
+    <p data-i18n="about.cta.subtitle">Accede al Copy Trading o a las se\u00f1ales VIP. Sin contratos, cancela cuando quieras.</p>
     <div class="btn-row">
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="btn-p">&#129302; Empezar Copy Trading</a>
-      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" rel="noopener" class="btn-s">&#128081; Canal VIP Pro</a>
-      <a href="/dashboard" class="btn-s">&#128202; Ver Resultados</a>
+      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="btn-p" data-i18n="about.cta.btn_copy">&#129302; Empezar Copy Trading</a>
+      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" rel="noopener" class="btn-s" data-i18n="about.cta.btn_vip">&#128081; Canal VIP Pro</a>
+      <a href="/dashboard" class="btn-s" data-i18n="about.cta.btn_results">&#128202; Ver Resultados</a>
     </div>
   </div>
 </section>
 
 <footer class="foot">
-  <a href="/">Inicio</a>
-  <a href="/dashboard">Dashboard</a>
-  <a href="/terminos">T\u00e9rminos</a>
-  <a href="/privacidad">Privacidad</a>
+  <a href="/" data-i18n="about.footer.home">Inicio</a>
+  <a href="/dashboard" data-i18n="about.footer.dashboard">Dashboard</a>
+  <a href="/terminos" data-i18n="about.footer.terms">T\u00e9rminos</a>
+  <a href="/privacidad" data-i18n="about.footer.privacy">Privacidad</a>
   <a href="mailto:soporte@buysell365.pro">soporte@buysell365.pro</a>
-  <p style="margin-top:12px">\u00a9 2026 BuySell365 Pro &mdash; Todos los derechos reservados</p>
-  <p style="margin-top:6px;font-size:0.75rem;color:#8b949e">Creador: Emmanuel Diaz</p>
+  <p style="margin-top:12px" data-i18n="about.footer.rights">\u00a9 2026 BuySell365 Pro &mdash; Todos los derechos reservados</p>
+  <p style="margin-top:6px;font-size:0.75rem;color:#8b949e" data-i18n="about.footer.creator">Creador: Emmanuel Diaz</p>
 </footer>
+
+<script>
+(function(){{
+  var FLAGS = {{es:'\U0001f1ea\U0001f1f8',en:'\U0001f1fa\U0001f1f8',pt:'\U0001f1e7\U0001f1f7',fr:'\U0001f1eb\U0001f1f7'}};
+  var SUPPORTED = ['es','en','pt','fr'];
+  var currentLang = 'es';
+  function detectLang(){{
+    var saved = localStorage.getItem('buysell365_lang');
+    if(saved && SUPPORTED.indexOf(saved) !== -1) return saved;
+    var nav = (navigator.language || navigator.userLanguage || 'es').toLowerCase();
+    if(nav.indexOf('en') === 0) return 'en';
+    if(nav.indexOf('pt') === 0) return 'pt';
+    if(nav.indexOf('fr') === 0) return 'fr';
+    return 'es';
+  }}
+  function applyTranslations(tr){{
+    document.querySelectorAll('[data-i18n]').forEach(function(el){{
+      var key = el.getAttribute('data-i18n');
+      if(tr[key]){{
+        var text = tr[key];
+        var vars = el.getAttribute('data-i18n-vars');
+        if(vars){{ try{{ var obj=JSON.parse(vars); Object.keys(obj).forEach(function(k){{ text=text.replace('{{{{'+k+'}}}}',obj[k]); }}); }}catch(e){{}} }}
+        if(text.indexOf('<br') !== -1 || text.indexOf('<span') !== -1 || text.indexOf('<strong') !== -1 || text.indexOf('<a ') !== -1){{ el.innerHTML = text; }}
+        else{{ el.textContent = text; }}
+      }}
+    }});
+    document.documentElement.lang = currentLang;
+    var flagEl = document.getElementById('currentFlag');
+    if(flagEl) flagEl.textContent = FLAGS[currentLang] || '\U0001f1ea\U0001f1f8';
+  }}
+  function loadLang(lang){{
+    if(SUPPORTED.indexOf(lang) === -1) lang = 'es';
+    fetch('/i18n/' + lang + '.json')
+      .then(function(r){{ return r.json(); }})
+      .then(function(data){{ currentLang = lang; localStorage.setItem('buysell365_lang', lang); applyTranslations(data); }})
+      .catch(function(err){{ console.warn('i18n load failed:', err); }});
+  }}
+  window.toggleLangMenu = function(){{
+    var menu = document.getElementById('langMenu');
+    if(menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  }};
+  window.setLang = function(lang){{ loadLang(lang); var menu = document.getElementById('langMenu'); if(menu) menu.style.display = 'none'; }};
+  document.addEventListener('click', function(e){{
+    var sel = document.getElementById('langSelector');
+    if(sel && !sel.contains(e.target)){{ var menu = document.getElementById('langMenu'); if(menu) menu.style.display = 'none'; }}
+  }});
+  var lang = detectLang();
+  if(lang !== 'es') loadLang(lang);
+  else{{ currentLang = 'es'; localStorage.setItem('buysell365_lang', 'es'); var flagEl = document.getElementById('currentFlag'); if(flagEl) flagEl.textContent = FLAGS['es']; }}
+}})();
+</script>
 </body>
 </html>"""
 
