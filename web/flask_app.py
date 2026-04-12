@@ -1212,12 +1212,12 @@ if('serviceWorker' in navigator){{
       <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:2rem" data-i18n="pricing.free">Acceso Libre</div>
       <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.community_desc">Acceso al grupo p\u00fablico de Telegram</p>
       <ul class="price-list">
-        <li style="color:#90caf9">&#128227; Resumen diario de mercado</li>
-        <li style="color:#90caf9">&#128218; Educaci\u00f3n y an\u00e1lisis general</li>
-        <li style="color:#90caf9">&#129309; Soporte de la comunidad</li>
-        <li style="color:#90caf9">&#128202; Dashboard p\u00fablico limitado</li>
+        <li style="color:#90caf9" data-i18n="pricing.cm1">&#128227; Resumen diario de mercado</li>
+        <li style="color:#90caf9" data-i18n="pricing.cm2">&#128218; Educaci\u00f3n y an\u00e1lisis general</li>
+        <li style="color:#90caf9" data-i18n="pricing.cm3">&#129309; Soporte de la comunidad</li>
+        <li style="color:#90caf9" data-i18n="pricing.cm4">&#128202; Dashboard p\u00fablico limitado</li>
       </ul>
-      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5,#64b5f6);border-radius:14px;color:#fff;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 25px rgba(66,165,245,0.5);transition:all .3s">&#128172; Unirse al Grupo</a>
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#1565c0,#42a5f5,#64b5f6);border-radius:14px;color:#fff;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 25px rgba(66,165,245,0.5);transition:all .3s"><span data-i18n="pricing.join_group">&#128172; Unirse al Grupo</span></a>
     </div>
     <div class="price-card featured" style="border:2px solid #fbbf24;box-shadow:0 0 50px rgba(251,191,36,0.3),0 0 100px rgba(251,191,36,0.1);transform:scale(1.04)">
       <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
@@ -1226,17 +1226,17 @@ if('serviceWorker' in navigator){{
         <span class="old">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
       </div>
-      <div style="margin:12px 0 4px;font-size:12px;color:rgba(255,215,0,.7);letter-spacing:1px">&#9733; PRECIO ESPECIAL FUNDADORES &#9733;</div>
+      <div style="margin:12px 0 4px;font-size:12px;color:rgba(255,215,0,.7);letter-spacing:1px" data-i18n="pricing.founders">&#9733; PRECIO ESPECIAL FUNDADORES &#9733;</div>
       <ul class="price-list" style="margin-top:20px">
-        <li style="color:#ffd740">&#128293; Se\u00f1ales en tiempo real con TP y SL exactos</li>
-        <li style="color:#ffd740">&#128081; Canal VIP privado de Telegram</li>
-        <li style="color:#ffd740">&#129302; <strong>Acceso total al bot de trading y soporte prioritario</strong></li>
-        <li style="color:#ffd740">&#9889; Alertas instant\u00e1neas — nunca pierdas una se\u00f1al</li>
-        <li style="color:#ffd740">&#128161; Soporte prioritario directo</li>
-        <li style="color:#ffd740">&#128202; An\u00e1lisis IA exclusivo por activo</li>
-        <li style="color:#ffd740">&#128200; Briefing matutino + Cierre nocturno</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp1">&#128293; Se\u00f1ales en tiempo real con TP y SL exactos</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp2">&#128081; Canal VIP privado de Telegram</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp3">&#129302; Acceso total al bot de trading y soporte prioritario</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp4">&#9889; Alertas instant\u00e1neas \u2014 nunca pierdas una se\u00f1al</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp5">&#128161; Soporte prioritario directo</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp6">&#128202; An\u00e1lisis IA exclusivo por activo</li>
+        <li style="color:#ffd740" data-i18n="pricing.vp7">&#128200; Briefing matutino + Cierre nocturno</li>
       </ul>
-      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s">\U0001f451 Suscribirme al VIP</a>
+      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s"><span data-i18n="pricing.subscribe_vip">&#128081; Suscribirme al VIP</span></a>
     </div>
     <div class="price-card" style="position:relative;border:2px solid #00ffcc;box-shadow:0 0 50px rgba(0,255,204,0.25),0 0 100px rgba(0,255,204,0.08)">
       <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00ffcc);box-shadow:0 0 30px rgba(0,255,204,.7);animation:glowPulse 3s infinite;font-size:15px;padding:10px 32px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
@@ -1280,29 +1280,27 @@ if('serviceWorker' in navigator){{
 <!-- XM BROKER SECTION -->
 <section class="xm-section fade-in">
   <div class="xm-section-logo">XM</div>
-  <div class="xm-section-sub">Broker oficial de BuySell365 Pro &mdash; Regulado internacionalmente</div>
+  <div class="xm-section-sub" data-i18n="xm.sub">Broker oficial de BuySell365 Pro &mdash; Regulado internacionalmente</div>
   <div class="xm-bonus-badge">
-    <div class="xm-bonus-text">
-      &#127873; Reciba un bono del 100% hasta $100
-      <span>Dep&oacute;sito m&iacute;nimo $5 &bull; Retira tus ganancias cuando quieras</span>
-    </div>
+    <div class="xm-bonus-text" data-i18n="xm.bonus">&#127873; Reciba un bono del 100% hasta $100</div>
+    <div style="font-size:12px;opacity:.8" data-i18n="xm.bonus_sub">Dep&oacute;sito m&iacute;nimo $5 &bull; Retira tus ganancias cuando quieras</div>
   </div>
   <div class="xm-section-pills">
-    <span class="xm-section-pill">&#10003; Regulado CySEC &middot; ASIC &middot; FCA</span>
-    <span class="xm-section-pill">&#128176; Dep&oacute;sito desde $5</span>
-    <span class="xm-section-pill">&#9889; Sin re-quotes</span>
+    <span class="xm-section-pill" data-i18n="xm.pill1">&#10003; Regulado CySEC &middot; ASIC &middot; FCA</span>
+    <span class="xm-section-pill" data-i18n="xm.pill2">&#128176; Dep&oacute;sito desde $5</span>
+    <span class="xm-section-pill" data-i18n="xm.pill3">&#9889; Sin re-quotes</span>
     <span class="xm-section-pill">&#128241; App iOS &amp; Android</span>
-    <span class="xm-section-pill">&#128274; Fondos segregados</span>
-    <span class="xm-section-pill">&#127758; +5M clientes</span>
+    <span class="xm-section-pill" data-i18n="xm.pill5">&#128274; Fondos segregados</span>
+    <span class="xm-section-pill" data-i18n="xm.pill6">&#127758; +5M clientes</span>
   </div>
-  <div class="xm-section-code">
+  <div class="xm-section-code" data-i18n="xm.code">
     Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b>
   </div><br>
   <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-section-cta">
-    &#128640; Abrir Cuenta Real &mdash; Gratis
+    <span data-i18n="xm.cta">&#128640; Abrir Cuenta Real &mdash; Gratis</span>
   </a>
-  <div class="xm-section-note">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
-  <div style="font-size:11px;color:rgba(139,159,180,.45);margin-top:8px">&#128276; Divulgación de afiliado: BuySell365 Pro es afiliado de XM y puede recibir comisión si abres una cuenta a través de nuestros enlaces. Esto no afecta el coste para ti ni nuestra opinión sobre el broker.</div>
+  <div class="xm-section-note" data-i18n="xm.risk">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
+  <div style="font-size:11px;color:rgba(139,159,180,.45);margin-top:8px" data-i18n="xm.affiliate">&#128276; Divulgaci\u00f3n de afiliado: BuySell365 Pro es afiliado de XM y puede recibir comisi\u00f3n si abres una cuenta a trav\u00e9s de nuestros enlaces. Esto no afecta el coste para ti.</div>
 </section>
 
 <!-- HOW IT WORKS -->
