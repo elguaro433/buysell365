@@ -344,13 +344,21 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         # ── Fuente 0: MT5 (precio real del broker — PRIORIDAD) ──
         try:
             import MetaTrader5 as _mt5_chart
+            # FIX 2026-04-12: Mapa COMPLETO — mismos pares que _mt5_sym_map del monitor
             _mt5_chart_map = {
+                # Oro
                 "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
-                "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
-                "US30": "US30Cash", "DOW30": "US30Cash", "DJ30": "US30Cash",
-                "US500": "US500Cash", "SP500": "US500Cash",
-                "USOIL": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
+                # Índices
+                "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "US100CASH": "US100Cash",
+                "US30": "US30Cash", "DOW": "US30Cash", "DOW30": "US30Cash", "DJ30": "US30Cash", "US30CASH": "US30Cash",
+                "US500": "US500Cash", "SP500": "US500Cash", "SPX500": "US500Cash", "US500CASH": "US500Cash",
+                "GER40": "GER40Cash", "GER40CASH": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
+                # Petróleo
+                "USOIL": "OILCash", "OILCASH": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
+                "BRENT": "BRENTCash", "BRENTCASH": "BRENTCash", "UKOIL": "BRENTCash",
+                # Crypto
                 "BTCUSD": "BTCUSD",
+                # Forex — se resuelve automático: pair.upper() ya es el símbolo MT5
             }
             _mt5_sym_chart = _mt5_chart_map.get(pair.upper(), pair.upper())
             if _mt5_chart.initialize():
@@ -392,11 +400,20 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             try:
                 import yfinance as yf
                 import warnings, sys as _sys_yf
+                # FIX 2026-04-12: Mapa COMPLETO — mismos pares que _yf_map global
                 _yf_chart_map = {
+                    # Oro
                     "GOLD": "GC=F", "XAUUSD": "GC=F", "GC": "GC=F",
-                    "US30": "YM=F", "DOW30": "YM=F", "DJ30": "YM=F", "YM": "YM=F",
-                    "NAS100": "NQ=F", "US100": "NQ=F", "NASDAQ": "NQ=F", "NQ": "NQ=F",
-                    "US500": "ES=F", "SP500": "ES=F", "ES": "ES=F",
+                    # Índices
+                    "US100Cash": "NQ=F", "NAS100": "NQ=F", "US100": "NQ=F", "NASDAQ": "NQ=F", "NQ": "NQ=F",
+                    "US500Cash": "ES=F", "US500": "ES=F", "SP500": "ES=F", "ES": "ES=F",
+                    "US30Cash": "YM=F", "US30": "YM=F", "DOW30": "YM=F", "DJ30": "YM=F", "DOW": "YM=F", "YM": "YM=F",
+                    "GER40Cash": "GER40=X", "GER40": "GER40=X", "DAX": "GER40=X",
+                    # Petróleo
+                    "OILCash": "CL=F", "USOIL": "CL=F", "WTI": "CL=F",
+                    "BRENTCash": "BZ=F", "BRENT": "BZ=F", "UKOIL": "BZ=F",
+                    # Crypto
+                    "BTCUSD": "BTC-USD",
                 }
                 _yf_ticker = _yf_chart_map.get(pair)
                 if not _yf_ticker:
