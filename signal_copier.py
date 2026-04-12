@@ -331,9 +331,10 @@ def _get_current_price(pair: str) -> float | None:
     return None
 
 
-def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, title_override: str = "") -> bytes | None:
+def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, title_override: str = "", tp_levels: list = None) -> bytes | None:
     """Generate professional chart using Twelve Data (primary) or yfinance (fallback) + matplotlib.
-    title_override: si se pasa, usa ese título en vez de 'TP HIT'."""
+    title_override: si se pasa, usa ese título en vez de 'TP HIT'.
+    tp_levels: lista de tuplas [("TP1", precio), ("TP2", precio), ...] para dibujar múltiples líneas."""
     pair_d = _get_display_pair(pair)
     try:
         import requests
@@ -489,20 +490,28 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
                                  facecolor=color, edgecolor=color, linewidth=0.5, zorder=4)
             ax.add_patch(rect)
 
-        # ── TP line — prominente ──
-        ax.axhline(y=tp, color=GOLD, linestyle="-", linewidth=2.5, alpha=0.95, zorder=5)
-        ax.text(n + 0.5, tp, f" TP {tp:.2f}", color="#131722", fontsize=11, fontweight="bold",
-                va="center", ha="left", zorder=6,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor=GOLD, edgecolor=GOLD, alpha=0.9))
+        # ── TP lines — todas las líneas de TP ──
+        _tp_colors = ["#ffd700", "#ffb300", "#ff8f00", "#ff6f00", "#ff4500"]  # Gold → Orange gradient
+        _all_tps = tp_levels if tp_levels else [("TP", tp)]
+        for _i_tp, (_tp_label, _tp_val) in enumerate(_all_tps):
+            if _tp_val <= 0:
+                continue
+            _tp_color = _tp_colors[min(_i_tp, len(_tp_colors) - 1)]
+            _lw = 2.5 if _i_tp == len(_all_tps) - 1 else 1.8  # Última TP más gruesa
+            _alpha = 0.95 if _i_tp == len(_all_tps) - 1 else 0.75
+            ax.axhline(y=_tp_val, color=_tp_color, linestyle="-", linewidth=_lw, alpha=_alpha, zorder=5)
+            ax.text(n + 0.5, _tp_val, f" {_tp_label} {fmt_price(_tp_val)}", color="#131722", fontsize=10,
+                    fontweight="bold", va="center", ha="left", zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor=_tp_color, edgecolor=_tp_color, alpha=0.9))
 
         # ── Entry line ──
         if entry > 0:
             ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=2, alpha=0.85, zorder=5)
-            ax.text(n + 0.5, entry, f" Entry {entry:.2f}", color="#ffffff", fontsize=10,
+            ax.text(n + 0.5, entry, f" Entry {fmt_price(entry)}", color="#ffffff", fontsize=10,
                     fontweight="bold", va="center", ha="left", zorder=6,
                     bbox=dict(boxstyle="round,pad=0.3", facecolor=ENTRY_COLOR, edgecolor=ENTRY_COLOR, alpha=0.85))
 
-        # ── Zona de profit (fill entre entry y TP) ──
+        # ── Zona de profit (fill entre entry y TP final) ──
         if entry > 0 and tp > 0:
             y_min = min(entry, tp)
             y_max = max(entry, tp)
@@ -538,7 +547,7 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         # Grid estilo TradingView
         ax.grid(True, alpha=0.08, color=TEXT, linestyle="-", linewidth=0.5)
         ax.tick_params(colors=TEXT, labelsize=9)
-        ax.set_xlim(-1, n + 7)  # Espacio para labels
+        ax.set_xlim(-1, n + 9)  # Espacio para labels (más ancho para múltiples TPs)
         for spine in ax.spines.values():
             spine.set_visible(False)
 
@@ -639,7 +648,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
         f"🚀 _BuySell365 Pro — señal exitosa_"
     )
 
-    chart_bytes = _fetch_chart_image(pair, direction, entry, tp)
+    chart_bytes = _fetch_chart_image(pair, direction, entry, tp, tp_levels=_valid_display if len(_valid_display) > 1 else None)
 
     try:
         if chart_bytes:
