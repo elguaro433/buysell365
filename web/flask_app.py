@@ -1261,6 +1261,9 @@ if('serviceWorker' in navigator){{
           &#128640; Empezar Copy Trading<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Ya tengo cuenta XM</span>
         </a>
       </div>
+      <a href="/static/BuySell365_Guia_CopyTrading.pdf" download style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding:12px 20px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.05));border:1.5px solid rgba(59,130,246,.4);border-radius:12px;color:#60a5fa;font-weight:700;font-size:13px;text-decoration:none;transition:all .3s">
+        &#128218; Descargar Gu\u00eda Copy Trading (PDF)<span style="font-size:10px;opacity:.7;margin-left:4px">Paso a paso desde cero</span>
+      </a>
     </div>
   </div>
 </section>
