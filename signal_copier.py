@@ -188,12 +188,13 @@ def _load_open_signals():
                         sig = sdata.get("signal", {})
                         entry = sig.get("entry", 0) or 0
                         # Descartar: >4h de antigüedad O sin precio de entrada válido
-                        if age > 4:
+                        if age > 24:
                             log.info(f"🗑️ Señal expirada al cargar ({age:.1f}h): {sid[:30]}")
                             continue
+                        # FIX 2026-04-09: No descartar señales con entry=0
+                        # El monitor les asignará precio live
                         if entry <= 0:
-                            log.info(f"🗑️ Señal sin entrada al cargar (entry=0): {sid[:30]}")
-                            continue
+                            log.info(f"⚠️ Señal con entry=0 cargada (se asignará precio live): {sid[:30]}")
                         _open_signals[sid] = sdata
                         loaded += 1
             if loaded:
@@ -279,8 +280,8 @@ def _get_current_price(pair: str) -> float | None:
                     return val if val > 0 else None
             finally:
                 sys.stderr = _old_stderr
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning(f"⚠️ yfinance falló para {pair} ({yf_ticker}): {e}")
 
     # Fallback final: Twelve Data (gasta 1 crédito)
     if TWELVE_KEY:
@@ -295,8 +296,9 @@ def _get_current_price(pair: str) -> float | None:
             data = resp.json()
             val = float(data.get("price", 0) or 0)
             return val if val > 0 else None
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning(f"⚠️ TwelveData falló para {pair} ({symbol}): {e}")
+    log.error(f"❌ Todas las fuentes de precio fallaron para {pair}")
     return None
 
 
@@ -543,28 +545,39 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
 
     pips_line = f"\n💰 Profit: *{pips_str}*" if pips_str else ""
 
-    # Build TP lines — show all TPs, mark the hit one with ✅
+    # FIX 2026-04-10: Solo mostrar TPs válidos (dirección correcta y no basura)
+    def _tp_valid(tval):
+        if tval <= 0:
+            return False
+        if entry > 0:
+            if abs(tval - entry) / entry > 0.20:
+                return False  # >20% = basura
+            if direction == "BUY" and tval < entry:
+                return False
+            if direction == "SELL" and tval > entry:
+                return False
+        return True
+
+    _tp1_val = signal.get("tp", 0) or 0
     tp2 = signal.get("tp2", 0) or 0
     tp3 = signal.get("tp3", 0) or 0
     tp4 = signal.get("tp4", 0) or 0
     tp5 = signal.get("tp5", 0) or 0
-    has_multi_tp = any(t > 0 for t in [tp2, tp3, tp4, tp5])
 
-    # FIX 2026-04-08: Marcar TODOS los TPs como ✅ (precio alcanzó el TP final)
-    _tp1_val = signal.get("tp", 0) or 0
+    _valid_display = []
+    if _tp_valid(_tp1_val): _valid_display.append(("TP1", _tp1_val))
+    if _tp_valid(tp2): _valid_display.append(("TP2", tp2))
+    if _tp_valid(tp3): _valid_display.append(("TP3", tp3))
+    if _tp_valid(tp4): _valid_display.append(("TP4", tp4))
+    if _tp_valid(tp5): _valid_display.append(("TP5", tp5))
+
     tp_lines = ""
-    if has_multi_tp:
-        if _tp1_val > 0:
-            tp_lines += f"\n✅ TP1: {fmt(_tp1_val)}"
-        if tp2 > 0:
-            tp_lines += f"\n✅ TP2: {fmt(tp2)}"
-        if tp3 > 0:
-            tp_lines += f"\n✅ TP3: {fmt(tp3)}"
-        if tp4 > 0:
-            tp_lines += f"\n✅ TP4: {fmt(tp4)}"
-        if tp5 > 0:
-            tp_lines += f"\n✅ TP5: {fmt(tp5)}"
-    else:
+    if len(_valid_display) > 1:
+        for _label, _val in _valid_display:
+            tp_lines += f"\n✅ {_label}: {fmt(_val)}"
+    elif len(_valid_display) == 1:
+        tp_lines = f"\n✅ {_valid_display[0][0]}: {fmt(_valid_display[0][1])}"
+    elif tp > 0:
         tp_lines = f"\n✅ TP: {fmt(tp)}"
 
     msg = (
@@ -971,18 +984,32 @@ async def _monitor_tp_loop() -> None:
             pair = signal["pair"]
             age_hours = (time.time() - sdata["sent_at"]) / 3600
 
-            # FIX 2026-04-08: Rastrear el TP MÁS ALTO de la señal, no solo TP1
-            # Así celebramos el profit real, no +2 pts de un TP1 scalper
+            # FIX 2026-04-10: Filtrar TPs basura ANTES de seleccionar _tp_final
+            _entry_ref = signal.get("entry", 0) or 0
             _tp1 = signal.get("tp", 0) or 0
             _tp2 = signal.get("tp2", 0) or 0
             _tp3 = signal.get("tp3", 0) or 0
             _tp4 = signal.get("tp4", 0) or 0
             _tp5 = signal.get("tp5", 0) or 0
-            _all_tps = [t for t in [_tp5, _tp4, _tp3, _tp2, _tp1] if t > 0]
+            _valid_tps = []
+            for _tval in [_tp1, _tp2, _tp3, _tp4, _tp5]:
+                if _tval <= 0:
+                    continue
+                # Descartar si >20% de diferencia con entry
+                if _entry_ref > 0 and abs(_tval - _entry_ref) / _entry_ref > 0.20:
+                    continue
+                # Descartar si dirección incorrecta (BUY→TP>entry, SELL→TP<entry)
+                if _entry_ref > 0:
+                    if direction == "BUY" and _tval < _entry_ref:
+                        continue
+                    if direction == "SELL" and _tval > _entry_ref:
+                        continue
+                _valid_tps.append(_tval)
+
             if direction == "BUY":
-                tp = max(_all_tps) if _all_tps else 0  # TP más alto para BUY
+                tp = max(_valid_tps) if _valid_tps else 0
             else:
-                tp = min(_all_tps) if _all_tps else 0  # TP más bajo para SELL
+                tp = min(_valid_tps) if _valid_tps else 0
 
             # Actualizar el signal con el TP final para que la celebración muestre el profit correcto
             signal["_tp_final"] = tp
@@ -1004,7 +1031,9 @@ async def _monitor_tp_loop() -> None:
                     "USOIL": "OILCash", "OILCASH": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
                     "BTCUSD": "BTCUSD", "BTCUSDM": "BTCUSD",
                 }
-                _mt5_sym = _mt5_sym_map.get(pair.upper(), pair.upper())
+                # Resolver símbolo MT5: primero mapa, luego quitar /
+                _pair_clean = pair.upper().replace("/", "")
+                _mt5_sym = _mt5_sym_map.get(_pair_clean, _pair_clean)
                 if _mt5_check.initialize():
                     _mt5_check.symbol_select(_mt5_sym, True)
                     _tick = _mt5_check.symbol_info_tick(_mt5_sym)
@@ -1019,11 +1048,19 @@ async def _monitor_tp_loop() -> None:
             if price is None:
                 continue
 
-            # BUG FIX: si TP=0 (abierto/desconocido), NO verificar TP hit — price>=0 siempre True
+            # FIX 2026-04-09: Si entry=0, asignar precio live al primer chequeo
+            _entry = signal.get("entry", 0) or 0
+            if _entry <= 0:
+                signal["entry"] = price
+                log.info(f"📍 Entry auto-asignado en monitor: {price} para {pair}")
+
+            # TP/SL hit checks — solo verificar si el valor existe (>0)
             tp_hit = False
             if tp > 0:
                 tp_hit = (direction == "BUY" and price >= tp) or (direction == "SELL" and price <= tp)
-            sl_hit = (direction == "BUY" and price <= sl) or (direction == "SELL" and price >= sl)
+            sl_hit = False
+            if sl > 0:
+                sl_hit = (direction == "BUY" and price <= sl) or (direction == "SELL" and price >= sl)
 
             if tp_hit:
                 to_resolve.append((sig_id, sdata, "tp"))
@@ -1050,11 +1087,16 @@ async def _monitor_tp_loop() -> None:
                 _now_notif = time.time()
                 _recently_notified.update({k: v for k, v in _recently_notified.items() if _now_notif - v < 1800})
 
-                # REGLA: No anunciar si no hay precio de entrada válido
+                # Si entry=0, asignar precio actual como referencia
                 _entry = signal.get('entry', 0) or 0
                 if _entry <= 0:
-                    log.info(f"🔕 TP/SL silenciado ({result.upper()} {signal.get('pair','?')}): entrada desconocida")
-                    continue
+                    _live_e = _get_current_price(signal.get("pair", ""))
+                    if _live_e and _live_e > 0:
+                        signal["entry"] = _live_e
+                        _entry = _live_e
+                    else:
+                        log.info(f"🔕 {result.upper()} sin entry ni precio live: {signal.get('pair','?')}")
+                        continue
 
                 if result == "tp":
                     log.info(f"🎯 Llamando _send_tp_celebration para {signal.get('pair','?')} entry={_entry}")
@@ -1809,23 +1851,53 @@ def send_to_channel(signal, executed, detail):
             if resp.status_code == 200:
                 log.info(f"📡 ENVIADO AL CANAL: {dir_label} {pair_display} ({source})")
                 _canal_msg_id = resp.json().get("result", {}).get("message_id")
-                # Registrar señal para seguimiento TP/SL
-                if signal["sl"] > 0:
-                    sig_id = f"{pair}_{int(time.time())}"
-                    with _signals_lock:
-                        _open_signals[sig_id] = {
-                            "signal": signal,
-                            "sent_at": time.time(),
-                            "telegram_msg_id": _canal_msg_id,
-                        }
-                    log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
-                    _save_open_signals()  # Persistir a disco
+                # Registrar TODAS las señales para seguimiento TP/SL
+                # FIX 2026-04-09: Ya no se requiere SL>0 para registrar.
+                # Si entry=0, intentar obtener precio live como entry.
+                if (signal.get("entry") or 0) <= 0:
+                    _live = _get_current_price(pair)
+                    if _live and _live > 0:
+                        signal["entry"] = round(_live, 5)
+                        log.info(f"📍 Entry auto-asignado (live): {signal['entry']} para {pair}")
+                    else:
+                        log.error(f"❌ No se pudo obtener entry para {pair} — señal NO registrada para seguimiento TP/SL")
+                        break  # No registrar señal incompleta
 
-                    # ── REGISTRO EN estado.json DESACTIVADO (FIX 2026-04-09) ──
-                    # Causa: doble monitor (copier + bot.py) generaba SL HIT duplicados
-                    # con valores de SL diferentes (yfinance vs MT5). Solo el copier
-                    # monitorea señales copiadas ahora.
-                    pass
+                # FIX 2026-04-10: Validar TPs DESPUÉS de tener entry real
+                _e_val = signal.get("entry", 0) or 0
+                _d_val = signal.get("direction", "")
+                if _e_val > 0:
+                    for _tk in ("tp", "tp2", "tp3", "tp4", "tp5"):
+                        _tv = signal.get(_tk, 0) or 0
+                        if _tv <= 0:
+                            continue
+                        # Sanity: >20% de diferencia = basura
+                        if abs(_tv - _e_val) / _e_val > 0.20:
+                            log.warning(f"🗑️ {_tk}={_tv} descartado (>20% de entry={_e_val})")
+                            signal[_tk] = 0
+                            continue
+                        # Dirección: BUY→TP>entry, SELL→TP<entry
+                        if _d_val == "BUY" and _tv < _e_val:
+                            log.warning(f"🗑️ {_tk}={_tv} descartado (BUY pero TP < entry={_e_val})")
+                            signal[_tk] = 0
+                        elif _d_val == "SELL" and _tv > _e_val:
+                            log.warning(f"🗑️ {_tk}={_tv} descartado (SELL pero TP > entry={_e_val})")
+                            signal[_tk] = 0
+
+                sig_id = f"{pair}_{int(time.time())}"
+                with _signals_lock:
+                    _open_signals[sig_id] = {
+                        "signal": signal,
+                        "sent_at": time.time(),
+                        "telegram_msg_id": _canal_msg_id,
+                    }
+                log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
+                _save_open_signals()  # Persistir a disco
+
+                # ── REGISTRO EN estado.json DESACTIVADO (FIX 2026-04-09) ──
+                # Causa: doble monitor (copier + bot.py) generaba SL HIT duplicados
+                # con valores de SL diferentes (yfinance vs MT5). Solo el copier
+                # monitorea señales copiadas ahora.
 
                 return _canal_msg_id
             elif resp.status_code == 429:
@@ -1931,10 +2003,10 @@ async def main():
                 if _prev_sent_time and (time.time() - _prev_sent_time) < 3600:
                     log.info(f"⏭️ Señal duplicada ignorada (cache): {_dedup_key} (enviada hace {(time.time() - _prev_sent_time):.0f}s)")
                     return
-                # Check 2: cooldown por PAR+DIRECCIÓN — máx 1 señal cada 10 min del mismo par
+                # Check 2: cooldown por PAR+DIRECCIÓN — máx 1 señal cada 30 min del mismo par
                 _prev_pair_time = _recently_sent.get(_pair_key, 0)
-                if _prev_pair_time and (time.time() - _prev_pair_time) < 600:
-                    log.info(f"⏭️ Cooldown activo: {_pair_key} (última hace {(time.time() - _prev_pair_time):.0f}s < 600s)")
+                if _prev_pair_time and (time.time() - _prev_pair_time) < 1800:
+                    log.info(f"⏭️ Cooldown activo: {_pair_key} (última hace {(time.time() - _prev_pair_time):.0f}s < 1800s)")
                     return
                 # Check 3: _open_signals — ya hay señal abierta del mismo par+dirección
                 with _signals_lock:
@@ -2078,17 +2150,26 @@ async def main():
             # FIX 2026-04-09: TODAS las señales pasan — sin filtro por activo
 
             # ── Deduplicación: no publicar si ya existe señal abierta del mismo par+dirección ──
-            _entry_round = round(signal.get("entry", 0), 2)
-            _dedup_key = f"{signal['pair']}_{signal['direction']}_{_entry_round}"
+            # FIX 2026-04-11: Verificar SOLO par+dirección (sin entry), ya que entry puede ser 0
+            # y se asigna live después. Esto causaba duplicados BTC desde 2 canales.
+            _sig_pair = signal.get("pair", "")
+            _sig_dir  = signal.get("direction", "")
             with _signals_lock:
                 for _sid, _sdata in _open_signals.items():
                     _s = _sdata.get("signal", {})
-                    _e_round = round(_s.get("entry", 0), 2)
-                    _existing_key = f"{_s.get('pair','')}_{_s.get('direction','')}_{_e_round}"
-                    if _existing_key == _dedup_key and (time.time() - _sdata.get("sent_at", 0)) < 3600:
-                        log.info(f"✏️ Edit ignorado — señal ya existe: {_dedup_key}")
+                    if (_s.get("pair", "") == _sig_pair and
+                        _s.get("direction", "") == _sig_dir and
+                        (time.time() - _sdata.get("sent_at", 0)) < 3600):
+                        log.info(f"✏️ Edit ignorado — ya hay {_sig_pair}_{_sig_dir} abierta (señal {_sid})")
                         _published_msg_ids.add(msg_id)
                         return
+            # También verificar en _recently_sent (cooldown 10min)
+            _pair_cooldown_key = f"{_sig_pair}_{_sig_dir}"
+            _prev_time = _recently_sent.get(_pair_cooldown_key, 0)
+            if _prev_time and (time.time() - _prev_time) < 600:
+                log.info(f"✏️ Edit ignorado — cooldown activo: {_pair_cooldown_key} (hace {time.time()-_prev_time:.0f}s)")
+                _published_msg_ids.add(msg_id)
+                return
 
             log.info(f"✏️ Señal capturada vía edición (msg_id={msg_id}): {signal.get('direction')} {signal.get('pair')}")
             MT5_EXECUTION_ENABLED = False

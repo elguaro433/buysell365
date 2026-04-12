@@ -10712,6 +10712,11 @@ def pagina_terminos():
     <p data-i18n="terms.s7_text">Nos esforzamos por mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida.
     Pueden ocurrir interrupciones por mantenimiento, actualizaciones t&eacute;cnicas o causas de fuerza mayor.</p>
 
+    <h2 data-i18n="terms.s7b_title">7.1 Horario del Copy Trading</h2>
+    <p data-i18n="terms.s7b_text">El servicio de Copy Trading opera exclusivamente de lunes a jueves en horario de mercado.
+    Los viernes, s&aacute;bados y domingos no se ejecutan operaciones de copy trading debido a la alta volatilidad
+    y baja liquidez propias del cierre semanal. Las se&ntilde;ales informativas del canal VIP pueden publicarse cualquier d&iacute;a.</p>
+
     <h2 data-i18n="terms.s8_title">8. Modificaciones</h2>
     <p data-i18n="terms.s8_text">Nos reservamos el derecho de modificar estos t&eacute;rminos en cualquier momento. Los cambios ser&aacute;n
     notificados por el canal de Telegram. El uso continuado del servicio implica aceptaci&oacute;n de los nuevos t&eacute;rminos.</p>
@@ -14040,19 +14045,29 @@ def analizar_activo(nombre, ticker):
             print(f"🕐 HORARIO: {nombre} — fuera de horario — descartado")
             return
 
-        # ⭐ CLASIFICACIÓN DE SEÑALES — Premium vs Standard
-        # FIX 2026-03-27: 70%→50% confianza premium, permitir STANDARD (score≥3, conf≥40%)
-        # FIX 2026-03-31: score=3 usa umbral 25% (mismo que MULTI-IA) — evita descartar Momentum válido
-        # Con ML bypass=0, 70% era casi imposible de alcanzar → 0 señales en 2 días
-        _es_premium = (score >= 4 and confianza_total >= 50)
-        _es_standard = (score >= 3 and confianza_total >= (25 if score <= 3 else 40))
+        # ⭐ CLASIFICACIÓN DE SEÑALES — PREMIUM + STANDARD
+        # FIX 2026-04-12: Relajar a score>=3.5 conf>=55% para no perder señales válidas
+        # Score>=4 + conf>=65% era demasiado restrictivo (eliminaba ~40% señales)
+        _es_premium = (score >= 4 and confianza_total >= 65)
+        _es_standard = (score >= 3.5 and confianza_total >= 55)
+
+        # Bloquear SELL en tendencia alcista SOLO si RSI no indica sobrecompra
+        # FIX 2026-04-12: RSI>70 = oportunidad de reversión incluso en tendencia alcista
+        if tipo == "VENTA" and diagnostico.get("ema_bull", False):
+            _rsi_val = diagnostico.get("rsi", 50)
+            if _rsi_val < 70:
+                print(f"🔒 FILTRO: {nombre} VENTA bloqueada — tendencia alcista + RSI {_rsi_val:.0f}<70 → sin sobrecompra")
+                return
+            else:
+                print(f"🔄 VENTA permitida en alcista: {nombre} RSI {_rsi_val:.0f}>=70 (sobrecompra = oportunidad reversión)")
 
         if _es_premium:
             _nivel_senal = "PREMIUM"
         elif _es_standard:
             _nivel_senal = "STANDARD"
+            print(f"📊 STANDARD: {nombre} {tipo} Score:{score}/5 Conf:{confianza_total}% — cumple umbral relajado")
         else:
-            print(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo → descartada")
+            print(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo (≥3.5 score, ≥55% conf) → descartada")
             return
 
         # ═══ C-03 FIX: RESERVA ATÓMICA — Todos los checks + reserva en UN lock ═══
@@ -17002,23 +17017,23 @@ PAR_PROFILES = {
     # ━━━━ XAUUSD (GOLD) — London + NY session, tendencia alcista fuerte ━━━━
     "XAUUSD": {
         "identity": {"mt5": "XAUUSD", "yf": "GC=F", "display": "GOLD", "category": "materia_prima", "currencies": ["XAU", "USD"], "pip_size": 0.01},
-        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 75, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.5, "vol_min_extrema": 0.05, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 30, "rsi_ob": 75, "adx_min": 20, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.5, "vol_min_extrema": 0.05, "ml_umbral": 53.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
-        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 3.0},
-        "time_filter": {"best_hours_utc": [(7, 22)], "peak_hours_utc": [(8, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "sl_tp": {"sl_mult": 1.0, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 5.0},
+        "time_filter": {"best_hours_utc": [(7, 21)], "peak_hours_utc": [(8, 17)], "best_days": [0, 1, 2, 3, 4]},  # FIX 2026-04-12: Restaurar London open (7h) + late NY (21h)
         "news": {"currencies": ["XAU", "USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 30},
     },
     # ━━━━ US100 (NASDAQ) — NY session 13:30-21:45 UTC (futuros NQ=F) ━━━━
     # Tendencia alcista → COMPRA | Tendencia bajista → VENTA | Neutral → bloqueado
     "US100Cash": {
         "identity": {"mt5": "US100Cash", "yf": "NQ=F", "display": "NASDAQ", "category": "indice", "currencies": ["USD"], "pip_size": 0.01},
-        "premium": {"enabled": True, "strategies": ["breakout", "momentum", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 78, "adx_min": 13, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.5, "vol_min_extrema": 0.05, "ml_umbral": 53.0, "min_score": 3, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
+        "premium": {"enabled": True, "strategies": ["breakout", "reversal_4", "reversal_5"], "rsi_period": 14, "rsi_os": 35, "rsi_ob": 78, "adx_min": 18, "bb_squeeze": 0.005, "min_atr": 0.5, "vol_breakout": 0.5, "vol_min_extrema": 0.05, "ml_umbral": 53.0, "min_score": 4, "rsi_gate_buy": None, "rsi_gate_sell": None, "adx_gate": None, "rev4_allowed": True},
         "risk": {"risk_pct": 0.005, "max_sl_pips": 500},
-        "sl_tp": {"sl_mult": 0.7, "tp1_mult": 2.2, "tp2_mult": 3.0, "tp3_mult": 4.0, "ze_mult": 0.2, "min_sl": 20.0},
-        "time_filter": {"best_hours_utc": [(13, 22)], "peak_hours_utc": [(13, 17)], "best_days": [0, 1, 2, 3, 4]},
+        "sl_tp": {"sl_mult": 0.8, "tp1_mult": 1.8, "tp2_mult": 2.6, "tp3_mult": 3.5, "ze_mult": 0.2, "min_sl": 25.0},
+        "time_filter": {"best_hours_utc": [(13, 21)], "peak_hours_utc": [(14, 17)], "best_days": [0, 1, 2, 3, 4]},
         "news": {"currencies": ["USD"], "block_minutes_before": 30, "reduce_minutes_before": 60},
-        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 20},
+        "behavior": {"solo_sell": False, "solo_buy": False, "block_buy": False, "block_sell": False, "max_positions": 2, "cooldown_minutes": 30},
     },
     # ━━━━ US500 (S&P 500) — NYSE session 13:00-21:00 UTC, tendencia ambas direcciones ━━━━
     "US500Cash": {
@@ -17421,37 +17436,49 @@ def _trailing_stop_dinamico(posicion, precio_actual, indicadores):
 
 def _factor_sesion(ticker):
     """
-    Retorna multiplicador de lote basado en sesión de mercado.
+    FIX 2026-04-10: Sesión más estricta — evitar horas de baja calidad.
+    - Madrugada/Asia 00:00-07:00 UTC → 0.3 (bloqueará señales)
     - London open 7:00-8:00 UTC → 0.5 (spreads altos)
-    - NY open 13:30-14:30 UTC → 0.7 (volátil)
-    - London-NY overlap 14:00-17:00 UTC → 1.0 (mejor liquidez)
-    - Late NY 20:00-22:00 UTC → 0.5 (baja liquidez)
-    - Otherwise → 0.8
+    - London core 8:00-13:00 UTC → 0.8 (buena para GOLD/Forex)
+    - NY open 13:30-14:30 UTC → 0.8 (volátil pero operable)
+    - London-NY overlap 14:00-17:00 UTC → 1.0 (MEJOR sesión)
+    - NY afternoon 17:00-20:00 UTC → 0.7 (aceptable)
+    - Late NY 20:00-22:00 UTC → 0.4 (baja liquidez)
+    - Cierre 22:00+ → 0.3 (bloqueará señales)
     """
     try:
         now_utc = datetime.now(pytz.UTC)
         hora_utc = now_utc.hour + now_utc.minute / 60.0
 
+        # Madrugada/Asia: muy baja calidad
+        if hora_utc < 7.0:
+            return 0.3
+
         # London open: spreads altos
         if 7.0 <= hora_utc < 8.0:
             return 0.5
 
-        # NY open: volatilidad de apertura
-        if 13.5 <= hora_utc < 14.5:
-            return 0.7
+        # London core: buena sesión
+        if 8.0 <= hora_utc < 13.0:
+            return 0.8
+
+        # NY open: volátil
+        if 13.0 <= hora_utc < 14.0:
+            return 0.8
 
         # London-NY overlap: MEJOR sesión (máxima liquidez)
         if 14.0 <= hora_utc < 17.0:
             return 1.0
 
-        # Late NY: baja liquidez
-        if 20.0 <= hora_utc < 22.0:
-            return 0.5
+        # NY afternoon: aceptable
+        if 17.0 <= hora_utc < 20.0:
+            return 0.7
 
-        return 0.8
+        # Late NY / cierre: mala calidad
+        return 0.4
 
     except Exception:
-        return 0.8
+        return 0.5
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
