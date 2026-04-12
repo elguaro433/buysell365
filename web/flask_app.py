@@ -1147,7 +1147,7 @@ if('serviceWorker' in navigator){{
     <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/5</span></h1>
     <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
     <div class="hero-buttons">
-      <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px">\U0001f680 Empezar Ahora</a>
+      <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px"><span data-i18n="hero.btn_start">\U0001f680 Empezar Ahora</span></a>
       <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
       <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Telegram</span></a>
     </div>
@@ -1313,20 +1313,20 @@ if('serviceWorker' in navigator){{
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,255,200,.05),rgba(0,100,255,.05));border:1px solid rgba(0,212,170,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00ffc8,#00d4aa);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">1</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4f2</div>
-      <h3 style="color:#00ffc8;font-size:1.1rem;margin-bottom:8px">Únete al Canal VIP</h3>
-      <p style="color:var(--text2);font-size:.9rem">Activa el canal VIP y obt\u00e9n acceso completo al bot de trading y soporte prioritario.</p>
+      <h3 style="color:#00ffc8;font-size:1.1rem;margin-bottom:8px" data-i18n="how.step1_title">\u00danete al Canal VIP</h3>
+      <p style="color:var(--text2);font-size:.9rem" data-i18n="how.step1_desc">Activa el canal VIP y obt\u00e9n acceso completo al bot de trading y soporte prioritario.</p>
     </div>
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(255,200,0,.05),rgba(255,150,0,.05));border:1px solid rgba(255,200,0,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#ffd700,#f0b90b);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">2</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4ca</div>
-      <h3 style="color:#ffd700;font-size:1.1rem;margin-bottom:8px">Recibe Se\u00f1ales</h3>
-      <p style="color:var(--text2);font-size:.9rem">Nuestra IA analiza +20 activos cada 3 minutos y te env\u00eda se\u00f1ales con Entry, TP y SL exactos.</p>
+      <h3 style="color:#ffd700;font-size:1.1rem;margin-bottom:8px" data-i18n="how.step2_title">Recibe Se\u00f1ales</h3>
+      <p style="color:var(--text2);font-size:.9rem" data-i18n="how.step2_desc">Nuestra IA analiza +20 activos cada 3 minutos y te env\u00eda se\u00f1ales con Entry, TP y SL exactos.</p>
     </div>
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,230,118,.05),rgba(0,180,90,.05));border:1px solid rgba(0,230,118,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00e676,#00c853);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">3</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4b0</div>
-      <h3 style="color:#00e676;font-size:1.1rem;margin-bottom:8px">Opera o Copia</h3>
-      <p style="color:var(--text2);font-size:.9rem">Ejecuta las se\u00f1ales manualmente o activa el Copy Trading para que se copien automaticamente en tu MT5.</p>
+      <h3 style="color:#00e676;font-size:1.1rem;margin-bottom:8px" data-i18n="how.step3_title">Opera o Copia</h3>
+      <p style="color:var(--text2);font-size:.9rem" data-i18n="how.step3_desc">Ejecuta las se\u00f1ales manualmente o activa el Copy Trading para que se copien autom\u00e1ticamente en tu MT5.</p>
     </div>
   </div>
 </section>
@@ -1545,8 +1545,8 @@ if('serviceWorker' in navigator){{
 <!-- WHY CHOOSE US -->
 <section class="fade-in" style="padding:60px 20px">
   <div class="section-title" style="margin-bottom:32px">
-    <h2>\U0001f3c6 <span>Por Qu\u00e9 Elegirnos</span></h2>
-    <p>Lo que nos diferencia de otros servicios de se\u00f1ales</p>
+    <h2>\U0001f3c6 <span data-i18n="why.title">Por Qu\u00e9 Elegirnos</span></h2>
+    <p data-i18n="why.subtitle">Lo que nos diferencia de otros servicios de se\u00f1ales</p>
   </div>
   <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;max-width:1100px;margin:0 auto">
     <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
@@ -1554,32 +1554,32 @@ if('serviceWorker' in navigator){{
          onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
          >
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f916</div>
-      <h4 style="color:#00ffc8;margin-bottom:8px">IA Real, No Opiniones</h4>
-      <p style="color:var(--text2);font-size:.85rem">Nuestro bot analiza datos reales cada 3 minutos. Sin emociones, sin sesgos — solo datos y algoritmos.</p>
+      <h4 style="color:#00ffc8;margin-bottom:8px" data-i18n="why.ai_title">IA Real, No Opiniones</h4>
+      <p style="color:var(--text2);font-size:.85rem" data-i18n="why.ai_desc">Nuestro bot analiza datos reales cada 3 minutos. Sin emociones, sin sesgos \u2014 solo datos y algoritmos.</p>
     </div>
     <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
          onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
          onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
          >
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4b0</div>
-      <h4 style="color:#ffd700;margin-bottom:8px">Copy Trading Sin Cuota</h4>
-      <p style="color:var(--text2);font-size:.85rem">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias reales.</p>
+      <h4 style="color:#ffd700;margin-bottom:8px" data-i18n="why.copy_title">Copy Trading Sin Cuota</h4>
+      <p style="color:var(--text2);font-size:.85rem" data-i18n="why.copy_desc">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias reales.</p>
     </div>
     <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
          onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
          onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
          >
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4ca</div>
-      <h4 style="color:#00e676;margin-bottom:8px">100% Transparente</h4>
-      <p style="color:var(--text2);font-size:.85rem">Dashboard p\u00fablico con resultados en vivo. Cada operaci\u00f3n visible con entrada, SL, TP y resultado.</p>
+      <h4 style="color:#00e676;margin-bottom:8px" data-i18n="why.transparent_title">100% Transparente</h4>
+      <p style="color:var(--text2);font-size:.85rem" data-i18n="why.transparent_desc">Dashboard p\u00fablico con resultados en vivo. Cada operaci\u00f3n visible con entrada, SL, TP y resultado.</p>
     </div>
     <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
          onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
          onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
          >
       <div style="font-size:2.2rem;margin-bottom:10px">\u26a1</div>
-      <h4 style="color:#a855f7;margin-bottom:8px">Ejecuci\u00f3n Instant\u00e1nea</h4>
-      <p style="color:var(--text2);font-size:.85rem">Las se\u00f1ales se ejecutan en menos de 1 segundo. Sin retrasos, sin slippage. Tu cuenta siempre sincronizada.</p>
+      <h4 style="color:#a855f7;margin-bottom:8px" data-i18n="why.instant_title">Ejecuci\u00f3n Instant\u00e1nea</h4>
+      <p style="color:var(--text2);font-size:.85rem" data-i18n="why.instant_desc">Las se\u00f1ales se ejecutan en menos de 1 segundo. Sin retrasos, sin slippage. Tu cuenta siempre sincronizada.</p>
     </div>
   </div>
 </section>
@@ -1587,12 +1587,12 @@ if('serviceWorker' in navigator){{
 <!-- SIGNAL PREVIEW -->
 <section style="padding:60px 20px;text-align:center" class="fade-in">
 <div style="max-width:500px;margin:0 auto">
-    <div style="font-size:11px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px">&#128227; Ejemplo de Se\u00f1al en Vivo</div>
-    <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:20px;background:linear-gradient(135deg,#fff 20%,#a78bfa 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">As\u00ed Recibir\u00e1s las Se\u00f1ales</h2>
+    <div style="font-size:11px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px" data-i18n="signal.badge">&#128227; Ejemplo de Se\u00f1al en Vivo</div>
+    <h2 style="font-size:1.6rem;font-weight:800;margin-bottom:20px;background:linear-gradient(135deg,#fff 20%,#a78bfa 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text" data-i18n="signal.title">As\u00ed Recibir\u00e1s las Se\u00f1ales</h2>
     <div style="background:linear-gradient(135deg,#0f1e2e,#1a0d2e);border:1px solid rgba(0,212,170,.3);border-radius:16px;padding:24px;text-align:left;margin-bottom:24px;box-shadow:0 4px 30px rgba(0,212,170,0.08)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
             <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#00d4aa,#00a080);display:flex;align-items:center;justify-content:center;font-size:18px">&#129302;</div>
-            <div><div style="font-weight:700;font-size:14px;color:#fff">BuySell365 Pro</div><div style="font-size:10px;color:#5a6a7a">Canal de Se\u00f1ales</div></div>
+            <div><div style="font-weight:700;font-size:14px;color:#fff">BuySell365 Pro</div><div style="font-size:10px;color:#5a6a7a" data-i18n="signal.channel">Canal de Se\u00f1ales</div></div>
         </div>
         <div style="font-size:14px;line-height:1.8;color:#e2e8f0">
             <div style="color:#ff3b30;font-weight:800;font-size:16px">&#128308; VENTA &mdash; AUD/JPY</div>
@@ -1602,18 +1602,18 @@ if('serviceWorker' in navigator){{
             <div style="margin-top:8px;font-size:12px;color:#7a90a8">Rendimiento en vivo &bull; <a href="/dashboard" style="color:#00d4aa;text-decoration:none">Ver Dashboard &rarr;</a></div>
         </div>
     </div>
-    <p style="color:#8a9ab5;font-size:13px;margin-bottom:12px">Recibe alertas como esta directamente en tu Telegram</p>
+    <p style="color:#8a9ab5;font-size:13px;margin-bottom:12px" data-i18n="signal.receive">Recibe alertas como esta directamente en tu Telegram</p>
 </div>
 </section>
 
 <!-- CTA -->
 <section class="cta fade-in" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
-  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Empieza a Operar con IA</span></h2>
-  <p style="font-size:1.1rem">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
+  <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text" data-i18n="cta.title">Empieza a Operar con IA</span></h2>
+  <p style="font-size:1.1rem" data-i18n="cta.subtitle">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
   <div class="hero-buttons">
-    <a href="#pricing" class="btn btn-primary">\U0001f451 Ver Planes</a>
+    <a href="#pricing" class="btn btn-primary"><span data-i18n="cta.plans">\U0001f451 Ver Planes</span></a>
     <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-secondary" style="border-color:rgba(0,230,118,0.3);color:#00e676">&#128640; Copy Trading</a>
-    <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4ac Comunidad Gratis</a>
+    <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary"><span data-i18n="cta.community">\U0001f4ac Comunidad Gratis</span></a>
   </div>
 </section>
 
@@ -1629,14 +1629,14 @@ if('serviceWorker' in navigator){{
 <footer class="footer">
   <div class="footer-links">
     <a href="/dashboard">\U0001f4ca <span data-i18n="footer.dashboard">Trading en Vivo</span></a>
-    <a href="/about">\U0001f465 Qui\u00e9nes Somos</a>
+    <a href="/about">\U0001f465 <span data-i18n="footer.about">Qui\u00e9nes Somos</span></a>
     <a href="/terminos">\U0001f4dc <span data-i18n="footer.terms">T\u00e9rminos</span></a>
     <a href="/privacidad">\U0001f512 <span data-i18n="footer.privacy">Privacidad</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank">\U0001f4e2 <span data-i18n="footer.telegram">Telegram</span></a>
     <a href="mailto:soporte@buysell365.pro">\U0001f4e7 <span data-i18n="footer.email">soporte@buysell365.pro</span></a>
   </div>
   <p data-i18n="footer.rights">\u00a9 2026 BuySell365 Pro. Todos los derechos reservados.</p>
-  <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)">BuySell365 Pro &mdash; Trading con Inteligencia Artificial</p>
+  <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)" data-i18n="footer.tagline">BuySell365 Pro &mdash; Trading con Inteligencia Artificial</p>
   <p style="margin-top:4px;font-size:0.7rem;color:#4a5568">Creador: Emmanuel Diaz</p>
   <p style="margin-top:8px;font-size:0.7rem;color:#4a5568">
     \u26a0\ufe0f <span data-i18n="footer.disclaimer">Trading con riesgo. Rendimientos pasados no garantizan resultados futuros. Opera bajo tu propia responsabilidad.</span>
