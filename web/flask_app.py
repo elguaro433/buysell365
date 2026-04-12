@@ -1637,7 +1637,7 @@ if('serviceWorker' in navigator){{
   </div>
   <p data-i18n="footer.rights">\u00a9 2026 BuySell365 Pro. Todos los derechos reservados.</p>
   <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)" data-i18n="footer.tagline">BuySell365 Pro &mdash; Trading con Inteligencia Artificial</p>
-  <p style="margin-top:4px;font-size:0.7rem;color:#4a5568">Creador: Emmanuel Diaz</p>
+  <p style="margin-top:4px;font-size:0.7rem;color:#4a5568" data-i18n="footer.creator">Creador: Emmanuel Diaz</p>
   <p style="margin-top:8px;font-size:0.7rem;color:#4a5568">
     \u26a0\ufe0f <span data-i18n="footer.disclaimer">Trading con riesgo. Rendimientos pasados no garantizan resultados futuros. Opera bajo tu propia responsabilidad.</span>
   </p>
@@ -1729,7 +1729,7 @@ if('serviceWorker' in navigator){{
             Object.keys(obj).forEach(function(k){{ text = text.replace('{{'+k+'}}', obj[k]); }});
           }}catch(e){{}}
         }}
-        if(text.includes('<br') || text.includes('<span') || text.includes('<strong')){{
+        if(text.includes('<') && text.includes('>')){{
           el.innerHTML = text;
         }}else{{
           el.textContent = text;
@@ -2403,7 +2403,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
         <p style="margin-top:8px;font-size:0.7rem;color:#888;max-width:700px;margin-left:auto;margin-right:auto">
             &#9888; <strong data-i18n="dash.footer_legal_title">Aviso legal:</strong> <span data-i18n="dash.footer_legal">BuySell365 Pro es una herramienta de an&aacute;lisis t&eacute;cnico automatizado con fines informativos y educativos. No constituye asesor&iacute;a financiera, recomendaci&oacute;n de inversi&oacute;n ni oferta de servicios regulados. Operar en mercados financieros conlleva riesgo de p&eacute;rdida de capital. Resultados pasados no garantizan resultados futuros. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n.</span>
         </p>
-        <p style="margin-top:6px;font-size:0.65rem;color:#666">Creador: Emmanuel Diaz</p>
+        <p style="margin-top:6px;font-size:0.65rem;color:#666" data-i18n="footer.creator">Creador: Emmanuel Diaz</p>
     </div>
 
 </div>
