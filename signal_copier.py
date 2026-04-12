@@ -132,6 +132,9 @@ def fmt_price(v, zero_label="—"):
     return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
 
 
+# FIX 2026-04-12: Lock para yfinance — evita race condition entre señales simultáneas
+_lock_yf = threading.Lock()
+
 # === TP TRACKER ===
 # _open_signals: { sig_id → {"signal": signal_dict, "sent_at": float, "telegram_msg_id": int} }
 _open_signals: dict = {}
@@ -289,22 +292,23 @@ def _get_current_price(pair: str) -> float | None:
         try:
             import yfinance as yf
             import warnings, io, sys
-            # Suprimir stderr/stdout de yfinance (evitar spam "possibly delisted")
-            _old_stderr = sys.stderr
-            sys.stderr = io.StringIO()
-            try:
-                tk = yf.Ticker(yf_ticker)
-                val = getattr(tk.fast_info, 'last_price', None)
-                if val and val > 0:
-                    return float(val)
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    data = tk.history(period="1d", interval="5m")
-                if data is not None and not data.empty:
-                    val = float(data["Close"].iloc[-1])
-                    return val if val > 0 else None
-            finally:
-                sys.stderr = _old_stderr
+            # FIX 2026-04-12: Lock para evitar race condition entre señales simultáneas
+            with _lock_yf:
+                _old_stderr = sys.stderr
+                sys.stderr = io.StringIO()
+                try:
+                    tk = yf.Ticker(yf_ticker)
+                    val = getattr(tk.fast_info, 'last_price', None)
+                    if val and val > 0:
+                        return float(val)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        data = tk.history(period="1d", interval="5m")
+                    if data is not None and not data.empty:
+                        val = float(data["Close"].iloc[-1])
+                        return val if val > 0 else None
+                finally:
+                    sys.stderr = _old_stderr
         except Exception as e:
             log.warning(f"⚠️ yfinance falló para {pair} ({yf_ticker}): {e}")
 
@@ -421,14 +425,16 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
                         _yf_ticker = f"{pair}=X"
                     else:
                         _yf_ticker = pair
-                _old_stderr = _sys_yf.stderr
-                _sys_yf.stderr = io.StringIO()
-                try:
-                    with warnings.catch_warnings():
-                        warnings.simplefilter("ignore")
-                        _df = yf.download(_yf_ticker, period="1d", interval="5m", progress=False)
-                finally:
-                    _sys_yf.stderr = _old_stderr
+                # FIX 2026-04-12: Lock para evitar race condition
+                with _lock_yf:
+                    _old_stderr = _sys_yf.stderr
+                    _sys_yf.stderr = io.StringIO()
+                    try:
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore")
+                            _df = yf.download(_yf_ticker, period="1d", interval="5m", progress=False)
+                    finally:
+                        _sys_yf.stderr = _old_stderr
                 if _df is not None and len(_df) >= 10:
                     # Handle both single and multi-level columns
                     _cols = _df.columns
