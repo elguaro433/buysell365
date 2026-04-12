@@ -66,8 +66,8 @@ SYMBOL_MAP = {
     "US30": "US30Cash", "DOW": "US30Cash", "DJ30": "US30Cash",
     "SPX500": "US500Cash", "SP500": "US500Cash", "US500": "US500Cash",
     "GER40": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
-    # Petróleo
-    "BRENT": "BRENT", "UKOIL": "BRENT", "OIL": "BRENT",
+    # Petróleo — XM usa "BRENTCash" y "OILCash"
+    "BRENT": "BRENTCash", "UKOIL": "BRENTCash", "OIL": "BRENTCash",
     # Pares USD principales
     "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF",
@@ -86,10 +86,11 @@ SYMBOL_MAP = {
     # Otros
     "NZDCAD": "NZDCAD", "NZDCHF": "NZDCHF",
     "CADCHF": "CADCHF",
-    # Petróleo (Sureshot INDICES envía USOIL)
-    "USOIL": "USOILCash", "WTI": "USOILCash", "CRUDEOIL": "USOILCash",
+    # Petróleo — XM usa "OILCash" (WTI) y "BRENTCash" (Brent)
+    "USOIL": "OILCash", "WTI": "OILCash", "CRUDEOIL": "OILCash",
     # Crypto (FxPremiere envía BTC/USD)
-    "BTCUSD": "BTCUSDm",
+    # FIX 2026-04-12: XM usa "BTCUSD" (no "BTCUSDm")
+    "BTCUSD": "BTCUSD",
 }
 
 MAGIC_COPIER = 20260325
@@ -98,20 +99,20 @@ TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 # Mapa de nombres para display — FIX 2026-04-06: mantener nombres originales del mercado
 # Antes: US30→"DOW 30", XAUUSD→"XAU/USD" — el usuario quiere los nombres estándar de trading
 _DISPLAY_MAP = {
-    # MT5 symbols → nombre estándar
+    # MT5 symbols → nombre estándar de display
     "GOLD": "XAUUSD", "US100Cash": "NAS100", "US500Cash": "US500",
-    "US30Cash": "US30", "GER40Cash": "GER40", "BRENT": "BRENT",
+    "US30Cash": "US30", "GER40Cash": "GER40", "BRENTCash": "BRENT", "OILCash": "USOIL",
     # Aliases → nombre estándar
     "XAUUSD": "XAUUSD", "ORO": "XAUUSD",
     "NAS100": "NAS100", "NASDAQ": "NAS100", "NASDAQ100": "NAS100", "NQ": "NAS100", "US100": "NAS100",
     "US30": "US30", "DOW": "US30", "DJ30": "US30",
     "SPX500": "US500", "SP500": "US500", "US500": "US500",
     "GER40": "GER40", "DAX": "GER40", "DE40": "GER40",
-    "UKOIL": "BRENT", "OIL": "BRENT",
+    "BRENT": "BRENT", "UKOIL": "BRENT", "OIL": "BRENT",
     # Petróleo WTI
-    "USOIL": "USOIL", "WTI": "USOIL", "USOILCash": "USOIL",
+    "USOIL": "USOIL", "WTI": "USOIL",
     # Crypto
-    "BTCUSD": "BTC/USD", "BTCUSDm": "BTC/USD",
+    "BTCUSD": "BTC/USD",
 }
 
 def _get_display_pair(pair: str) -> str:
@@ -214,16 +215,20 @@ _published_msg_ids: set = set()  # msg_ids ya publicados como señal completa (e
 
 def _normalize_twelve_symbol(pair: str) -> str:
     """Convierte símbolo interno → formato Twelve Data (XAU/USD, NDX, etc.)."""
+    # FIX 2026-04-12: Mapa COMPLETO — todos los pares que pueden llegar al chart generator
     _twelve_map = {
-        # ORO
+        # Oro
         "GOLD": "XAU/USD", "XAUUSD": "XAU/USD", "GC": "XAU/USD", "XAUUSD=X": "XAU/USD",
-        # Índices — tickers yfinance sin sufijo → símbolo Twelve Data
+        # Índices
         "US100Cash": "NDX",  "NQ": "NDX",  "NAS100": "NDX",  "NASDAQ": "NDX",
         "US500Cash": "SPX",  "ES": "SPX",  "SP500": "SPX",
         "US30Cash":  "DJI",  "YM": "DJI",  "DOW30": "DJI",
         "GER40Cash": "GER40", "GER40": "GER40", "DAX": "GER40", "DE40": "GER40",
-        # Commodities
-        "BRENT": "BRENT",
+        # Petróleo
+        "BRENT": "BRENT", "BRENTCash": "BRENT", "UKOIL": "BRENT",
+        "OILCash": "WTI/USD", "USOIL": "WTI/USD", "USOILCash": "WTI/USD", "WTI": "WTI/USD",
+        # Crypto
+        "BTCUSD": "BTC/USD",
     }
     if pair in _twelve_map:
         return _twelve_map[pair]
@@ -237,18 +242,38 @@ def _get_current_price(pair: str) -> float | None:
     """Fetch current price via yfinance (gratis, sin límite).
     Twelve Data se reserva SOLO para gráficos de velas.
     """
+    # FIX 2026-04-12: Mapa COMPLETO — todos los pares que SYMBOL_MAP puede recibir
     _yf_map = {
-        "GOLD": "GC=F", "XAUUSD": "GC=F",  # FIX 2026-04-07: XAUUSD=X delisted — usar GC=F (COMEX futures)
-        "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
-        "GBPJPY": "GBPJPY=X", "AUDCAD": "AUDCAD=X", "USDCAD": "USDCAD=X",
-        "EURCHF": "EURCHF=X", "GBPAUD": "GBPAUD=X", "EURJPY": "EURJPY=X",
-        "NZDUSD": "NZDUSD=X", "AUDUSD": "AUDUSD=X",
+        # Oro
+        "GOLD": "GC=F", "XAUUSD": "GC=F",
+        # Índices
         "US100Cash": "NQ=F", "US500Cash": "ES=F", "US30Cash": "YM=F",
         "NAS100": "NQ=F", "US100": "NQ=F", "NASDAQ": "NQ=F",
         "US30": "YM=F", "DOW30": "YM=F", "DJ30": "YM=F", "DOW": "YM=F",
         "US500": "ES=F", "SP500": "ES=F",
         "GER40Cash": "GER40=X", "GER40": "GER40=X", "DAX": "GER40=X",
-        "BRENT": "BZ=F",
+        # Petróleo
+        "BRENT": "BZ=F", "BRENTCash": "BZ=F", "UKOIL": "BZ=F",
+        "OILCash": "CL=F", "USOIL": "CL=F", "USOILCash": "CL=F", "WTI": "CL=F",
+        # Crypto — XM usa "BTCUSD"
+        "BTCUSD": "BTC-USD",
+        # Forex — pares USD principales
+        "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
+        "AUDUSD": "AUDUSD=X", "NZDUSD": "NZDUSD=X", "USDCAD": "USDCAD=X",
+        "USDCHF": "USDCHF=X",
+        # Forex — pares GBP
+        "GBPJPY": "GBPJPY=X", "GBPAUD": "GBPAUD=X", "GBPNZD": "GBPNZD=X",
+        "GBPCAD": "GBPCAD=X", "GBPCHF": "GBPCHF=X",
+        # Forex — pares EUR
+        "EURJPY": "EURJPY=X", "EURCHF": "EURCHF=X", "EURAUD": "EURAUD=X",
+        "EURGBP": "EURGBP=X", "EURCAD": "EURCAD=X", "EURNZD": "EURNZD=X",
+        # Forex — pares AUD
+        "AUDCAD": "AUDCAD=X", "AUDJPY": "AUDJPY=X", "AUDNZD": "AUDNZD=X",
+        "AUDCHF": "AUDCHF=X",
+        # Forex — pares JPY cruzados
+        "NZDJPY": "NZDJPY=X", "CADJPY": "CADJPY=X", "CHFJPY": "CHFJPY=X",
+        # Forex — otros
+        "NZDCAD": "NZDCAD=X", "NZDCHF": "NZDCHF=X", "CADCHF": "CADCHF=X",
     }
     yf_ticker = _yf_map.get(pair)
     if not yf_ticker:
@@ -1023,13 +1048,35 @@ async def _monitor_tp_loop() -> None:
             price = None
             try:
                 import MetaTrader5 as _mt5_check
+                # FIX 2026-04-12: Mapa COMPLETO — todos los pares que SYMBOL_MAP puede recibir
                 _mt5_sym_map = {
+                    # Oro
                     "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
-                    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "US100CASH": "US100Cash",
-                    "US30": "US30Cash", "DOW30": "US30Cash", "DJ30": "US30Cash", "US30CASH": "US30Cash",
-                    "US500": "US500Cash", "SP500": "US500Cash", "US500CASH": "US500Cash",
-                    "USOIL": "OILCash", "OILCASH": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
+                    # Índices
+                    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "US100CASH": "US100Cash", "NQ": "US100Cash",
+                    "US30": "US30Cash", "DOW": "US30Cash", "DOW30": "US30Cash", "DJ30": "US30Cash", "US30CASH": "US30Cash",
+                    "US500": "US500Cash", "SP500": "US500Cash", "SPX500": "US500Cash", "US500CASH": "US500Cash",
+                    "GER40": "GER40Cash", "GER40CASH": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
+                    # Petróleo
+                    "USOIL": "OILCash", "USOILCASH": "OILCash", "OILCASH": "OILCash", "OIL": "OILCash", "WTI": "OILCash",
+                    "BRENT": "BRENTCash", "UKOIL": "BRENTCash",
+                    # Crypto — XM usa "BTCUSD" (no BTCUSDm)
                     "BTCUSD": "BTCUSD", "BTCUSDM": "BTCUSD",
+                    # Forex — pares USD
+                    "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "AUDUSD": "AUDUSD",
+                    "NZDUSD": "NZDUSD", "USDCAD": "USDCAD", "USDCHF": "USDCHF", "USDJPY": "USDJPY",
+                    # Forex — pares GBP
+                    "GBPJPY": "GBPJPY", "GBPAUD": "GBPAUD", "GBPNZD": "GBPNZD",
+                    "GBPCAD": "GBPCAD", "GBPCHF": "GBPCHF",
+                    # Forex — pares EUR
+                    "EURJPY": "EURJPY", "EURAUD": "EURAUD", "EURGBP": "EURGBP",
+                    "EURCHF": "EURCHF", "EURCAD": "EURCAD", "EURNZD": "EURNZD",
+                    # Forex — pares AUD
+                    "AUDJPY": "AUDJPY", "AUDCAD": "AUDCAD", "AUDNZD": "AUDNZD", "AUDCHF": "AUDCHF",
+                    # Forex — pares JPY cruzados
+                    "NZDJPY": "NZDJPY", "CADJPY": "CADJPY", "CHFJPY": "CHFJPY",
+                    # Forex — otros
+                    "NZDCAD": "NZDCAD", "NZDCHF": "NZDCHF", "CADCHF": "CADCHF",
                 }
                 # Resolver símbolo MT5: primero mapa, luego quitar /
                 _pair_clean = pair.upper().replace("/", "")
