@@ -1261,9 +1261,18 @@ if('serviceWorker' in navigator){{
           &#128640; Empezar Copy Trading<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Ya tengo cuenta XM</span>
         </a>
       </div>
-      <a href="/static/BuySell365_Guia_CopyTrading.pdf" download style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding:12px 20px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.05));border:1.5px solid rgba(59,130,246,.4);border-radius:12px;color:#60a5fa;font-weight:700;font-size:13px;text-decoration:none;transition:all .3s">
-        &#128218; Descargar Gu\u00eda Copy Trading (PDF)<span style="font-size:10px;opacity:.7;margin-left:4px">Paso a paso desde cero</span>
+      <a id="guide-pdf-btn" href="/static/BuySell365_Guia_CopyTrading.pdf" download style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding:12px 20px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.05));border:1.5px solid rgba(59,130,246,.4);border-radius:12px;color:#60a5fa;font-weight:700;font-size:13px;text-decoration:none;transition:all .3s">
+        &#128218; <span data-i18n="pricing.guide_btn">Descargar Gu\u00eda Copy Trading (PDF)</span><span style="font-size:10px;opacity:.7;margin-left:4px" data-i18n="pricing.guide_sub">Paso a paso desde cero</span>
       </a>
+      <script>
+      (function(){{
+        var pdfMap={{es:'/static/BuySell365_Guia_CopyTrading.pdf',en:'/static/BuySell365_Guide_CopyTrading_EN.pdf',pt:'/static/BuySell365_Guide_CopyTrading_PT.pdf',fr:'/static/BuySell365_Guide_CopyTrading_FR.pdf'}};
+        function updatePdfLink(){{var lang=(localStorage.getItem('lang')||'es').toLowerCase();var btn=document.getElementById('guide-pdf-btn');if(btn)btn.href=pdfMap[lang]||pdfMap.es;}}
+        updatePdfLink();
+        window.addEventListener('storage',updatePdfLink);
+        setInterval(updatePdfLink,2000);
+      }})();
+      </script>
     </div>
   </div>
 </section>

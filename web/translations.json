@@ -240,7 +240,9 @@
     "faq.q8": "Puedo retirar mi dinero cuando quiera?",
     "faq.a8": "Si. Tu capital esta en tu propia cuenta del broker — nosotros nunca lo tocamos. Puedes retirar en cualquier momento directamente desde XM, sin restricciones ni penalizaciones de nuestra parte.",
     "faq.q9": "Que pasa si una operacion tiene perdidas?",
-    "faq.a9": "El trading siempre conlleva riesgo. Todas nuestras operaciones llevan Stop Loss automatico para limitar la exposicion. En el Copy Trading, si una operacion cierra en negativo no pagas ninguna comision — solo se cobra un pequeño % cuando hay ganancias reales."
+    "faq.a9": "El trading siempre conlleva riesgo. Todas nuestras operaciones llevan Stop Loss automatico para limitar la exposicion. En el Copy Trading, si una operacion cierra en negativo no pagas ninguna comision — solo se cobra un pequeño % cuando hay ganancias reales.",
+    "pricing.guide_btn": "Descargar Guia Copy Trading (PDF)",
+    "pricing.guide_sub": "Paso a paso desde cero"
   },
   "en": {
     "nav.technology": "Technology",
@@ -483,7 +485,9 @@
     "faq.q8": "Can I withdraw my money anytime?",
     "faq.a8": "Yes. Your capital is in your own broker account — we never touch it. You can withdraw at any time directly from XM, with no restrictions or penalties from us.",
     "faq.q9": "What happens if a trade is a loss?",
-    "faq.a9": "Trading always carries risk. All our operations include an automatic Stop Loss to limit exposure. In Copy Trading, if a trade closes negative you pay no commission — only a small % is charged when there are real profits."
+    "faq.a9": "Trading always carries risk. All our operations include an automatic Stop Loss to limit exposure. In Copy Trading, if a trade closes negative you pay no commission — only a small % is charged when there are real profits.",
+    "pricing.guide_btn": "Download Copy Trading Guide (PDF)",
+    "pricing.guide_sub": "Step by step from scratch"
   },
   "pt": {
     "nav.technology": "Tecnologia",
@@ -726,7 +730,9 @@
     "faq.q8": "Posso retirar meu dinheiro quando quiser?",
     "faq.a8": "Sim. Seu capital esta na sua propria conta do broker — nos nunca o tocamos. Voce pode retirar a qualquer momento diretamente pela XM, sem restricoes ou penalidades da nossa parte.",
     "faq.q9": "O que acontece se uma operacao tiver prejuizo?",
-    "faq.a9": "O trading sempre envolve riscos. Todas as nossas operacoes tem Stop Loss automatico para limitar a exposicao. No Copy Trading, se uma operacao fechar no negativo voce nao paga nenhuma comissao — apenas uma pequena % e cobrada quando ha lucros reais."
+    "faq.a9": "O trading sempre envolve riscos. Todas as nossas operacoes tem Stop Loss automatico para limitar a exposicao. No Copy Trading, se uma operacao fechar no negativo voce nao paga nenhuma comissao — apenas uma pequena % e cobrada quando ha lucros reais.",
+    "pricing.guide_btn": "Baixar Guia Copy Trading (PDF)",
+    "pricing.guide_sub": "Passo a passo do zero"
   },
   "fr": {
     "nav.technology": "Technologie",
@@ -969,6 +975,8 @@
     "faq.q8": "Puis-je retirer mon argent quand je veux ?",
     "faq.a8": "Oui. Votre capital est dans votre propre compte chez le broker — nous ne le touchons jamais. Vous pouvez retirer a tout moment directement depuis XM, sans restrictions ni penalites de notre part.",
     "faq.q9": "Que se passe-t-il si une operation est perdante ?",
-    "faq.a9": "Le trading comporte toujours des risques. Toutes nos operations ont un Stop Loss automatique pour limiter l'exposition. En Copy Trading, si une operation se cloture en negatif vous ne payez aucune commission — seulement un petit % est preleve lorsqu'il y a de vrais benefices."
+    "faq.a9": "Le trading comporte toujours des risques. Toutes nos operations ont un Stop Loss automatique pour limiter l'exposition. En Copy Trading, si une operation se cloture en negatif vous ne payez aucune commission — seulement un petit % est preleve lorsqu'il y a de vrais benefices.",
+    "pricing.guide_btn": "Telecharger Guide Copy Trading (PDF)",
+    "pricing.guide_sub": "Etape par etape depuis zero"
   }
 }
