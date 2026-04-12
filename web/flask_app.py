@@ -1267,7 +1267,7 @@ if('serviceWorker' in navigator){{
       <script>
       (function(){{
         var pdfMap={{es:'/static/BuySell365_Guia_CopyTrading.pdf',en:'/static/BuySell365_Guide_CopyTrading_EN.pdf',pt:'/static/BuySell365_Guide_CopyTrading_PT.pdf',fr:'/static/BuySell365_Guide_CopyTrading_FR.pdf'}};
-        function updatePdfLink(){{var lang=(localStorage.getItem('lang')||'es').toLowerCase();var btn=document.getElementById('guide-pdf-btn');if(btn)btn.href=pdfMap[lang]||pdfMap.es;}}
+        function updatePdfLink(){{var lang=(localStorage.getItem('buysell365_lang')||'es').toLowerCase();var btn=document.getElementById('guide-pdf-btn');if(btn)btn.href=pdfMap[lang]||pdfMap.es;}}
         updatePdfLink();
         window.addEventListener('storage',updatePdfLink);
         setInterval(updatePdfLink,2000);
