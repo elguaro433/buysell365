@@ -1572,6 +1572,21 @@ def _es_miembro_canal(user_id: str, force: bool = False) -> bool:
     return es_miembro
 
 
+def es_usuario_vip(user_id: str) -> bool:
+    """Verifica si un usuario tiene acceso VIP por cualquier vía:
+    1. Es admin (acceso permanente)
+    2. Está en suscripciones_vip con entrada_confirmada
+    3. Es miembro actual del canal VIP (añadido manualmente, etc.)
+    """
+    if str(user_id) in ADMIN_IDS:
+        return True
+    uid = str(user_id)
+    sub = suscripciones_vip.get(uid)
+    if sub and sub.get("entrada_confirmada", False):
+        return True
+    return _es_miembro_canal(uid)
+
+
 def borrar_mensaje_telegram(chat_id, message_id):
     """Elimina un mensaje de Telegram (requiere permisos de admin en grupos)."""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
@@ -6312,6 +6327,19 @@ def cmd_vip(user_id: str = None):
                 # Tratar como usuario nuevo (el menú VIP no mostrará trial si ya lo usó)
                 pass  # Cae al menú VIP normal de abajo
 
+    # ── Miembro del canal pero NO registrado en suscripciones_vip ──
+    # (añadido manualmente por admin, invitación directa, etc.)
+    if user_id and _es_miembro_canal(user_id):
+        return (
+            "👑 *VIP ACTIVO — MIEMBRO DEL CANAL*\n"
+            "━━━━━━━━━━\n\n"
+            "✅ Tienes acceso completo al canal VIP\n"
+            "✅ Senales IA con Entry, SL y TP exactos\n"
+            "✅ Analisis, panel y todas las herramientas\n"
+            "✅ Soporte directo con el admin\n\n"
+            "🔧 _Acceso concedido como miembro del canal._"
+        ), None
+
     # ── Pago pendiente: NO bloquear, integrar como info extra en menú ──
     _tiene_pago_pendiente = user_id and user_id in pagos_pendientes_vip
 
@@ -6904,11 +6932,26 @@ def cmd_vip_pendientes():
     return "\n".join(lineas)
 
 
-def cmd_vip_dar(target_id: str):
-    """Admin: otorga acceso VIP gratuito a un usuario."""
-    target_id = target_id.strip()
-    if not target_id.isdigit():
-        return "❌ Formato: `/vip_dar [user_id]`\nEjemplo: `/vip_dar 123456789`"
+def cmd_vip_dar(args: str):
+    """Admin: otorga acceso VIP gratuito a un usuario.
+    Formato: /vip_dar [user_id] [dias]   (dias es opcional, default 30)
+    Ejemplo: /vip_dar 123456789 4
+    """
+    parts = args.strip().split()
+    if not parts or not parts[0].isdigit():
+        return "❌ Formato: `/vip_dar [user_id] [dias]`\nEjemplo: `/vip_dar 123456789 4`"
+
+    target_id = parts[0]
+    dias = None
+    if len(parts) >= 2:
+        try:
+            dias = int(parts[1])
+            if dias < 1 or dias > 365:
+                return "❌ Dias debe ser entre 1 y 365."
+        except ValueError:
+            return "❌ Formato: `/vip_dar [user_id] [dias]`\nEjemplo: `/vip_dar 123456789 4`"
+
+    dias_final = dias if dias is not None else VIP_DURACION_DIAS
 
     user_data = directorio_usuarios.get(target_id, {})
     nombre = user_data.get("nombre", "Usuario")
@@ -6918,8 +6961,8 @@ def cmd_vip_dar(target_id: str):
     with _lock_ops:
         pagos_pendientes_vip.pop(target_id, None)
 
-    _otorgar_acceso_vip(target_id, nombre, username, monto=0, tx_id="admin_grant")
-    return f"✅ *VIP otorgado a {nombre}* (`{target_id}`) por {VIP_DURACION_DIAS} dias."
+    _otorgar_acceso_vip(target_id, nombre, username, monto=0, tx_id="admin_grant", dias=dias)
+    return f"✅ *VIP otorgado a {nombre}* (`{target_id}`) por {dias_final} dias."
 
 
 def cmd_vip_quitar(target_id: str):
@@ -8764,9 +8807,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return cmd_mi_cuenta(remitente), crear_teclado_principal()
     if t in ("/panel", "panel", "/inicio", "/menu", "/start panel"):
         # Panel VIP interactivo — muestra botones de análisis y herramientas
-        _es_vip_panel = (remitente in suscripciones_vip
-                         and suscripciones_vip[remitente].get("entrada_confirmada", False))
-        if _es_vip_panel or es_admin:
+        if es_usuario_vip(remitente):
             return (
                 "🏆 *Panel VIP — BuySell365 Pro*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -8830,7 +8871,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "👑 *VIP:*\n"
             "• `/vip_lista` — Suscriptores activos\n"
             "• `/vip_pendientes` — Pagos pendientes\n"
-            "• `/vip_dar [ID]` — Dar acceso VIP\n"
+            "• `/vip_dar [ID] [dias]` — Dar acceso VIP (dias opcional, default 30)\n"
             "• `/vip_quitar [ID]` — Quitar VIP\n"
             "• `/addvip [args]` — Añadir VIP manual\n"
             "• `/gencode` — Generar código invitación\n"
@@ -9031,8 +9072,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return cmd_vip_pendientes()
     if t.startswith("/vip_dar ") or t.startswith("vip_dar "):
         if not es_admin: return "⛔ Solo administradores."
-        target_id = t.replace("/vip_dar ", "").replace("vip_dar ", "").strip()
-        return cmd_vip_dar(target_id)
+        args = t.replace("/vip_dar ", "").replace("vip_dar ", "").strip()
+        return cmd_vip_dar(args)
     if t.startswith("/vip_quitar ") or t.startswith("vip_quitar "):
         if not es_admin: return "⛔ Solo administradores."
         target_id = t.replace("/vip_quitar ", "").replace("vip_quitar ", "").strip()
