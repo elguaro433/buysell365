@@ -1107,7 +1107,7 @@ if('serviceWorker' in navigator){{
     <a href="#assets" data-i18n="nav.assets">Activos</a>
     <a href="#pricing" data-i18n="nav.pricing">Servicios</a>
     <a href="/dashboard" data-i18n="nav.dashboard">Trading en Vivo</a>
-    <a href="/about">Qui\u00e9nes Somos</a>
+    <a href="/about" data-i18n="nav.about">Qui\u00e9nes Somos</a>
     <div class="lang-selector" id="langSelector" style="position:relative">
       <button class="lang-btn" onclick="toggleLangMenu()"><span id="currentFlag">\U0001f1ea\U0001f1f8</span><span style="font-size:12px;color:#00d4aa;font-weight:700">\u25bc</span></button>
       <div class="lang-menu" id="langMenu">
@@ -1118,7 +1118,7 @@ if('serviceWorker' in navigator){{
       </div>
     </div>
   </div>
-    <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker<small>&#127873; Bono 100% hasta $100</small></a>
+    <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker<small data-i18n="nav.xm_bonus">&#127873; Bono 100% hasta $100</small></a>
   <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()">
     <span></span><span></span><span></span>
   </button>
@@ -1127,7 +1127,7 @@ if('serviceWorker' in navigator){{
 <!-- MOBILE MENU OVERLAY -->
 <div class="mobile-overlay" id="mobileMenu">
   <a href="#features" onclick="closeMobileMenu()" data-i18n="nav.technology">Tecnolog\u00eda</a>
-  <a href="/about" onclick="closeMobileMenu()">Qui\u00e9nes Somos</a>
+  <a href="/about" onclick="closeMobileMenu()" data-i18n="nav.about">Qui\u00e9nes Somos</a>
   <a href="#assets" onclick="closeMobileMenu()" data-i18n="nav.assets">Activos</a>
   <a href="#pricing" onclick="closeMobileMenu()" data-i18n="nav.pricing">Precios</a>
   <a href="/dashboard" data-i18n="nav.dashboard">Trading en Vivo</a>
@@ -1223,7 +1223,7 @@ if('serviceWorker' in navigator){{
       <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
       <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">VIP Pro</div>
       <div class="price-amount" style="font-size:3.8rem;text-shadow:0 0 30px rgba(255,255,255,0.1)">
-        <span class="old">$299/mes</span>
+        <span class="old" data-i18n="pricing.old_price">$299/mes</span>
         $149<span data-i18n="pricing.month">/mes USDT</span>
       </div>
       <div style="margin:12px 0 4px;font-size:12px;color:rgba(255,215,0,.7);letter-spacing:1px" data-i18n="pricing.founders">&#9733; PRECIO ESPECIAL FUNDADORES &#9733;</div>
@@ -1255,10 +1255,10 @@ if('serviceWorker' in navigator){{
       </ul>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
         <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(255,215,0,.35);transition:all .3s;line-height:1.3">
-          &#127873; Abrir Cuenta XM<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Bono 100% hasta $100</span>
+          <span data-i18n="pricing.open_xm">&#127873; Abrir Cuenta XM</span><span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8" data-i18n="pricing.open_xm_sub">Bono 100% hasta $100</span>
         </a>
         <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(0,230,118,.4);transition:all .3s;line-height:1.3">
-          &#128640; Empezar Copy Trading<span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8">Ya tengo cuenta XM</span>
+          <span data-i18n="pricing.start_copy">&#128640; Empezar Copy Trading</span><span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8" data-i18n="pricing.start_copy_sub">Ya tengo cuenta XM</span>
         </a>
       </div>
       <a id="guide-pdf-btn" href="/static/BuySell365_Guia_CopyTrading.pdf" download style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding:12px 20px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.05));border:1.5px solid rgba(59,130,246,.4);border-radius:12px;color:#60a5fa;font-weight:700;font-size:13px;text-decoration:none;transition:all .3s">

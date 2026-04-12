@@ -293,7 +293,14 @@
     "cta.plans": "👑 Ver Planes",
     "cta.community": "💬 Comunidad Gratis",
     "footer.about": "Quiénes Somos",
-    "footer.tagline": "BuySell365 Pro — Trading con Inteligencia Artificial"
+    "footer.tagline": "BuySell365 Pro — Trading con Inteligencia Artificial",
+    "nav.about": "Quiénes Somos",
+    "nav.xm_bonus": "🎁 Bono 100% hasta $100",
+    "pricing.open_xm": "🎁 Abrir Cuenta XM",
+    "pricing.open_xm_sub": "Bono 100% hasta $100",
+    "pricing.start_copy": "🚀 Empezar Copy Trading",
+    "pricing.start_copy_sub": "Ya tengo cuenta XM",
+    "pricing.old_price": "$299/mes"
   },
   "en": {
     "nav.technology": "Technology",
@@ -589,7 +596,14 @@
     "cta.plans": "👑 View Plans",
     "cta.community": "💬 Free Community",
     "footer.about": "About Us",
-    "footer.tagline": "BuySell365 Pro — AI-Powered Trading"
+    "footer.tagline": "BuySell365 Pro — AI-Powered Trading",
+    "nav.about": "About Us",
+    "nav.xm_bonus": "🎁 100% Bonus up to $100",
+    "pricing.open_xm": "🎁 Open XM Account",
+    "pricing.open_xm_sub": "100% Bonus up to $100",
+    "pricing.start_copy": "🚀 Start Copy Trading",
+    "pricing.start_copy_sub": "I already have XM account",
+    "pricing.old_price": "$299/mo"
   },
   "pt": {
     "nav.technology": "Tecnologia",
@@ -885,7 +899,14 @@
     "cta.plans": "👑 Ver Planos",
     "cta.community": "💬 Comunidade Grátis",
     "footer.about": "Quem Somos",
-    "footer.tagline": "BuySell365 Pro — Trading com Inteligência Artificial"
+    "footer.tagline": "BuySell365 Pro — Trading com Inteligência Artificial",
+    "nav.about": "Quem Somos",
+    "nav.xm_bonus": "🎁 Bônus 100% até $100",
+    "pricing.open_xm": "🎁 Abrir Conta XM",
+    "pricing.open_xm_sub": "Bônus 100% até $100",
+    "pricing.start_copy": "🚀 Começar Copy Trading",
+    "pricing.start_copy_sub": "Já tenho conta XM",
+    "pricing.old_price": "$299/mês"
   },
   "fr": {
     "nav.technology": "Technologie",
@@ -1181,6 +1202,13 @@
     "cta.plans": "👑 Voir les Plans",
     "cta.community": "💬 Communauté Gratuite",
     "footer.about": "Qui Sommes-Nous",
-    "footer.tagline": "BuySell365 Pro — Trading avec Intelligence Artificielle"
+    "footer.tagline": "BuySell365 Pro — Trading avec Intelligence Artificielle",
+    "nav.about": "Qui Sommes-Nous",
+    "nav.xm_bonus": "🎁 Bonus 100% jusqu'à $100",
+    "pricing.open_xm": "🎁 Ouvrir Compte XM",
+    "pricing.open_xm_sub": "Bonus 100% jusqu'à $100",
+    "pricing.start_copy": "🚀 Démarrer Copy Trading",
+    "pricing.start_copy_sub": "J'ai déjà un compte XM",
+    "pricing.old_price": "$299/mois"
   }
 }
