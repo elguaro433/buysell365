@@ -658,12 +658,20 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 payload["reply_to_message_id"] = reply_to_msg_id
             resp = requests.post(url, data=payload,
                 files={"photo": ("chart.png", chart_bytes, "image/png")}, timeout=20)
+            # FIX: Si falla por reply_to inválido, reintentar sin reply
+            if resp.status_code == 400 and "message to be replied" in resp.text:
+                payload.pop("reply_to_message_id", None)
+                resp = requests.post(url, data=payload,
+                    files={"photo": ("chart.png", chart_bytes, "image/png")}, timeout=20)
         else:
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
             payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
             if reply_to_msg_id:
                 payload["reply_to_message_id"] = reply_to_msg_id
             resp = requests.post(url, json=payload, timeout=10)
+            if resp.status_code == 400 and "message to be replied" in resp.text:
+                payload.pop("reply_to_message_id", None)
+                resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
             log.info(f"🎉 TP CELEBRATION enviada: {dir_label} {pair}")
         else:
@@ -752,6 +760,10 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
         if reply_to_msg_id:
             payload["reply_to_message_id"] = reply_to_msg_id
         resp = requests.post(url, json=payload, timeout=10)
+        # FIX: Si falla por reply_to inválido, reintentar sin reply
+        if resp.status_code == 400 and "message to be replied" in resp.text:
+            payload.pop("reply_to_message_id", None)
+            resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
             log.info(f"🛑 SL notification enviada: {dir_label} {pair}")
         else:
@@ -1831,6 +1843,10 @@ def send_to_channel(signal, executed, detail):
                 if _reply_id:
                     _payload["reply_to_message_id"] = _reply_id
                 _resp_upd = requests.post(url, json=_payload, timeout=10)
+                # FIX: Si falla por reply_to inválido, reintentar sin reply
+                if _resp_upd.status_code == 400 and "message to be replied" in _resp_upd.text:
+                    _payload.pop("reply_to_message_id", None)
+                    _resp_upd = requests.post(url, json=_payload, timeout=10)
                 log.info(f"📢 Update notificado al canal: {_action} {_pair_d} (reply_to={_reply_id})")
                 if _resp_upd.status_code == 200:
                     return _resp_upd.json().get("result", {}).get("message_id")
@@ -2175,12 +2191,12 @@ async def main():
             elif signal["type"] == "update":
                 # ── Updates: publicar TP HIT, SL HIT y CLOSE HALF al canal VIP ──
                 log.info(f"📡 UPDATE recibido: {signal.get('action','?')} {signal['pair']}")
+                executed, detail = False, ""
                 send_to_channel(signal, executed, detail)
                 # MT5 execution (si se reactiva en el futuro)
                 if MT5_EXECUTION_ENABLED:
                     executed, detail = handle_update_mt5(signal)
                     log.info(f"📡 UPDATE MT5: {'✅' if executed else '❌'} {detail}")
-                # send_to_channel desactivado — no enviar CERRAR/TP/SL/MOVER al canal VIP
 
         except Exception as e:
             log.error(f"Error processing message: {e}")
