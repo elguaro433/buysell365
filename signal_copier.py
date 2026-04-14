@@ -552,8 +552,8 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             spine.set_visible(False)
 
         # ── Watermark grande de fondo ──
-        fig.text(0.50, 0.50, "BUYSELL365 PRO", fontsize=48, color="#1e2230",
-                 ha="center", va="center", fontweight="bold", alpha=0.7,
+        fig.text(0.50, 0.58, "BUYSELL365 PRO", fontsize=48, color="#2a3045",
+                 ha="center", va="center", fontweight="bold", alpha=0.85,
                  fontstyle="normal", fontfamily="sans-serif",
                  transform=fig.transFigure, zorder=0)
         # Watermark pequeño esquina
