@@ -750,7 +750,7 @@ def index_web():
     document.head.appendChild(s);
     window.dataLayer=window.dataLayer||[];
     window.gtag=function(){{dataLayer.push(arguments);}};
-    gtag('js',new Date()); gtag('config','G-L514BL7E83');
+    gtag('js',new Date()); gtag('config','G-L514BL7E83'); gtag('config','AW-18090606337');
   }}
   if(c==='accepted') _loadGA();
   window._acceptCookies=function(){{
@@ -2036,7 +2036,7 @@ def dashboard_visual():
     document.head.appendChild(s);
     window.dataLayer=window.dataLayer||[];
     window.gtag=function(){{dataLayer.push(arguments);}};
-    gtag('js',new Date()); gtag('config','G-L514BL7E83');
+    gtag('js',new Date()); gtag('config','G-L514BL7E83'); gtag('config','AW-18090606337');
   }}
   if(c==='accepted') _loadGA();
   window._acceptCookies=function(){{
@@ -3003,7 +3003,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     document.head.appendChild(s);
     window.dataLayer=window.dataLayer||[];
     window.gtag=function(){{dataLayer.push(arguments);}};
-    gtag('js',new Date()); gtag('config','G-L514BL7E83');
+    gtag('js',new Date()); gtag('config','G-L514BL7E83'); gtag('config','AW-18090606337');
   }}
   if(c==='accepted') _loadGA();
   window._acceptCookies=function(){{
