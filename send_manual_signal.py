@@ -73,10 +73,11 @@ def build_message(pair, direction, entry, sl, tp, tp2=0, tp3=0, tp4=0, tp5=0):
     has_multi_tp = any(t > 0 for t in [tp2, tp3, tp4, tp5])
     tp_label = "TP1" if has_multi_tp else "TP"
 
+    dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
     lines = [
-        f"{dir_emoji} *{direction.upper()} \u2014 {pair_display}*",
+        f"{dir_emoji} *{dir_label} \u2014 {pair_display}*",
         "",
-        f"\U0001f4cd Entry: {fmt_price(entry) if entry > 0 else 'Market Price'}",
+        f"\U0001f4cd Entrada: {fmt_price(entry) if entry > 0 else 'Precio de Mercado'}",
     ]
     if tp > 0:
         lines.append(f"\U0001f3af {tp_label}: {fmt_price(tp)}")

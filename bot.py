@@ -4180,11 +4180,11 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
         tp3_total = dist(precio, niveles['tp3'])
         is_premium = tp3_total >= 100
 
-    # FIX 2026-04-07: Señales en inglés (BUY/SELL)
+    # FIX 2026-04-14: Señales en español (COMPRA/VENTA)
     if tipo == "COMPRA":
-        cabecera = f"🟢 *BUY — {nombre}*"
+        cabecera = f"🟢 *COMPRA — {nombre}*"
     else:
-        cabecera = f"🔴 *SELL — {nombre}*"
+        cabecera = f"🔴 *VENTA — {nombre}*"
 
     sl_dist  = dist(precio, niveles['sl'])
     tp1_dist = dist(precio, niveles['tp1'])
@@ -4211,7 +4211,7 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     return (
         f"{cabecera}\n"
         f"\n"
-        f"📍 Entry: {f_(precio)}\n"
+        f"📍 Entrada: {f_(precio)}\n"
         f"🎯 TP: {f_(niveles['tp1'])}\n"
         f"🛡️ SL: {f_(niveles['sl'])}"
     )
@@ -4222,9 +4222,9 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 # ============================================================
 
 def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
-    # FIX 2026-04-07: Formato en inglés, consistente con signal_copier
+    # FIX 2026-04-14: Formato en español
     f_ = lambda v: fmt(v, ticker)
-    tipo_emoji = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
+    tipo_emoji = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
     _unidad = unidad_medida(ticker)
     _pips_str = f"+{pips:.1f} {_unidad}"
 
@@ -4234,24 +4234,24 @@ def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="
         _h = int(duracion_seg // 3600)
         _m = int((duracion_seg % 3600) // 60)
         if _h > 0:
-            _dur_str = f"\n⏱ Duration: {_h}h {_m}m"
+            _dur_str = f"\n⏱ Duración: {_h}h {_m}m"
         else:
-            _dur_str = f"\n⏱ Duration: {_m}m"
+            _dur_str = f"\n⏱ Duración: {_m}m"
 
     return (
-        f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
+        f"🎯🎯🎯 *TP ALCANZADO* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
         f"{tipo_emoji}  {nombre}\n\n"
-        f"📍 Entry: {f_(entrada)}\n"
-        f"✅ Exit: {f_(salida)}\n"
-        f"💰 *Profit: {_pips_str}*"
+        f"📍 Entrada: {f_(entrada)}\n"
+        f"✅ Salida: {f_(salida)}\n"
+        f"💰 *Ganancia: {_pips_str}*"
         f"{_dur_str}\n"
         f"━━━━━━━━━━━━━━\n"
         f"🚀 _BuySell365 Pro — señal exitosa_"
     )
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
-    # FIX 2026-04-07: Formato en inglés, consistente con signal_copier
+    # FIX 2026-04-14: Formato en español
     cat = get_categoria(ticker)
     pips_abs = abs(pips)
     if cat == "crypto":
@@ -4261,32 +4261,32 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, 
     else:
         p_txt = f"{pips_abs:.1f} pts"
     f_ = lambda v: fmt(v, ticker)
-    cabecera = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
+    cabecera = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
     return (
-        f"🛑🛑🛑 *SL HIT* 🛑🛑🛑\n"
+        f"🛑🛑🛑 *SL TOCADO* 🛑🛑🛑\n"
         f"━━━━━━━━━━━━━━\n"
         f"{cabecera}  {nombre}\n\n"
-        f"📍 Entry: {f_(entrada)}\n"
+        f"📍 Entrada: {f_(entrada)}\n"
         f"🛡️ SL: {f_(salida)}\n"
-        f"💔 Loss: *−{p_txt}*\n"
         f"━━━━━━━━━━━━━━\n"
         f"📊 _BuySell365 Pro — gestión de riesgo_"
     )
 
 def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
-    # FIX 2026-04-07: Formato en inglés
+    # FIX 2026-04-14: Formato en español
     cat = get_categoria(ticker)
     p_txt = f"{pips:.2f}%" if cat == "crypto" else f"{pips:.1f} {unidad_medida(ticker)}"
     f_ = lambda v: fmt(v, ticker)
     signo = "+" if pips > 0 else ""
     emoji = "🟢" if pips > 0 else "🔴"
-    _tipo_en = "BUY" if tipo == "COMPRA" else "SELL"
+    _tipo_es = "COMPRA" if tipo == "COMPRA" else "VENTA"
     return (
-        f"⏰ *AUTO CLOSE 24H* — {nombre}\n"
+        f"⏰ *CIERRE AUTO 24H* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{emoji} {_tipo_en} *{signo}{p_txt}*\n"
-        f"📍 Entry: {f_(entrada)} → Exit: {f_(salida)}\n"
-        f"━━━━━━━━━━━━━━"
+        f"{emoji} {_tipo_es} *{signo}{p_txt}*\n"
+        f"📍 Entrada: {f_(entrada)} → Salida: {f_(salida)}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"🕐 _Cerramos automáticamente tras 24h para proteger tu capital._"
     )
 
 def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
@@ -4296,11 +4296,12 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
     h = int(horas)
     m = int((horas % 1) * 60)
     dur = f"{h}h {m}m" if h > 0 else f"{m}m"
-    tipo_txt = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
+    tipo_txt = "🟢 COMPRA" if tipo == "COMPRA" else "🔴 VENTA"
     return (
-        f"🔒 *PROFIT LOCK* — {nombre}\n"
+        f"🔒 *GANANCIA ASEGURADA* — {nombre}\n"
         f"{tipo_txt} +{p_txt}\n"
-        f"Entry {f_(entrada)} → Close {f_(salida)} | {dur}"
+        f"Entrada {f_(entrada)} → Cierre {f_(salida)} | {dur}\n"
+        f"✅ _Cerramos con beneficio para proteger la ganancia acumulada._"
     )
 
 # ============================================================

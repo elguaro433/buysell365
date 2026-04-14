@@ -637,11 +637,12 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     elif tp > 0:
         tp_lines = f"\n✅ TP: {fmt(tp)}"
 
+    _dir_label_es = "COMPRA" if direction.upper() == "BUY" else "VENTA"
     msg = (
-        f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
+        f"🎯🎯🎯 *TP ALCANZADO* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
-        f"📍 Entry: {fmt(entry)}"
+        f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
+        f"📍 Entrada: {fmt(entry)}"
         f"{tp_lines}"
         f"{pips_line}\n"
         f"━━━━━━━━━━━━━━\n"
@@ -689,10 +690,10 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
             "\n\n📈 *Resultados reales, sin trucos*\nSeñales en vivo con entrada, TP y SL exactos.\n👉 Escribe */vip* para unirte",
         ]
         _msg_grupo = (
-            f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
+            f"🎯🎯🎯 *TP ALCANZADO* 🎯🎯🎯\n"
             f"━━━━━━━━━━━━━━\n"
-            f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
-            f"📍 Entry: {fmt(entry)}"
+            f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
+            f"📍 Entrada: {fmt(entry)}"
             f"{tp_lines}"
             f"{pips_line}\n"
             f"━━━━━━━━━━━━━━\n"
@@ -740,15 +741,13 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
     else:
         loss_str = f"-{pips_lost * 10000:.0f} pips" if pips_lost > 0 else ""
 
-    loss_line = f"\n💔 Loss: *{loss_str}*" if loss_str else ""
-
+    _dir_label_es = "COMPRA" if direction.upper() == "BUY" else "VENTA"
     msg = (
-        f"🛑🛑🛑 *SL HIT* 🛑🛑🛑\n"
+        f"🛑🛑🛑 *SL TOCADO* 🛑🛑🛑\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
-        f"📍 Entry: {fmt(entry)}\n"
-        f"🛡️ SL: {fmt(sl)}"
-        f"{loss_line}\n"
+        f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
+        f"📍 Entrada: {fmt(entry)}\n"
+        f"🛡️ SL: {fmt(sl)}\n"
         f"━━━━━━━━━━━━━━\n"
         f"📊 _BuySell365 Pro — gestión de riesgo_"
     )
@@ -1812,14 +1811,14 @@ def send_to_channel(signal, executed, detail):
         _action = signal.get("action", "")
         _pair = signal.get("pair", "")
         _pair_d = _get_display_pair(_pair)
-        # FIX 2026-04-06: Labels en inglés — canal profesional
+        # FIX 2026-04-14: Labels en español con contexto claro
         _action_labels = {
-            "close_half":       f"⚡ *CLOSE HALF* — {_pair_d}",
-            "close_partial":    f"⚡ *PARTIAL CLOSE* — {_pair_d}",
-            "full_close":       f"🔒 *FULL CLOSE* — {_pair_d}",
-            "move_sl_to_entry": f"🛡️ *MOVE SL TO ENTRY* — {_pair_d}",
-            "sl_hit":           f"🛑 *SL HIT* — {_pair_d}",
-            "tp_hit":           f"✅ *TP HIT* — {_pair_d}",
+            "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}\n💰 Aseguramos el 50% de la ganancia, dejamos correr el resto.",
+            "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 Tomamos parte de las ganancias y mantenemos posición abierta.",
+            "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ Cerramos toda la posición. Operación finalizada.",
+            "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Movemos el stop loss al precio de entrada. Operación sin riesgo.",
+            "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
+            "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
         }
         _msg = _action_labels.get(_action)
         if _msg:
@@ -1865,8 +1864,8 @@ def send_to_channel(signal, executed, detail):
     rrr        = signal.get("rrr", "")
     style      = signal.get("style", "")
 
-    # FIX 2026-04-06: Mantener idioma original BUY/SELL — no traducir a COMPRA/VENTA
-    dir_label = direction.upper()  # "BUY" o "SELL"
+    # FIX 2026-04-14: Señales en español
+    dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
     src_emoji = {
         "SureShotFX":      "📡",
@@ -1877,13 +1876,13 @@ def send_to_channel(signal, executed, detail):
 
     pair_display = _get_display_pair(pair)
 
-    # Tipo de orden en inglés
-    tipo_label = {"Market": "Market", "Limit": "Limit Order", "Stop": "Stop Order"}.get(order_type, order_type)
+    # Tipo de orden en español
+    tipo_label = {"Market": "Mercado", "Limit": "Orden Límite", "Stop": "Orden Stop"}.get(order_type, order_type)
 
     # Formato de precios
     fmt = fmt_price
 
-    entry_display = fmt(entry) if entry > 0 else "Market Price"
+    entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
 
     tp2 = signal.get("tp2", 0) or 0
     tp3 = signal.get("tp3", 0) or 0
@@ -1895,7 +1894,7 @@ def send_to_channel(signal, executed, detail):
     lines = [
         f"{dir_emoji} *{dir_label} — {pair_display}*",
         f"",
-        f"📍 Entry: {entry_display}",
+        f"📍 Entrada: {entry_display}",
     ]
     # FIX 2026-04-08: No mostrar "TP: Open" — si no hay TP válido, omitir línea
     if tp > 0:
