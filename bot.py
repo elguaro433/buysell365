@@ -9046,7 +9046,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "🤖 *COPY TRADING — BuySell365 Pro*\n"
             "━━━━━━━━━━\n\n"
             "⚡ Tu cuenta opera *automáticamente* 24/7\n"
-            "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
+            "📍 Entrada · 🎯 TP · 🛡️ SL — todo automático\n"
             "🏦 Sobre *XM* — broker regulado (CySEC, ASIC)\n"
             "🔒 +5M clientes · fondos segregados\n"
             "💰 *Sin mensualidad — pagas solo si ganas*\n\n"
@@ -14580,7 +14580,7 @@ def loop_publicidad_grupo():
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "🤖 *COPY TRADING — BuySell365 Pro*\n\n"
             "⚡ Nuestro bot opera *por ti* en tiempo real\n"
-            "📍 Entry · 🎯 TP · 🛡️ SL — todo automático\n"
+            "📍 Entrada · 🎯 TP · 🛡️ SL — todo automático\n"
             "🌍 EUR/USD · NASDAQ · S&P 500 y más activos\n"
             "💰 Pagas *solo si ganas* — sin mensualidad fija\n\n"
             "🔥 *Sin pantallas. Sin estrés. Sin perder señales.*",
@@ -14595,16 +14595,18 @@ def loop_publicidad_grupo():
         (
             "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Asi se ven nuestras senales VIP:\n\n"
-            "🟢 *BUY — XAUUSD*\n"
-            "📍 Entry: 4750.00\n"
-            "🎯 TP: 4790.00\n"
-            "🛡️ SL: 4720.00\n"
-            "_(Ejemplo ilustrativo, no es una senal activa)_\n\n"
-            "✅ Entry, TP y SL exactos en cada senal\n"
+            "Así se ven nuestras señales VIP:\n\n"
+            "🟢 *COMPRA — XAUUSD*\n\n"
+            "📍 Entrada: 4750.00\n"
+            "🎯 TP1: 4760.00\n"
+            "🎯 TP2: 4770.00\n"
+            "🎯 TP3: 4780.00\n"
+            "🛡️ SL: 4740.00\n"
+            "_(Ejemplo ilustrativo, no es una señal activa)_\n\n"
+            "✅ Entrada, TP y SL exactos en cada señal\n"
             "✅ GOLD (XAUUSD) y NASDAQ en tiempo real\n"
-            "✅ Alertas instantaneas al canal VIP\n"
-            "🤖 Copy Trading automatico disponible\n\n"
+            "✅ Alertas instantáneas al canal VIP\n"
+            "🤖 Copy Trading automático disponible\n\n"
             "👇 *Escribe /vip para unirte*",
             {"inline_keyboard": [[
                 {"text": "💎 UNIRME AL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
@@ -14636,7 +14638,7 @@ def loop_publicidad_grupo():
             "🔥 *DOS SERVICIOS. UN OBJETIVO: GANAR*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "💎 *Canal VIP — Señales con IA*\n"
-            "   ├ 📍 Entry · 🎯 TP · 🛡️ SL exactos\n"
+            "   ├ 📍 Entrada · 🎯 TP · 🛡️ SL exactos\n"
             "   ├ 📊 Análisis diario de mercados\n"
             "   ├ ⚡ Alertas en tiempo real\n"
             "   └ 🤖 Bot asistente personal 24/7\n\n"
@@ -15507,7 +15509,7 @@ def loop_polling():
         _desc_corta = "Trading con IA — Señales de Oro, Forex, NASDAQ y S&P 500 en tiempo real."
         _desc_larga = (
             "Trading con IA — Señales de Oro, Forex, NASDAQ y S&P 500 en tiempo real.\n\n"
-            "Entry, TP y SL exactos.\n"
+            "Entrada, TP y SL exactos.\n"
             "Copy Trading automático en MT5.\n"
             "Dashboard en vivo: buysell365.pro"
         )
