@@ -3326,6 +3326,154 @@ a{{color:var(--green);text-decoration:none}}
 </body>
 </html>"""
 
+
+# ══════════════════════════════════════════════════════════════
+#  LANDING PAGE /unete — Optimizada para Google Ads / Meta Ads
+# ══════════════════════════════════════════════════════════════
+@app.route("/unete")
+def pagina_unete():
+    """Landing page para campañas de ads — conversión directa."""
+    # Datos reales para credibilidad
+    with _lock:
+        hist = list(_historial_real) if _historial_real else []
+    total_ops = len(hist)
+    wins = sum(1 for h in hist if float(h.get('pips', 0)) > 0)
+    wr = round(wins / total_ops * 100, 1) if total_ops > 0 else 0
+    total_pips = sum(float(h.get('pips', 0)) for h in hist if float(h.get('pips', 0)) > 0)
+
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Señales de Trading Gratis — Oro, Forex, NASDAQ | BuySell365 Pro</title>
+<meta name="description" content="Recibe señales de trading gratis en Telegram. Oro (XAUUSD), EUR/USD, NASDAQ, US30. Entrada, TP y SL exactos. Copy Trading automático disponible.">
+<meta name="keywords" content="señales trading gratis, señales forex telegram, señales oro telegram, copy trading MT5, bot trading, señales XAUUSD gratis">
+<meta property="og:title" content="Señales de Trading Gratis en Telegram">
+<meta property="og:description" content="Oro, Forex, NASDAQ en tiempo real. Únete gratis y recibe señales con Entrada, TP y SL exactos.">
+<meta property="og:image" content="https://buysell365.pro/img/og_image.png">
+<meta property="og:url" content="https://buysell365.pro/unete">
+<meta property="og:type" content="website">
+<link rel="canonical" href="https://buysell365.pro/unete">
+<link rel="icon" href="/img/bull_bear.png" type="image/png">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;min-height:100vh}}
+.hero{{text-align:center;padding:60px 24px 40px;background:linear-gradient(180deg,#0a1628 0%,#07091f 100%)}}
+.hero h1{{font-size:2.4rem;margin-bottom:16px;line-height:1.2}}
+.hero h1 span{{background:linear-gradient(135deg,#00ffcc,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}
+.hero p{{font-size:1.15rem;color:#8b9fc4;max-width:600px;margin:0 auto 32px}}
+.stats{{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin:32px 0}}
+.stat{{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px 24px;min-width:120px}}
+.stat .num{{font-size:1.8rem;font-weight:800;color:#00ffcc}}
+.stat .label{{font-size:0.8rem;color:#8b9fc4;margin-top:4px}}
+.signal-example{{background:rgba(0,255,204,.05);border:1px solid rgba(0,255,204,.15);border-radius:16px;padding:24px;max-width:400px;margin:32px auto;text-align:left;font-family:monospace;font-size:0.95rem;line-height:1.8}}
+.signal-example .title{{color:#00ffcc;font-weight:bold;font-size:1.1rem}}
+.pares{{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:24px auto;max-width:600px}}
+.par{{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px 16px;font-size:0.85rem;color:#8b9fc4}}
+.benefits{{max-width:600px;margin:40px auto;text-align:left;padding:0 24px}}
+.benefit{{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}}
+.benefit .icon{{font-size:1.4rem;flex-shrink:0}}
+.benefit .text h3{{font-size:1rem;margin-bottom:4px}}
+.benefit .text p{{font-size:0.9rem;color:#8b9fc4}}
+.cta-section{{text-align:center;padding:40px 24px 60px}}
+.btn{{display:inline-block;padding:16px 40px;border-radius:12px;font-size:1.1rem;font-weight:700;text-decoration:none;margin:8px;transition:transform .2s}}
+.btn:hover{{transform:translateY(-2px)}}
+.btn-green{{background:linear-gradient(135deg,#00ffcc,#00d4aa);color:#07091f}}
+.btn-blue{{background:linear-gradient(135deg,#4d9fff,#2563eb);color:#fff}}
+.btn-gold{{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#07091f}}
+.trust{{text-align:center;padding:20px;color:#8b9fc4;font-size:0.85rem;border-top:1px solid rgba(255,255,255,.05)}}
+.note{{font-size:0.8rem;color:#555;text-align:center;margin-top:8px}}
+@media(max-width:640px){{
+.hero h1{{font-size:1.8rem}}
+.stats{{gap:12px}}
+.stat{{min-width:100px;padding:12px 16px}}
+.stat .num{{font-size:1.4rem}}
+.btn{{display:block;margin:8px 24px}}
+}}
+</style>
+</head>
+<body>
+
+<div class="hero">
+<h1>Recibe <span>señales de trading</span> gratis en Telegram</h1>
+<p>Oro, Forex, NASDAQ y más — con Entrada, TP y SL exactos. Nuestro bot de IA analiza el mercado y te envía las mejores oportunidades.</p>
+
+<div class="stats">
+<div class="stat"><div class="num">{wr}%</div><div class="label">Win Rate</div></div>
+<div class="stat"><div class="num">{total_ops:,}</div><div class="label">Operaciones</div></div>
+<div class="stat"><div class="num">+{total_pips:,.0f}</div><div class="label">Pips ganados</div></div>
+<div class="stat"><div class="num">24/5</div><div class="label">Monitoreo</div></div>
+</div>
+</div>
+
+<div class="signal-example">
+<div class="title">🟢 COMPRA — XAUUSD</div>
+<br>
+📍 Entrada: 4750.00<br>
+🎯 TP1: 4760.00<br>
+🎯 TP2: 4770.00<br>
+🎯 TP3: 4780.00<br>
+🛡️ SL: 4740.00<br>
+<br>
+<span style="color:#8b9fc4;font-size:0.8rem">(Ejemplo real del formato de nuestras señales)</span>
+</div>
+
+<h2 style="text-align:center;margin:32px 0 16px;font-size:1.3rem">Pares que operamos</h2>
+<div class="pares">
+<div class="par">🥇 GOLD</div>
+<div class="par">💱 EUR/USD</div>
+<div class="par">💱 GBP/USD</div>
+<div class="par">💱 USD/JPY</div>
+<div class="par">💱 USD/CAD</div>
+<div class="par">💱 AUD/USD</div>
+<div class="par">💱 GBP/JPY</div>
+<div class="par">💱 EUR/JPY</div>
+<div class="par">💱 EUR/CHF</div>
+<div class="par">📈 NASDAQ</div>
+<div class="par">📈 US30</div>
+<div class="par">📈 S&P 500</div>
+</div>
+
+<div class="benefits">
+<div class="benefit">
+<div class="icon">🤖</div>
+<div class="text"><h3>Inteligencia Artificial</h3><p>Nuestro bot analiza RSI, MACD, Bollinger, noticias económicas y datos institucionales en tiempo real.</p></div>
+</div>
+<div class="benefit">
+<div class="icon">⚡</div>
+<div class="text"><h3>Alertas instantáneas</h3><p>Recibes cada señal directo en Telegram con Entrada, TP y SL exactos. Sin retrasos.</p></div>
+</div>
+<div class="benefit">
+<div class="icon">🔄</div>
+<div class="text"><h3>Copy Trading automático</h3><p>Tu cuenta opera sola en MT5 con broker regulado (XM). Pagas solo si ganas.</p></div>
+</div>
+<div class="benefit">
+<div class="icon">📊</div>
+<div class="text"><h3>Resultados transparentes</h3><p>Dashboard en vivo en buysell365.pro. Cada operación verificada en MT5.</p></div>
+</div>
+</div>
+
+<div class="cta-section">
+<h2 style="font-size:1.5rem;margin-bottom:8px">Empieza ahora — es gratis</h2>
+<p style="color:#8b9fc4;margin-bottom:24px">Únete al grupo público y ve las señales en acción</p>
+<a href="https://t.me/BUYSELL_365_24_7" class="btn btn-green">📱 Unirme al Grupo Gratis</a>
+<br>
+<a href="https://t.me/{BOT_USERNAME}?start=vip" class="btn btn-blue">💎 Canal VIP — Señales Premium</a>
+<br>
+<a href="https://social.tp-redirect.com/s/WRE0V7jm" class="btn btn-gold">🤖 Activar Copy Trading</a>
+<p class="note">Sin tarjeta. Sin compromiso. Cancela cuando quieras.</p>
+</div>
+
+<div class="trust">
+<p>BuySell365 Pro — Resultados reales, verificados en MT5</p>
+<p style="margin-top:8px"><a href="https://buysell365.pro" style="color:#4d9fff;text-decoration:none">buysell365.pro</a> · <a href="https://buysell365.pro/about" style="color:#4d9fff;text-decoration:none">Quiénes somos</a> · <a href="https://buysell365.pro/terminos" style="color:#4d9fff;text-decoration:none">Términos</a></p>
+</div>
+
+</body>
+</html>"""
+
+
 @app.route("/terminos")
 def pagina_terminos():
     return f"""<!DOCTYPE html>
