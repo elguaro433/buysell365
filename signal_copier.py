@@ -857,18 +857,18 @@ def _build_promo_report(hora_label: str) -> str | None:
 
     wr = len(tps) / (len(tps) + len(sls)) * 100 if (tps or sls) else 0
 
-    # FIX 2026-04-14: Reporte simplificado — solo ganancias totales, sin SLs ni Win Rate
+    # FIX 2026-04-14: Reporte simplificado — solo ganancias + promo VIP
     msg = (
         f"📊📊📊 *REPORTE {hora_label}* 📊📊📊\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"📅 {hoy}\n\n"
         f"💰 *Ganancias del día:*\n"
-        f"{resumen}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"💎 *¿Quieres recibir estas señales en tiempo real?*\n"
-        f"Únete al canal VIP y copia estas operaciones.\n\n"
-        f"👉 Escribe */vip* para más info\n"
-        f"🤖 O activa el *Copy Trading* automático\n\n"
+        f"{resumen}\n\n"
+        f"🔥 *Estas ganancias fueron en VIVO*\n"
+        f"Nuestros suscriptores VIP las recibieron en tiempo real.\n\n"
+        f"👉 Escribe */vip* y empieza a ganar con nosotros\n"
+        f"🤖 O activa el *Copy Trading* y opera sin hacer nada\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
         f"_BuySell365 Pro — Resultados reales, verificados en MT5_"
     )
     return msg
