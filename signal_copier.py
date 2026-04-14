@@ -1836,6 +1836,13 @@ def send_to_channel(signal, executed, detail):
             if not _tenemos_senal:
                 log.info(f"🔕 Update '{_action}' {_pair_d} ignorado — BuySell365 no tiene señal abierta para ese par")
                 return None
+            # FIX 2026-04-14: Deduplicar updates — cooldown 5 min por acción+par
+            _upd_key = f"upd_{_action}_{_pair}"
+            _upd_now = time.time()
+            if _upd_key in _recently_notified and (_upd_now - _recently_notified[_upd_key]) < 300:
+                log.info(f"🔕 Update '{_action}' {_pair_d} ignorado — ya enviado hace {_upd_now - _recently_notified[_upd_key]:.0f}s (cooldown 5min)")
+                return None
+            _recently_notified[_upd_key] = _upd_now
             try:
                 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
                 _payload = {"chat_id": CHANNEL_ID, "text": _msg, "parse_mode": "Markdown"}
@@ -2152,7 +2159,7 @@ async def main():
                     else:
                         log.info(f"📍 Sin entry y sin precio disponible — publicando con 'Market Price'")
 
-                # FIX 2026-04-09: Validar SL dirección DESPUÉS de obtener entry
+                # FIX 2026-04-14: Validar SL + TPs DESPUÉS de obtener entry real
                 _e = signal.get("entry", 0)
                 _s = signal.get("sl", 0)
                 _d = signal.get("direction", "")
@@ -2164,14 +2171,29 @@ async def main():
                     if _d == "BUY" and _s > _e:
                         log.warning(f"⚠️ BUY con SL({_s}) > entry({_e}) — señal inválida, descartando")
                         return
-                    # Validar TPs absurdos (ej: TP2=200 para GOLD a 4700)
+                if _e > 0:
+                    # Validar TODOS los TPs: dirección correcta + rango razonable
                     for _tp_key in ("tp", "tp2", "tp3", "tp4", "tp5"):
                         _tv = signal.get(_tp_key, 0) or 0
-                        if _tv > 0 and _e > 0:
-                            _pct = abs(_tv - _e) / _e
-                            if _pct > 0.20:  # > 20% de diferencia = basura
-                                log.warning(f"⚠️ {_tp_key}={_tv} absurdo vs entry={_e} ({_pct:.0%}) — limpiando")
-                                signal[_tp_key] = 0
+                        if _tv <= 0:
+                            continue
+                        # Dirección: BUY → TP debe ser > entry | SELL → TP debe ser < entry
+                        _tp_wrong_dir = False
+                        if _d == "BUY" and _tv < _e and abs(_tv - _e) > 0.001:
+                            _tp_wrong_dir = True
+                        elif _d == "SELL" and _tv > _e and abs(_tv - _e) > 0.001:
+                            _tp_wrong_dir = True
+                        # Rango: > 20% de diferencia = basura (ej: TP2=200 para GOLD a 4700)
+                        _pct = abs(_tv - _e) / _e
+                        _tp_out_range = _pct > 0.20
+                        if _tp_wrong_dir or _tp_out_range:
+                            _reason = f"dirección invertida ({_d} pero TP {'<' if _tv < _e else '>'} entry)" if _tp_wrong_dir else f"fuera de rango ({_pct:.0%})"
+                            log.warning(f"⚠️ {_tp_key}={_tv} inválido vs entry={_e} — {_reason} — limpiando")
+                            signal[_tp_key] = 0
+                    # Si TP principal fue limpiado, la señal no tiene sentido — descartar
+                    if (signal.get("tp", 0) or 0) <= 0 and all((signal.get(f"tp{i}", 0) or 0) <= 0 for i in range(2, 6)):
+                        log.warning(f"⚠️ Todos los TPs inválidos para {_d} {signal.get('pair','')} entry={_e} — descartando señal")
+                        return
 
                 # Publicar inmediatamente (con o sin precio)
                 send_to_channel(signal, executed, detail)
