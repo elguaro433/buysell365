@@ -1839,19 +1839,19 @@ def send_to_channel(signal, executed, detail):
         _pips_txt = f"+{_pips} {_unit}" if _pips > 0 else ""
         if _pips_txt:
             _action_labels = {
-                "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}\n💰 *{_pips_txt}* asegurados. Cerramos el 50% y dejamos correr el resto.",
-                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 *{_pips_txt}* tomados. Mantenemos posición abierta.",
+                "close_half":       f"⚡ *CIERRE PARCIAL 50%* — {_pair_d}\n💰 *{_pips_txt}* asegurados. Mercado volátil, protegemos ganancia.",
+                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 *{_pips_txt}* asegurados. Mercado volátil, protegemos ganancia.",
                 "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ *{_pips_txt}* de ganancia. Operación finalizada.",
-                "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Movemos el stop loss al precio de entrada. Operación sin riesgo.",
+                "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Protegemos la operación. Ya no hay riesgo de pérdida.",
                 "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
                 "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
             }
         else:
             _action_labels = {
-                "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}\n💰 Aseguramos el 50% de la ganancia, dejamos correr el resto.",
-                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 Tomamos parte de las ganancias y mantenemos posición abierta.",
+                "close_half":       f"⚡ *CIERRE PARCIAL 50%* — {_pair_d}\n💰 Mercado volátil, protegemos ganancia cerrando la mitad.",
+                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 Mercado volátil, protegemos ganancia cerrando parte.",
                 "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ Cerramos toda la posición. Operación finalizada.",
-                "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Movemos el stop loss al precio de entrada. Operación sin riesgo.",
+                "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Protegemos la operación. Ya no hay riesgo de pérdida.",
                 "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
                 "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
             }
