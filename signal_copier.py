@@ -1835,10 +1835,44 @@ def send_to_channel(signal, executed, detail):
                                     _pips = round(_raw_diff * 10000)
                         break
         _pips_txt = f"+{_pips} {_unit}" if _pips > 0 else ""
+
+        # FIX 2026-04-14: Detectar volatilidad real desde MT5 (spread + ATR)
+        _es_volatil = False
+        try:
+            import MetaTrader5 as _mt5_vol
+            _mt5_sym_vol = signal.get("mt5_symbol") or _pair
+            if _mt5_vol.initialize():
+                _tick_vol = _mt5_vol.symbol_info_tick(_mt5_sym_vol)
+                _info_vol = _mt5_vol.symbol_info(_mt5_sym_vol)
+                if _tick_vol and _info_vol:
+                    _spread_actual = _tick_vol.ask - _tick_vol.bid
+                    _spread_normal = _info_vol.spread_float if hasattr(_info_vol, 'spread_float') else _info_vol.spread * _info_vol.point
+                    # Volátil si spread > 2x el normal
+                    if _spread_normal > 0 and _spread_actual > _spread_normal * 2:
+                        _es_volatil = True
+                # También verificar ATR via últimas velas
+                _rates_vol = _mt5_vol.copy_rates_from_pos(_mt5_sym_vol, _mt5_vol.TIMEFRAME_M15, 0, 20)
+                if _rates_vol is not None and len(_rates_vol) >= 10:
+                    _ranges = [float(r['high'] - r['low']) for r in _rates_vol]
+                    _atr_reciente = sum(_ranges[-5:]) / 5  # ATR últimas 5 velas
+                    _atr_previo = sum(_ranges[:10]) / 10    # ATR previas 10
+                    if _atr_previo > 0 and _atr_reciente > _atr_previo * 1.5:
+                        _es_volatil = True
+        except Exception:
+            pass  # Si falla, no pasa nada — usamos mensaje genérico
+
+        # Razón del cierre según volatilidad real
+        if _es_volatil:
+            _razon_half = "Mercado volátil, protegemos ganancia cerrando la mitad."
+            _razon_partial = "Mercado volátil, protegemos ganancia cerrando parte."
+        else:
+            _razon_half = "Protegemos ganancia cerrando la mitad."
+            _razon_partial = "Protegemos ganancia cerrando parte."
+
         if _pips_txt:
             _action_labels = {
-                "close_half":       f"⚡ *CIERRE PARCIAL 50%* — {_pair_d}\n💰 *{_pips_txt}* asegurados. Mercado volátil, protegemos ganancia.",
-                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 *{_pips_txt}* asegurados. Mercado volátil, protegemos ganancia.",
+                "close_half":       f"⚡ *CIERRE PARCIAL 50%* — {_pair_d}\n💰 *{_pips_txt}* asegurados. {_razon_half}",
+                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 *{_pips_txt}* asegurados. {_razon_partial}",
                 "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ *{_pips_txt}* de ganancia. Operación finalizada.",
                 "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Protegemos la operación. Ya no hay riesgo de pérdida.",
                 "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
@@ -1846,8 +1880,8 @@ def send_to_channel(signal, executed, detail):
             }
         else:
             _action_labels = {
-                "close_half":       f"⚡ *CIERRE PARCIAL 50%* — {_pair_d}\n💰 Mercado volátil, protegemos ganancia cerrando la mitad.",
-                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 Mercado volátil, protegemos ganancia cerrando parte.",
+                "close_half":       f"⚡ *CIERRE PARCIAL 50%* — {_pair_d}\n💰 {_razon_half}",
+                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 {_razon_partial}",
                 "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ Cerramos toda la posición. Operación finalizada.",
                 "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Protegemos la operación. Ya no hay riesgo de pérdida.",
                 "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
