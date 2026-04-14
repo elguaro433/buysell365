@@ -14604,8 +14604,7 @@ def loop_publicidad_grupo():
             "🛡️ SL: 4740.00\n"
             "_(Ejemplo ilustrativo, no es una señal activa)_\n\n"
             "✅ Entrada, TP y SL exactos en cada señal\n"
-            "✅ 🥇 GOLD · 💱 EUR/USD · USD/JPY · GBP/USD\n"
-            "✅ 📈 NASDAQ · US30 · S&P 500\n"
+            "✅ GOLD · EUR/USD · GBP/USD · USD/JPY · USD/CAD · AUD/USD · GBP/JPY · EUR/JPY · GBP/NZD · EUR/CHF · NASDAQ · US30 · S&P 500\n"
             "✅ Alertas instantáneas al canal VIP\n"
             "🤖 Copy Trading automático disponible\n\n"
             "👇 *Escribe /vip para unirte*",
