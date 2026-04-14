@@ -326,7 +326,7 @@ def _get_current_price(pair: str) -> float | None:
             val = float(data.get("price", 0) or 0)
             return val if val > 0 else None
         except Exception as e:
-            log.warning(f"⚠️ TwelveData falló para {pair} ({symbol}): {e}")
+            log.warning(f"⚠️ TwelveData falló para {pair}: {e}")
     log.error(f"❌ Todas las fuentes de precio fallaron para {pair}")
     return None
 
@@ -579,7 +579,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     pair = signal["pair"]
     entry = signal["entry"]
     # FIX 2026-04-08: Usar TP final (el más alto/bajo) para calcular profit real
-    tp = signal.get("_tp_final", signal["tp"]) or signal["tp"]
+    tp = signal.get("_tp_final") or signal.get("tp", 0) or 0
     pair_d = _get_display_pair(pair)
 
     fmt = lambda v: fmt_price(v, zero_label="Market")
@@ -1022,18 +1022,16 @@ async def _monitor_tp_loop() -> None:
             if _stale_ids:
                 log.info(f"🧹 Limpieza: {len(_stale_ids)} pending_entry antiguos eliminados")
 
-        # ── Limpieza de sets que crecen sin límite ──
-        if len(_published_msg_ids) > 2000:
-            # Conservar solo los últimos 500 (los más recientes son los más altos)
-            _sorted = sorted(_published_msg_ids)
-            _published_msg_ids.clear()
-            _published_msg_ids.update(_sorted[-500:])
-            log.info(f"🧹 _published_msg_ids limpiado: 2000+ → 500")
-        if len(_resolved_signals) > 2000:
-            # No hay forma de saber cuáles son recientes, limpiar dejando vacío
-            # Las señales en disco (copier_open_signals.json) ya están resueltas
-            _resolved_signals.clear()
-            log.info(f"🧹 _resolved_signals limpiado (>2000 entradas)")
+        # ── Limpieza de sets que crecen sin límite (con lock) ──
+        with _signals_lock:
+            if len(_published_msg_ids) > 2000:
+                _sorted = sorted(_published_msg_ids)
+                _published_msg_ids.clear()
+                _published_msg_ids.update(_sorted[-500:])
+                log.info(f"🧹 _published_msg_ids limpiado: 2000+ → 500")
+            if len(_resolved_signals) > 2000:
+                _resolved_signals.clear()
+                log.info(f"🧹 _resolved_signals limpiado (>2000 entradas)")
 
         with _signals_lock:
             signals_copy = dict(_open_signals)

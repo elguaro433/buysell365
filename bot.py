@@ -3306,7 +3306,7 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
             return False
 
         spread_actual = symbol_info.spread
-        max_spread = MAX_SPREAD_ALLOWED.get(ticker, 9999)
+        max_spread = MAX_SPREAD_ALLOWED.get(ticker, 50)  # Default 5 pips
 
         if spread_actual > max_spread:
             print(f"🛡️ ORDEN CANCELADA [{cuenta_name}]: Spread en {mt5_ticker} demasiado alto ({spread_actual} > {max_spread})")
@@ -3423,7 +3423,7 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
             log_op(f"❌ ORDEN RECHAZADA [{cuenta_name}]: {mt5_ticker} {tipo} | {result.comment} (code:{result.retcode})", "error")
             return False
 
-        _ticket_id = result.order if result.order else True
+        _ticket_id = result.order if result.order else 0  # 0 = ejecutado pero sin ticket
         log_op(f"🚀 ORDEN EJECUTADA [{cuenta_name}]: {tipo} {lote_val} {mt5_ticker} @ {price} ticket#{_ticket_id}")
         print(f"🚀 ORDEN EJECUTADA [{cuenta_name}]: {tipo} {lote_val} {mt5_ticker} @ {price} ticket#{_ticket_id}")
         return _ticket_id  # Retorna ticket ID (int) en vez de True
@@ -3783,13 +3783,13 @@ def sync_mt5_positions():
                 emoji_res = "🛑"
                 tipo_cierre = "SL ACTIVADO"
                 color = "🔴"
-            # FIX 2026-04-07: Formato en inglés
-            _tipo_en = "BUY" if tipo in ("COMPRA", "BUY") else "SELL"
+            # FIX 2026-04-14: Formato en español
+            _tipo_es = "COMPRA" if tipo in ("COMPRA", "BUY") else "VENTA"
             msg = (
                 f"{emoji_res} <b>{tipo_cierre}</b> — {nombre}\n"
-                f"{color} {_tipo_en} | {signo}{p_txt}\n"
-                f"📥 Entry: {fmt(entrada, ticker)}\n"
-                f"📤 Exit: {fmt(precio_cierre, ticker)}"
+                f"{color} {_tipo_es} | {signo}{p_txt}\n"
+                f"📥 Entrada: {fmt(entrada, ticker)}\n"
+                f"📤 Salida: {fmt(precio_cierre, ticker)}"
             )
             enviar_canal(msg)
             logger.info(f"🔔 {tipo_cierre}: {nombre} {tipo} | {signo}{p_txt}")
@@ -4409,7 +4409,7 @@ def cmd_estado():
             mt5_ticker = MT5_TICKER_MAP.get(ticker, ticker)
             with _lock_mt5:  # H-01 FIX
                 si = mt5.symbol_info(mt5_ticker)
-            if si and si.spread > MAX_SPREAD_ALLOWED.get(ticker, 999):
+            if si and si.spread > MAX_SPREAD_ALLOWED.get(ticker, 50):
                 _spreads_mal.append(f"⚠️{nombre}:{si.spread}")
         if _spreads_mal:
             res += "🛡️ " + " │ ".join(_spreads_mal) + "\n"
@@ -8584,7 +8584,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 if admin_id:
                     enviar_telegram(
                         f"⚠️ *Error MT5*: No se pudo abrir {tipo} {ticker}\n"
-                        f"Entry: {_entry_d} | SL: {fmt(sl, ticker)} | TP: {fmt(tp, ticker)}",
+                        f"Entrada: {_entry_d} | SL: {fmt(sl, ticker)} | TP: {fmt(tp, ticker)}",
                         admin_id
                     )
                 # Aunque MT5 falle, enviar la señal al canal VIP
@@ -12620,13 +12620,13 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         msg = (f"{emoji} *{_dir_es}* — {nombre_activo}\n"
                f"━━━━━━━━━━\n"
-               f"Entry: `{_fmt_wh(price)}`\n"
+               f"Entrada: `{_fmt_wh(price)}`\n"
                f"SL: `{_fmt_wh(sl)}` (\u2212{_wh_fmt_d(_wh_sl_d)})\n\n"
                f"TP1: `{_fmt_wh(tp1)}` (+{_wh_fmt_d(_wh_tp1_d)})\n"
                f"TP2: `{_fmt_wh(tp2)}` (+{_wh_fmt_d(_wh_tp2_d)})\n"
                f"TP3: `{_fmt_wh(tp3)}` (+{_wh_fmt_d(_wh_tp3_d)})\n"
                f"━━━━━━━━━━\n"
-               f"Score: {score}/10")
+               f"Puntuación: {score}/10")
 
         # ═══ RESERVA ATÓMICA: Todos los checks + reserva de slot en UN lock ═══
         op_id = f"{ticker_yf}_{int(time.time())}"
