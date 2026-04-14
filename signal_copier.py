@@ -507,7 +507,7 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         # ── Entry line ──
         if entry > 0:
             ax.axhline(y=entry, color=ENTRY_COLOR, linestyle="--", linewidth=2, alpha=0.85, zorder=5)
-            ax.text(n + 0.5, entry, f" Entry {fmt_price(entry)}", color="#ffffff", fontsize=10,
+            ax.text(n + 0.5, entry, f" Entrada {fmt_price(entry)}", color="#ffffff", fontsize=10,
                     fontweight="bold", va="center", ha="left", zorder=6,
                     bbox=dict(boxstyle="round,pad=0.3", facecolor=ENTRY_COLOR, edgecolor=ENTRY_COLOR, alpha=0.85))
 
@@ -534,11 +534,11 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             pips_label = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
 
         # Título con pips
-        dir_label = direction.upper()  # BUY/SELL sin traducir
+        dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
         if title_override:
             title = title_override
         else:
-            title = f"✅ TP HIT — {dir_label} {pair_d}"
+            title = f"✅ TP ALCANZADO — {dir_label} {pair_d}"
             if pips_label:
                 title += f"  |  {pips_label}"
         ax.set_title(title, color=GOLD, fontsize=16, fontweight="bold", pad=18,
@@ -600,7 +600,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     else:
         pips_str = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
 
-    pips_line = f"\n💰 Profit: *{pips_str}*" if pips_str else ""
+    pips_line = f"\n💰 Ganancia: *{pips_str}*" if pips_str else ""
 
     # FIX 2026-04-10: Solo mostrar TPs válidos (dirección correcta y no basura)
     def _tp_valid(tval):
