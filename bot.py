@@ -6302,19 +6302,19 @@ def cmd_vip(user_id: str = None):
                 # ✅ Está en el canal — mostrar estado completo
                 if es_trial:
                     txt_vip = (
-                        "🎉 *TU TRIAL ESTA ACTIVA*\n"
+                        "🎉 *TU TRIAL ESTÁ ACTIVA*\n"
                         "━━━━━━━━━━\n\n"
-                        f"⏳ Te quedan *{dias_restantes} dias* de acceso gratuito\n"
+                        f"⏳ Te quedan *{dias_restantes} días* de acceso gratuito\n"
                         f"📅 Expira: *{sub.get('expira', '?')[:10]}*\n\n"
                         "✅ Ya tienes acceso al canal VIP\n"
-                        "✅ Senales IA con Entry, SL y TP exactos\n"
+                        "✅ Señales IA con Entrada, SL y TP exactos\n"
                         "✅ Monitoreo 24/7 de tus operaciones"
                     )
                 else:
                     txt_vip = (
-                        "👑 *TU VIP ESTA ACTIVO*\n"
+                        "👑 *TU VIP ESTÁ ACTIVO*\n"
                         "━━━━━━━━━━\n\n"
-                        f"⏳ Expira en *{dias_restantes} dias* ({sub.get('expira', '?')[:10]})\n\n"
+                        f"⏳ Expira en *{dias_restantes} días* ({sub.get('expira', '?')[:10]})\n\n"
                         "✅ Ya tienes acceso al canal VIP"
                     )
                 botones = []
@@ -6335,8 +6335,8 @@ def cmd_vip(user_id: str = None):
             "👑 *VIP ACTIVO — MIEMBRO DEL CANAL*\n"
             "━━━━━━━━━━\n\n"
             "✅ Tienes acceso completo al canal VIP\n"
-            "✅ Senales IA con Entry, SL y TP exactos\n"
-            "✅ Analisis, panel y todas las herramientas\n"
+            "✅ Señales IA con Entrada, SL y TP exactos\n"
+            "✅ Análisis, panel y todas las herramientas\n"
             "✅ Soporte directo con el admin\n\n"
             "🔧 _Acceso concedido como miembro del canal._"
         ), None
@@ -6349,10 +6349,10 @@ def cmd_vip(user_id: str = None):
     texto = (
         "👑 *CANAL VIP — BuySell365.pro*\n"
         "━━━━━━━━━━\n\n"
-        "✅ Senales IA: Oro, Forex, NASDAQ, S&P 500\n"
-        "✅ Alta precision | Entrada, SL, TP exactos\n"
+        "✅ Señales IA: Oro, Forex, NASDAQ, S&P 500\n"
+        "✅ Alta precisión | Entrada, SL, TP exactos\n"
         "✅ Notificaciones en tiempo real a Telegram\n"
-        "✅ Gestion de riesgo | Trading en Vivo\n"
+        "✅ Gestión de riesgo | Trading en Vivo\n"
         "✅ Briefing matutino + Cierre nocturno\n"
         "✅ Soporte directo con el admin\n\n"
     )
@@ -6364,7 +6364,7 @@ def cmd_vip(user_id: str = None):
             f"🔥 *OFERTA DE LANZAMIENTO — 50% OFF*\n"
             f"💰 ~{M}{pi['precio_regular']}~ → *{M}{precio}/mes* (~{_usdt_aprox:.0f} USDT)\n"
             f"⏰ _Oferta hasta {VIP_DESCUENTO_HASTA}_\n"
-            f"📅 _Quedan {pi['dias_restantes_desc']} dias_\n\n"
+            f"📅 _Quedan {pi['dias_restantes_desc']} días_\n\n"
         )
     else:
         texto += f"💰 *{M}{precio}/mes* (~{_usdt_aprox:.0f} USDT) — Suscripcion mensual\n\n"

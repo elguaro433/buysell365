@@ -769,10 +769,10 @@ def index_web():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con Inteligencia Artificial</title>
-<meta name="description" content="Se\u00f1ales de trading automatizadas con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos. An\u00e1lisis con IA avanzada y datos institucionales.">
-<meta name="keywords" content="trading signals, se\u00f1ales trading, inteligencia artificial trading, forex signals, oro trading, NASDAQ signals, copy trading, bot trading, XAU USD, BuySell365">
+<meta name="description" content="Se\u00f1ales de trading en tiempo real con Inteligencia Artificial. Oro (XAUUSD), EUR/USD, NASDAQ, S&amp;P 500, US30 y m\u00e1s. Copy Trading autom\u00e1tico en MT5 con broker regulado XM. Entrada, TP y SL exactos.">
+<meta name="keywords" content="se\u00f1ales trading telegram, se\u00f1ales forex gratis, se\u00f1ales oro telegram, gold signals, copy trading MT5, bot trading telegram, se\u00f1ales NASDAQ, se\u00f1ales EUR/USD, trading con IA, BuySell365, se\u00f1ales XAUUSD, forex signals free, trading bot, se\u00f1ales de trading gratis, copy trading XM">
 <meta property="og:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta property="og:description" content="Se\u00f1ales profesionales de trading con Inteligencia Artificial. EUR/USD, NASDAQ, S&amp;P 500 + se\u00f1ales de canales afiliados.">
+<meta property="og:description" content="Se\u00f1ales de Oro, Forex y NASDAQ en tiempo real. Copy Trading autom\u00e1tico en MT5. Entrada, TP y SL exactos. \u00danete gratis al grupo.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -781,7 +781,7 @@ def index_web():
 <meta property="og:site_name" content="BuySell365 Pro">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta name="twitter:description" content="Se\u00f1ales de trading con IA. EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos en tiempo real.">
+<meta name="twitter:description" content="Se\u00f1ales de Oro, Forex y NASDAQ en tiempo real. Copy Trading autom\u00e1tico. \u00danete gratis.">
 <meta name="twitter:image" content="https://buysell365.pro/img/og_image.png">
 <meta name="twitter:site" content="@buysell365pro">
 <link rel="canonical" href="https://buysell365.pro">
