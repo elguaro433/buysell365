@@ -3334,12 +3334,17 @@ a{{color:var(--green);text-decoration:none}}
 def pagina_unete():
     """Landing page para campañas de ads — conversión directa."""
     # Datos reales para credibilidad
-    with _lock:
-        hist = list(_historial_real) if _historial_real else []
-    total_ops = len(hist)
-    wins = sum(1 for h in hist if float(h.get('pips', 0)) > 0)
-    wr = round(wins / total_ops * 100, 1) if total_ops > 0 else 0
-    total_pips = sum(float(h.get('pips', 0)) for h in hist if float(h.get('pips', 0)) > 0)
+    try:
+        with _lock:
+            hist = list(_historial_real) if _historial_real else []
+        total_ops = len(hist)
+        wins = sum(1 for h in hist if float(h.get('pips', 0)) > 0)
+        wr = round(wins / total_ops * 100, 1) if total_ops > 0 else 0
+        total_pips = sum(float(h.get('pips', 0)) for h in hist if float(h.get('pips', 0)) > 0)
+    except Exception:
+        total_ops = 0
+        wr = 0
+        total_pips = 0
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -3459,7 +3464,7 @@ body{{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;
 <p style="color:#8b9fc4;margin-bottom:24px">Únete al grupo público y ve las señales en acción</p>
 <a href="https://t.me/BUYSELL_365_24_7" class="btn btn-green">📱 Unirme al Grupo Gratis</a>
 <br>
-<a href="https://t.me/{BOT_USERNAME}?start=vip" class="btn btn-blue">💎 Canal VIP — Señales Premium</a>
+<a href="https://t.me/BuySell365_bot?start=vip" class="btn btn-blue">💎 Canal VIP — Señales Premium</a>
 <br>
 <a href="https://social.tp-redirect.com/s/WRE0V7jm" class="btn btn-gold">🤖 Activar Copy Trading</a>
 <p class="note">Sin tarjeta. Sin compromiso. Cancela cuando quieras.</p>
