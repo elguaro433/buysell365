@@ -739,6 +739,9 @@ def index_web():
     _html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
+<!-- Google Ads tag -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-18090606337"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','AW-18090606337');</script>
 <!-- Cookie Consent + Conditional Analytics -->
 <script>
 (function(){{
