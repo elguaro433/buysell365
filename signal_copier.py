@@ -857,20 +857,14 @@ def _build_promo_report(hora_label: str) -> str | None:
 
     wr = len(tps) / (len(tps) + len(sls)) * 100 if (tps or sls) else 0
 
+    # FIX 2026-04-14: Reporte simplificado — solo ganancias totales, sin SLs ni Win Rate
     msg = (
         f"📊📊📊 *REPORTE {hora_label}* 📊📊📊\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"📅 {hoy}\n\n"
-        f"🎯 *{len(tps)} TP{'s' if len(tps) != 1 else ''} ganado{'s' if len(tps) != 1 else ''}*"
-    )
-    if sls:
-        msg += f"  |  🛑 {len(sls)} SL{'s' if len(sls) != 1 else ''}"
-    msg += f"  |  ✅ *{wr:.0f}% Win Rate*\n\n"
-
-    msg += f"*Señales exitosas:*\n{tp_lines}\n"
-    msg += f"{resumen}\n"
-    msg += f"━━━━━━━━━━━━━━━━━━━\n\n"
-    msg += (
+        f"💰 *Ganancias del día:*\n"
+        f"{resumen}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"💎 *¿Quieres recibir estas señales en tiempo real?*\n"
         f"Únete al canal VIP y copia estas operaciones.\n\n"
         f"👉 Escribe */vip* para más info\n"
@@ -1558,13 +1552,16 @@ def _parse_update(text, upper):
         action = "sl_hit"
     elif "TP HIT" in upper or "TAKE PROFIT HIT" in upper:
         action = "tp_hit"
-    # "EN CURSO CON GANANCIA" = info only, suggest full close
+    # FIX 2026-04-14: "RUNNING...FULL CLOSE" = cierre real, no descartar
     elif "EN CURSO CON" in upper or "RUNNING" in upper:
-        action = "info_running"
+        if "FULL CLOSE" in upper or "CERRAR" in upper:
+            action = "full_close"
+        else:
+            action = "info_running"
     else:
         return None
 
-    # info_running = just notify, don't execute
+    # info_running sin FULL CLOSE = informativo, descartar
     if action == "info_running":
         return None
 
@@ -1582,11 +1579,18 @@ def _parse_update(text, upper):
     if not pair_found:
         return None
 
+    # FIX 2026-04-14: Extraer pips de ganancia del mensaje aliado
+    _pips_profit = 0
+    _pips_match = re.search(r'(\d+)\s*\+?\s*(?:PIPS|PTS)', upper)
+    if _pips_match:
+        _pips_profit = int(_pips_match.group(1))
+
     return {
         "type": "update",
         "action": action,
         "pair": pair_found[0],
         "mt5_symbol": pair_found[1],
+        "pips_profit": _pips_profit,
         "raw": text[:200],
     }
 
@@ -1811,15 +1815,46 @@ def send_to_channel(signal, executed, detail):
         _action = signal.get("action", "")
         _pair = signal.get("pair", "")
         _pair_d = _get_display_pair(_pair)
-        # FIX 2026-04-14: Labels en español con contexto claro
-        _action_labels = {
-            "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}\n💰 Aseguramos el 50% de la ganancia, dejamos correr el resto.",
-            "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 Tomamos parte de las ganancias y mantenemos posición abierta.",
-            "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ Cerramos toda la posición. Operación finalizada.",
-            "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Movemos el stop loss al precio de entrada. Operación sin riesgo.",
-            "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
-            "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
-        }
+        # FIX 2026-04-14: Labels en español con pips dinámicos del canal aliado
+        _pips = signal.get("pips_profit", 0)
+        _unit = "pts" if _pair in ("GOLD", "XAUUSD", "XAUUSD=X") or _pair_d in ("GOLD", "US30", "NAS100", "S&P 500") else "pips"
+        # Calcular pips desde _open_signals si no vienen del canal aliado
+        if _pips <= 0:
+            with _signals_lock:
+                for _sid, _sdata in _open_signals.items():
+                    _s = _sdata.get("signal", {})
+                    if _s.get("pair") == _pair or _s.get("mt5_symbol") == _pair:
+                        _entry_sig = _s.get("entry", 0)
+                        if _entry_sig > 0:
+                            _live_p = _get_current_price(_pair)
+                            if _live_p and _live_p > 0:
+                                _raw_diff = abs(_live_p - _entry_sig)
+                                if _entry_sig >= 100:
+                                    _pips = round(_raw_diff, 1)
+                                elif "JPY" in _pair.upper():
+                                    _pips = round(_raw_diff * 100)
+                                else:
+                                    _pips = round(_raw_diff * 10000)
+                        break
+        _pips_txt = f"+{_pips} {_unit}" if _pips > 0 else ""
+        if _pips_txt:
+            _action_labels = {
+                "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}\n💰 *{_pips_txt}* asegurados. Cerramos el 50% y dejamos correr el resto.",
+                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 *{_pips_txt}* tomados. Mantenemos posición abierta.",
+                "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ *{_pips_txt}* de ganancia. Operación finalizada.",
+                "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Movemos el stop loss al precio de entrada. Operación sin riesgo.",
+                "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
+                "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
+            }
+        else:
+            _action_labels = {
+                "close_half":       f"⚡ *CERRAR MITAD* — {_pair_d}\n💰 Aseguramos el 50% de la ganancia, dejamos correr el resto.",
+                "close_partial":    f"⚡ *CIERRE PARCIAL* — {_pair_d}\n💰 Tomamos parte de las ganancias y mantenemos posición abierta.",
+                "full_close":       f"🔒 *CIERRE TOTAL* — {_pair_d}\n✅ Cerramos toda la posición. Operación finalizada.",
+                "move_sl_to_entry": f"🛡️ *SL A ENTRADA* — {_pair_d}\n🔐 Movemos el stop loss al precio de entrada. Operación sin riesgo.",
+                "sl_hit":           f"🛑 *SL TOCADO* — {_pair_d}",
+                "tp_hit":           f"✅ *TP ALCANZADO* — {_pair_d}",
+            }
         _msg = _action_labels.get(_action)
         if _msg:
             # FIX 2026-03-31: Solo publicar actualización si tenemos señal abierta para ese par
