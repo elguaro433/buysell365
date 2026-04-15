@@ -156,6 +156,184 @@ _daily_results_lock = threading.Lock()
 MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
 # Archivo de señales abiertas — sobrevive reinicios del copier
 OPEN_SIGNALS_FILE = Path(__file__).parent / "copier_open_signals.json"
+# FIX 2026-04-15: Archivo de estadísticas persistentes — sobrevive reinicios
+COPIER_STATS_FILE = Path(__file__).parent / "copier_stats.json"
+# Flag para enviar resumen diario solo una vez
+_daily_summary_sent: str = ""  # fecha "DD/MM/YYYY" del último resumen enviado
+
+
+def _get_pips_info(pair: str, entry: float, exit_price: float) -> tuple:
+    """Calcula pips y unidad según tipo de activo. Retorna (pips_numeric, pips_unit)."""
+    pips_raw = abs(exit_price - entry) if entry > 0 and exit_price > 0 else 0
+    if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
+        return round(pips_raw, 1), "pts"
+    elif "JPY" in pair.upper():
+        return round(pips_raw * 100, 1), "pips"
+    elif entry >= 100:  # Índices
+        return round(pips_raw, 1), "pts"
+    else:  # Forex
+        return round(pips_raw * 10000, 1), "pips"
+
+
+def _save_copier_stats(trade: dict) -> None:
+    """Persiste un trade cerrado a copier_stats.json. Limita a 90 días."""
+    try:
+        data = {"trades": []}
+        if COPIER_STATS_FILE.exists():
+            with open(COPIER_STATS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+        data["trades"].append(trade)
+
+        # Cleanup: mantener solo últimos 90 días
+        cutoff = time.time() - (90 * 86400)
+        data["trades"] = [t for t in data["trades"] if t.get("closed_at", 0) > cutoff]
+
+        with open(COPIER_STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log.warning(f"Error guardando copier_stats: {e}")
+
+
+def _load_copier_stats_today() -> list:
+    """Carga trades de HOY desde copier_stats.json para restaurar _daily_results."""
+    try:
+        if not COPIER_STATS_FILE.exists():
+            return []
+        with open(COPIER_STATS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        from datetime import datetime
+        import pytz
+        tz = pytz.timezone("Europe/Andorra")
+        hoy = datetime.now(tz).strftime("%d/%m/%Y")
+        return [t for t in data.get("trades", []) if t.get("fecha") == hoy]
+    except Exception as e:
+        log.warning(f"Error cargando copier_stats: {e}")
+        return []
+
+
+def _record_close_result(pair: str, action: str, pips: float, direction: str = "", source: str = "") -> None:
+    """Registra un cierre parcial/total en copier_stats.json."""
+    pair_d = _get_display_pair(pair)
+    pips_numeric, pips_unit = _get_pips_info(pair, 100 if pips > 50 else 1, (100 + pips) if pips > 50 else (1 + pips / 10000))
+    # Usar pips directos para Gold/índices, convertir para forex
+    if pair in ("GOLD", "XAUUSD", "XAUUSD=X") or pips > 50:
+        pips_numeric = round(pips, 1)
+        pips_unit = "pts"
+    else:
+        pips_numeric = round(pips, 1)
+        pips_unit = "pips"
+
+    from datetime import datetime
+    import pytz
+    tz = pytz.timezone("Europe/Andorra")
+
+    trade = {
+        "sig_id": f"{pair}_{action}_{int(time.time())}",
+        "pair": pair,
+        "pair_display": pair_d,
+        "direction": direction,
+        "source": source,
+        "entry": 0,
+        "tp": 0,
+        "sl": 0,
+        "result": action,  # close_half | close_partial | full_close
+        "pips": pips_numeric,
+        "pips_unit": pips_unit,
+        "opened_at": 0,
+        "closed_at": time.time(),
+        "fecha": datetime.now(tz).strftime("%d/%m/%Y"),
+    }
+    _save_copier_stats(trade)
+    with _daily_results_lock:
+        _daily_results.append(trade)
+    log.info(f"📊 Stats: {action} {pair_d} +{pips_numeric} {pips_unit}")
+
+
+def _send_daily_summary() -> None:
+    """Envía resumen completo del día al canal VIP."""
+    import requests
+    from datetime import datetime
+    import pytz
+    tz = pytz.timezone("Europe/Andorra")
+    hoy = datetime.now(tz).strftime("%d/%m/%Y")
+
+    # Cargar todos los trades de hoy
+    today_trades = _load_copier_stats_today()
+    if not today_trades:
+        log.info("📊 Resumen diario: sin trades hoy, no se envía")
+        return
+
+    tps = [t for t in today_trades if t.get("result") == "tp"]
+    sls = [t for t in today_trades if t.get("result") == "sl"]
+    closes_profit = [t for t in today_trades if t.get("result") in ("close_half", "close_partial", "full_close") and t.get("pips", 0) > 0]
+    total_signals = len([t for t in today_trades if t.get("result") in ("tp", "sl")])
+
+    # Win rate (TP vs SL)
+    wr = len(tps) / total_signals * 100 if total_signals > 0 else 0
+
+    # Pips netos (TPs positivos, SLs negativos)
+    pips_tp = sum(t.get("pips", 0) for t in tps)
+    pips_sl = sum(t.get("pips", 0) for t in sls)
+    pips_closes = sum(t.get("pips", 0) for t in closes_profit)
+    pips_netos = pips_tp - pips_sl + pips_closes
+
+    # Mejor y peor señal
+    all_with_pips = [t for t in today_trades if t.get("pips", 0) > 0 and t.get("result") in ("tp", "sl", "full_close")]
+    mejor = max(all_with_pips, key=lambda x: x.get("pips", 0) if x.get("result") == "tp" else 0, default=None)
+    peor = max(sls, key=lambda x: x.get("pips", 0), default=None)
+
+    mejor_txt = ""
+    if mejor and mejor.get("result") == "tp":
+        mejor_txt = f"\n🏆 Mejor: {mejor['pair_display']} *+{mejor['pips']:.0f} {mejor.get('pips_unit', 'pts')}*"
+    peor_txt = ""
+    if peor:
+        peor_txt = f"\n💥 Peor: {peor['pair_display']} *-{peor['pips']:.0f} {peor.get('pips_unit', 'pts')}*"
+
+    # Por activo
+    asset_stats = {}
+    for t in today_trades:
+        if t.get("result") not in ("tp", "sl"):
+            continue
+        p = t.get("pair_display", t.get("pair", "?"))
+        if p not in asset_stats:
+            asset_stats[p] = {"w": 0, "l": 0}
+        if t["result"] == "tp":
+            asset_stats[p]["w"] += 1
+        else:
+            asset_stats[p]["l"] += 1
+
+    asset_lines = ""
+    for asset, stats in sorted(asset_stats.items(), key=lambda x: x[1]["w"] + x[1]["l"], reverse=True):
+        asset_lines += f"\n  {asset}: {stats['w']}W / {stats['l']}L"
+
+    pips_sign = "+" if pips_netos >= 0 else ""
+    msg = (
+        f"📊 *RESUMEN DEL DÍA — {hoy}*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"✅ TP Alcanzados: *{len(tps)}*\n"
+        f"🛑 SL Tocados: *{len(sls)}*\n"
+        f"⚡ Cierres con ganancia: *{len(closes_profit)}*\n"
+        f"📊 Win Rate: *{wr:.0f}%*\n\n"
+        f"💰 Pips netos: *{pips_sign}{pips_netos:.0f}*"
+        f"{mejor_txt}"
+        f"{peor_txt}\n\n"
+        f"📈 *Por activo:*{asset_lines}\n\n"
+        f"🔔 Total señales: *{total_signals}*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"_BuySell365 Pro — Transparencia total_"
+    )
+
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
+        resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code == 200:
+            log.info(f"📊 Resumen diario enviado al canal VIP ({len(tps)} TPs, {len(sls)} SLs)")
+        else:
+            log.warning(f"📊 Error enviando resumen: {resp.status_code}")
+    except Exception as e:
+        log.warning(f"📊 Error enviando resumen: {e}")
 
 
 def _save_open_signals():
@@ -841,20 +1019,33 @@ def _record_daily_result(signal: dict, result: str) -> None:
         pips_str = f"{pips_raw * 10000:.0f} pips"
         pips_numeric = pips_raw * 10000
 
+    from datetime import datetime
+    import pytz
+    tz = pytz.timezone("Europe/Andorra")
+
     record = {
         "pair": pair,
         "pair_display": _get_display_pair(pair),
         "direction": direction,
+        "source": signal.get("source", ""),
         "entry": entry,
         "tp": tp,
         "sl": sl,
         "pips_str": pips_str,
+        "pips": pips_numeric,
+        "pips_unit": "pts" if pair in ("GOLD", "XAUUSD", "XAUUSD=X") or entry >= 100 else "pips",
         "pips_numeric": pips_numeric,
         "result": result,
         "time": time.time(),
+        "opened_at": signal.get("timestamp", 0),
+        "closed_at": time.time(),
+        "fecha": datetime.now(tz).strftime("%d/%m/%Y"),
     }
     with _daily_results_lock:
         _daily_results.append(record)
+
+    # FIX 2026-04-15: Persistir a disco (sobrevive reinicios)
+    _save_copier_stats(record)
     log.info(f"📊 Daily tracker: +1 {result.upper()} {pair} ({pips_str}) — total hoy: {len(_daily_results)}")
 
 
@@ -1036,8 +1227,22 @@ async def _loop_promo_reportes() -> None:
 async def _monitor_tp_loop() -> None:
     """Async background loop — checks every 30s if any tracked signal hit TP or SL."""
     log.info("🎯 Monitor TP/SL loop iniciado (intervalo: 30s)")
+    global _daily_summary_sent
     while True:
         await asyncio.sleep(30)  # 30s para no perder TP/SL en mercados volátiles
+
+        # ── FIX 2026-04-15: Resumen diario automático a las 22:00 hora Andorra ──
+        try:
+            from datetime import datetime
+            import pytz
+            _tz_sum = pytz.timezone("Europe/Andorra")
+            _now_sum = datetime.now(_tz_sum)
+            _hoy_str = _now_sum.strftime("%d/%m/%Y")
+            if _now_sum.hour == 22 and _now_sum.minute < 5 and _daily_summary_sent != _hoy_str:
+                _daily_summary_sent = _hoy_str
+                _send_daily_summary()
+        except Exception as _e_sum:
+            log.warning(f"Error en resumen diario: {_e_sum}")
 
         # ── Cargar señales manuales del admin (manual_signals.json) ──
         try:
@@ -1966,6 +2171,18 @@ def send_to_channel(signal, executed, detail):
                     _payload.pop("reply_to_message_id", None)
                     _resp_upd = requests.post(url, json=_payload, timeout=10)
                 log.info(f"📢 Update notificado al canal: {_action} {_pair_d} (reply_to={_reply_id})")
+                # FIX 2026-04-15: Registrar cierre con pips en estadísticas persistentes
+                if _action in ("close_half", "close_partial", "full_close") and _pips > 0:
+                    _sig_dir = ""
+                    _sig_src = ""
+                    with _signals_lock:
+                        for _sid, _sdata in _open_signals.items():
+                            _s = _sdata.get("signal", {})
+                            if _s.get("pair") == _pair or _s.get("mt5_symbol") == _pair:
+                                _sig_dir = _s.get("direction", "")
+                                _sig_src = _s.get("source", "")
+                                break
+                    _record_close_result(_pair, _action, _pips, direction=_sig_dir, source=_sig_src)
                 # FIX 2026-04-15: Remover señal de tracking al recibir cierre definitivo
                 # Previene: 1) TP duplicado de señal ya cerrada (Bug 3)
                 #           2) Doble CIERRE TOTAL (Bug 4) — segundo full_close no encuentra señal
@@ -2443,6 +2660,13 @@ async def main():
 
     # Cargar señales abiertas de la sesión anterior (sobreviven reinicios)
     _load_open_signals()
+
+    # FIX 2026-04-15: Restaurar estadísticas del día actual desde disco
+    _today_stats = _load_copier_stats_today()
+    if _today_stats:
+        with _daily_results_lock:
+            _daily_results.extend(_today_stats)
+        log.info(f"📊 {len(_today_stats)} resultados de hoy restaurados desde copier_stats.json")
 
     # Intentar conectar con sesión existente PRIMERO (sin enviar código SMS)
     # FIX 2026-04-06: Si la sesión no se reconoce, limpiar WAL/SHM y reintentar
