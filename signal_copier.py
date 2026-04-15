@@ -1668,12 +1668,14 @@ def execute_in_mt5(signal):
 
     # R:R check
     risk = abs(price - sl)
-    reward = abs(tp - price)
     if risk <= 0:
         return False, "Invalid SL"
-    rr = reward / risk
-    if rr < 0.8:
-        return False, f"R:R {rr:.2f} too low"
+    # FIX 2026-04-15: Skip R:R check si TP=0 (señal sin TP definido)
+    if tp > 0:
+        reward = abs(tp - price)
+        rr = reward / risk
+        if rr < 0.8:
+            return False, f"R:R {rr:.2f} too low"
 
     # Lot calculation (1% risk)
     account = mt5.account_info()

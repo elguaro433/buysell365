@@ -140,14 +140,16 @@ def main():
                     _pos_vistos[d.position_id] = d
                 elif d.entry == 1: # DEAL_ENTRY_OUT (cierre)
                     entrada_deal = _pos_vistos.get(d.position_id)
-                    is_buy = (d.type == 1)  # DEAL_TYPE_SELL cierra una compra
+                    # FIX 2026-04-15: Clarificar lógica — deal de cierre tiene tipo inverso
+                    # DEAL_TYPE_SELL(1) cierra BUY, DEAL_TYPE_BUY(0) cierra SELL
+                    original_was_buy = (d.type == 1)  # Si deal de cierre es SELL → posición original era BUY
                     price_open  = entrada_deal.price if entrada_deal else d.price
                     price_close = d.price
-                    pips_val = _pips(d.symbol, price_open, price_close, not is_buy)
+                    pips_val = _pips(d.symbol, price_open, price_close, original_was_buy)
                     historial_hoy.append({
                         "ticket":      d.position_id,
                         "symbol":      d.symbol,
-                        "tipo":        "COMPRA" if not is_buy else "VENTA",
+                        "tipo":        "COMPRA" if original_was_buy else "VENTA",
                         "entrada":     price_open,
                         "salida":      price_close,
                         "profit":      round(d.profit, 2),

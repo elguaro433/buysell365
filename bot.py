@@ -2388,7 +2388,8 @@ def calcular_indicadores_profesionales(df, precio, ticker=""):
             "macd": float(get_col(macd_df, 'MACD_').iloc[-1]),
             "signal": float(get_col(macd_df, 'MACDs').iloc[-1]),
             "macd_hist": float(get_col(macd_df, 'MACDh_').iloc[-1]),
-            "macd_hist_prev": float(get_col(macd_df, 'MACDh_').iloc[-2]),
+            # FIX 2026-04-15: check length >= 2 antes de iloc[-2]
+            "macd_hist_prev": float(get_col(macd_df, 'MACDh_').iloc[-2]) if len(macd_df) >= 2 else 0.0,
 
             # Bollinger Bands
             "bb_up": float(get_col(bb, 'BBU').iloc[-1]),
@@ -2842,7 +2843,8 @@ def evaluar_senal_profesional(ind, ticker=""):
     logger.info(f"📋 DIAGNÓSTICO {ticker}: {' | '.join(_diag)}")
 
     # FIX 2026-03-19: Guardar diagnóstico para la consola
-    _diagnostico_activos[ticker] = {
+    # FIX 2026-04-15: Proteger con lock — evita race condition con hilo de lectura
+    _diag_data = {
         "adx": round(ind['adx'], 1),
         "rsi": round(ind['rsi'], 1),
         "vol": round(ind.get('vol_ratio', 0), 1),
@@ -2854,6 +2856,8 @@ def evaluar_senal_profesional(ind, ticker=""):
         "spread": round(ind.get('spread_puntos', 0), 1),
         "ts": time.time(),
     }
+    with _lock_ops:
+        _diagnostico_activos[ticker] = _diag_data
 
     return None, 0, [f"📋 {' | '.join(_diag)}"]
 
@@ -14095,8 +14099,10 @@ def analizar_activo(nombre, ticker):
 
         # Bloquear SELL en tendencia alcista SOLO si RSI no indica sobrecompra
         # FIX 2026-04-12: RSI>70 = oportunidad de reversión incluso en tendencia alcista
-        if tipo == "VENTA" and diagnostico.get("ema_bull", False):
-            _rsi_val = diagnostico.get("rsi", 50)
+        # FIX 2026-04-15: usar _diagnostico_activos (antes: variable 'diagnostico' undefined → NameError)
+        _diag_ticker = _diagnostico_activos.get(ticker, {})
+        if tipo == "VENTA" and _diag_ticker.get("ema_bull", False):
+            _rsi_val = _diag_ticker.get("rsi", 50)
             if _rsi_val < 70:
                 print(f"🔒 FILTRO: {nombre} VENTA bloqueada — tendencia alcista + RSI {_rsi_val:.0f}<70 → sin sobrecompra")
                 return
@@ -14162,7 +14168,8 @@ def analizar_activo(nombre, ticker):
 
             # ✅ TODOS LOS CHECKS PASADOS — RESERVAR SLOT (atómico con checks)
             _senal_reciente[_base_symbol] = time.time()  # BUG-3: Marcar señal reciente
-            op_id = f"{ticker}_{int(time.time() * 1000)}"  # Milliseconds to avoid collision
+            # FIX 2026-04-15: Microsegundos para evitar colisión teórica
+            op_id = f"{ticker}_{int(time.time() * 1000000)}"
             operaciones_activas[op_id] = {
                 'ticker': ticker, 'nombre': nombre, 'tipo': tipo, 'entrada': precio,
                 'tp1': niveles['tp1'], 'tp2': niveles['tp2'], 'tp3': niveles['tp3'], 'sl': niveles['sl'],
@@ -14209,8 +14216,8 @@ def analizar_activo(nombre, ticker):
             mt5_ok = bool(_mt5_result)
             if mt5_ok:
                 mt5_ejecutado = True
+                # FIX 2026-04-15: Línea duplicada sobreescribía ticket con boolean
                 _activo_ticket_mt5 = _mt5_result if isinstance(_mt5_result, int) else None
-                _activo_ticket_mt5 = mt5_ok if isinstance(mt5_ok, int) else None
 
         # Actualizar reserva con resultados MT5 o limpiar si falló
         _debe_registrar = mt5_ok or _skip_mt5 or not (MT5_AVAILABLE and AUTO_TRADING)
