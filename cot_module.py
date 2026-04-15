@@ -49,14 +49,14 @@ def descargar_cot_cftc():
             resp.raise_for_status()
             text = resp.text
         except Exception as e1:
-            logger.info(f"COT SSL normal falló ({e1}), probando sin verificación...")
+            logger.debug(f"COT SSL normal falló ({e1}), probando sin verificación...")
             # Intento 2: requests sin SSL — fallback solo si el certificado de CFTC falla
             try:
                 resp = requests.get(url, headers=headers, timeout=30, verify=False)
                 resp.raise_for_status()
                 text = resp.text
             except Exception as e2:
-                logger.info(f"COT requests falló ({e2}), probando urllib...")
+                logger.debug(f"COT requests falló ({e2}), probando urllib...")
                 # Intento 3: urllib como último recurso
                 try:
                     ctx = ssl.create_default_context()
@@ -66,7 +66,7 @@ def descargar_cot_cftc():
                     resp3 = urllib.request.urlopen(req, context=ctx, timeout=30)
                     text = resp3.read().decode('utf-8')
                 except Exception as e3:
-                    logger.warning(f"COT urllib también falló: {e3}")
+                    logger.debug(f"COT urllib también falló: {e3}")
                     raise e3
 
         if not text or len(text) < 1000:
@@ -112,7 +112,7 @@ def descargar_cot_cftc():
 
     except Exception as e:
         _ultimo_error_cot = time.time()  # Marcar fallo — no reintentar por 30 min
-        logger.warning(f"Error COT: {e} — no se reintentará por {_COT_ERROR_TTL//60} min")
+        logger.info(f"Error COT: {e} — no se reintentará por {_COT_ERROR_TTL//60} min")
         return _cache_cot if _cache_cot else {}
 
 def obtener_sesgo_cot(ticker):

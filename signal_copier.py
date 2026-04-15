@@ -241,6 +241,49 @@ def _normalize_twelve_symbol(pair: str) -> str:
     return pair
 
 
+def _validate_entry_vs_market(signal: dict) -> None:
+    """FIX 2026-04-15: Si entry difiere >1.5% del precio de mercado, corregir al precio actual.
+    Previene señales con precios stale/viejos (ej: FXPremiere publica precio del domingo).
+    """
+    entry = signal.get("entry", 0) or 0
+    if entry <= 0:
+        return
+    pair = signal.get("pair", "")
+    if not pair:
+        return
+
+    # Intentar MT5 primero (precio exacto del broker)
+    live = None
+    try:
+        import MetaTrader5 as _mt5v
+        _mt5_sym_map_v = {
+            "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
+            "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+            "US30": "US30Cash", "DOW": "US30Cash", "US500": "US500Cash",
+            "USOIL": "OILCash", "BRENT": "BRENTCash", "BTCUSD": "BTCUSD",
+        }
+        _pair_clean = pair.upper().replace("/", "")
+        _sym = _mt5_sym_map_v.get(_pair_clean, _pair_clean)
+        if _mt5v.initialize():
+            _mt5v.symbol_select(_sym, True)
+            _tick = _mt5v.symbol_info_tick(_sym)
+            if _tick and _tick.bid > 0:
+                live = (_tick.ask + _tick.bid) / 2
+    except Exception:
+        pass
+
+    # Fallback yfinance/TwelveData
+    if not live:
+        live = _get_current_price(pair)
+    if not live or live <= 0:
+        return
+
+    pct_diff = abs(entry - live) / live
+    if pct_diff > 0.015:  # >1.5% de diferencia
+        log.warning(f"⚠️ Entry stale: {entry} difiere {pct_diff:.1%} del precio actual {live:.2f} — corrigiendo a precio de mercado")
+        signal["entry"] = round(live, 5 if live < 100 else 2)
+
+
 def _get_current_price(pair: str) -> float | None:
     """Fetch current price via yfinance (gratis, sin límite).
     Twelve Data se reserva SOLO para gráficos de velas.
@@ -1921,6 +1964,20 @@ def send_to_channel(signal, executed, detail):
                     _payload.pop("reply_to_message_id", None)
                     _resp_upd = requests.post(url, json=_payload, timeout=10)
                 log.info(f"📢 Update notificado al canal: {_action} {_pair_d} (reply_to={_reply_id})")
+                # FIX 2026-04-15: Remover señal de tracking al recibir cierre definitivo
+                # Previene: 1) TP duplicado de señal ya cerrada (Bug 3)
+                #           2) Doble CIERRE TOTAL (Bug 4) — segundo full_close no encuentra señal
+                if _action in ("full_close", "sl_hit", "tp_hit"):
+                    with _signals_lock:
+                        _to_remove = [s for s, sd in _open_signals.items()
+                                      if sd.get("signal", {}).get("pair") == _pair
+                                      or sd.get("signal", {}).get("mt5_symbol") == _pair]
+                        for s in _to_remove:
+                            _open_signals.pop(s, None)
+                            _resolved_signals.add(s)
+                    if _to_remove:
+                        _save_open_signals()
+                        log.info(f"🗑️ {len(_to_remove)} señal(es) {_pair_d} removida(s) de tracking tras {_action}")
                 if _resp_upd.status_code == 200:
                     return _resp_upd.json().get("result", {}).get("message_id")
             except Exception as _e:
@@ -2224,7 +2281,9 @@ async def main():
                         signal["entry"] = round(_live, 5 if _live < 100 else 2)
                         log.info(f"📍 Sin entry en señal — usando precio actual: {signal['entry']}")
                     else:
-                        log.info(f"📍 Sin entry y sin precio disponible — publicando con 'Market Price'")
+                        # FIX 2026-04-15: No publicar señal sin entry — esperar edición del canal
+                        log.warning(f"⚠️ Sin entry y sin precio disponible — NO publicando (esperamos edición del canal)")
+                        return
 
                 # FIX 2026-04-14: Validar SL + TPs DESPUÉS de obtener entry real
                 _e = signal.get("entry", 0)
@@ -2262,7 +2321,10 @@ async def main():
                         log.warning(f"⚠️ Todos los TPs inválidos para {_d} {signal.get('pair','')} entry={_e} — descartando señal")
                         return
 
-                # Publicar inmediatamente (con o sin precio)
+                # FIX 2026-04-15: Validar entry vs precio actual (previene entries stale)
+                _validate_entry_vs_market(signal)
+
+                # Publicar inmediatamente
                 send_to_channel(signal, executed, detail)
                 # FIX 2026-04-09: Registrar en cache anti-duplicados + cooldown por par
                 _entry_r = round(signal.get("entry", 0), 2)
@@ -2355,6 +2417,12 @@ async def main():
                 return
 
             log.info(f"✏️ Señal capturada vía edición (msg_id={msg_id}): {signal.get('direction')} {signal.get('pair')}")
+            # FIX 2026-04-15: Validar entry vs precio actual (previene entries stale)
+            _validate_entry_vs_market(signal)
+            # FIX 2026-04-15: No publicar si entry=0 (sin precio)
+            if (signal.get("entry", 0) or 0) <= 0:
+                log.warning(f"✏️ Edit sin entry resuelto — NO publicando {signal.get('pair','?')}")
+                return
             MT5_EXECUTION_ENABLED = False
             executed, detail = False, "Ejecución MT5 desactivada (kill-switch activo)"
             send_to_channel(signal, executed, detail)
