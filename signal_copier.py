@@ -1343,6 +1343,58 @@ async def _monitor_tp_loop() -> None:
         except Exception as _e_ig:
             log.warning(f"Error promo Instagram: {_e_ig}")
 
+        # ── Post programado de Instagram (10:00 motivacional/tip) ──
+        try:
+            if _now_sum.hour == 10 and _now_sum.minute < 5 and _sent_today.get("ig_scheduled") != _hoy_str:
+                _sent_today["ig_scheduled"] = _hoy_str
+                try:
+                    from instagram_poster import post_scheduled_content as _ig_scheduled
+                    _ig_scheduled("auto")
+                    log.info("📸 Instagram: post programado lanzado (10:00)")
+                except Exception as _ig_sc_err:
+                    log.debug(f"Instagram scheduled skip: {_ig_sc_err}")
+        except Exception as _e_ig_sc:
+            log.warning(f"Error Instagram scheduled: {_e_ig_sc}")
+
+        # ── Segundo post programado (18:00 tip/horarios) ──
+        try:
+            if _now_sum.hour == 18 and _now_sum.minute < 5 and _sent_today.get("ig_scheduled2") != _hoy_str:
+                _sent_today["ig_scheduled2"] = _hoy_str
+                try:
+                    from instagram_poster import post_scheduled_content as _ig_scheduled2
+                    _ig_scheduled2("auto")
+                    log.info("📸 Instagram: segundo post programado lanzado (18:00)")
+                except Exception as _ig_sc_err2:
+                    log.debug(f"Instagram scheduled2 skip: {_ig_sc_err2}")
+        except Exception as _e_ig_sc2:
+            log.warning(f"Error Instagram scheduled2: {_e_ig_sc2}")
+
+        # ── Auto-follow diario (12:00, conservador: 5 follows) ──
+        try:
+            if _now_sum.hour == 12 and _now_sum.minute < 5 and _sent_today.get("ig_follow") != _hoy_str:
+                _sent_today["ig_follow"] = _hoy_str
+                try:
+                    from instagram_poster import auto_follow_niche as _ig_follow
+                    _ig_follow(max_follows=5)
+                    log.info("📸 Instagram: auto-follow lanzado (12:00)")
+                except Exception as _ig_f_err:
+                    log.debug(f"Instagram auto-follow skip: {_ig_f_err}")
+        except Exception as _e_ig_f:
+            log.warning(f"Error Instagram auto-follow: {_e_ig_f}")
+
+        # ── Auto-unfollow semanal (domingos 15:00) ──
+        try:
+            if _now_sum.weekday() == 6 and _now_sum.hour == 15 and _now_sum.minute < 5 and _sent_today.get("ig_unfollow") != _hoy_str:
+                _sent_today["ig_unfollow"] = _hoy_str
+                try:
+                    from instagram_poster import auto_unfollow_non_followers as _ig_unfollow
+                    _ig_unfollow(max_unfollows=5)
+                    log.info("📸 Instagram: auto-unfollow semanal lanzado")
+                except Exception as _ig_uf_err:
+                    log.debug(f"Instagram auto-unfollow skip: {_ig_uf_err}")
+        except Exception as _e_ig_uf:
+            log.warning(f"Error Instagram auto-unfollow: {_e_ig_uf}")
+
         # ── Cargar señales manuales del admin (manual_signals.json) ──
         try:
             if MANUAL_SIGNALS_FILE.exists():

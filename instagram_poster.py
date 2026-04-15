@@ -2,9 +2,10 @@
 BuySell365 — Instagram Auto-Poster
 ====================================
 Genera imagenes profesionales y publica automaticamente en Instagram:
-- TPs alcanzados (celebraciones)
+- TPs alcanzados (celebraciones) — post + Story + Reel
 - Resumen diario de resultados
-- Nuevas senales destacadas
+- Posts programados (motivacion, tips, horarios mercado)
+- Auto-follow conservador de cuentas del nicho
 
 Usa instagrapi para la API de Instagram y Pillow para generar imagenes.
 Credenciales en .env: IG_USERNAME, IG_PASSWORD
@@ -13,11 +14,12 @@ Credenciales en .env: IG_USERNAME, IG_PASSWORD
 import os
 import json
 import logging
+import random
 import threading
 import time
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
@@ -690,11 +692,447 @@ def _generate_carousel_slides(brand_image_path: str = None) -> list:
     return slides
 
 
+# ── Hashtags rotativos por categoria ─────────────────────────
+_HASHTAGS = {
+    "tp": [
+        ["#trading", "#forex", "#tp", "#profit", "#buysell365", "#forexsignals",
+         "#tradingresults", "#pips", "#daytrading", "#tradinglifestyle",
+         "#forextrader", "#tradingview", "#swingtrading", "#fx"],
+        ["#trading", "#forexsignals", "#takeprofit", "#buysell365", "#tradingsignals",
+         "#forexprofit", "#pips", "#daytrader", "#tradingcommunity",
+         "#forexlife", "#currencytrading", "#tradingjournal", "#priceaction"],
+        ["#trading", "#forex", "#profit", "#buysell365", "#forextrading",
+         "#tradingresults", "#signalsprovider", "#goldtrading", "#xauusd",
+         "#indices", "#nasdaq", "#forexsignals", "#tradingwin", "#pipsgain"],
+    ],
+    "daily": [
+        ["#trading", "#forex", "#tradingresults", "#buysell365", "#forexsignals",
+         "#winrate", "#tradingjournal", "#accountability", "#daytrading",
+         "#tradinglifestyle", "#pips", "#transparencia", "#tradingstats"],
+        ["#trading", "#forexsignals", "#dailyresults", "#buysell365", "#tradingrecap",
+         "#forextrader", "#tradingcommunity", "#results", "#daytrader",
+         "#tradingperformance", "#forexlife", "#pipscount", "#tradingdata"],
+        ["#trading", "#forex", "#tradingresults", "#buysell365", "#dailyrecap",
+         "#forexsignals", "#winrate", "#tradingjournal", "#signalsprovider",
+         "#forexprofit", "#tradingview", "#priceaction", "#accountability"],
+    ],
+    "motivational": [
+        ["#trading", "#tradingmotivation", "#buysell365", "#forextrader",
+         "#tradingmindset", "#tradinglife", "#discipline", "#forexsignals",
+         "#daytrader", "#tradingpsychology", "#tradingquotes", "#mindset",
+         "#forexlifestyle", "#traderslife"],
+        ["#trading", "#motivation", "#buysell365", "#forexmotivation",
+         "#tradingjourney", "#tradingdiscipline", "#forextrading", "#patience",
+         "#tradingmindset", "#daytrading", "#riskmanagement", "#trader",
+         "#forexcommunity", "#growthmindset"],
+    ],
+    "reel": [
+        ["#trading", "#forexreels", "#buysell365", "#tradingresults", "#forex",
+         "#tradingview", "#forexsignals", "#pips", "#daytrading", "#reels",
+         "#tradinglife", "#forextrader", "#viral", "#explore", "#tradingchart"],
+        ["#trading", "#reels", "#buysell365", "#forexsignals", "#tradingsignals",
+         "#chartanalysis", "#technicalanalysis", "#forextrading", "#explore",
+         "#viral", "#tradingresults", "#forexlife", "#tradingcommunity"],
+    ],
+}
+
+
+def _get_hashtags(category: str, pair: str = "") -> str:
+    """Devuelve hashtags rotativos para la categoria dada."""
+    sets = _HASHTAGS.get(category, _HASHTAGS["tp"])
+    tags = random.choice(sets).copy()
+    # Añadir hashtag del par si aplica
+    if pair:
+        pair_tag = "#" + pair.lower().replace("/", "").replace(" ", "")
+        if pair_tag not in tags:
+            tags.insert(4, pair_tag)
+    return " ".join(tags[:20])  # Instagram max ~30, usamos 20 para ser seguros
+
+
+# ── Generador de imagenes motivacionales ─────────────────────
+
+_MOTIVATIONAL_QUOTES = [
+    ("La disciplina es el puente\nentre metas y logros.", "Jim Rohn"),
+    ("El mercado recompensa\nla paciencia, no la prisa.", "BuySell365"),
+    ("Un buen trader no predice,\ngestiona el riesgo.", "BuySell365"),
+    ("La consistencia supera\nal talento sin disciplina.", "BuySell365"),
+    ("Protege tu capital.\nLas oportunidades siempre vuelven.", "BuySell365"),
+    ("El 90% del trading es\npsicolog\u00eda y gesti\u00f3n de riesgo.", "BuySell365"),
+    ("No operes por emoci\u00f3n.\nOpera por estrategia.", "BuySell365"),
+    ("Las p\u00e9rdidas son el costo\nde hacer negocios en el mercado.", "BuySell365"),
+    ("Un plan de trading sin disciplina\nes solo una lista de deseos.", "BuySell365"),
+    ("El mejor trade es el que\nno tomas cuando no hay setup.", "BuySell365"),
+    ("Pierde peque\u00f1o, gana grande.\nAs\u00ed se construye una cuenta.", "BuySell365"),
+    ("No necesitas ganar siempre.\nNecesitas ganar m\u00e1s de lo que pierdes.", "BuySell365"),
+]
+
+_TRADING_TIPS = [
+    ("Tip: Stop Loss", "NUNCA operes sin Stop Loss.\nEs tu seguro de vida en el mercado.\nDefine tu riesgo ANTES de entrar."),
+    ("Tip: Gesti\u00f3n de Riesgo", "No arriesgues m\u00e1s del 1-2%\nde tu cuenta por operaci\u00f3n.\nSobrevivir > ganar."),
+    ("Tip: Horarios Clave", "Las mejores oportunidades:\n08:00-11:00 (Londres)\n14:30-17:00 (NY overlap)\nEvita el mercado asi\u00e1tico si operas Forex."),
+    ("Tip: Diario de Trading", "Registra TODAS tus operaciones.\nSin datos no hay mejora.\nRevisa tu journal cada semana."),
+    ("Tip: Overtrading", "M\u00e1s operaciones \u2260 m\u00e1s ganancias.\nCalidad > Cantidad.\n3 buenos trades > 15 mediocres."),
+    ("Tip: Noticias", "No operes 30 min antes/despu\u00e9s\nde noticias de alto impacto (NFP, CPI, FOMC).\nEl spread se dispara."),
+    ("Tip: Tendencia", "La tendencia es tu amiga.\nNo pelees contra el mercado.\nOpera en la direcci\u00f3n del impulso."),
+    ("Tip: Take Profit", "No seas codicioso.\nToma parciales cuando el mercado te da.\nAsegurar ganancias = consistencia."),
+]
+
+_MARKET_HOURS = {
+    "Sydney":   ("22:00", "07:00", "AUD, NZD"),
+    "Tokio":    ("00:00", "09:00", "JPY, pares asi\u00e1ticos"),
+    "Londres":  ("08:00", "17:00", "GBP, EUR — Mayor volumen"),
+    "Nueva York": ("13:00", "22:00", "USD — Overlap con Londres"),
+}
+
+
+def _generate_motivational_image(quote: str = None, author: str = None) -> Path:
+    """Genera imagen con frase motivacional de trading."""
+    if not quote:
+        q, a = random.choice(_MOTIVATIONAL_QUOTES)
+        quote, author = q, a
+
+    img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
+    _draw_gradient_bg(img, (8, 10, 20), (14, 18, 28))
+    draw = ImageDraw.Draw(img)
+
+    font_brand = _get_font(32, bold=True)
+    font_quote = _get_font(44, bold=True)
+    font_author = _get_font(28)
+    font_small = _get_font(22)
+    font_cta = _get_font(26, bold=True)
+
+    # Borde superior dorado
+    for y in range(6):
+        a = 1.0 - (y / 6)
+        draw.line([(0, y), (IMG_W, y)], fill=(int(255 * a), int(204 * a), 0))
+
+    # Brand
+    draw.text((IMG_W // 2, 40), "BUYSELL365 PRO", fill=COLOR_WHITE,
+              font=font_brand, anchor="mt")
+    draw.line([(390, 78), (690, 78)], fill=COLOR_GOLD, width=2)
+
+    # Comillas decorativas
+    draw.text((100, 200), "\u201c", fill=(COLOR_GOLD[0], COLOR_GOLD[1], COLOR_GOLD[2], 80),
+              font=_get_font(120, bold=True))
+
+    # Quote centrado
+    _draw_rounded_rect(draw, [80, 280, IMG_W - 80, 680], radius=20,
+                       fill=COLOR_CARD_BG, outline=(35, 40, 50), width=1)
+    draw.multiline_text((IMG_W // 2, 480), quote, fill=COLOR_WHITE,
+                        font=font_quote, anchor="mm", align="center", spacing=16)
+
+    # Comilla final y autor
+    draw.text((IMG_W - 120, 600), "\u201d", fill=COLOR_GOLD,
+              font=_get_font(120, bold=True), anchor="rt")
+
+    if author:
+        draw.text((IMG_W // 2, 730), f"\u2014 {author}", fill=COLOR_GOLD,
+                  font=font_author, anchor="mt")
+
+    # Linea decorativa
+    draw.line([(300, 800), (IMG_W - 300, 800)], fill=COLOR_ACCENT, width=2)
+
+    # CTA
+    draw.text((IMG_W // 2, 840), "\u00bfQuieres se\u00f1ales de trading?",
+              fill=COLOR_GRAY, font=font_small, anchor="mt")
+    _draw_rounded_rect(draw, [200, 890, IMG_W - 200, 945], radius=25,
+                       fill=COLOR_ACCENT)
+    draw.text((IMG_W // 2, 917), "\u00danete al VIP \u2014 Link en bio",
+              fill=COLOR_WHITE, font=font_cta, anchor="mm")
+
+    # Footer
+    draw.line([(150, 975), (IMG_W - 150, 975)], fill=(40, 46, 54), width=1)
+    draw.text((IMG_W // 2, 1000), "buysell365.pro  \u2022  Trading Signals",
+              fill=COLOR_GRAY, font=font_small, anchor="mt")
+    draw.text((IMG_W // 2, 1035), "S\u00edguenos para m\u00e1s contenido",
+              fill=(70, 75, 85), font=_get_font(18), anchor="mt")
+
+    filename = f"motivational_{int(time.time())}.jpg"
+    filepath = IMAGES_DIR / filename
+    img.save(filepath, "JPEG", quality=95)
+    log.info(f"Instagram: imagen motivacional generada -> {filename}")
+    return filepath
+
+
+def _generate_tip_image(title: str, body: str) -> Path:
+    """Genera imagen con tip de trading."""
+    img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
+    _draw_gradient_bg(img, (10, 12, 22), (16, 20, 32))
+    draw = ImageDraw.Draw(img)
+
+    font_brand = _get_font(32, bold=True)
+    font_title = _get_font(48, bold=True)
+    font_body = _get_font(34)
+    font_small = _get_font(22)
+    font_cta = _get_font(26, bold=True)
+    font_emoji = _get_font(60, bold=True)
+
+    # Borde superior azul
+    for y in range(6):
+        a = 1.0 - (y / 6)
+        draw.line([(0, y), (IMG_W, y)], fill=(int(59 * a), int(130 * a), int(246 * a)))
+
+    # Brand
+    draw.text((IMG_W // 2, 40), "BUYSELL365 PRO", fill=COLOR_WHITE,
+              font=font_brand, anchor="mt")
+    draw.line([(390, 78), (690, 78)], fill=COLOR_ACCENT, width=2)
+
+    # Icono libro
+    draw.text((IMG_W // 2, 130), "\U0001f4d6", fill=COLOR_ACCENT,
+              font=font_emoji, anchor="mt")
+
+    # Titulo
+    _draw_rounded_rect(draw, [80, 220, IMG_W - 80, 310], radius=16,
+                       fill=COLOR_ACCENT)
+    draw.text((IMG_W // 2, 265), title.upper(), fill=COLOR_WHITE,
+              font=font_title, anchor="mm")
+
+    # Body
+    _draw_rounded_rect(draw, [60, 350, IMG_W - 60, 720], radius=20,
+                       fill=COLOR_CARD_BG, outline=(35, 40, 50), width=1)
+    draw.multiline_text((IMG_W // 2, 535), body, fill=COLOR_WHITE,
+                        font=font_body, anchor="mm", align="center", spacing=14)
+
+    # Separador
+    draw.line([(200, 770), (IMG_W - 200, 770)], fill=COLOR_GOLD, width=2)
+
+    # CTA
+    draw.text((IMG_W // 2, 810), "M\u00e1s tips y se\u00f1ales en nuestro canal",
+              fill=COLOR_GRAY, font=font_small, anchor="mt")
+    _draw_rounded_rect(draw, [200, 870, IMG_W - 200, 925], radius=25,
+                       fill=COLOR_ACCENT)
+    draw.text((IMG_W // 2, 897), "\u00danete al VIP \u2014 Link en bio",
+              fill=COLOR_WHITE, font=font_cta, anchor="mm")
+
+    # Footer
+    draw.line([(150, 960), (IMG_W - 150, 960)], fill=(40, 46, 54), width=1)
+    draw.text((IMG_W // 2, 985), "buysell365.pro  \u2022  Trading Signals",
+              fill=COLOR_GRAY, font=font_small, anchor="mt")
+    draw.text((IMG_W // 2, 1020), "Educa \u2022 Opera \u2022 Crece",
+              fill=COLOR_GOLD, font=_get_font(20), anchor="mt")
+
+    filename = f"tip_{int(time.time())}.jpg"
+    filepath = IMAGES_DIR / filename
+    img.save(filepath, "JPEG", quality=95)
+    log.info(f"Instagram: imagen tip generada -> {filename}")
+    return filepath
+
+
+def _generate_market_hours_image() -> Path:
+    """Genera imagen con horarios de mercado."""
+    img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
+    _draw_gradient_bg(img, (8, 12, 20), (14, 18, 28))
+    draw = ImageDraw.Draw(img)
+
+    font_brand = _get_font(32, bold=True)
+    font_title = _get_font(44, bold=True)
+    font_session = _get_font(36, bold=True)
+    font_time = _get_font(30)
+    font_desc = _get_font(24)
+    font_small = _get_font(22)
+    font_cta = _get_font(26, bold=True)
+
+    # Borde superior
+    for y in range(6):
+        a = 1.0 - (y / 6)
+        draw.line([(0, y), (IMG_W, y)], fill=(int(255 * a), int(165 * a), 0))
+
+    # Brand
+    draw.text((IMG_W // 2, 40), "BUYSELL365 PRO", fill=COLOR_WHITE,
+              font=font_brand, anchor="mt")
+    draw.line([(390, 78), (690, 78)], fill=COLOR_GOLD, width=2)
+
+    # Titulo
+    draw.text((IMG_W // 2, 110), "HORARIOS DEL MERCADO", fill=COLOR_WHITE,
+              font=font_title, anchor="mt")
+    draw.text((IMG_W // 2, 165), "(Hora Espa\u00f1a / CET)", fill=COLOR_GRAY,
+              font=font_desc, anchor="mt")
+
+    # Sesiones
+    sessions_colors = [
+        ("Sydney", (0, 150, 200)),
+        ("Tokio", (200, 50, 50)),
+        ("Londres", (0, 180, 100)),
+        ("Nueva York", (59, 130, 246)),
+    ]
+    y_pos = 230
+    for session_name, color in sessions_colors:
+        hours = _MARKET_HOURS[session_name]
+        _draw_rounded_rect(draw, [60, y_pos, IMG_W - 60, y_pos + 140], radius=16,
+                           fill=COLOR_CARD_BG, outline=color, width=2)
+        # Barra lateral de color
+        draw.rounded_rectangle([60, y_pos, 75, y_pos + 140], radius=8, fill=color)
+
+        draw.text((110, y_pos + 15), session_name.upper(), fill=color,
+                  font=font_session)
+        draw.text((110, y_pos + 60), f"\u23f0  {hours[0]} — {hours[1]}",
+                  fill=COLOR_WHITE, font=font_time)
+        draw.text((110, y_pos + 100), hours[2], fill=COLOR_GRAY, font=font_desc)
+        y_pos += 165
+
+    # Nota overlap
+    _draw_rounded_rect(draw, [100, y_pos + 10, IMG_W - 100, y_pos + 60], radius=12,
+                       fill=(30, 50, 30), outline=COLOR_GREEN, width=1)
+    draw.text((IMG_W // 2, y_pos + 35), "\u26a1 Mejor hora: 14:30-17:00 (Overlap Londres-NY)",
+              fill=COLOR_GREEN, font=font_desc, anchor="mm")
+
+    # CTA
+    _draw_rounded_rect(draw, [200, y_pos + 90, IMG_W - 200, y_pos + 145], radius=25,
+                       fill=COLOR_ACCENT)
+    draw.text((IMG_W // 2, y_pos + 117), "\u00danete al VIP \u2014 Link en bio",
+              fill=COLOR_WHITE, font=font_cta, anchor="mm")
+
+    # Footer
+    draw.line([(150, IMG_H - 60), (IMG_W - 150, IMG_H - 60)], fill=(40, 46, 54), width=1)
+    draw.text((IMG_W // 2, IMG_H - 35), "buysell365.pro  \u2022  Trading Signals",
+              fill=COLOR_GRAY, font=font_small, anchor="mt")
+
+    filename = f"market_hours_{int(time.time())}.jpg"
+    filepath = IMAGES_DIR / filename
+    img.save(filepath, "JPEG", quality=95)
+    log.info(f"Instagram: imagen horarios generada -> {filename}")
+    return filepath
+
+
+# ── Generador de Reels (video con efecto Ken Burns) ──────────
+
+def _generate_reel_from_image(image_path: Path, pair: str = "",
+                              pips: str = "", duration_s: float = 6.0) -> Optional[Path]:
+    """Genera un Reel (video MP4 9:16) con efecto zoom/pan desde una imagen.
+    Usa imageio para escribir frames."""
+    try:
+        import imageio
+        import numpy as np
+    except ImportError:
+        log.warning("Instagram Reel: imageio/numpy no disponible")
+        return None
+
+    try:
+        # Reel vertical 1080x1920
+        REEL_W, REEL_H = 1080, 1920
+        FPS = 24
+        total_frames = int(duration_s * FPS)
+
+        # Cargar imagen base y escalar
+        src = Image.open(image_path).convert("RGB")
+        # Escalar la imagen a mayor tamano para tener margen de zoom
+        scale = max(REEL_W / src.width, REEL_H / src.height) * 1.3
+        big_w = int(src.width * scale)
+        big_h = int(src.height * scale)
+        src_big = src.resize((big_w, big_h), Image.LANCZOS)
+
+        # Definir zoom: de 1.0x a 1.15x (sutil)
+        zoom_start, zoom_end = 1.0, 1.15
+        # Pan: ligero movimiento del centro
+        cx_start = big_w * 0.48
+        cy_start = big_h * 0.45
+        cx_end = big_w * 0.52
+        cy_end = big_h * 0.48
+
+        reel_path = IMAGES_DIR / f"reel_{pair.replace('/', '')}_{int(time.time())}.mp4"
+        writer = imageio.get_writer(str(reel_path), fps=FPS, codec="libx264",
+                                     quality=8, pixelformat="yuv420p",
+                                     macro_block_size=2)
+
+        for frame_i in range(total_frames):
+            t = frame_i / max(total_frames - 1, 1)
+            # Ease in-out
+            t_smooth = t * t * (3 - 2 * t)
+
+            zoom = zoom_start + (zoom_end - zoom_start) * t_smooth
+            cx = cx_start + (cx_end - cx_start) * t_smooth
+            cy = cy_start + (cy_end - cy_start) * t_smooth
+
+            # Crop area
+            crop_w = REEL_W / zoom
+            crop_h = REEL_H / zoom
+            x1 = int(cx - crop_w / 2)
+            y1 = int(cy - crop_h / 2)
+            x2 = int(cx + crop_w / 2)
+            y2 = int(cy + crop_h / 2)
+
+            # Clamp
+            x1 = max(0, min(x1, big_w - int(crop_w)))
+            y1 = max(0, min(y1, big_h - int(crop_h)))
+            x2 = x1 + int(crop_w)
+            y2 = y1 + int(crop_h)
+
+            cropped = src_big.crop((x1, y1, x2, y2))
+            frame = cropped.resize((REEL_W, REEL_H), Image.LANCZOS)
+
+            # Añadir overlay de texto en los ultimos 2 segundos
+            if frame_i >= total_frames - (FPS * 2):
+                overlay_draw = ImageDraw.Draw(frame)
+                # Semi-transparent bar at bottom
+                for yy in range(REEL_H - 300, REEL_H):
+                    alpha = min((yy - (REEL_H - 300)) / 150, 1.0) * 0.7
+                    for xx in range(REEL_W):
+                        px = frame.getpixel((xx, yy))
+                        frame.putpixel((xx, yy), tuple(int(p * (1 - alpha)) for p in px))
+                overlay_draw = ImageDraw.Draw(frame)
+                overlay_draw.text((REEL_W // 2, REEL_H - 200),
+                                  "\u00danete al Canal VIP",
+                                  fill=COLOR_WHITE, font=_get_font(48, bold=True),
+                                  anchor="mt")
+                overlay_draw.text((REEL_W // 2, REEL_H - 130),
+                                  "Link en bio \u2192 buysell365.pro",
+                                  fill=COLOR_GOLD, font=_get_font(36, bold=True),
+                                  anchor="mt")
+
+            writer.append_data(np.array(frame))
+
+        writer.close()
+        log.info(f"Instagram: Reel generado -> {reel_path.name} ({total_frames} frames)")
+        return reel_path
+
+    except Exception as e:
+        log.warning(f"Instagram Reel generation error: {e}")
+        return None
+
+
+def _generate_reel_thumbnail(pair: str, pips: str, direction: str) -> Path:
+    """Genera thumbnail vertical para el Reel (1080x1920)."""
+    REEL_W, REEL_H = 1080, 1920
+    img = Image.new("RGB", (REEL_W, REEL_H), COLOR_BG)
+    _draw_gradient_bg_custom(img, (8, 12, 20), (16, 22, 32), REEL_W, REEL_H)
+    draw = ImageDraw.Draw(img)
+
+    is_buy = direction.upper() in ("BUY", "COMPRA")
+    dir_color = COLOR_GREEN if is_buy else COLOR_RED
+
+    draw.text((REEL_W // 2, 400), "TP ALCANZADO", fill=COLOR_GREEN,
+              font=_get_font(72, bold=True), anchor="mt")
+    draw.text((REEL_W // 2, 550), pair.upper(), fill=COLOR_WHITE,
+              font=_get_font(90, bold=True), anchor="mt")
+    draw.text((REEL_W // 2, 750), pips, fill=dir_color,
+              font=_get_font(120, bold=True), anchor="mt")
+    draw.text((REEL_W // 2, 1000), "BUYSELL365 PRO", fill=COLOR_ACCENT,
+              font=_get_font(44, bold=True), anchor="mt")
+    draw.text((REEL_W // 2, 1100), "\u00danete al VIP \u2014 Link en bio",
+              fill=COLOR_GOLD, font=_get_font(36, bold=True), anchor="mt")
+
+    path = IMAGES_DIR / f"reel_thumb_{pair.replace('/', '')}_{int(time.time())}.jpg"
+    img.save(path, "JPEG", quality=95)
+    return path
+
+
+def _draw_gradient_bg_custom(img: Image.Image, color_top: tuple, color_bottom: tuple,
+                              w: int, h: int):
+    """Gradiente vertical para dimensiones arbitrarias."""
+    for y in range(h):
+        ratio = y / h
+        r = int(color_top[0] + (color_bottom[0] - color_top[0]) * ratio)
+        g = int(color_top[1] + (color_bottom[1] - color_top[1]) * ratio)
+        b = int(color_top[2] + (color_bottom[2] - color_top[2]) * ratio)
+        for x in range(w):
+            img.putpixel((x, y), (r, g, b))
+
+
 # ── Funciones publicas (llamadas desde signal_copier.py) ──────
 
 def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                         pips: str, source: str = "") -> bool:
-    """Genera imagen de TP y publica en Instagram. Thread-safe."""
+    """Genera imagen de TP y publica en Instagram (post + Story + Reel). Thread-safe."""
     if not IG_ENABLED:
         return False
 
@@ -707,6 +1145,7 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                     log.warning("Instagram: no se pudo conectar, imagen guardada localmente")
                     return
 
+                hashtags = _get_hashtags("tp", pair)
                 caption = (
                     f"TP ALCANZADO {pair.upper()} {pips}\n\n"
                     f"Otra se\u00f1al exitosa de nuestro Canal VIP\n\n"
@@ -714,27 +1153,49 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                     f"antes de que el mercado se moviera.\n\n"
                     f"\u00bfQuieres recibir las pr\u00f3ximas?\n"
                     f"Link en bio para unirte\n\n"
-                    f"Tambi\u00e9n puedes unirte a nuestro grupo GRATIS:\n"
-                    f"@BUYSELL_365_24_7 en Telegram\n\n"
-                    f"#trading #forex #tp #profit #buysell365 "
-                    f"#{pair.lower().replace('/', '')} #tradingview #forexsignals "
-                    f"#daytrading #swingtrading #pips #tradinglifestyle "
-                    f"#tradingresults #forextrader"
+                    f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram\n\n"
+                    f"{hashtags}"
                 )
 
+                # 1) Post normal
                 cl.photo_upload(image_path, caption)
-                log.info(f"Instagram: TP {pair} publicado OK")
+                log.info(f"Instagram: TP {pair} post publicado OK")
+
+                # 2) Story
+                time.sleep(random.randint(3, 8))
+                try:
+                    cl.photo_upload_to_story(image_path)
+                    log.info(f"Instagram: TP {pair} Story publicada OK")
+                except Exception as e_st:
+                    log.warning(f"Instagram Story error: {e_st}")
+
+                # 3) Reel (si hay chart)
+                time.sleep(random.randint(5, 15))
+                try:
+                    reel_path = _generate_reel_from_image(image_path, pair, pips)
+                    if reel_path and reel_path.exists():
+                        thumbnail = _generate_reel_thumbnail(pair, pips, direction)
+                        reel_hashtags = _get_hashtags("reel", pair)
+                        reel_caption = (
+                            f"TP ALCANZADO {pair.upper()} {pips}\n\n"
+                            f"Se\u00f1al del Canal VIP\n"
+                            f"\u00danete \u2014 Link en bio\n\n"
+                            f"{reel_hashtags}"
+                        )
+                        cl.clip_upload(reel_path, reel_caption, thumbnail)
+                        log.info(f"Instagram: TP {pair} Reel publicado OK")
+                except Exception as e_rl:
+                    log.warning(f"Instagram Reel error: {e_rl}")
 
             except Exception as e:
                 log.warning(f"Instagram post TP error: {e}")
 
-    # Ejecutar en thread separado para no bloquear el copier
     threading.Thread(target=_do_post, daemon=True, name="ig_tp_post").start()
     return True
 
 
 def post_daily_summary(stats: dict) -> bool:
-    """Genera imagen de resumen diario y publica en Instagram."""
+    """Genera imagen de resumen diario y publica en Instagram (post + Story)."""
     if not IG_ENABLED:
         return False
 
@@ -752,21 +1213,29 @@ def post_daily_summary(stats: dict) -> bool:
                 sls = stats.get("sls", 0)
                 pips = stats.get("pips_netos", 0)
                 fecha = stats.get("fecha", datetime.now().strftime("%d/%m/%Y"))
+                hashtags = _get_hashtags("daily")
 
                 caption = (
-                    f"RESUMEN DEL DIA - {fecha}\n\n"
+                    f"RESUMEN DEL DIA \u2014 {fecha}\n\n"
                     f"Win Rate: {wr:.0f}%\n"
                     f"TPs: {tps} | SLs: {sls}\n"
                     f"Pips Netos: {pips:+.0f}\n\n"
-                    f"Transparencia total - Publicamos TODOS los resultados\n\n"
-                    f"Quieres recibir nuestras senales? Link en bio\n\n"
-                    f"#trading #forex #results #tradingresults #buysell365 "
-                    f"#forexsignals #daytrading #winrate #tradingjournal "
-                    f"#accountability #tradinglifestyle #pips"
+                    f"Transparencia total \u2014 Publicamos TODOS los resultados\n\n"
+                    f"\u00bfQuieres recibir nuestras se\u00f1ales? Link en bio\n\n"
+                    f"{hashtags}"
                 )
 
+                # Post
                 cl.photo_upload(image_path, caption)
                 log.info(f"Instagram: resumen diario publicado OK")
+
+                # Story
+                time.sleep(random.randint(3, 8))
+                try:
+                    cl.photo_upload_to_story(image_path)
+                    log.info(f"Instagram: resumen diario Story OK")
+                except Exception as e_st:
+                    log.warning(f"Instagram Story resumen error: {e_st}")
 
             except Exception as e:
                 log.warning(f"Instagram post resumen error: {e}")
@@ -775,11 +1244,216 @@ def post_daily_summary(stats: dict) -> bool:
     return True
 
 
+def post_scheduled_content(content_type: str = "auto") -> bool:
+    """Publica contenido programado: motivacional, tip o horarios de mercado.
+    content_type: 'motivational', 'tip', 'market_hours', 'auto' (rotacion)."""
+    if not IG_ENABLED:
+        return False
+
+    def _do_post():
+        with _ig_lock:
+            try:
+                cl = _get_client()
+                if not cl:
+                    return
+
+                # Auto-rotar entre tipos de contenido
+                if content_type == "auto":
+                    _type = random.choice(["motivational", "motivational", "tip", "tip", "market_hours"])
+                else:
+                    _type = content_type
+
+                if _type == "motivational":
+                    quote, author = random.choice(_MOTIVATIONAL_QUOTES)
+                    image_path = _generate_motivational_image(quote, author)
+                    hashtags = _get_hashtags("motivational")
+                    caption = (
+                        f"\u201c{quote.replace(chr(10), ' ')}\u201d\n"
+                        f"\u2014 {author}\n\n"
+                        f"\u00bfQuieres se\u00f1ales de trading?\n"
+                        f"Link en bio para unirte al Canal VIP\n\n"
+                        f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram\n\n"
+                        f"{hashtags}"
+                    )
+                elif _type == "tip":
+                    title, body = random.choice(_TRADING_TIPS)
+                    image_path = _generate_tip_image(title, body)
+                    hashtags = _get_hashtags("motivational")
+                    caption = (
+                        f"{title}\n\n"
+                        f"{body.replace(chr(10), ' ')}\n\n"
+                        f"M\u00e1s tips y se\u00f1ales en nuestro Canal VIP\n"
+                        f"Link en bio para unirte\n\n"
+                        f"{hashtags}"
+                    )
+                else:  # market_hours
+                    image_path = _generate_market_hours_image()
+                    hashtags = _get_hashtags("motivational")
+                    caption = (
+                        f"HORARIOS DEL MERCADO (Hora Espa\u00f1a)\n\n"
+                        f"\U0001f30f Sydney: 22:00 - 07:00\n"
+                        f"\U0001f1ef\U0001f1f5 Tokio: 00:00 - 09:00\n"
+                        f"\U0001f1ec\U0001f1e7 Londres: 08:00 - 17:00\n"
+                        f"\U0001f1fa\U0001f1f8 Nueva York: 13:00 - 22:00\n\n"
+                        f"\u26a1 Mejor hora: 14:30-17:00 (Overlap)\n\n"
+                        f"Link en bio para se\u00f1ales en vivo\n\n"
+                        f"{hashtags}"
+                    )
+
+                cl.photo_upload(image_path, caption)
+                log.info(f"Instagram: contenido {_type} publicado OK")
+
+                # Tambien publicar como Story
+                time.sleep(random.randint(3, 8))
+                try:
+                    cl.photo_upload_to_story(image_path)
+                    log.info(f"Instagram: Story {_type} publicada OK")
+                except Exception as e_st:
+                    log.debug(f"Story {_type} skip: {e_st}")
+
+            except Exception as e:
+                log.warning(f"Instagram scheduled content error: {e}")
+
+    threading.Thread(target=_do_post, daemon=True, name="ig_scheduled").start()
+    return True
+
+
+def auto_follow_niche(max_follows: int = 5) -> int:
+    """Auto-follow conservador de cuentas del nicho trading.
+    Busca por hashtags relevantes y sigue usuarios que no seguimos.
+    Max 5 follows por ejecucion, con delays largos.
+    Retorna numero de follows realizados."""
+    if not IG_ENABLED:
+        return 0
+
+    follows_done = 0
+    follow_log_file = Path(__file__).parent / "ig_follow_log.json"
+
+    def _do_follow():
+        nonlocal follows_done
+        with _ig_lock:
+            try:
+                cl = _get_client()
+                if not cl:
+                    return
+
+                # Cargar log de follows previos
+                followed_ids = set()
+                if follow_log_file.exists():
+                    try:
+                        data = json.loads(follow_log_file.read_text(encoding="utf-8"))
+                        followed_ids = set(data.get("followed", []))
+                    except Exception:
+                        pass
+
+                # Hashtags para buscar
+                search_tags = ["forexsignals", "forextrader", "daytrading",
+                               "tradingsignals", "forexlife", "tradingview",
+                               "goldtrading", "xauusd", "tradingresults"]
+                tag = random.choice(search_tags)
+
+                log.info(f"Instagram auto-follow: buscando #{tag}")
+                time.sleep(random.randint(2, 5))
+
+                # Obtener medias recientes del hashtag
+                try:
+                    medias = cl.hashtag_medias_recent(tag, amount=20)
+                except Exception as e_ht:
+                    log.debug(f"Hashtag search error: {e_ht}")
+                    return
+
+                # Filtrar usuarios unicos que no seguimos
+                candidates = []
+                seen_users = set()
+                for media in medias:
+                    uid = media.user.pk
+                    if uid not in followed_ids and uid not in seen_users:
+                        seen_users.add(uid)
+                        candidates.append(media.user)
+
+                random.shuffle(candidates)
+
+                for user in candidates[:max_follows]:
+                    try:
+                        time.sleep(random.randint(15, 40))  # Delay largo entre follows
+                        cl.user_follow(user.pk)
+                        followed_ids.add(user.pk)
+                        follows_done += 1
+                        log.info(f"Instagram: follow @{user.username} OK ({follows_done}/{max_follows})")
+                    except Exception as e_f:
+                        log.warning(f"Follow @{user.username} error: {e_f}")
+                        break  # Si hay error, parar para no forzar
+
+                # Guardar log
+                follow_log_file.write_text(
+                    json.dumps({"followed": list(followed_ids)[-500:],  # Ultimos 500
+                                "last_follow": datetime.now().isoformat()},
+                               ensure_ascii=False),
+                    encoding="utf-8"
+                )
+                log.info(f"Instagram auto-follow: {follows_done} nuevos follows")
+
+            except Exception as e:
+                log.warning(f"Instagram auto-follow error: {e}")
+
+    threading.Thread(target=_do_follow, daemon=True, name="ig_autofollow").start()
+    return follows_done
+
+
+def auto_unfollow_non_followers(max_unfollows: int = 5) -> int:
+    """Unfollow de cuentas que no nos siguen de vuelta (limpieza semanal).
+    Conservador: max 5 por ejecucion."""
+    if not IG_ENABLED:
+        return 0
+
+    unfollows_done = 0
+
+    def _do_unfollow():
+        nonlocal unfollows_done
+        with _ig_lock:
+            try:
+                cl = _get_client()
+                if not cl:
+                    return
+
+                my_id = cl.user_id
+                time.sleep(random.randint(2, 5))
+
+                # Obtener quienes seguimos
+                following = cl.user_following(my_id, amount=100)
+                time.sleep(random.randint(3, 8))
+
+                # Obtener quienes nos siguen
+                followers = cl.user_followers(my_id, amount=200)
+                follower_ids = set(followers.keys())
+
+                # Encontrar no-reciprocos
+                non_followers = [uid for uid in following.keys() if uid not in follower_ids]
+                random.shuffle(non_followers)
+
+                for uid in non_followers[:max_unfollows]:
+                    try:
+                        time.sleep(random.randint(15, 40))
+                        cl.user_unfollow(uid)
+                        unfollows_done += 1
+                        uname = following[uid].username if uid in following else uid
+                        log.info(f"Instagram: unfollow @{uname} OK ({unfollows_done}/{max_unfollows})")
+                    except Exception as e_u:
+                        log.warning(f"Unfollow error: {e_u}")
+                        break
+
+                log.info(f"Instagram auto-unfollow: {unfollows_done} unfollows")
+
+            except Exception as e:
+                log.warning(f"Instagram auto-unfollow error: {e}")
+
+    threading.Thread(target=_do_unfollow, daemon=True, name="ig_unfollow").start()
+    return unfollows_done
+
+
 def post_new_signal(pair: str, direction: str, entry: float, tp: float,
                     sl: float, source: str = "") -> bool:
     """DESACTIVADO — no publicar se\u00f1ales en Instagram (contenido VIP exclusivo)."""
-    # Las se\u00f1ales con precios son contenido exclusivo del canal VIP.
-    # Instagram es solo para marketing: TPs, resumenes y publicidad.
     return False
 
 
@@ -873,15 +1547,18 @@ if __name__ == "__main__":
     })
     print(f"  Daily image: {p2}")
 
-    p3 = generate_signal_image_only("EUR/USD", "BUY", 1.1745, 1.1845, 1.1690,
-                                     "Learn2Trade")
-    print(f"  Signal image: {p3}")
+    p3 = _generate_motivational_image()
+    print(f"  Motivational image: {p3}")
 
-    # Carrusel con imagen de marca si se proporciona
-    brand_img = sys.argv[1] if len(sys.argv) > 1 else None
-    slides = generate_carousel_only(brand_img)
-    for i, s in enumerate(slides):
-        print(f"  Carousel slide {i+1}: {s}")
+    p4 = _generate_tip_image(*random.choice(_TRADING_TIPS))
+    print(f"  Tip image: {p4}")
+
+    p5 = _generate_market_hours_image()
+    print(f"  Market hours image: {p5}")
+
+    # Reel desde imagen TP
+    p6 = _generate_reel_from_image(p1, "XAUUSD", "+334 pts", duration_s=4.0)
+    print(f"  Reel video: {p6}")
 
     print(f"\nIm\u00e1genes generadas en ig_images/")
     print(f"Instagram habilitado: {IG_ENABLED}")
