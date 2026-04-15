@@ -994,7 +994,332 @@ def _generate_market_hours_image() -> Path:
     return filepath
 
 
+# ── Imagen promo de Instagram para Telegram ──────────────────
+
+def generate_ig_promo_image() -> Path:
+    """Genera imagen profesional de promo Instagram para el grupo Telegram.
+    Incluye logo Instagram real dibujado con PIL, gradiente de marca, y CTA."""
+    img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
+    _draw_gradient_bg(img, (10, 8, 20), (20, 14, 35))
+    draw = ImageDraw.Draw(img)
+
+    font_brand = _get_font(32, bold=True)
+    font_big = _get_font(56, bold=True)
+    font_handle = _get_font(34, bold=True)
+    font_body = _get_font(30)
+    font_small = _get_font(24)
+    font_cta = _get_font(28, bold=True)
+    font_bullet = _get_font(28)
+
+    # ── Borde superior con gradiente Instagram ──
+    for y in range(10):
+        a = 1.0 - (y / 10)
+        ratio = y / 10
+        r = int((240 + (188 - 240) * ratio) * a)
+        g = int((148 + (24 - 148) * ratio) * a)
+        b = int((51 + (136 - 51) * ratio) * a)
+        draw.line([(0, y), (IMG_W, y)], fill=(r, g, b))
+
+    # ── Brand arriba ──
+    draw.text((IMG_W // 2, 40), "BUYSELL365 PRO", fill=COLOR_WHITE,
+              font=font_brand, anchor="mt")
+    draw.line([(390, 78), (690, 78)], fill=COLOR_ACCENT, width=2)
+
+    # ── Logo Instagram (dibujado con formas) ──
+    # Cuadrado redondeado con gradiente Instagram
+    ig_cx, ig_cy = IMG_W // 2, 230
+    ig_size = 140
+
+    # Fondo gradiente del logo
+    for _dy in range(-ig_size // 2, ig_size // 2):
+        for _dx in range(-ig_size // 2, ig_size // 2):
+            # Verificar que esta dentro del rectangulo redondeado
+            ax, ay = abs(_dx), abs(_dy)
+            corner_r = 30
+            in_rect = True
+            if ax > ig_size // 2 - corner_r and ay > ig_size // 2 - corner_r:
+                dist = ((ax - (ig_size // 2 - corner_r)) ** 2 + (ay - (ig_size // 2 - corner_r)) ** 2) ** 0.5
+                if dist > corner_r:
+                    in_rect = False
+            if in_rect:
+                # Gradiente diagonal (naranja arriba-izq a morado abajo-der)
+                t = ((_dx + ig_size // 2) + (_dy + ig_size // 2)) / (ig_size * 2)
+                r = int(240 + (188 - 240) * t)
+                g = int(148 + (24 - 148) * t)
+                b = int(51 + (136 - 51) * t)
+                img.putpixel((ig_cx + _dx, ig_cy + _dy), (r, g, b))
+
+    # Circulo central (lente de la camara)
+    for angle_step in range(360 * 4):
+        angle = angle_step / 4 * 3.14159 / 180
+        for radius in range(35, 42):
+            import math
+            px = int(ig_cx + radius * math.cos(angle))
+            py = int(ig_cy + radius * math.sin(angle))
+            if 0 <= px < IMG_W and 0 <= py < IMG_H:
+                img.putpixel((px, py), (255, 255, 255))
+
+    # Punto del flash (esquina superior derecha)
+    for _dy2 in range(-6, 7):
+        for _dx2 in range(-6, 7):
+            if _dx2 ** 2 + _dy2 ** 2 <= 36:
+                px2 = ig_cx + 40 + _dx2
+                py2 = ig_cy - 40 + _dy2
+                if 0 <= px2 < IMG_W and 0 <= py2 < IMG_H:
+                    img.putpixel((px2, py2), (255, 255, 255))
+
+    draw = ImageDraw.Draw(img)
+
+    # ── Titulo ──
+    draw.text((IMG_W // 2, 340), "S\u00edguenos en", fill=COLOR_GRAY,
+              font=font_body, anchor="mt")
+    # "Instagram" con gradiente (simulado con color rosa)
+    draw.text((IMG_W // 2, 385), "Instagram", fill=(225, 48, 108),
+              font=_get_font(64, bold=True), anchor="mt")
+
+    # ── Handle ──
+    _draw_rounded_rect(draw, [120, 475, IMG_W - 120, 535], radius=28,
+                       fill=(35, 20, 45), outline=(225, 48, 108), width=2)
+    draw.text((IMG_W // 2, 505), "@buysell365.pro_tradingsignals",
+              fill=COLOR_WHITE, font=font_handle, anchor="mm")
+
+    # ── Beneficios ──
+    benefits = [
+        ("\u2705  Resultados diarios verificados", COLOR_GREEN),
+        ("\U0001f3af  Celebraciones de cada TP en vivo", COLOR_GOLD),
+        ("\U0001f4ca  Estad\u00edsticas y win rate real", COLOR_ACCENT),
+        ("\U0001f4a1  Tips y motivaci\u00f3n de trading", (180, 130, 255)),
+        ("\U0001f50d  Transparencia total \u2014 sin filtros", COLOR_WHITE),
+    ]
+    y_pos = 580
+    for text, color in benefits:
+        _draw_rounded_rect(draw, [100, y_pos, IMG_W - 100, y_pos + 50], radius=10,
+                           fill=COLOR_CARD_BG)
+        draw.text((130, y_pos + 10), text, fill=color, font=font_bullet)
+        y_pos += 62
+
+    # ── CTA ──
+    # Boton con gradiente Instagram
+    _draw_rounded_rect(draw, [150, 920, IMG_W - 150, 985], radius=30,
+                       fill=(225, 48, 108))
+    draw.text((IMG_W // 2, 952), "S\u00edguenos ahora \u2192",
+              fill=COLOR_WHITE, font=font_cta, anchor="mm")
+
+    # ── Footer ──
+    draw.line([(200, 1010), (IMG_W - 200, 1010)], fill=(40, 46, 54), width=1)
+    draw.text((IMG_W // 2, 1030), "buysell365.pro  \u2022  Trading con IA",
+              fill=COLOR_GRAY, font=font_small, anchor="mt")
+
+    filename = f"ig_promo_{int(time.time())}.jpg"
+    filepath = IMAGES_DIR / filename
+    img.save(filepath, "JPEG", quality=95)
+    log.info(f"Instagram promo image generada -> {filename}")
+    return filepath
+
+
 # ── Generador de Reels (video con efecto Ken Burns) ──────────
+
+def _generate_tp_reel_video(pair: str, direction: str, pips: str,
+                            tp_image_path: Path = None, duration_s: float = 8.0) -> Optional[Path]:
+    """Genera un Reel profesional con escenas animadas:
+    Escena 1: Logo + flash (1.5s)
+    Escena 2: Par + direccion aparece (2s)
+    Escena 3: Pips grandes con efecto (2s)
+    Escena 4: Imagen TP + CTA (2.5s)
+    """
+    try:
+        import imageio
+        import numpy as np
+    except ImportError:
+        log.warning("Instagram Reel: imageio/numpy no disponible")
+        return None
+
+    try:
+        REEL_W, REEL_H = 1080, 1920
+        FPS = 24
+        total_frames = int(duration_s * FPS)
+
+        is_buy = direction.upper() in ("BUY", "COMPRA")
+        dir_color = COLOR_GREEN if is_buy else COLOR_RED
+        dir_label = "COMPRA" if is_buy else "VENTA"
+        dir_icon = "\u25b2" if is_buy else "\u25bc"
+
+        reel_path = IMAGES_DIR / f"reel_{pair.replace('/', '')}_{int(time.time())}.mp4"
+        writer = imageio.get_writer(str(reel_path), fps=FPS, codec="libx264",
+                                     quality=8, pixelformat="yuv420p",
+                                     macro_block_size=2)
+
+        # Cargar imagen TP si existe
+        tp_img = None
+        if tp_image_path and Path(tp_image_path).exists():
+            tp_img = Image.open(tp_image_path).convert("RGB")
+
+        for frame_i in range(total_frames):
+            t = frame_i / max(total_frames - 1, 1)
+            seconds = frame_i / FPS
+
+            img = Image.new("RGB", (REEL_W, REEL_H), (10, 14, 22))
+            # Gradiente de fondo
+            for y in range(REEL_H):
+                ratio = y / REEL_H
+                r = int(8 + (18 - 8) * ratio)
+                g = int(12 + (24 - 12) * ratio)
+                b = int(20 + (35 - 20) * ratio)
+                for x in range(REEL_W):
+                    img.putpixel((x, y), (r, g, b))
+            draw = ImageDraw.Draw(img)
+
+            # ── ESCENA 1: Logo + flash (0-1.5s) ──
+            if seconds < 1.5:
+                scene_t = seconds / 1.5
+                # Fade in del brand
+                alpha = min(scene_t * 2, 1.0)
+                brand_color = tuple(int(c * alpha) for c in COLOR_WHITE)
+                accent_color = tuple(int(c * alpha) for c in COLOR_ACCENT)
+
+                draw.text((REEL_W // 2, 750), "BUYSELL365",
+                          fill=brand_color, font=_get_font(80, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 850), "PRO",
+                          fill=accent_color, font=_get_font(60, bold=True), anchor="mt")
+
+                # Linea que crece
+                line_w = int(400 * min(scene_t * 1.5, 1.0))
+                if line_w > 0:
+                    draw.line([(REEL_W // 2 - line_w, 940),
+                               (REEL_W // 2 + line_w, 940)],
+                              fill=COLOR_GOLD, width=3)
+
+                # Flash al final de la escena
+                if scene_t > 0.85:
+                    flash = int((scene_t - 0.85) / 0.15 * 60)
+                    for y in range(REEL_H):
+                        for x in range(REEL_W):
+                            px = img.getpixel((x, y))
+                            img.putpixel((x, y), tuple(min(p + flash, 255) for p in px))
+                    draw = ImageDraw.Draw(img)
+
+            # ── ESCENA 2: TP ALCANZADO + Par (1.5-3.5s) ──
+            elif seconds < 3.5:
+                scene_t = (seconds - 1.5) / 2.0
+
+                # Barra verde TP ALCANZADO — slide in desde arriba
+                bar_y = int(-120 + 120 * min(scene_t * 3, 1.0))  # Slide down
+                if bar_y > -120:
+                    _draw_rounded_rect(draw, [80, 350 + bar_y, REEL_W - 80, 470 + bar_y],
+                                       radius=20, fill=COLOR_GREEN)
+                    draw.text((REEL_W // 2, 410 + bar_y), "TP ALCANZADO",
+                              fill=(10, 15, 10), font=_get_font(64, bold=True), anchor="mm")
+
+                # Par — fade in
+                if scene_t > 0.3:
+                    pair_alpha = min((scene_t - 0.3) / 0.4, 1.0)
+                    pair_color = tuple(int(c * pair_alpha) for c in COLOR_WHITE)
+                    draw.text((REEL_W // 2, 580), pair.upper(),
+                              fill=pair_color, font=_get_font(100, bold=True), anchor="mt")
+
+                # Direccion — fade in
+                if scene_t > 0.5:
+                    dir_alpha = min((scene_t - 0.5) / 0.3, 1.0)
+                    d_color = tuple(int(c * dir_alpha) for c in dir_color)
+                    draw.text((REEL_W // 2, 710), f"{dir_icon} {dir_label}",
+                              fill=d_color, font=_get_font(50, bold=True), anchor="mt")
+
+                # Brand arriba
+                draw.text((REEL_W // 2, 100), "BUYSELL365 PRO",
+                          fill=(80, 90, 110), font=_get_font(32, bold=True), anchor="mt")
+
+            # ── ESCENA 3: PIPS grandes con efecto scale (3.5-5.5s) ──
+            elif seconds < 5.5:
+                scene_t = (seconds - 3.5) / 2.0
+
+                # Brand arriba
+                draw.text((REEL_W // 2, 100), "BUYSELL365 PRO",
+                          fill=(80, 90, 110), font=_get_font(32, bold=True), anchor="mt")
+
+                # Par arriba
+                draw.text((REEL_W // 2, 350), pair.upper(),
+                          fill=COLOR_GRAY, font=_get_font(48, bold=True), anchor="mt")
+
+                # Pips — escala de grande a normal (bounce effect)
+                scale_factor = 1.0 + max(0, (1.0 - scene_t * 2)) * 0.5
+                pips_size = int(130 * min(scale_factor, 1.5))
+                pips_font = _get_font(pips_size, bold=True)
+
+                # Caja verde de fondo
+                _draw_rounded_rect(draw, [80, 550, REEL_W - 80, 850],
+                                   radius=30, fill=(10, 50, 20))
+                _draw_rounded_rect(draw, [80, 550, REEL_W - 80, 850],
+                                   radius=30, fill=None, outline=(0, 160, 60), width=3)
+
+                draw.text((REEL_W // 2, 700), pips,
+                          fill=COLOR_GREEN, font=pips_font, anchor="mm")
+
+                # Texto bajo pips
+                if scene_t > 0.4:
+                    draw.text((REEL_W // 2, 920), "Otra se\u00f1al exitosa",
+                              fill=COLOR_GRAY, font=_get_font(36), anchor="mt")
+                    draw.text((REEL_W // 2, 970), "del Canal VIP",
+                              fill=COLOR_GOLD, font=_get_font(40, bold=True), anchor="mt")
+
+            # ── ESCENA 4: CTA final (5.5-8s) ──
+            else:
+                scene_t = (seconds - 5.5) / 2.5
+
+                # Si tenemos la imagen TP, mostrarla centrada
+                if tp_img:
+                    # Escalar imagen TP a caber en el reel
+                    tp_resized = tp_img.resize((900, 900), Image.LANCZOS)
+                    paste_x = (REEL_W - 900) // 2
+                    paste_y = 200
+                    img.paste(tp_resized, (paste_x, paste_y))
+                    draw = ImageDraw.Draw(img)
+
+                # Overlay oscuro abajo para CTA
+                for yy in range(REEL_H - 500, REEL_H):
+                    alpha_ov = min((yy - (REEL_H - 500)) / 250, 1.0) * 0.85
+                    for xx in range(REEL_W):
+                        px = img.getpixel((xx, yy))
+                        img.putpixel((xx, yy), tuple(int(p * (1 - alpha_ov)) for p in px))
+                draw = ImageDraw.Draw(img)
+
+                # CTA text
+                cta_alpha = min(scene_t * 2, 1.0)
+                cta_white = tuple(int(c * cta_alpha) for c in COLOR_WHITE)
+                cta_gold = tuple(int(c * cta_alpha) for c in COLOR_GOLD)
+                cta_accent = tuple(int(c * cta_alpha) for c in COLOR_ACCENT)
+
+                draw.text((REEL_W // 2, REEL_H - 380),
+                          "\u00bfQuieres estas se\u00f1ales?",
+                          fill=cta_white, font=_get_font(44, bold=True), anchor="mt")
+
+                # Boton CTA
+                if scene_t > 0.3:
+                    btn_alpha = min((scene_t - 0.3) / 0.4, 1.0)
+                    btn_color = tuple(int(c * btn_alpha) for c in COLOR_ACCENT)
+                    _draw_rounded_rect(draw, [150, REEL_H - 290, REEL_W - 150, REEL_H - 210],
+                                       radius=30, fill=btn_color)
+                    draw.text((REEL_W // 2, REEL_H - 250),
+                              "\u00danete al VIP \u2014 Link en bio",
+                              fill=cta_white, font=_get_font(36, bold=True), anchor="mm")
+
+                # Web
+                draw.text((REEL_W // 2, REEL_H - 150), "buysell365.pro",
+                          fill=cta_gold, font=_get_font(32, bold=True), anchor="mt")
+
+                # Brand
+                draw.text((REEL_W // 2, REEL_H - 80), "BUYSELL365 PRO",
+                          fill=(60, 70, 90), font=_get_font(24, bold=True), anchor="mt")
+
+            writer.append_data(np.array(img))
+
+        writer.close()
+        log.info(f"Instagram: Reel profesional generado -> {reel_path.name}")
+        return reel_path
+
+    except Exception as e:
+        log.warning(f"Instagram Reel generation error: {e}")
+        return None
+
 
 def _generate_reel_from_image(image_path: Path, pair: str = "",
                               pips: str = "", duration_s: float = 6.0) -> Optional[Path]:
@@ -1169,10 +1494,10 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                 except Exception as e_st:
                     log.warning(f"Instagram Story error: {e_st}")
 
-                # 3) Reel (si hay chart)
+                # 3) Reel con video profesional
                 time.sleep(random.randint(5, 15))
                 try:
-                    reel_path = _generate_reel_from_image(image_path, pair, pips)
+                    reel_path = _generate_tp_reel_video(pair, direction, pips, image_path)
                     if reel_path and reel_path.exists():
                         thumbnail = _generate_reel_thumbnail(pair, pips, direction)
                         reel_hashtags = _get_hashtags("reel", pair)

@@ -1311,7 +1311,8 @@ async def _monitor_tp_loop() -> None:
             if _now_sum.hour == 14 and _now_sum.minute < 5 and _sent_today.get("ig_promo") != _hoy_str:
                 _sent_today["ig_promo"] = _hoy_str
                 import random
-                _ig_promos = [
+                import requests as _req_ig
+                _ig_captions = [
                     "📸 *¡Síguenos en Instagram!*\n\n"
                     "Publicamos resultados diarios, TPs alcanzados y contenido exclusivo.\n\n"
                     "🔗 @buysell365.pro\\_tradingsignals\n"
@@ -1331,13 +1332,26 @@ async def _monitor_tp_loop() -> None:
                     "🔗 @buysell365.pro\\_tradingsignals\n"
                     "_BuySell365 Pro — Transparencia total_",
                 ]
-                _ig_msg = random.choice(_ig_promos)
-                import requests as _req_ig
-                _url_ig = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                _pay_ig = {"chat_id": GROUP_ID, "text": _ig_msg, "parse_mode": "Markdown"}
-                _resp_ig = _req_ig.post(_url_ig, json=_pay_ig, timeout=10)
+                _ig_caption = random.choice(_ig_captions)
+                # Generar imagen promo con logo de Instagram
+                try:
+                    from instagram_poster import generate_ig_promo_image
+                    _promo_img_path = generate_ig_promo_image()
+                    _url_ig = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+                    with open(str(_promo_img_path), "rb") as _img_f:
+                        _resp_ig = _req_ig.post(_url_ig, data={
+                            "chat_id": GROUP_ID,
+                            "caption": _ig_caption,
+                            "parse_mode": "Markdown"
+                        }, files={"photo": _img_f}, timeout=15)
+                except Exception as _img_err:
+                    log.debug(f"Promo imagen error, enviando texto: {_img_err}")
+                    _url_ig = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                    _resp_ig = _req_ig.post(_url_ig, json={
+                        "chat_id": GROUP_ID, "text": _ig_caption, "parse_mode": "Markdown"
+                    }, timeout=10)
                 if _resp_ig.status_code == 200:
-                    log.info("📸 Promo Instagram enviada al grupo")
+                    log.info("📸 Promo Instagram enviada al grupo (con imagen)")
                 else:
                     log.warning(f"Promo Instagram error: {_resp_ig.status_code}")
         except Exception as _e_ig:
@@ -1992,6 +2006,24 @@ def _parse_update(text, upper):
     }
 
 
+# === MT5 CONFIG ===
+MT5_DEMO_LOGIN = int(os.getenv("MT5_LOGIN", 0))
+MT5_DEMO_PASSWORD = os.getenv("MT5_PASSWORD", "")
+MT5_DEMO_SERVER = os.getenv("MT5_SERVER", "")
+
+
+def _mt5_init_and_login():
+    """Initialize MT5 and login to the configured account."""
+    import MetaTrader5 as mt5
+    if not mt5.initialize():
+        return False, "MT5 not initialized"
+    # Login explícito para asegurar que estamos en la cuenta correcta
+    if MT5_DEMO_LOGIN and MT5_DEMO_PASSWORD:
+        if not mt5.login(MT5_DEMO_LOGIN, password=MT5_DEMO_PASSWORD, server=MT5_DEMO_SERVER):
+            return False, f"MT5 login failed: {mt5.last_error()}"
+    return True, "OK"
+
+
 # === MT5 EXECUTION ===
 def execute_in_mt5(signal):
     """Execute signal in MT5. Returns (success, detail)."""
@@ -2000,8 +2032,9 @@ def execute_in_mt5(signal):
     except ImportError:
         return False, "MetaTrader5 not installed"
 
-    if not mt5.initialize():
-        return False, "MT5 not initialized"
+    ok, msg = _mt5_init_and_login()
+    if not ok:
+        return False, msg
 
     sym = signal["mt5_symbol"]
     info = mt5.symbol_info(sym)
@@ -2022,31 +2055,17 @@ def execute_in_mt5(signal):
     if entry == 0 or entry == 0.0:
         entry = price
 
-    # R:R check
+    # R:R check — solo log informativo, NO rechazar (todas las señales se ejecutan)
     risk = abs(price - sl)
     if risk <= 0:
         return False, "Invalid SL"
-    # FIX 2026-04-15: Skip R:R check si TP=0 (señal sin TP definido)
     if tp > 0:
         reward = abs(tp - price)
         rr = reward / risk
-        if rr < 0.8:
-            return False, f"R:R {rr:.2f} too low"
+        log.info(f"📊 R:R = {rr:.2f} para {sym}")
 
-    # Lot calculation (1% risk)
-    account = mt5.account_info()
-    capital = account.balance if account else 1000
-    risk_money = capital * 0.01
-
-    tick_size = info.trade_tick_size
-    tick_value = info.trade_tick_value
-    if tick_size > 0 and tick_value > 0:
-        sl_ticks = abs(price - sl) / tick_size
-        lot = risk_money / (sl_ticks * tick_value) if sl_ticks > 0 else 0.01
-    else:
-        lot = 0.01
-
-    lot = max(info.volume_min, min(info.volume_max, round(lot, 2)))
+    # Lot = SIEMPRE el mínimo (cuenta demo, sin riesgo)
+    lot = info.volume_min  # Normalmente 0.01
 
     order_type = mt5.ORDER_TYPE_BUY if signal["direction"] == "BUY" else mt5.ORDER_TYPE_SELL
     request = {
@@ -2076,8 +2095,9 @@ def handle_update_mt5(update):
     """Handle signal updates (close half, move SL to entry, etc.)."""
     try:
         import MetaTrader5 as mt5
-        if not mt5.initialize():
-            return False, "MT5 not initialized"
+        ok, msg = _mt5_init_and_login()
+        if not ok:
+            return False, msg
 
         sym = update["mt5_symbol"]
         positions = mt5.positions_get(symbol=sym)
@@ -2613,12 +2633,12 @@ async def main():
                             return
 
             # ══════════════════════════════════════════════════════════════
-            # 🔒 KILL-SWITCH GLOBAL — MT5 EXECUTION COMPLETAMENTE DESACTIVADO
-            # Para reactivar cuando el usuario autorice:
-            #   1. Cambiar MT5_EXECUTION_ENABLED = True aquí abajo
-            #   2. Y asegurarse de que AUTO_TRADING=True en el .env del bot
+            # 🟢 MT5 EXECUTION ACTIVADO — Cuenta DEMO (101595184)
+            # Autorizado por el usuario 2026-04-15
+            # Cada señal del canal VIP se replica con lotaje mínimo (0.01)
+            # Para desactivar: cambiar a False
             # ══════════════════════════════════════════════════════════════
-            MT5_EXECUTION_ENABLED = False  # ← NUNCA cambiar sin autorización explícita del usuario
+            MT5_EXECUTION_ENABLED = True  # ← Activado para cuenta demo
 
             if signal["type"] == "new_signal":
                 executed, detail = False, "Ejecución MT5 desactivada (kill-switch activo)"

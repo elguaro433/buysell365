@@ -1,5 +1,5 @@
 """
-BuySell365 — Monitor cuenta REAL XM (88849791)
+BuySell365 — Monitor cuenta MT5
 ================================================
 - Lee TODAS las posiciones abiertas (manuales + bot) cada 30s
 - Lee historial de deals cerrados del día
@@ -15,10 +15,10 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env")
 
-# ── Configuración — credenciales desde .env (nunca hardcodeadas) ───────────
-MT5_LOGIN    = int(os.getenv("MT5_LOGIN",    "88849791"))
+# ── Configuración — credenciales desde .env (sin fallbacks peligrosos) ─────
+MT5_LOGIN    = int(os.getenv("MT5_LOGIN",    "0"))
 MT5_PASSWORD = os.getenv("MT5_PASSWORD", "")
-MT5_SERVER   = os.getenv("MT5_SERVER",   "XMGlobal-MT5 4")
+MT5_SERVER   = os.getenv("MT5_SERVER",   "")
 
 CHECK_INTERVAL = 30  # segundos entre lecturas
 
