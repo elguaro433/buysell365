@@ -1617,6 +1617,7 @@ if('serviceWorker' in navigator){{
     <a href="#pricing" class="btn btn-primary"><span data-i18n="cta.plans">\U0001f451 Ver Planes</span></a>
     <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-secondary" style="border-color:rgba(0,230,118,0.3);color:#00e676">&#128640; Copy Trading</a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary"><span data-i18n="cta.community">\U0001f4ac Comunidad Gratis</span></a>
+    <a href="https://www.instagram.com/buysell365.pro_tradingsignals/" target="_blank" class="btn btn-secondary" style="border-color:rgba(225,48,108,0.3);color:#e1306c">\U0001f4f8 Instagram</a>
   </div>
 </section>
 
@@ -1636,6 +1637,7 @@ if('serviceWorker' in navigator){{
     <a href="/terminos">\U0001f4dc <span data-i18n="footer.terms">T\u00e9rminos</span></a>
     <a href="/privacidad">\U0001f512 <span data-i18n="footer.privacy">Privacidad</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank">\U0001f4e2 <span data-i18n="footer.telegram">Telegram</span></a>
+    <a href="https://www.instagram.com/buysell365.pro_tradingsignals/" target="_blank">\U0001f4f8 Instagram</a>
     <a href="mailto:soporte@buysell365.pro">\U0001f4e7 <span data-i18n="footer.email">soporte@buysell365.pro</span></a>
   </div>
   <p data-i18n="footer.rights">\u00a9 2026 BuySell365 Pro. Todos los derechos reservados.</p>
@@ -2402,7 +2404,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     <!-- FOOTER -->
     <div class="footer">
         <p>&#169; 2026 BuySell365 Pro | <span data-i18n="dash.footer_refresh">Auto-refresh cada 30s</span></p>
-        <p style="margin-top:4px"><a href="https://t.me/BUYSELL_365_24_7" data-i18n="dash.footer_telegram">Grupo Telegram</a> &middot; <a href="https://t.me/BuySell365Traiding" data-i18n="dash.footer_vip">Contacto VIP</a> &middot; <a href="/terminos" data-i18n="footer.terms">T&eacute;rminos</a> &middot; <a href="/privacidad" data-i18n="footer.privacy">Privacidad</a></p>
+        <p style="margin-top:4px"><a href="https://t.me/BUYSELL_365_24_7" data-i18n="dash.footer_telegram">Grupo Telegram</a> &middot; <a href="https://www.instagram.com/buysell365.pro_tradingsignals/" target="_blank">Instagram</a> &middot; <a href="https://t.me/BuySell365Traiding" data-i18n="dash.footer_vip">Contacto VIP</a> &middot; <a href="/terminos" data-i18n="footer.terms">T&eacute;rminos</a> &middot; <a href="/privacidad" data-i18n="footer.privacy">Privacidad</a></p>
         <p style="margin-top:8px;font-size:0.7rem;color:#888;max-width:700px;margin-left:auto;margin-right:auto">
             &#9888; <strong data-i18n="dash.footer_legal_title">Aviso legal:</strong> <span data-i18n="dash.footer_legal">BuySell365 Pro es una herramienta de an&aacute;lisis t&eacute;cnico automatizado con fines informativos y educativos. No constituye asesor&iacute;a financiera, recomendaci&oacute;n de inversi&oacute;n ni oferta de servicios regulados. Operar en mercados financieros conlleva riesgo de p&eacute;rdida de capital. Resultados pasados no garantizan resultados futuros. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n.</span>
         </p>

@@ -335,6 +335,23 @@ def _send_daily_summary() -> None:
     except Exception as e:
         log.warning(f"📊 Error enviando resumen: {e}")
 
+    # ── Instagram: resumen diario ──
+    try:
+        from instagram_poster import post_daily_summary as _ig_post_daily
+        _ig_stats = {
+            "fecha": hoy,
+            "wr": wr,
+            "tps": len(tps),
+            "sls": len(sls),
+            "pips_netos": pips_netos,
+            "total": total_signals,
+            "mejor": f"{mejor['pair_display']} +{mejor['pips']:.0f} {mejor.get('pips_unit', 'pts')}" if mejor and mejor.get("result") == "tp" else None,
+            "peor": f"{peor['pair_display']} -{peor['pips']:.0f} {peor.get('pips_unit', 'pts')}" if peor else None,
+        }
+        _ig_post_daily(_ig_stats)
+    except Exception as _ig_err:
+        log.debug(f"Instagram resumen skip: {_ig_err}")
+
 
 def _save_open_signals():
     """Guarda señales abiertas a disco para sobrevivir reinicios."""
@@ -589,13 +606,37 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             _mt5_sym_chart = _mt5_chart_map.get(pair.upper(), pair.upper())
             if _mt5_chart.initialize():
                 _mt5_chart.symbol_select(_mt5_sym_chart, True)
-                _rates = _mt5_chart.copy_rates_from_pos(_mt5_sym_chart, _mt5_chart.TIMEFRAME_M15, 0, 50)
-                if _rates is not None and len(_rates) >= 10:
-                    opens  = [float(r['open'])  for r in _rates]
-                    closes = [float(r['close']) for r in _rates]
-                    highs  = [float(r['high'])  for r in _rates]
-                    lows   = [float(r['low'])   for r in _rates]
-                    log.info(f"📊 Chart data from MT5 ({len(_rates)} candles) — precio real broker")
+                # Intentar varios timeframes/tamaños para que el gráfico incluya
+                # tanto la entrada como el TP (el precio pudo haber rebotado)
+                _best_rates = None
+                _target_prices = [p for p in [entry, tp] if p > 0]
+                for _tf, _tf_name, _count in [
+                    (_mt5_chart.TIMEFRAME_M5, "M5", 80),
+                    (_mt5_chart.TIMEFRAME_M15, "M15", 80),
+                    (_mt5_chart.TIMEFRAME_M30, "M30", 60),
+                    (_mt5_chart.TIMEFRAME_H1, "H1", 50),
+                ]:
+                    _rates = _mt5_chart.copy_rates_from_pos(_mt5_sym_chart, _tf, 0, _count)
+                    if _rates is None or len(_rates) < 10:
+                        continue
+                    # Verificar que las velas cubren el rango entry-TP
+                    _all_lows = [float(r['low']) for r in _rates]
+                    _all_highs = [float(r['high']) for r in _rates]
+                    _data_min = min(_all_lows)
+                    _data_max = max(_all_highs)
+                    _covers_all = all(_data_min <= p <= _data_max for p in _target_prices)
+                    if _covers_all:
+                        _best_rates = _rates
+                        log.info(f"📊 Chart {_tf_name} cubre entry+TP ({len(_rates)} velas)")
+                        break
+                    if _best_rates is None:
+                        _best_rates = _rates  # Guardar como fallback
+                if _best_rates is not None and len(_best_rates) >= 10:
+                    opens  = [float(r['open'])  for r in _best_rates]
+                    closes = [float(r['close']) for r in _best_rates]
+                    highs  = [float(r['high'])  for r in _best_rates]
+                    lows   = [float(r['low'])   for r in _best_rates]
+                    log.info(f"📊 Chart data from MT5 ({len(_best_rates)} candles) — precio real broker")
         except Exception as _e_mt5c:
             log.warning(f"📊 MT5 chart error: {_e_mt5c}")
 
@@ -769,6 +810,19 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         ax.grid(True, alpha=0.08, color=TEXT, linestyle="-", linewidth=0.5)
         ax.tick_params(colors=TEXT, labelsize=9)
         ax.set_xlim(-1, n + 9)  # Espacio para labels (más ancho para múltiples TPs)
+
+        # FIX 2026-04-15: Forzar eje Y para incluir entry y todos los TPs
+        # Si las velas no cubren el rango, el gráfico se veía cortado/incoherente
+        _y_prices = [v for v in [entry, tp] if v > 0]
+        for _tp_item in (_all_tps if tp_levels else []):
+            if _tp_item[1] > 0:
+                _y_prices.append(_tp_item[1])
+        if _y_prices and lows and highs:
+            _chart_min = min(min(lows), min(_y_prices))
+            _chart_max = max(max(highs), max(_y_prices))
+            _margin = (_chart_max - _chart_min) * 0.08
+            ax.set_ylim(_chart_min - _margin, _chart_max + _margin)
+
         for spine in ax.spines.values():
             spine.set_visible(False)
 
@@ -934,6 +988,14 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
             log.info(f"📢 TP celebration enviada al GRUPO: {dir_label} {pair}")
         except Exception as _eg:
             log.warning(f"Error enviando TP al grupo: {_eg}")
+
+    # ── Instagram auto-post ──
+    try:
+        from instagram_poster import post_tp_celebration as _ig_post_tp
+        _ig_post_tp(pair_d, direction, entry, tp, pips_str if pips_str else "+0",
+                    source=signal.get("source", ""))
+    except Exception as _ig_err:
+        log.debug(f"Instagram TP post skip: {_ig_err}")
 
 
 def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
@@ -1243,6 +1305,43 @@ async def _monitor_tp_loop() -> None:
                 _send_daily_summary()
         except Exception as _e_sum:
             log.warning(f"Error en resumen diario: {_e_sum}")
+
+        # ── Publicidad diaria de Instagram en grupo Telegram (14:00) ──
+        try:
+            if _now_sum.hour == 14 and _now_sum.minute < 5 and _sent_today.get("ig_promo") != _hoy_str:
+                _sent_today["ig_promo"] = _hoy_str
+                import random
+                _ig_promos = [
+                    "📸 *¡Síguenos en Instagram!*\n\n"
+                    "Publicamos resultados diarios, TPs alcanzados y contenido exclusivo.\n\n"
+                    "🔗 @buysell365.pro\\_tradingsignals\n"
+                    "👉 instagram.com/buysell365.pro\\_tradingsignals\n\n"
+                    "_Transparencia total — resultados reales cada día_",
+
+                    "🚀 *BuySell365 ya está en Instagram*\n\n"
+                    "📊 Resultados diarios verificados\n"
+                    "🎯 Celebraciones de cada TP\n"
+                    "📈 Estadísticas semanales\n\n"
+                    "Síguenos: @buysell365.pro\\_tradingsignals\n"
+                    "👉 instagram.com/buysell365.pro\\_tradingsignals",
+
+                    "📱 *¿Ya nos sigues en Instagram?*\n\n"
+                    "Cada día publicamos nuestros resultados reales — los buenos y los malos.\n"
+                    "Sin filtros, sin trucos.\n\n"
+                    "🔗 @buysell365.pro\\_tradingsignals\n"
+                    "_BuySell365 Pro — Transparencia total_",
+                ]
+                _ig_msg = random.choice(_ig_promos)
+                import requests as _req_ig
+                _url_ig = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                _pay_ig = {"chat_id": GROUP_ID, "text": _ig_msg, "parse_mode": "Markdown"}
+                _resp_ig = _req_ig.post(_url_ig, json=_pay_ig, timeout=10)
+                if _resp_ig.status_code == 200:
+                    log.info("📸 Promo Instagram enviada al grupo")
+                else:
+                    log.warning(f"Promo Instagram error: {_resp_ig.status_code}")
+        except Exception as _e_ig:
+            log.warning(f"Error promo Instagram: {_e_ig}")
 
         # ── Cargar señales manuales del admin (manual_signals.json) ──
         try:
