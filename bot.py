@@ -19,6 +19,7 @@ import numpy as np
 import random
 from difflib import get_close_matches
 import copy
+from pathlib import Path
 try:
     from dotenv import load_dotenv
     import os as _os
@@ -215,6 +216,7 @@ MIN_SCORE = 3                   # Score mínimo para enviar señal (auto-calibra
 CAPITAL_USUARIO   = 555.00      # Capital base (se actualiza con balance real de MT5)
 RIESGO_POR_TRADE  = 0.01        # 1% para TODOS los activos (~$5.5 por trade)
 RIESGO_PREMIUM    = 0.015       # 1.5% para señales premium (~$8 por trade — solo score≥4)
+USAR_LOTE_MINIMO_SIEMPRE = True # Si True, todas las señales se abren al lote mínimo del símbolo (0.01 forex / 0.1 índices). Cambiar a False para usar cálculo dinámico por riesgo.
 BOT_TZ = pytz.timezone('Europe/Andorra')  # Zona horaria del usuario (CET/CEST)
 HORA_APERTURA_LOCAL = 0         # 00:00 — sin restricción horaria, opera 24/5
 HORA_CORTE_LOCAL = 24           # 24:00 — sin restricción horaria, opera 24/5
@@ -558,8 +560,122 @@ if _acc2_login and _acc2_pass and _acc2_srv:
 _mt5_primary_account = MT5_ACCOUNTS[0] if MT5_ACCOUNTS else None
 _lock_mt5_switch = threading.RLock()  # Proteger cambio de cuenta
 _lock_mt5 = threading.Lock()  # Thread-safety para TODAS las llamadas MT5 (IPC no es thread-safe)
-_mt5_consecutive_failures = 0  # Circuit breaker: si falla N veces seguidas, pausar señales
-_MT5_MAX_FAILURES = 5  # Máx fallos antes de pausar
+
+# === CIRCUIT BREAKER MT5 ===
+# Protege el capital: si MT5 falla 5 veces seguidas, pausa operaciones 5 min
+# Estados: CLOSED (normal) → OPEN (pausado) → HALF_OPEN (probando)
+_mt5_consecutive_failures = 0
+_MT5_MAX_FAILURES = 5
+_mt5_cb_state = "CLOSED"       # "CLOSED" | "OPEN" | "HALF_OPEN"
+_mt5_cb_opened_at = 0.0        # Timestamp cuando se abrió el breaker
+_mt5_cb_cooldown = 300          # 5 minutos de pausa
+_mt5_cb_last_error = ""         # Último error para notificación
+_mt5_cb_notified = False        # Evitar spam de notificaciones
+_MT5_CB_FILE = Path(__file__).parent / "mt5_circuit_breaker.json"
+
+
+def _mt5_cb_save_state():
+    """Guarda estado del circuit breaker a disco (para signal_copier)."""
+    try:
+        import json as _json_cb
+        with open(_MT5_CB_FILE, "w") as _f_cb:
+            _json_cb.dump({
+                "state": _mt5_cb_state,
+                "failures": _mt5_consecutive_failures,
+                "opened_at": _mt5_cb_opened_at,
+                "last_error": _mt5_cb_last_error[:200],
+            }, _f_cb, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _mt5_cb_trip(error_msg: str = ""):
+    """Abre el circuit breaker — pausar operaciones y notificar admin."""
+    global _mt5_cb_state, _mt5_cb_opened_at, _mt5_cb_last_error, _mt5_cb_notified
+    _mt5_cb_state = "OPEN"
+    _mt5_cb_opened_at = time.time()
+    _mt5_cb_last_error = str(error_msg)[:200]
+    _mt5_cb_save_state()
+
+    if not _mt5_cb_notified:
+        _mt5_cb_notified = True
+        _reintento = time.strftime("%H:%M", time.localtime(time.time() + _mt5_cb_cooldown))
+        _msg_cb = (
+            f"🚨 *CIRCUIT BREAKER ACTIVADO* 🚨\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"MT5 falló {_MT5_MAX_FAILURES} veces seguidas\n"
+            f"⏸️ Operaciones pausadas 5 min\n\n"
+            f"Último error: _{_mt5_cb_last_error[:100]}_\n"
+            f"⏰ Reintento a las {_reintento}"
+        )
+        try:
+            import requests as _req_cb
+            for _admin_id in ADMIN_IDS:
+                _req_cb.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={"chat_id": _admin_id, "text": _msg_cb, "parse_mode": "Markdown"},
+                    timeout=10)
+        except Exception:
+            pass
+        logger.warning(f"🚨 CIRCUIT BREAKER ABIERTO — MT5 pausado 5 min. Error: {error_msg}")
+
+
+def _mt5_cb_reset():
+    """Cierra el circuit breaker — operaciones reanudadas."""
+    global _mt5_cb_state, _mt5_consecutive_failures, _mt5_cb_opened_at, _mt5_cb_notified
+    was_open = _mt5_cb_state != "CLOSED"
+    _mt5_cb_state = "CLOSED"
+    _mt5_consecutive_failures = 0
+    _mt5_cb_opened_at = 0.0
+    _mt5_cb_save_state()
+
+    if was_open and _mt5_cb_notified:
+        _mt5_cb_notified = False
+        try:
+            import requests as _req_cb2
+            for _admin_id in ADMIN_IDS:
+                _req_cb2.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                    json={"chat_id": _admin_id, "text": "✅ *MT5 RECONECTADO*\nOperaciones reanudadas.", "parse_mode": "Markdown"},
+                    timeout=10)
+        except Exception:
+            pass
+        logger.info("✅ CIRCUIT BREAKER CERRADO — MT5 reconectado")
+
+
+def _mt5_cb_record_failure(error_msg: str = ""):
+    """Registra un fallo MT5. Si supera el umbral, abre el breaker."""
+    global _mt5_consecutive_failures
+    _mt5_consecutive_failures += 1
+    logger.warning(f"⚠️ MT5 fallo #{_mt5_consecutive_failures}/{_MT5_MAX_FAILURES}: {error_msg[:80]}")
+    if _mt5_consecutive_failures >= _MT5_MAX_FAILURES:
+        _mt5_cb_trip(error_msg)
+
+
+def _mt5_cb_record_success():
+    """Registra un éxito MT5. Resetea el breaker si estaba abierto."""
+    global _mt5_consecutive_failures
+    if _mt5_consecutive_failures > 0 or _mt5_cb_state != "CLOSED":
+        _mt5_cb_reset()
+
+
+def mt5_cb_is_open() -> bool:
+    """Comprueba si el circuit breaker está abierto (operaciones pausadas).
+    Si pasó el cooldown, cambia a HALF_OPEN para permitir un intento."""
+    global _mt5_cb_state
+    if _mt5_cb_state == "CLOSED":
+        return False
+    if _mt5_cb_state == "OPEN":
+        elapsed = time.time() - _mt5_cb_opened_at
+        if elapsed >= _mt5_cb_cooldown:
+            _mt5_cb_state = "HALF_OPEN"
+            logger.info("🔄 Circuit Breaker → HALF_OPEN — probando MT5...")
+            _mt5_cb_save_state()
+            return False  # Permitir un intento
+        return True  # Todavía en pausa
+    # HALF_OPEN: permitir un intento
+    return False
+
 
 # 🧵 THREAD POOL para procesamiento de webhooks — limitar concurrencia (prevenir DoS)
 _pool_webhook = ThreadPoolExecutor(max_workers=4, thread_name_prefix="webhook")
@@ -2999,6 +3115,13 @@ def calcular_lote_sugerido(capital, riesgo_pct, entrada, sl, ticker):
     Se restaura automáticamente al ganar.
     """
     try:
+        # 🔒 MODO LOTE MÍNIMO GLOBAL — todas las señales al mínimo, el usuario sube manualmente si quiere
+        if USAR_LOTE_MINIMO_SIEMPRE:
+            cat = get_categoria(ticker)
+            if cat == "futuros" or any(x in ticker.upper() for x in ["US100", "US500", "NQ", "ES"]):
+                return "0.1"
+            return "0.01"
+
         # ── REDUCCIÓN DINÁMICA DE LOTE (Gestión de drawdown activo) ────
         racha_perdidas = _calcular_racha_perdidas_actual()
         factor_reduccion = 1.0
@@ -3295,10 +3418,16 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
         except Exception:
             lote_val = 0.01
 
-        # 2. Validar conexión (todas las llamadas MT5 protegidas con _lock_mt5)
+        # 2. CIRCUIT BREAKER: si está abierto, no operar
+        if mt5_cb_is_open():
+            print(f"🚨 Circuit Breaker ABIERTO — operación {mt5_ticker} rechazada [{cuenta_name}]")
+            return False
+
+        # 3. Validar conexión (todas las llamadas MT5 protegidas con _lock_mt5)
         with _lock_mt5:
             _tinfo = mt5.terminal_info()
         if _tinfo is None or not _tinfo.connected:
+            _mt5_cb_record_failure(f"terminal_info None/disconnected para {mt5_ticker}")
             print(f"❌ MT5 Desconectado [{cuenta_name}]. No se pudo abrir {mt5_ticker}")
             return False
 
@@ -3366,9 +3495,12 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
         vol_min = symbol_info.volume_min
         vol_max = symbol_info.volume_max
         vol_step = symbol_info.volume_step
-        lote_val = max(vol_min, lote_val)
-        lote_val = min(vol_max, lote_val)
-        lote_val = min(lote_val, MAX_LOTE_SEGURIDAD)
+        if USAR_LOTE_MINIMO_SIEMPRE:
+            lote_val = vol_min
+        else:
+            lote_val = max(vol_min, lote_val)
+            lote_val = min(vol_max, lote_val)
+            lote_val = min(lote_val, MAX_LOTE_SEGURIDAD)
         lote_val = round(round(lote_val / vol_step) * vol_step, 2)
 
         # 🔒 VERIFICAR MARGEN LIBRE antes de enviar orden
@@ -3423,10 +3555,14 @@ def _ejecutar_orden_en_cuenta(ticker, tipo, capital, riesgo_pct, entrada, sl, tp
         with _lock_mt5:
             result = mt5.order_send(request)
 
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            log_op(f"❌ ORDEN RECHAZADA [{cuenta_name}]: {mt5_ticker} {tipo} | {result.comment} (code:{result.retcode})", "error")
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            _err_msg = result.comment if result else "order_send returned None"
+            _mt5_cb_record_failure(f"order_send {mt5_ticker}: {_err_msg}")
+            log_op(f"❌ ORDEN RECHAZADA [{cuenta_name}]: {mt5_ticker} {tipo} | {_err_msg} (code:{result.retcode if result else '?'})", "error")
             return False
 
+        # Orden exitosa — resetear circuit breaker
+        _mt5_cb_record_success()
         _ticket_id = result.order if result.order else 0  # 0 = ejecutado pero sin ticket
         log_op(f"🚀 ORDEN EJECUTADA [{cuenta_name}]: {tipo} {lote_val} {mt5_ticker} @ {price} ticket#{_ticket_id}")
         print(f"🚀 ORDEN EJECUTADA [{cuenta_name}]: {tipo} {lote_val} {mt5_ticker} @ {price} ticket#{_ticket_id}")
@@ -3797,6 +3933,17 @@ def sync_mt5_positions():
             )
             enviar_canal(msg)
             logger.info(f"🔔 {tipo_cierre}: {nombre} {tipo} | {signo}{p_txt}")
+
+            # 📸 Instagram: publicar TP ganador (post + Story + Reel multi-idioma)
+            if pips > 0:
+                try:
+                    from instagram_poster import post_tp_celebration as _ig_tp
+                    _ig_tp(nombre, _tipo_es, entrada, precio_cierre,
+                           f"{signo}{p_txt}", source="VIP",
+                           reel_entry=entrada, reel_tp=precio_cierre)
+                except Exception as _ig_err:
+                    logger.debug(f"IG TP post skip ({nombre}): {_ig_err}")
+
             guardar_estado()
 
     except Exception as e:
@@ -3938,10 +4085,27 @@ def hay_noticia_alto_impacto(ticker, horas_antes=3, horas_despues=2):
             try:
                 fecha_str = n.get("date", "")
                 hora_str  = n.get("time", "").strip().lower()
-                if not fecha_str or hora_str in ("", "all day", "tentative"):
+                dt_utc = None
+                # FIX 2026-04-17: Soporte ISO 8601 nuevo formato FF
+                if "T" in fecha_str:
+                    try:
+                        _dt_iso = datetime.fromisoformat(fecha_str)
+                        if _dt_iso.tzinfo:
+                            dt_utc = _dt_iso.astimezone(pytz.UTC)
+                        else:
+                            dt_utc = pytz.UTC.localize(_dt_iso)
+                    except Exception:
+                        pass
+                if not dt_utc and fecha_str and hora_str not in ("", "all day", "tentative"):
+                    for _fmt in ("%m-%d-%Y %I:%M%p", "%Y-%m-%d %I:%M%p", "%m/%d/%Y %I:%M%p"):
+                        try:
+                            _dt = datetime.strptime(f"{fecha_str} {hora_str}", _fmt)
+                            dt_utc = tz_ny.localize(_dt).astimezone(pytz.UTC)
+                            break
+                        except Exception:
+                            continue
+                if not dt_utc:
                     continue
-                dt     = datetime.strptime(f"{fecha_str} {hora_str}", "%m-%d-%Y %I:%M%p")
-                dt_utc = tz_ny.localize(dt).astimezone(pytz.UTC)
                 diff   = (dt_utc - ahora_utc).total_seconds() / 3600
                 # diff > 0 = evento en el futuro, diff < 0 = evento ya pasó
                 titulo = n.get("title", "Desconocido")
@@ -12980,40 +13144,110 @@ def enviar_resumen_diario():
 #  MOTOR DE ESCANEO - OPTIMIZADO
 # ============================================================
 
+# Traducciones país/impacto al español — se usa en briefing
+_PAISES_ES_BRIEFING = {
+    "USD": "🇺🇸 EE.UU.", "EUR": "🇪🇺 Eurozona", "GBP": "🇬🇧 R.Unido",
+    "JPY": "🇯🇵 Japón", "CAD": "🇨🇦 Canadá", "AUD": "🇦🇺 Australia",
+    "NZD": "🇳🇿 N.Zelanda", "CHF": "🇨🇭 Suiza", "CNY": "🇨🇳 China",
+}
+_FG_ES_BRIEFING = {
+    "Extreme Fear": "Miedo Extremo", "Fear": "Miedo",
+    "Neutral": "Neutral", "Greed": "Codicia", "Extreme Greed": "Codicia Extrema",
+}
+_TRADUCCIONES_TITULO = [
+    ("Speaks", "habla"), ("Speech", "discurso"),
+    ("Member", "miembro"), ("Governor", "gobernador"),
+    ("Interest Rate", "Tipos de interés"), ("Rate Decision", "Decisión de tipos"),
+    ("Retail Sales", "Ventas minoristas"), ("Unemployment Rate", "Tasa de desempleo"),
+    ("Industrial Production", "Producción industrial"),
+    ("Manufacturing PMI", "PMI manufacturero"), ("Services PMI", "PMI servicios"),
+    ("CPI", "IPC"), ("Consumer Confidence", "Confianza consumidor"),
+    ("Trade Balance", "Balanza comercial"), ("GDP", "PIB"),
+    ("Home Sales", "Ventas viviendas"), ("Building Permits", "Permisos construcción"),
+    ("Crude Oil Inventories", "Inventarios petróleo"),
+    ("ECB", "BCE"),
+]
+
+def _traducir_titulo_briefing(t):
+    t = t or ""
+    for en, es in _TRADUCCIONES_TITULO:
+        t = t.replace(en, es)
+    return t
+
+
 def enviar_briefing_matutino():
     """Envía el briefing del mercado a las 7:00 AM hora Andorra al canal VIP."""
     hora = ahora().strftime("%H:%M")
-    fg = get_fear_greed()
+    # FIX 2026-04-17: get_fear_greed() devuelve TUPLA (valor, clasificacion) — desempacar
+    try:
+        _fg_val, _fg_class_raw = get_fear_greed()
+        _fg_class = _FG_ES_BRIEFING.get(_fg_class_raw, _fg_class_raw)
+    except Exception:
+        _fg_val, _fg_class = 50, "Neutral"
+    # FIX 2026-04-17: Incluir también impacto MEDIO + PARSER NUEVO formato ISO 8601
+    # ForexFactory cambió el JSON: ahora usa "2026-04-17T04:00:00-04:00" en vez de
+    # "date"+"time" separados. Soportamos ambos formatos con fallback.
     noticias = cargar_calendario_economico()
     ahora_utc = datetime.now(pytz.UTC)
     tz_ny = pytz.timezone("America/New_York")
-    noticias_hoy = []
+    noticias_high = []
+    noticias_medium = []
+    noticias_todo_dia = []
     for n in (noticias or []):
-        if n.get("impact", "").lower() != "high":
+        impacto = n.get("impact", "").lower()
+        if impacto not in ("high", "medium"):
             continue
         try:
             fecha_str = n.get("date", "")
             hora_str  = n.get("time", "").strip().lower()
-            if not fecha_str or hora_str in ("", "all day", "tentative"):
+            dt_utc = None
+            es_all_day = hora_str in ("", "all day", "tentative")
+            if "T" in fecha_str:
+                try:
+                    _dt_iso = datetime.fromisoformat(fecha_str)
+                    # Detectar All Day: hora 00:00 sin hora explícita en "time"
+                    if _dt_iso.hour == 0 and _dt_iso.minute == 0 and not any(x in hora_str for x in ("am","pm",":")):
+                        es_all_day = True
+                    if _dt_iso.tzinfo:
+                        dt_utc = _dt_iso.astimezone(pytz.UTC)
+                    else:
+                        dt_utc = pytz.UTC.localize(_dt_iso)
+                except Exception:
+                    pass
+            if not dt_utc and fecha_str and not es_all_day:
+                for _fmt in ("%m-%d-%Y %I:%M%p", "%Y-%m-%d %I:%M%p", "%m/%d/%Y %I:%M%p"):
+                    try:
+                        _dt = datetime.strptime(f"{fecha_str} {hora_str}", _fmt)
+                        dt_utc = tz_ny.localize(_dt).astimezone(pytz.UTC)
+                        break
+                    except Exception:
+                        continue
+            if not dt_utc:
                 continue
-            dt = datetime.strptime(f"{fecha_str} {hora_str}", "%m-%d-%Y %I:%M%p")
-            dt_utc = tz_ny.localize(dt).astimezone(pytz.UTC)
+            # Filtrar a solo el día de hoy (local Andorra)
+            _dt_loc = dt_utc.astimezone(BOT_TZ)
+            _ahora_loc = ahora_utc.astimezone(BOT_TZ)
+            _mismo_dia = _dt_loc.date() == _ahora_loc.date()
             diff = (dt_utc - ahora_utc).total_seconds() / 3600
-            if 0 <= diff <= 24:
-                _hora_local = dt_utc.astimezone(BOT_TZ).strftime("%H:%M")
-                noticias_hoy.append(f"   🔴 {_hora_local} — {n.get('country','')} {n.get('title','')}")
+            if not _mismo_dia and not (0 <= diff <= 18):
+                continue
+
+            _pais = _PAISES_ES_BRIEFING.get(n.get("country", ""), n.get("country", ""))
+            _titulo = _traducir_titulo_briefing(n.get("title", ""))
+            _emoji = "🔴" if impacto == "high" else "🟠"
+            if es_all_day:
+                _line = f"   {_emoji} Todo el día — {_pais} {_titulo}"
+                noticias_todo_dia.append(_line)
+            else:
+                _hora_local = _dt_loc.strftime("%H:%M")
+                _line = f"   {_emoji} {_hora_local} — {_pais} {_titulo}"
+                if impacto == "high":
+                    noticias_high.append(_line)
+                else:
+                    noticias_medium.append(_line)
         except Exception:
             continue
-
-    # Contexto IA para el briefing
-    _ia_outlook = ""
-    try:
-        _ia_outlook = _ia_responder(
-            "Dame una perspectiva de 2 líneas para hoy en español: EUR/USD, NASDAQ, S&P 500. Menciona niveles clave y qué sesión será más activa. No uses palabras en inglés.",
-            "Canal VIP"
-        ) or ""
-    except Exception:
-        pass
+    noticias_hoy = (noticias_high + noticias_medium + noticias_todo_dia)[:6]
 
     _hora_actual = ahora().replace(tzinfo=None).hour
     if _hora_actual < 12:
@@ -13023,13 +13257,7 @@ def enviar_briefing_matutino():
     else:
         _saludo_emoji, _saludo = "🌙", "BUENAS NOCHES"
 
-    lineas = [
-        f"{_saludo_emoji} *{_saludo} — RESUMEN* {ahora().strftime('%d/%m/%Y')} | {hora}\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
-    ]
-
-    # Tabla de activos
-    lineas.append("\n📊 *PANORAMA DE MERCADO*")
+    # Construir panorama PRIMERO (para pasárselo a la IA como contexto)
     _alcistas = []
     _bajistas = []
     _neutros = []
@@ -13037,38 +13265,69 @@ def enviar_briefing_matutino():
         ind = _cache_ind.get(ticker)
         if ind:
             if ind['ema9'] > ind['ema20'] > ind['ema50']:
-                _alcistas.append(f"   📈 *{nombre_act}*  RSI {ind['rsi']:.0f}")
+                _alcistas.append((nombre_act, ind['rsi']))
             elif ind['ema9'] < ind['ema20'] < ind['ema50']:
-                _bajistas.append(f"   📉 *{nombre_act}*  RSI {ind['rsi']:.0f}")
+                _bajistas.append((nombre_act, ind['rsi']))
             else:
-                _neutros.append(f"   ➡️ *{nombre_act}*  RSI {ind['rsi']:.0f}")
+                _neutros.append((nombre_act, ind['rsi']))
 
+    # FIX 2026-04-17: Contexto IA con panorama REAL (no inventa activos)
+    _ia_outlook = ""
+    try:
+        _ctx_alcistas = ", ".join(f"{n} (RSI {r:.0f})" for n, r in _alcistas) or "ninguno"
+        _ctx_bajistas = ", ".join(f"{n} (RSI {r:.0f})" for n, r in _bajistas) or "ninguno"
+        _ctx_neutros  = ", ".join(f"{n} (RSI {r:.0f})" for n, r in _neutros) or "ninguno"
+        _prompt_ia = (
+            "Eres un analista de trading. Responde en español, máximo 3 líneas, sin saludos. "
+            "NO inventes activos que no estén en el panorama. NO uses palabras en inglés. "
+            "Usa este panorama real:\n"
+            f"- Alcistas: {_ctx_alcistas}\n"
+            f"- Bajistas: {_ctx_bajistas}\n"
+            f"- Neutros: {_ctx_neutros}\n"
+            f"- Miedo y Codicia: {_fg_val}/100 ({_fg_class})\n"
+            "Da perspectiva accionable: qué observar hoy, sesión más activa, niveles clave. Nada genérico."
+        )
+        _ia_outlook = _ia_responder(_prompt_ia, "") or ""
+        # Limpiar saludos que la IA pueda colar igualmente
+        for _saludo_bad in ("Hola Canal VIP", "Hola,", "Buenos días", "Buenas tardes", "Canal VIP"):
+            _ia_outlook = _ia_outlook.replace(_saludo_bad, "").strip().lstrip(",. ").strip()
+    except Exception:
+        pass
+
+    lineas = [
+        f"{_saludo_emoji} *{_saludo}* — {ahora().strftime('%d/%m/%Y')} · {hora}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    ]
+
+    # Panorama compacto
+    lineas.append("\n📊 *PANORAMA*")
     if _alcistas:
-        lineas.append("🟢 *Alcistas:*")
-        lineas.extend(_alcistas)
+        lineas.append("🟢 *Alcistas:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _alcistas))
     if _bajistas:
-        lineas.append("🔴 *Bajistas:*")
-        lineas.extend(_bajistas)
+        lineas.append("🔴 *Bajistas:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _bajistas))
     if _neutros:
-        lineas.append("⚪ *Neutros:*")
-        lineas.extend(_neutros)
+        lineas.append("⚪ *Neutros:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _neutros))
 
-    lineas.append(f"\n😱 *Miedo y Codicia:* {fg}/100")
+    # FIX 2026-04-17: Miedo y Codicia con contexto accionable
+    _fg_insight = ""
+    if _fg_val <= 25:
+        _fg_insight = " — miedo extremo, históricamente buen momento contrarian 🎯"
+    elif _fg_val >= 75:
+        _fg_insight = " — codicia extrema, precaución en longs ⚠️"
+    lineas.append(f"\n😱 *Miedo y Codicia:* {_fg_val}/100 ({_fg_class}){_fg_insight}")
 
     if noticias_hoy:
-        lineas.append("\n📰 *Noticias Alto Impacto:*")
+        lineas.append("\n📰 *Alto impacto hoy:*")
         lineas.extend(noticias_hoy[:5])
-    else:
-        lineas.append("\n📰 Sin noticias de alto impacto hoy")
 
     if _ia_outlook:
-        lineas.append(f"\n💡 *Perspectiva IA:*\n{_ia_outlook[:300]}")
+        lineas.append(f"\n💡 *Perspectiva:*\n{_ia_outlook[:400]}")
 
     # Operaciones activas overnight
     with _lock_ops:
         n_activas = len(operaciones_activas)
     if n_activas > 0:
-        lineas.append(f"\n🔔 *{n_activas} operaciones activas* desde ayer")
+        lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
 
     lineas.append("━━━━━━━━━━━━━━━━━━━━")
 
@@ -14246,6 +14505,13 @@ def analizar_activo(nombre, ticker):
                         operaciones_activas[op_id]['telegram_msg_id'] = _msg_canal_id or 0
                         operaciones_activas[op_id]['_reservado'] = False
 
+            # 📸 Instagram: teaser Story para promocionar canal VIP (sin revelar entrada/SL/TP)
+            try:
+                from instagram_poster import post_vip_signal_teaser_story as _ig_teaser
+                _ig_teaser(nombre, tipo, nivel=_nivel_senal)
+            except Exception as _ig_t_err:
+                logger.debug(f"IG teaser Story skip ({nombre}): {_ig_t_err}")
+
             # 🚨 FOMO desactivado — solo TP ganadores van al grupo como publicidad
             # notificar_fomo_grupo(nombre, tipo)
 
@@ -14353,16 +14619,18 @@ def loop_health_check():
                 )
                 _ultimo_health_check = time.time()
 
-            # ── Check 2: MT5 conexión ──
+            # ── Check 2: MT5 conexión + Circuit Breaker ──
             if MT5_AVAILABLE and AUTO_TRADING:
                 try:
                     _tinfo = mt5.terminal_info()
                     if _tinfo is None or not _tinfo.connected:
+                        _mt5_cb_record_failure("health_check: terminal disconnected")
                         if _mt5_desconectado_desde == 0:
                             _mt5_desconectado_desde = time.time()
                         log_op("⚠️ MT5 desconectado — intentando reconectar...", "warning")
                         if _reconectar_mt5():
                             _mt5_desconectado_desde = 0.0
+                            _mt5_cb_record_success()
                         else:
                             mins_off = int((time.time() - _mt5_desconectado_desde) / 60)
                             if mins_off >= 10:
@@ -14379,7 +14647,9 @@ def loop_health_check():
                         if _mt5_desconectado_desde > 0:
                             log_op("✅ MT5 conexión restaurada")
                             _mt5_desconectado_desde = 0.0
+                            _mt5_cb_record_success()
                 except Exception as e_mt5:
+                    _mt5_cb_record_failure(f"health_check exception: {e_mt5}")
                     log_op(f"⚠️ Error verificando MT5: {e_mt5}", "warning")
 
         except Exception as e:
@@ -14948,14 +15218,14 @@ def loop_vip_check():
                 except Exception as e:
                     logger.error(f"❌ Error enviando briefing matutino: {e}")
 
-            # 0c. 🌙 CIERRE NOCTURNO AL CANAL VIP (22:00 L-V)
-            if not es_finde and (ahora_check.hour > CIERRE_HORA or (ahora_check.hour == CIERRE_HORA and ahora_check.minute >= CIERRE_MINUTO)) and _ultimo_cierre_diario != hoy_str_check:
-                _ultimo_cierre_diario = hoy_str_check
-                try:
-                    enviar_cierre_nocturno()
-                    log_sistema("🌙 Cierre nocturno enviado al canal VIP")
-                except Exception as e:
-                    logger.error(f"❌ Error enviando cierre nocturno: {e}")
+            # 0c. 🌙 CIERRE NOCTURNO — DESACTIVADO (el signal_copier envía resumen completo a las 22:00)
+            # if not es_finde and (ahora_check.hour > CIERRE_HORA or (ahora_check.hour == CIERRE_HORA and ahora_check.minute >= CIERRE_MINUTO)) and _ultimo_cierre_diario != hoy_str_check:
+            #     _ultimo_cierre_diario = hoy_str_check
+            #     try:
+            #         enviar_cierre_nocturno()
+            #         log_sistema("🌙 Cierre nocturno enviado al canal VIP")
+            #     except Exception as e:
+            #         logger.error(f"❌ Error enviando cierre nocturno: {e}")
 
             # 1. Verificar depósitos en Binance (matchear pagos pendientes)
             if pagos_pendientes_vip and BINANCE_API_KEY and BINANCE_API_SECRET:
@@ -15222,30 +15492,62 @@ def loop_sync_mt5_real():
     time.sleep(20)  # esperar inicialización
 
     # Mapa pip_size por símbolo
-    # Divisores de pip — misma convencion que calcular_pips() en bot.py
+    # FIX 2026-04-17: Unificado con monitor_real.py. Antes XAUUSD=0.01 inflaba pips x100
+    # (18.59$ diff = 1859 "pips") y BTC caía al default 0.0001 → 760M pips fantasma.
+    # Ahora oro/índices/crypto = PUNTOS DIRECTOS (pip=1.0).
     _PIP = {
-        "US100Cash": 1.0, "US100": 1.0,        # NASDAQ: 1 pip = 1 punto
-        "US500Cash": 1.0, "US500": 1.0,        # S&P 500: 1 pip = 1 punto
-        "DE40Cash": 1.0, "UK100Cash": 1.0,     # DAX / FTSE: 1 pip = 1 punto
-        "EURJPY": 0.01, "AUDJPY": 0.01,
-        "EURUSD": 0.0001, "AUDUSD": 0.0001,    # Forex: 1 pip = 0.0001
-        "AUDCAD": 0.0001, "EURCHF": 0.0001,
-        "USDCAD": 0.0001, "GBPUSD": 0.0001,
-        "XAUUSD": 0.01,                         # GOLD: 1 pip = 0.01 (=$0.01 por unidad)
-        "GOLD": 0.01,                           # Alias GOLD
+        # Índices (puntos directos)
+        "US100Cash": 1.0, "US100": 1.0, "NAS100": 1.0,
+        "US500Cash": 1.0, "US500": 1.0, "SPX500": 1.0,
+        "US30Cash":  1.0, "US30":  1.0, "DOW30":  1.0,
+        "DE40Cash":  1.0, "GER40Cash": 1.0, "DAX":  1.0,
+        "UK100Cash": 1.0, "FTSE":  1.0,
+        # Metales (puntos directos)
+        "XAUUSD": 1.0, "GOLD": 1.0,
+        "XAGUSD": 0.01,
+        # Crypto (puntos directos)
+        "BTCUSD": 1.0, "ETHUSD": 1.0,
+        # Petróleo (céntimos)
+        "BRENTCash": 0.01, "OILCash": 0.01, "USOIL": 0.01, "UKOIL": 0.01,
+        # Forex JPY
+        "USDJPY": 0.01, "EURJPY": 0.01, "GBPJPY": 0.01, "AUDJPY": 0.01,
+        "NZDJPY": 0.01, "CADJPY": 0.01, "CHFJPY": 0.01,
+        # Forex USD/EUR/GBP/AUD
+        "EURUSD": 0.0001, "GBPUSD": 0.0001, "AUDUSD": 0.0001, "NZDUSD": 0.0001,
+        "USDCAD": 0.0001, "USDCHF": 0.0001,
+        "EURAUD": 0.0001, "EURNZD": 0.0001, "EURGBP": 0.0001,
+        "EURCAD": 0.0001, "EURCHF": 0.0001,
+        "GBPAUD": 0.0001, "GBPNZD": 0.0001, "GBPCAD": 0.0001, "GBPCHF": 0.0001,
+        "AUDCAD": 0.0001, "AUDNZD": 0.0001, "AUDCHF": 0.0001,
+        "NZDCAD": 0.0001, "NZDCHF": 0.0001, "CADCHF": 0.0001,
     }
     _NOMBRE = {
         "EURUSD": "EUR/USD",
         "AUDUSD": "AUD/USD", "AUDCAD": "AUD/CAD", "EURCHF": "EUR/CHF", "USDCAD": "USD/CAD",
         "GBPUSD": "GBP/USD", "US100Cash": "NASDAQ", "US500Cash": "S&P 500",
         "DE40Cash": "DAX", "UK100Cash": "FTSE 100", "US100": "NASDAQ", "US500": "S&P 500",
+        "US30Cash": "DOW30", "US30": "DOW30", "GER40Cash": "DAX",
+        "XAUUSD": "ORO", "GOLD": "ORO",
+        "BTCUSD": "BTC/USD", "ETHUSD": "ETH/USD",
+        "BRENTCash": "BRENT", "OILCash": "WTI",
     }
 
     def _pip_size(sym):
+        s = sym.upper()
+        # Match exacto primero (evita que "US30" matchee "US30Cash" por substring y viceversa)
+        if s in _PIP:
+            return _PIP[s]
+        # Match parcial
         for k, v in _PIP.items():
-            if k.upper() in sym.upper():
+            if k.upper() in s or s in k.upper():
                 return v
-        return 0.01 if "JPY" in sym.upper() else 0.0001
+        # FIX 2026-04-17: Default inteligente — JPY=0.01, forex 6-alfa=0.0001, resto=1.0
+        if "JPY" in s:
+            return 0.01
+        if len(s) == 6 and s.isalpha():
+            return 0.0001
+        # Crypto / índices / desconocido → pip=1.0 (evita bug BTC 760M pips)
+        return 1.0
 
     def _nombre(sym):
         for k, v in _NOMBRE.items():
@@ -17402,23 +17704,7 @@ def _circuit_breaker_check():
     if _cb_perdidas_consecutivas >= 5:
         logger.info(f"ℹ️ {_cb_perdidas_consecutivas} pérdidas consecutivas — CB desactivado, trading continúa")
 
-    # Nunca activar — siempre retornar False
-    return False
-
-    # --- Código original desactivado ---
-    if False:  # DEAD CODE
-        _cb_activo = True
-        _mañana = ahora().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        _cb_hasta = _mañana.timestamp()
-        msg_cb = f"CIRCUIT BREAKER ACTIVADO"
-        logger.warning(msg_cb)
-        for _admin_id in ADMIN_IDS:
-            try:
-                enviar_telegram(msg_cb, destino=_admin_id)
-            except Exception:
-                pass
-        return True
-
+    # Circuit breaker desactivado por política (se eliminó activación histórica 2026-04-17)
     return False
 
 

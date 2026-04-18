@@ -52,6 +52,8 @@ BOT_SCRIPT = os.path.join(BASE_DIR, "bot.py")
 CONFIG_FILE = os.path.join(BASE_DIR, "launcher_config.json")
 TRADING_CONFIG_FILE = os.path.join(BASE_DIR, "launcher_trading_config.json")
 LOG_FILE = os.path.join(BASE_DIR, "logs", "bot.log")
+COPIER_LOG_FILE = os.path.join(BASE_DIR, "logs", "copier.log")
+COPIER_STATS_FILE = os.path.join(BASE_DIR, "copier_stats.json")
 LAUNCHER_LOG = os.path.join(BASE_DIR, "logs", "launcher.log")
 ESTADO_FILE = os.path.join(BASE_DIR, "estado.json")
 ENV_FILE = os.path.join(BASE_DIR, ".env")
@@ -102,6 +104,46 @@ def _log(msg):
             f.write(line + "\n")
     except Exception:
         pass
+
+
+# ============================================================
+#  COPIER STATS — leer copier_stats.json para el dashboard
+# ============================================================
+_copier_stats_cache = {"mtime": 0, "data": None}
+
+def _get_copier_stats_today():
+    """Lee copier_stats.json y devuelve resumen del día actual."""
+    try:
+        if not os.path.exists(COPIER_STATS_FILE):
+            return {"tps": 0, "sls": 0, "closes": 0, "pips_total": 0, "trades": [], "win_rate": 0}
+        mtime = os.path.getmtime(COPIER_STATS_FILE)
+        if mtime == _copier_stats_cache["mtime"] and _copier_stats_cache["data"]:
+            return _copier_stats_cache["data"]
+        with open(COPIER_STATS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        today_str = datetime.now().strftime("%d/%m/%Y")
+        today = [t for t in data.get("trades", []) if t.get("fecha") == today_str]
+        tps = [t for t in today if t["result"] == "tp"]
+        sls = [t for t in today if t["result"] == "sl"]
+        closes = [t for t in today if t["result"] in ("close_half", "close_partial", "full_close")]
+        pips_tp = sum(t.get("pips", 0) for t in tps)
+        pips_sl = sum(t.get("pips", 0) for t in sls)
+        pips_closes = sum(t.get("pips", 0) for t in closes if t.get("pips", 0) > 0)
+        pips_total = pips_tp - pips_sl + pips_closes
+        total_wins = len(tps) + len([c for c in closes if c.get("pips", 0) > 0])
+        total_all = len(today)
+        win_rate = (total_wins / total_all * 100) if total_all > 0 else 0
+        result = {
+            "tps": len(tps), "sls": len(sls), "closes": len(closes),
+            "pips_total": round(pips_total, 1), "trades": today,
+            "win_rate": round(win_rate, 1), "total": total_all,
+            "best": max(today, key=lambda t: t.get("pips", 0), default=None),
+        }
+        _copier_stats_cache["mtime"] = mtime
+        _copier_stats_cache["data"] = result
+        return result
+    except Exception:
+        return {"tps": 0, "sls": 0, "closes": 0, "pips_total": 0, "trades": [], "win_rate": 0, "total": 0}
 
 
 # ============================================================
@@ -414,6 +456,7 @@ class BotManager:
     def __init__(self):
         self._proc = None
         self._running = False
+        self._stop_requested = False  # FIX 2026-04-06c: Flag para que el watchdog NO reinicie tras stop manual
         self.pid = None
         self.start_time = None
         self.restart_count = 0
@@ -494,6 +537,7 @@ class BotManager:
     def start(self):
         if self.is_running:
             return
+        self._stop_requested = False  # FIX 2026-04-06c: Limpiar flag al iniciar
         # Auto-abrir MT5 antes de iniciar el bot
         _ensure_mt5_running()
         # Clean up stale PID before starting
@@ -544,6 +588,7 @@ class BotManager:
     def stop(self):
         if not self.is_running:
             return
+        self._stop_requested = True  # FIX 2026-04-06c: Señal al watchdog de NO reiniciar
         _target_pid = None
         try:
             # Determinar PID a matar (proceso propio o adoptado)
@@ -557,34 +602,38 @@ class BotManager:
                 self._running = False
                 return
 
-            # Graceful shutdown: taskkill en Windows
             import subprocess as _sp
+            import signal as _sig
+            # ── Graceful shutdown via CTRL_BREAK_EVENT (Python lo escucha con SIGBREAK) ──
+            # CREATE_NEW_PROCESS_GROUP permite enviar CTRL_BREAK al grupo del proceso
+            _sent_break = False
             try:
                 if os.name == 'nt':
-                    # Intentar taskkill graceful (sin /F)
-                    _sp.run(["taskkill", "/PID", str(_target_pid)],
-                            capture_output=True, timeout=10)
+                    os.kill(_target_pid, _sig.CTRL_BREAK_EVENT)
+                    _sent_break = True
                 else:
-                    import signal as _sig
                     os.kill(_target_pid, _sig.SIGTERM)
-                # Esperar a que termine (máx 8 segundos)
-                for _ in range(16):
-                    time.sleep(0.5)
-                    if self._proc and self._proc.poll() is not None:
-                        break
-                    if not self._pid_alive(_target_pid):
-                        break
+            except (OSError, ProcessLookupError):
+                pass  # Proceso ya muerto
+
+            # Esperar hasta 4 segundos (Python guarda estado y sale en <1s con SIGBREAK)
+            for _ in range(8):
+                time.sleep(0.5)
+                if self._proc and self._proc.poll() is not None:
+                    break
                 if not self._pid_alive(_target_pid):
-                    _log("Bot detenido gracefully (estado guardado)")
-                else:
-                    raise TimeoutError("Bot no respondio")
-            except (TimeoutError, _sp.TimeoutExpired, OSError):
-                _log("Bot no respondio al cierre graceful, forzando kill...")
+                    break
+
+            if not self._pid_alive(_target_pid):
+                _log("Bot detenido — estado guardado correctamente")
+            else:
+                # Fallback: force kill si no respondió en 4s
+                _log("Bot tardó en cerrar, forzando kill...")
                 try:
-                    # /T mata el árbol completo de procesos hijo
                     _sp.run(["taskkill", "/F", "/T", "/PID", str(_target_pid)],
-                            capture_output=True, timeout=10)
-                    time.sleep(1)
+                            capture_output=True, timeout=5)
+                    # Esperar 2s extra para que Windows libere el mutex antes del próximo start
+                    time.sleep(2)
                 except Exception as e2:
                     _log(f"Error en kill forzado: {e2}")
         except Exception as e:
@@ -593,9 +642,32 @@ class BotManager:
         self.pid = None
         self._running = False
         self._cleanup_pid_file()
-        # Detener auxiliares
-        self._stop_aux(self._copier_proc,  "signal_copier.py")
+        # Detener copier: primero por _copier_proc, luego por PID en .copier.lock (fallback)
+        self._stop_aux(self._copier_proc, "signal_copier.py")
+        _lock = os.path.join(BASE_DIR, ".copier.lock")
+        try:
+            if os.path.exists(_lock):
+                _cpid = int(open(_lock).read().strip())
+                if self._pid_alive(_cpid):
+                    _sp.run(["taskkill", "/F", "/PID", str(_cpid)], capture_output=True, timeout=5)
+                    _log(f"signal_copier.py detenido por lock (PID={_cpid})")
+                os.remove(_lock)
+        except Exception:
+            pass
         self._stop_aux(self._monitor_proc, "monitor_real.py")
+        # FIX 2026-04-17: Fallback por lock file — si _monitor_proc se perdió entre
+        # reinicios del launcher, matar por el PID guardado en .monitor_real.lock.
+        # Antes se acumulaban hasta 8 monitor_real huérfanos por esto.
+        _mlock = os.path.join(BASE_DIR, ".monitor_real.lock")
+        try:
+            if os.path.exists(_mlock):
+                _mpid = int(open(_mlock).read().strip())
+                if self._pid_alive(_mpid):
+                    _sp.run(["taskkill", "/F", "/PID", str(_mpid)], capture_output=True, timeout=5)
+                    _log(f"monitor_real.py detenido por lock (PID={_mpid})")
+                os.remove(_mlock)
+        except Exception:
+            pass
         self._copier_proc  = None
         self._monitor_proc = None
         _log("Bot y servicios auxiliares detenidos")
@@ -617,16 +689,14 @@ class BotManager:
     def restart(self):
         _log("Reiniciando bot...")
         self.stop()
-        # Esperar a que el proceso realmente muera
-        for _ in range(15):
-            time.sleep(1)
-            if not self.is_running and (not self.pid or not self._pid_alive(self.pid)):
-                break
-        # Forzar estado limpio
+        # FIX 2026-04-16: Asegurar estado limpio ANTES de start()
+        # stop() puede dejar .bot.pid vivo por race condition → start() cree que sigue corriendo
         self._proc = None
         self.pid = None
         self._running = False
-        time.sleep(2)
+        self._cleanup_pid_file()  # Forzar limpieza del PID file
+        time.sleep(2)  # Esperar que Windows libere el proceso completamente
+        self._cleanup_pid_file()  # Segundo intento por si el proceso escribió PID al morir
         self.start()
         self.restart_count += 1
         if self.is_running:
@@ -656,6 +726,10 @@ class BotManager:
             _bot_alive = self.is_running  # propiedad pura — no modifica self._running
             if not _bot_alive:
                 self._running = False  # marcar caído SÓLO aquí (no en is_running)
+                # FIX 2026-04-06c: Si el usuario pidió stop, NO reiniciar
+                if self._stop_requested:
+                    _log("Watchdog: bot detenido por usuario — NO reiniciando.")
+                    break  # Salir del watchdog loop
                 _consecutive_restarts += 1
                 if _consecutive_restarts > 3:
                     _wait = min(60 * _consecutive_restarts, 300)
@@ -815,7 +889,7 @@ class ManagementConsole:
         _status_frame = tk.Frame(self.root, bg="#0a0e14")
         _status_frame.pack(side="bottom", fill="x")
         self._status_bar = tk.Label(
-            _status_frame, text="BuySell365 Pro v5.0 | Bot: OFF",
+            _status_frame, text="BuySell365 Pro v6.0 | Bot: OFF",
             bg="#0a0e14", fg=TEXT_SEC, font=("Segoe UI", 9), anchor="w", padx=8
         )
         self._status_bar.pack(side="left", fill="x", expand=True)
@@ -1072,7 +1146,44 @@ class ManagementConsole:
             val_lbl.grid(row=i, column=3, sticky="w", pady=3)
             setattr(self, attr, val_lbl)
 
-        # ── Sección 3: Estado de Activos ──
+        # ── Sección 3: Signal Copier (VIP) ──
+        copier_frame = _make_section_frame(scroll_frame, "Signal Copier — Canal VIP")
+        copier_frame.pack(fill="x", padx=10, pady=5)
+
+        copier_grid = tk.Frame(copier_frame, bg=BG_PANEL)
+        copier_grid.pack(fill="x", padx=10, pady=4)
+        copier_grid.columnconfigure(1, weight=1)
+        copier_grid.columnconfigure(3, weight=1)
+
+        copier_labels_left = [
+            ("Estado Copier:", "_cop_status"),
+            ("Señales Hoy:",   "_cop_senales"),
+            ("Win Rate VIP:",  "_cop_winrate"),
+        ]
+        copier_labels_right = [
+            ("TPs / SLs:",      "_cop_tp_sl"),
+            ("Cierres (+):",    "_cop_closes"),
+            ("Pips Netos VIP:", "_cop_pips"),
+        ]
+        for i, (lbl_text, attr) in enumerate(copier_labels_left):
+            _make_label(copier_grid, lbl_text, fg=TEXT_SEC,
+                        font=("Segoe UI", 10)).grid(row=i, column=0, sticky="w", padx=(0, 8), pady=3)
+            val_lbl = _make_label(copier_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
+            val_lbl.grid(row=i, column=1, sticky="w", pady=3)
+            setattr(self, attr, val_lbl)
+
+        for i, (lbl_text, attr) in enumerate(copier_labels_right):
+            _make_label(copier_grid, lbl_text, fg=TEXT_SEC,
+                        font=("Segoe UI", 10)).grid(row=i, column=2, sticky="w", padx=(30, 8), pady=3)
+            val_lbl = _make_label(copier_grid, "--", fg=TEXT, font=("Segoe UI", 10, "bold"))
+            val_lbl.grid(row=i, column=3, sticky="w", pady=3)
+            setattr(self, attr, val_lbl)
+
+        # Mejor señal del día
+        self._cop_best = _make_label(copier_frame, "", fg=ACCENT, font=("Segoe UI", 9))
+        self._cop_best.pack(anchor="w", padx=10, pady=(0, 5))
+
+        # ── Sección 4: Estado de Activos ──
         traffic_frame = _make_section_frame(scroll_frame, "Estado de Activos")
         traffic_frame.pack(fill="x", padx=10, pady=5)
 
@@ -1098,11 +1209,15 @@ class ManagementConsole:
         conn_row.pack(fill="x", pady=4)
 
         self._conn_mt5 = _make_label(conn_row, "MT5  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
-        self._conn_mt5.pack(side="left", padx=20)
+        self._conn_mt5.pack(side="left", padx=15)
         self._conn_telegram = _make_label(conn_row, "Telegram  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
-        self._conn_telegram.pack(side="left", padx=20)
+        self._conn_telegram.pack(side="left", padx=15)
+        self._conn_copier = _make_label(conn_row, "Copier  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
+        self._conn_copier.pack(side="left", padx=15)
+        self._conn_ig = _make_label(conn_row, "Instagram  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
+        self._conn_ig.pack(side="left", padx=15)
         self._conn_web = _make_label(conn_row, "Web Sync  ●", fg=TEXT_SEC, font=("Segoe UI", 11))
-        self._conn_web.pack(side="left", padx=20)
+        self._conn_web.pack(side="left", padx=15)
 
         # Start MT5 capital refresh timer (every 30s)
         self.root.after(5000, self._refresh_mt5_capital_loop)
@@ -1112,9 +1227,10 @@ class ManagementConsole:
     def _show_about(self):
         messagebox.showinfo(
             "Acerca de BuySell365 Pro",
-            "BuySell365 Pro v5.0\n\n"
-            "Bot de trading automatizado con IA\n"
-            "Senales para EUR/USD, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD\n\n"
+            "BuySell365 Pro v6.0\n\n"
+            "Bot de trading + Signal Copier VIP + Instagram\n"
+            "Scalper: EUR/USD, NASDAQ, S&P 500, AUD/CAD, EUR/CHF, USD/CAD\n"
+            "Copier VIP: XAUUSD, NAS100, US30, Forex majors\n\n"
             "Creado por Emmanuel Diaz\n"
             "https://buysell365.pro\n\n"
             "(c) 2026 BuySell365. Todos los derechos reservados."
@@ -1332,11 +1448,11 @@ class ManagementConsole:
         self._news_tree.tag_configure("past", foreground="#4a5568")
         self._news_tree.tag_configure("upcoming_high", foreground="#ef4444", background="#1a0a0a",
                                        font=("Segoe UI", 10, "bold"))
-        self._news_tree.pack(fill="x", pady=(0, 5))
-
-        # Scrollbar
+        # Scrollbar — FIX 2026-04-16: faltaba .pack() — debe ir ANTES del tree
         scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self._news_tree.yview)
+        scrollbar.pack(side="right", fill="y")
         self._news_tree.configure(yscrollcommand=scrollbar.set)
+        self._news_tree.pack(side="left", fill="both", expand=True, pady=(0, 5))
 
         # Leyenda
         legend_frame = tk.Frame(scroll_frame, bg=BG_MAIN)
@@ -2502,12 +2618,9 @@ class ManagementConsole:
                    insertbackground=TEXT, font=("Segoe UI", 10),
                    relief="flat").pack(side="left", padx=5)
 
-        _make_label(spin_frame, "Dias de prueba gratis:", fg=TEXT).pack(side="left", padx=(20, 5))
-        self._vip_trial_var = tk.IntVar(value=7)
-        tk.Spinbox(spin_frame, from_=1, to=30, textvariable=self._vip_trial_var, width=6,
-                   bg=BG_INPUT, fg=TEXT, buttonbackground=BG_INPUT,
-                   insertbackground=TEXT, font=("Segoe UI", 10),
-                   relief="flat").pack(side="left", padx=5)
+        # FIX 2026-04-07: Trials desactivados — campo oculto pero variable preservada
+        self._vip_trial_var = tk.IntVar(value=0)
+        _make_label(spin_frame, "Prueba gratis: DESACTIVADA", fg="#ff4444").pack(side="left", padx=(20, 5))
 
         _make_button(vip_config_frame, "Guardar Config VIP", self._save_vip_config,
                      bg=ACCENT, fg="#000000").pack(anchor="w", pady=(5, 0))
@@ -2936,6 +3049,18 @@ class ManagementConsole:
         header = tk.Frame(self._tab_logs, bg=BG_MAIN)
         header.pack(fill="x", padx=10, pady=(10, 5))
 
+        # Selector de fuente de logs (Bot vs Copier)
+        self._log_source = tk.StringVar(value="Bot")
+        for src in ["Bot", "Copier"]:
+            rb_src = tk.Radiobutton(header, text=src, variable=self._log_source, value=src,
+                                    command=self._refresh_logs, bg=BG_MAIN, fg=ACCENT,
+                                    selectcolor=BG_INPUT, activebackground=BG_MAIN,
+                                    activeforeground=ACCENT_BRIGHT, font=("Segoe UI", 10, "bold"))
+            rb_src.pack(side="left", padx=5)
+
+        # Separador visual
+        _make_label(header, " | ", fg=TEXT_SEC, font=("Segoe UI", 9)).pack(side="left", padx=2)
+
         self._log_filter = tk.StringVar(value="Todos")
         for level in ["Todos", "INFO", "WARNING", "ERROR"]:
             rb = tk.Radiobutton(header, text=level, variable=self._log_filter, value=level,
@@ -2989,10 +3114,17 @@ class ManagementConsole:
         self._log_text.config(state="disabled")
 
     def _refresh_logs(self, *args):
-        if not os.path.exists(LOG_FILE):
+        # FIX 2026-04-16: Soporte para logs del Copier además del Bot
+        _src = getattr(self, '_log_source', None)
+        _log_path = COPIER_LOG_FILE if (_src and _src.get() == "Copier") else LOG_FILE
+        if not os.path.exists(_log_path):
+            self._log_text.config(state="normal")
+            self._log_text.delete("1.0", "end")
+            self._log_text.insert("end", f"Archivo no encontrado: {_log_path}\n", "WARNING")
+            self._log_text.config(state="disabled")
             return
         try:
-            with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+            with open(_log_path, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
         except Exception:
             return
@@ -3336,10 +3468,7 @@ class ManagementConsole:
         else:
             self._btn_restart.config(text="Reiniciar", state="normal", bg=WARN)
             self._restart_pending = False
-            if self.bot.is_running:
-                _log(f"Bot reiniciado OK — PID={self.bot.pid}")
-            else:
-                _log("Bot reiniciado (verificar estado)")
+            # restart() ya loguea "Bot reiniciado OK" — no duplicar aquí
 
     def _toggle_autostart(self):
         self.config["autostart_bot"] = self._autostart_var.get()
@@ -3435,7 +3564,14 @@ class ManagementConsole:
 
         # Update window title with P&L info (usar balance MT5 real si disponible)
         _cap_titulo = getattr(self, '_mt5_balance_real', capital)
-        self.root.title(f"BuySell365 Pro | ${_cap_titulo:.0f} | {pips_today:+.1f} pips hoy | {wins_today}W/{losses_today}L | Propiedad de Emmanuel Diaz")
+        # Incluir pips del copier VIP en el título
+        try:
+            _cop_day = _get_copier_stats_today()
+            _cop_pips_t = _cop_day.get("pips_total", 0)
+            _cop_info = f" | VIP: {_cop_pips_t:+.0f} pts" if _cop_pips_t != 0 else ""
+        except Exception:
+            _cop_info = ""
+        self.root.title(f"BuySell365 Pro | ${_cap_titulo:.0f} | {pips_today:+.1f} pips{_cop_info} | {wins_today}W/{losses_today}L | Propiedad de Emmanuel Diaz")
 
         self._dash_winrate.config(text=f"{win_rate:.1f}%",
                                   fg=WIN_COLOR if win_rate >= 50 else ERR)
@@ -3469,6 +3605,57 @@ class ManagementConsole:
                 fg=WIN_COLOR if active_count > 0 else TEXT
             )
 
+        # ── Signal Copier Stats ──
+        try:
+            cop = _get_copier_stats_today()
+            # Estado
+            _copier_lock = os.path.join(BASE_DIR, ".copier.lock")
+            _cop_running = False
+            try:
+                if os.path.exists(_copier_lock):
+                    with open(_copier_lock) as _lf:
+                        _cpid = int(_lf.read().strip())
+                    import psutil
+                    _cop_running = psutil.pid_exists(_cpid)
+            except Exception:
+                pass
+            if _cop_running:
+                self._cop_status.config(text="● Activo", fg=WIN_COLOR)
+            else:
+                self._cop_status.config(text="● Inactivo", fg=ERR)
+
+            _cop_total = cop.get("total", 0)
+            _cop_tps = cop.get("tps", 0)
+            _cop_sls = cop.get("sls", 0)
+            _cop_closes = cop.get("closes", 0)
+            _cop_pips = cop.get("pips_total", 0)
+            _cop_wr = cop.get("win_rate", 0)
+
+            self._cop_senales.config(text=f"{_cop_total}" if _cop_total > 0 else "0")
+            self._cop_tp_sl.config(
+                text=f"✅ {_cop_tps}  /  🛑 {_cop_sls}",
+                fg=WIN_COLOR if _cop_tps > _cop_sls else (ERR if _cop_sls > _cop_tps else TEXT))
+            self._cop_closes.config(
+                text=f"⚡ {_cop_closes}" if _cop_closes > 0 else "0",
+                fg=ACCENT if _cop_closes > 0 else TEXT)
+            self._cop_winrate.config(
+                text=f"{_cop_wr:.0f}%",
+                fg=WIN_COLOR if _cop_wr >= 50 else (WARN if _cop_wr >= 30 else ERR))
+            if _cop_pips >= 0:
+                self._cop_pips.config(text=f"+{_cop_pips:.0f}", fg=WIN_COLOR)
+            else:
+                self._cop_pips.config(text=f"{_cop_pips:.0f}", fg=ERR)
+
+            # Mejor señal
+            _best = cop.get("best")
+            if _best and _best.get("pips", 0) > 0:
+                _best_txt = f"🏆 Mejor: {_best['pair_display']} {_best.get('direction','')} +{_best['pips']:.0f} {_best.get('pips_unit','pts')}"
+                self._cop_best.config(text=_best_txt)
+            else:
+                self._cop_best.config(text="")
+        except Exception:
+            pass
+
         # Connections
         self._update_connections(estado)
 
@@ -3498,7 +3685,7 @@ class ManagementConsole:
         active_count = len(estado.get("operaciones_activas", {}))
         _cap_status = getattr(self, '_mt5_balance_real', capital)
         self._status_bar.config(
-            text=f"BuySell365 Pro v5.0 | Bot: {'ON' if self.bot.is_running else 'OFF'} | "
+            text=f"BuySell365 Pro v6.0 | Bot: {'ON' if self.bot.is_running else 'OFF'} | "
                  f"Activas: {active_count} | Capital: ${_cap_status:,.2f} | "
                  f"{datetime.now().strftime('%H:%M:%S')}"
         )
@@ -3523,6 +3710,35 @@ class ManagementConsole:
             self._conn_telegram.config(text="Telegram  \u25cf Configurado", fg=WARN)
         else:
             self._conn_telegram.config(text="Telegram  \u25cf Sin configurar", fg=ERR)
+
+        # Signal Copier
+        _copier_lock = os.path.join(BASE_DIR, ".copier.lock")
+        _copier_alive = False
+        try:
+            if os.path.exists(_copier_lock):
+                with open(_copier_lock) as _lf:
+                    _cpid = int(_lf.read().strip())
+                import psutil
+                if psutil.pid_exists(_cpid):
+                    _copier_alive = True
+        except Exception:
+            pass
+        if _copier_alive:
+            self._conn_copier.config(text="Copier  \u25cf Activo", fg=WIN_COLOR)
+        elif self.bot.is_running:
+            self._conn_copier.config(text="Copier  \u25cf Iniciando...", fg=WARN)
+        else:
+            self._conn_copier.config(text="Copier  \u25cf Inactivo", fg=ERR)
+
+        # Instagram
+        ig_user = env.get("IG_USERNAME", "")
+        ig_pass = env.get("IG_PASSWORD", "")
+        if ig_user and ig_pass and self.bot.is_running:
+            self._conn_ig.config(text="Instagram  \u25cf Conectado", fg=WIN_COLOR)
+        elif ig_user:
+            self._conn_ig.config(text="Instagram  \u25cf Configurado", fg=WARN)
+        else:
+            self._conn_ig.config(text="Instagram  \u25cf No config", fg=TEXT_SEC)
 
         # Web
         web_url = env.get("WEB_URL", "")
@@ -3672,7 +3888,40 @@ class ManagementConsole:
                                                      f"{pips:+.1f}", resultado, duracion),
                                              tags=(tag,))
 
-        # Summary
+        # ── Copier signals (from copier_stats.json) ──
+        try:
+            cop = _get_copier_stats_today()
+            for t in cop.get("trades", []):
+                _pair_d = t.get("pair_display", t.get("pair", "?"))
+                _dir = t.get("direction", "?")
+                _tipo = "COMPRA" if _dir.upper() == "BUY" else ("VENTA" if _dir.upper() == "SELL" else _dir)
+                _result = t.get("result", "?")
+                _pips = t.get("pips", 0)
+                _unit = t.get("pips_unit", "pts")
+                _closed = t.get("closed_at", 0)
+                _hora = datetime.fromtimestamp(_closed).strftime("%H:%M") if _closed > 0 else "--"
+                # Resultado legible
+                _res_map = {"tp": "TP ✅", "sl": "SL 🛑", "close_half": "Parcial 50%",
+                            "close_partial": "Parcial", "full_close": "Cierre Total"}
+                _resultado = _res_map.get(_result, _result)
+                # Tag
+                if _result == "tp" or (_result in ("close_half", "close_partial", "full_close") and _pips > 0):
+                    tag = "WIN"
+                    wins_today += 1
+                elif _result == "sl":
+                    tag = "LOSS"
+                    losses_today += 1
+                else:
+                    tag = "MANUAL"
+                _pips_txt = f"{_pips:+.0f} {_unit}"
+                pips_today += _pips if _result != "sl" else -_pips
+                self._senales_closed_tree.insert("", "end",
+                    values=(_hora, f"VIP {_pair_d}", _tipo, "--", "--", _pips_txt, _resultado, "--"),
+                    tags=(tag,))
+        except Exception:
+            pass
+
+        # Summary (incluye bot + copier)
         total_today = wins_today + losses_today
         self._senales_summary.config(
             text=f"Activas: {active_count} | Hoy: {wins_today}W / {losses_today}L | "

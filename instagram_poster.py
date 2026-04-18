@@ -57,6 +57,9 @@ _ig_lock = threading.Lock()
 # ── Cliente Instagram (singleton) ─────────────────────────────
 _ig_client = None
 
+# ── Highlight "TPs" — se crea automáticamente si no existe ────
+_highlight_tp_pk = None  # Se resuelve al primer TP
+
 
 def _get_client():
     """Obtiene o crea el cliente de Instagram con session caching.
@@ -95,6 +98,27 @@ def _get_client():
 
     except Exception as e:
         log.warning(f"Instagram login fallido: {e}")
+        return None
+
+
+def _get_or_create_tp_highlight(cl) -> Optional[str]:
+    """Obtiene el Highlight 'TPs' o lo crea si no existe. Retorna highlight_pk."""
+    global _highlight_tp_pk
+    if _highlight_tp_pk:
+        return _highlight_tp_pk
+    try:
+        user_id = cl.user_id
+        highlights = cl.user_highlights(user_id)
+        for h in highlights:
+            if h.title.upper() in ("TPS", "TP", "TPS ALCANZADOS"):
+                _highlight_tp_pk = h.pk
+                log.info(f"Instagram: Highlight '{h.title}' encontrado (pk={h.pk})")
+                return _highlight_tp_pk
+        # No existe — se creara al primer TP (necesita al menos 1 story)
+        log.info("Instagram: Highlight 'TPs' no existe, se creara con el primer TP")
+        return None
+    except Exception as e:
+        log.debug(f"Instagram highlight check error: {e}")
         return None
 
 
@@ -997,118 +1021,133 @@ def _generate_market_hours_image() -> Path:
 # ── Imagen promo de Instagram para Telegram ──────────────────
 
 def generate_ig_promo_image() -> Path:
-    """Genera imagen profesional de promo Instagram para el grupo Telegram.
-    Incluye logo Instagram real dibujado con PIL, gradiente de marca, y CTA."""
-    img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
-    _draw_gradient_bg(img, (10, 8, 20), (20, 14, 35))
+    """Genera imagen compacta y profesional de promo Instagram para Telegram.
+    Diseno minimalista: logo + handle + CTA. Sin listas largas."""
+    import math
+
+    # Imagen compacta (800x500) — se ve mejor en Telegram
+    W, H = 800, 500
+    img = Image.new("RGB", (W, H), (8, 10, 16))
     draw = ImageDraw.Draw(img)
 
-    font_brand = _get_font(32, bold=True)
-    font_big = _get_font(56, bold=True)
-    font_handle = _get_font(34, bold=True)
-    font_body = _get_font(30)
-    font_small = _get_font(24)
-    font_cta = _get_font(28, bold=True)
-    font_bullet = _get_font(28)
+    # ── Fondo: gradiente oscuro con tinte morado ──
+    for y in range(H):
+        t = y / H
+        r = int(8 + 12 * t)
+        g = int(10 + 6 * t)
+        b = int(16 + 20 * t)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
 
-    # ── Borde superior con gradiente Instagram ──
-    for y in range(10):
-        a = 1.0 - (y / 10)
-        ratio = y / 10
-        r = int((240 + (188 - 240) * ratio) * a)
-        g = int((148 + (24 - 148) * ratio) * a)
-        b = int((51 + (136 - 51) * ratio) * a)
-        draw.line([(0, y), (IMG_W, y)], fill=(r, g, b))
+    # ── Linea superior gradiente Instagram (fina, elegante) ──
+    for y in range(4):
+        ratio = y / 4
+        r = int(240 - 52 * ratio)
+        g = int(148 - 124 * ratio)
+        b = int(51 + 85 * ratio)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
 
-    # ── Brand arriba ──
-    draw.text((IMG_W // 2, 40), "BUYSELL365 PRO", fill=COLOR_WHITE,
-              font=font_brand, anchor="mt")
-    draw.line([(390, 78), (690, 78)], fill=COLOR_ACCENT, width=2)
+    # ── Tarjeta central ──
+    card_m = 40
+    _draw_rounded_rect(draw, [card_m, 28, W - card_m, H - 28],
+                       radius=20, fill=(14, 17, 24), outline=(40, 44, 55), width=1)
 
-    # ── Logo Instagram (dibujado con formas) ──
-    # Cuadrado redondeado con gradiente Instagram
-    ig_cx, ig_cy = IMG_W // 2, 230
-    ig_size = 140
+    # ── Logo Instagram (compacto, 80px) ──
+    ig_cx, ig_cy = W // 2, 105
+    ig_size = 80
+    corner_r = 18
 
-    # Fondo gradiente del logo
     for _dy in range(-ig_size // 2, ig_size // 2):
         for _dx in range(-ig_size // 2, ig_size // 2):
-            # Verificar que esta dentro del rectangulo redondeado
             ax, ay = abs(_dx), abs(_dy)
-            corner_r = 30
             in_rect = True
             if ax > ig_size // 2 - corner_r and ay > ig_size // 2 - corner_r:
                 dist = ((ax - (ig_size // 2 - corner_r)) ** 2 + (ay - (ig_size // 2 - corner_r)) ** 2) ** 0.5
                 if dist > corner_r:
                     in_rect = False
             if in_rect:
-                # Gradiente diagonal (naranja arriba-izq a morado abajo-der)
                 t = ((_dx + ig_size // 2) + (_dy + ig_size // 2)) / (ig_size * 2)
-                r = int(240 + (188 - 240) * t)
-                g = int(148 + (24 - 148) * t)
-                b = int(51 + (136 - 51) * t)
-                img.putpixel((ig_cx + _dx, ig_cy + _dy), (r, g, b))
+                cr = int(240 + (188 - 240) * t)
+                cg = int(148 + (24 - 148) * t)
+                cb = int(51 + (136 - 51) * t)
+                img.putpixel((ig_cx + _dx, ig_cy + _dy), (cr, cg, cb))
 
-    # Circulo central (lente de la camara)
-    for angle_step in range(360 * 4):
-        angle = angle_step / 4 * 3.14159 / 180
-        for radius in range(35, 42):
-            import math
-            px = int(ig_cx + radius * math.cos(angle))
-            py = int(ig_cy + radius * math.sin(angle))
-            if 0 <= px < IMG_W and 0 <= py < IMG_H:
+    # Circulo lente
+    for ang in range(360 * 4):
+        a = ang / 4 * math.pi / 180
+        for rad in range(20, 25):
+            px = int(ig_cx + rad * math.cos(a))
+            py = int(ig_cy + rad * math.sin(a))
+            if 0 <= px < W and 0 <= py < H:
                 img.putpixel((px, py), (255, 255, 255))
 
-    # Punto del flash (esquina superior derecha)
-    for _dy2 in range(-6, 7):
-        for _dx2 in range(-6, 7):
-            if _dx2 ** 2 + _dy2 ** 2 <= 36:
-                px2 = ig_cx + 40 + _dx2
-                py2 = ig_cy - 40 + _dy2
-                if 0 <= px2 < IMG_W and 0 <= py2 < IMG_H:
+    # Flash dot
+    for _dy2 in range(-4, 5):
+        for _dx2 in range(-4, 5):
+            if _dx2 ** 2 + _dy2 ** 2 <= 16:
+                px2 = ig_cx + 24 + _dx2
+                py2 = ig_cy - 24 + _dy2
+                if 0 <= px2 < W and 0 <= py2 < H:
                     img.putpixel((px2, py2), (255, 255, 255))
 
     draw = ImageDraw.Draw(img)
 
-    # ── Titulo ──
-    draw.text((IMG_W // 2, 340), "S\u00edguenos en", fill=COLOR_GRAY,
-              font=font_body, anchor="mt")
-    # "Instagram" con gradiente (simulado con color rosa)
-    draw.text((IMG_W // 2, 385), "Instagram", fill=(225, 48, 108),
-              font=_get_font(64, bold=True), anchor="mt")
+    # ── Brand sutil arriba ──
+    draw.text((W // 2, 48), "BUYSELL365 PRO", fill=(80, 88, 105),
+              font=_get_font(16, bold=True), anchor="mt")
 
     # ── Handle ──
-    _draw_rounded_rect(draw, [120, 475, IMG_W - 120, 535], radius=28,
-                       fill=(35, 20, 45), outline=(225, 48, 108), width=2)
-    draw.text((IMG_W // 2, 505), "@buysell365.pro_tradingsignals",
-              fill=COLOR_WHITE, font=font_handle, anchor="mm")
+    draw.text((W // 2, 162), "@buysell365.pro_tradingsignals",
+              fill=COLOR_WHITE, font=_get_font(22, bold=True), anchor="mt")
 
-    # ── Beneficios ──
-    benefits = [
-        ("\u2705  Resultados diarios verificados", COLOR_GREEN),
-        ("\U0001f3af  Celebraciones de cada TP en vivo", COLOR_GOLD),
-        ("\U0001f4ca  Estad\u00edsticas y win rate real", COLOR_ACCENT),
-        ("\U0001f4a1  Tips y motivaci\u00f3n de trading", (180, 130, 255)),
-        ("\U0001f50d  Transparencia total \u2014 sin filtros", COLOR_WHITE),
+    # ── Linea separadora rosa ──
+    draw.line([(W // 2 - 100, 198), (W // 2 + 100, 198)], fill=(225, 48, 108), width=2)
+
+    # ── Subtitulo ──
+    draw.text((W // 2, 218), "Resultados reales  |  TPs verificados  |  Sin filtros",
+              fill=(120, 128, 145), font=_get_font(16), anchor="mt")
+
+    # ── 3 Stats compactas ──
+    stats_y = 268
+    cols = [
+        ("24/7", "Senales", COLOR_GREEN),
+        ("100%", "Transparencia", (225, 48, 108)),
+        ("VIP", "Canal Activo", COLOR_GOLD),
     ]
-    y_pos = 580
-    for text, color in benefits:
-        _draw_rounded_rect(draw, [100, y_pos, IMG_W - 100, y_pos + 50], radius=10,
-                           fill=COLOR_CARD_BG)
-        draw.text((130, y_pos + 10), text, fill=color, font=font_bullet)
-        y_pos += 62
+    col_w = (W - card_m * 2) // 3
+    for i, (num, label, color) in enumerate(cols):
+        cx = card_m + col_w * i + col_w // 2
+        draw.text((cx, stats_y), num, fill=color,
+                  font=_get_font(30, bold=True), anchor="mt")
+        draw.text((cx, stats_y + 38), label, fill=(90, 98, 115),
+                  font=_get_font(13), anchor="mt")
 
-    # ── CTA ──
-    # Boton con gradiente Instagram
-    _draw_rounded_rect(draw, [150, 920, IMG_W - 150, 985], radius=30,
-                       fill=(225, 48, 108))
-    draw.text((IMG_W // 2, 952), "S\u00edguenos ahora \u2192",
-              fill=COLOR_WHITE, font=font_cta, anchor="mm")
+    # ── Boton CTA con gradiente Instagram ──
+    btn_w, btn_h = 260, 42
+    btn_x = (W - btn_w) // 2
+    btn_y = 365
+    for y in range(btn_h):
+        for x in range(btn_w):
+            ax2 = min(x, btn_w - 1 - x)
+            ay2 = min(y, btn_h - 1 - y)
+            r_btn = 21
+            in_btn = True
+            if ax2 < r_btn and ay2 < r_btn:
+                if (r_btn - ax2) ** 2 + (r_btn - ay2) ** 2 > r_btn ** 2:
+                    in_btn = False
+            if in_btn:
+                t = x / btn_w
+                cr = int(240 - 52 * t)
+                cg = int(148 - 124 * t)
+                cb = int(51 + 85 * t)
+                img.putpixel((btn_x + x, btn_y + y), (cr, cg, cb))
+
+    draw = ImageDraw.Draw(img)
+    draw.text((W // 2, btn_y + btn_h // 2), "Seguir en Instagram",
+              fill=COLOR_WHITE, font=_get_font(17, bold=True), anchor="mm")
 
     # ── Footer ──
-    draw.line([(200, 1010), (IMG_W - 200, 1010)], fill=(40, 46, 54), width=1)
-    draw.text((IMG_W // 2, 1030), "buysell365.pro  \u2022  Trading con IA",
-              fill=COLOR_GRAY, font=font_small, anchor="mt")
+    draw.text((W // 2, H - 42), "buysell365.pro",
+              fill=(50, 56, 68), font=_get_font(12), anchor="mt")
 
     filename = f"ig_promo_{int(time.time())}.jpg"
     filepath = IMAGES_DIR / filename
@@ -1117,15 +1156,104 @@ def generate_ig_promo_image() -> Path:
     return filepath
 
 
-# ── Generador de Reels (video con efecto Ken Burns) ──────────
+# ── Sonido cha-ching (generado en memoria) ───────────────────
+
+def _generate_cash_sound() -> Path:
+    """Genera sonido ka-ching de caja registradora realista."""
+    import numpy as np
+    import wave
+    cash_path = IMAGES_DIR / "cash_sound.wav"
+    # Siempre regenerar para usar la version mejorada
+    sr = 44100
+    dur = 1.2
+    t = np.linspace(0, dur, int(sr * dur), endpoint=False)
+    audio = np.zeros_like(t)
+
+    # === PARTE 1: "Ka" — golpe metalico del boton (0-0.15s) ===
+    ka_env = np.exp(-30 * t) * (t < 0.15).astype(float)
+    audio += 0.6 * ka_env * np.sin(2 * np.pi * 800 * t)   # tono bajo del mecanismo
+    audio += 0.3 * ka_env * np.sin(2 * np.pi * 1600 * t)  # armonico
+    # Click metalico
+    click_env = np.exp(-80 * t) * (t < 0.05).astype(float)
+    audio += 0.4 * click_env * np.random.randn(len(t))
+
+    # === PARTE 2: "CHING" — campana metalica brillante (0.12-1.2s) ===
+    ching_start = 0.12
+    ching_t = np.maximum(t - ching_start, 0)
+    ching_env = np.exp(-3.5 * ching_t) * (t >= ching_start).astype(float)
+    # Frecuencias de campana metalica (fundamental + armonicos inharmonicos)
+    audio += 0.7 * ching_env * np.sin(2 * np.pi * 3520 * t)    # La7 fundamental
+    audio += 0.5 * ching_env * np.sin(2 * np.pi * 5280 * t)    # armonico 1.5x
+    audio += 0.35 * ching_env * np.sin(2 * np.pi * 7040 * t)   # 2x (octava)
+    audio += 0.2 * ching_env * np.sin(2 * np.pi * 8800 * t)    # 2.5x
+    audio += 0.15 * ching_env * np.sin(2 * np.pi * 10560 * t)  # 3x (brillo)
+    # Shimmer metalico (modulacion de amplitud)
+    shimmer = 1.0 + 0.15 * np.sin(2 * np.pi * 12 * t)
+    audio *= shimmer
+
+    # === PARTE 3: Cajon abriendo (ruido filtrado sutil 0.08-0.4s) ===
+    drawer_env = np.exp(-8 * np.maximum(t - 0.08, 0)) * (t >= 0.08).astype(float) * (t < 0.5).astype(float)
+    audio += 0.12 * drawer_env * np.random.randn(len(t))
+
+    # === PARTE 4: Monedas cayendo (pings rapidos 0.25-0.6s) ===
+    for i, (off, freq) in enumerate([(0.25, 6000), (0.32, 7200), (0.38, 5500), (0.43, 8000), (0.48, 6800)]):
+        coin_env = np.exp(-25 * np.maximum(t - off, 0)) * (t >= off).astype(float)
+        audio += 0.15 * coin_env * np.sin(2 * np.pi * freq * t)
+
+    # Normalizar
+    audio = audio / np.max(np.abs(audio)) * 0.9
+    audio_16 = (audio * 32767).astype(np.int16)
+    with wave.open(str(cash_path), "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(audio_16.tobytes())
+    log.info("Sonido ka-ching generado")
+    return cash_path
+
+
+def _add_sound_to_video(video_path: Path) -> Path:
+    """Agrega sonido ka-ching al video: a los 3s (pips aparecen) y 4.5s (resultado)."""
+    import subprocess
+    try:
+        import imageio_ffmpeg
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return video_path
+
+    sound = _generate_cash_sound()
+    output = video_path.with_name(video_path.stem + "_sound.mp4")
+    # Sonido 1 a los 3s (pips en el grafico), sonido 2 a los 4.5s (pantalla resultado)
+    cmd = [
+        ffmpeg, "-y",
+        "-i", str(video_path),
+        "-i", str(sound),
+        "-i", str(sound),
+        "-filter_complex",
+        "[1:a]adelay=3000|3000,volume=1.0[c1];"
+        "[2:a]adelay=4500|4500,volume=0.7[c2];"
+        "[c1][c2]amix=inputs=2:duration=longest[aout]",
+        "-map", "0:v", "-map", "[aout]",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-shortest", str(output)
+    ]
+    result = subprocess.run(cmd, capture_output=True, timeout=30)
+    if result.returncode == 0 and output.exists():
+        log.info(f"Instagram: sonido ka-ching agregado -> {output.name}")
+        return output
+    log.warning(f"ffmpeg error: {result.stderr[-200:]}")
+    return video_path
+
+
+# ── Generador de Reels con velas reales MT5 ──────────────────
 
 def _generate_tp_reel_video(pair: str, direction: str, pips: str,
-                            tp_image_path: Path = None, duration_s: float = 8.0) -> Optional[Path]:
-    """Genera un Reel profesional con escenas animadas:
-    Escena 1: Logo + flash (1.5s)
-    Escena 2: Par + direccion aparece (2s)
-    Escena 3: Pips grandes con efecto (2s)
-    Escena 4: Imagen TP + CTA (2.5s)
+                            tp_image_path: Path = None, duration_s: float = 8.0,
+                            entry_price: float = 0, tp_price: float = 0) -> Optional[Path]:
+    """Genera Reel con velas reales de MT5 animadas + marca de agua + sonido cha-ching.
+    Escena 1: Velas apareciendo una a una con entry/TP (4.5s)
+    Escena 2: Resultado grande — par + pips (2s)
+    Escena 3: CTA — unirse al VIP (1.5s)
     """
     try:
         import imageio
@@ -1142,182 +1270,557 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
         is_buy = direction.upper() in ("BUY", "COMPRA")
         dir_color = COLOR_GREEN if is_buy else COLOR_RED
         dir_label = "COMPRA" if is_buy else "VENTA"
-        dir_icon = "\u25b2" if is_buy else "\u25bc"
 
         reel_path = IMAGES_DIR / f"reel_{pair.replace('/', '')}_{int(time.time())}.mp4"
         writer = imageio.get_writer(str(reel_path), fps=FPS, codec="libx264",
                                      quality=8, pixelformat="yuv420p",
                                      macro_block_size=2)
+        # ── Obtener velas reales de MT5 ──
+        candle_opens, candle_closes, candle_highs, candle_lows = None, None, None, None
+        try:
+            import MetaTrader5 as _mt5r
+            # FIX 2026-04-16: Mapa completo — incluye pares con slash (display names) y forex
+            _mt5r_map = {
+            "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD", "XAU/USD": "GOLD",
+            "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash", "NQ": "US100Cash",
+            "US30": "US30Cash", "DOW": "US30Cash", "DJ30": "US30Cash",
+            "US500": "US500Cash", "SP500": "US500Cash", "SPX500": "US500Cash",
+            # Forex — manejar tanto "GBPUSD" como "GBP/USD" (display name)
+            "EURUSD": "EURUSD", "EUR/USD": "EURUSD",
+            "GBPUSD": "GBPUSD", "GBP/USD": "GBPUSD",
+            "AUDUSD": "AUDUSD", "AUD/USD": "AUDUSD",
+            "USDJPY": "USDJPY", "USD/JPY": "USDJPY",
+            "USDCAD": "USDCAD", "USD/CAD": "USDCAD",
+            "USDCHF": "USDCHF", "USD/CHF": "USDCHF",
+            "NZDUSD": "NZDUSD", "NZD/USD": "NZDUSD",
+            "GBPJPY": "GBPJPY", "GBP/JPY": "GBPJPY",
+            "EURJPY": "EURJPY", "EUR/JPY": "EURJPY",
+            "GBPAUD": "GBPAUD", "GBP/AUD": "GBPAUD",
+            "GBPCAD": "GBPCAD", "GBP/CAD": "GBPCAD",
+            "EURCAD": "EURCAD", "EUR/CAD": "EURCAD",
+            "NZDCHF": "NZDCHF", "NZD/CHF": "NZDCHF",
+            }
+            # Limpiar slash del par antes de buscar en el mapa (fallback)
+            _pair_clean = pair.upper().replace("/", "")
+            _mt5r_sym = _mt5r_map.get(pair.upper(), _mt5r_map.get(_pair_clean, _pair_clean))
+            if _mt5r.initialize():
+                try:
+                    _mt5r.symbol_select(_mt5r_sym, True)
+                    _rates = _mt5r.copy_rates_from_pos(_mt5r_sym, _mt5r.TIMEFRAME_M15, 0, 40)
+                finally:
+                    _mt5r.shutdown()  # FIX 2026-04-16: shutdown siempre
+                if _rates is not None and len(_rates) >= 10:
+                    candle_opens = [float(r["open"]) for r in _rates]
+                    candle_closes = [float(r["close"]) for r in _rates]
+                    candle_highs = [float(r["high"]) for r in _rates]
+                    candle_lows = [float(r["low"]) for r in _rates]
+                    log.info(f"Reel: {len(_rates)} velas MT5 para {_mt5r_sym}")
+        except Exception as _e_mt5r:
+            log.debug(f"Reel: MT5 velas error: {_e_mt5r}")
 
-        # Cargar imagen TP si existe
-        tp_img = None
-        if tp_image_path and Path(tp_image_path).exists():
-            tp_img = Image.open(tp_image_path).convert("RGB")
+        has_candles = candle_opens is not None
+        n_candles = len(candle_opens) if has_candles else 0
+
+        # Chart geometry — FIX 2026-04-16: Chart más grande, usar más espacio vertical
+        chart_left, chart_right = 80, REEL_W - 40
+        chart_top, chart_bot = 400, 1500
+        chart_w = chart_right - chart_left
+        chart_h = chart_bot - chart_top
+
+        if has_candles:
+            p_min = min(candle_lows) - (max(candle_highs) - min(candle_lows)) * 0.05
+            p_max = max(candle_highs) + (max(candle_highs) - min(candle_lows)) * 0.05
+            candle_w = max(4, chart_w // n_candles - 2)
+        else:
+            p_min, p_max, candle_w = 0, 1, 10
+
+        def _p2y(price):
+            return int(chart_bot - (price - p_min) / max(p_max - p_min, 0.001) * chart_h)
+
+        # Pre-generar marca de agua
+        wm_font = _get_font(90, bold=True)
+        wm_layer = Image.new("RGBA", (REEL_W, REEL_H), (0, 0, 0, 0))
+        wm_draw = ImageDraw.Draw(wm_layer)
+        wm_color = (255, 255, 255, 18)
+        for wy in range(-400, REEL_H + 400, 300):
+            for wx in range(-200, REEL_W + 200, 700):
+                wm_draw.text((wx, wy), "BUYSELL365", fill=wm_color,
+                             font=wm_font, anchor="lt")
+        wm_rotated = wm_layer.rotate(30, expand=False, center=(REEL_W // 2, REEL_H // 2))
 
         for frame_i in range(total_frames):
-            t = frame_i / max(total_frames - 1, 1)
-            seconds = frame_i / FPS
-
+            sec = frame_i / FPS
             img = Image.new("RGB", (REEL_W, REEL_H), (10, 14, 22))
-            # Gradiente de fondo
-            for y in range(REEL_H):
-                ratio = y / REEL_H
-                r = int(8 + (18 - 8) * ratio)
-                g = int(12 + (24 - 12) * ratio)
-                b = int(20 + (35 - 20) * ratio)
-                for x in range(REEL_W):
-                    img.putpixel((x, y), (r, g, b))
             draw = ImageDraw.Draw(img)
 
-            # ── ESCENA 1: Logo + flash (0-1.5s) ──
-            if seconds < 1.5:
-                scene_t = seconds / 1.5
-                # Fade in del brand
-                alpha = min(scene_t * 2, 1.0)
-                brand_color = tuple(int(c * alpha) for c in COLOR_WHITE)
-                accent_color = tuple(int(c * alpha) for c in COLOR_ACCENT)
+            # Fondo gradiente
+            for y in range(0, REEL_H, 2):
+                t = y / REEL_H
+                c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
+                draw.line([(0, y), (REEL_W, y)], fill=c)
+                draw.line([(0, y + 1), (REEL_W, y + 1)], fill=c)
 
-                draw.text((REEL_W // 2, 750), "BUYSELL365",
-                          fill=brand_color, font=_get_font(80, bold=True), anchor="mt")
-                draw.text((REEL_W // 2, 850), "PRO",
-                          fill=accent_color, font=_get_font(60, bold=True), anchor="mt")
+            # Marca de agua
+            img = img.convert("RGBA")
+            img = Image.alpha_composite(img, wm_rotated)
+            img = img.convert("RGB")
+            draw = ImageDraw.Draw(img)
 
-                # Linea que crece
-                line_w = int(400 * min(scene_t * 1.5, 1.0))
-                if line_w > 0:
-                    draw.line([(REEL_W // 2 - line_w, 940),
-                               (REEL_W // 2 + line_w, 940)],
-                              fill=COLOR_GOLD, width=3)
+            # ── ESCENA 1: Velas animadas (0-4.5s) ──
+            # FIX 2026-04-16: Layout expandido — chart más grande, menos espacio vacío
+            if sec < 4.5 and has_candles:
+                scene_t = sec / 4.5
+                n_visible = max(1, int(scene_t * n_candles))
 
-                # Flash al final de la escena
-                if scene_t > 0.85:
-                    flash = int((scene_t - 0.85) / 0.15 * 60)
-                    for y in range(REEL_H):
-                        for x in range(REEL_W):
-                            px = img.getpixel((x, y))
-                            img.putpixel((x, y), tuple(min(p + flash, 255) for p in px))
-                    draw = ImageDraw.Draw(img)
+                draw.text((REEL_W // 2, 40), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(28, bold=True), anchor="mt")
+                draw.rounded_rectangle([100, 90, REEL_W - 100, 190], radius=20, fill=COLOR_GREEN)
+                draw.text((REEL_W // 2, 140), "TP ALCANZADO", fill=(10, 15, 10),
+                          font=_get_font(60, bold=True), anchor="mm")
+                draw.text((REEL_W // 2, 230), pair.upper(), fill=COLOR_WHITE,
+                          font=_get_font(90, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 340), dir_label, fill=dir_color,
+                          font=_get_font(44, bold=True), anchor="mt")
 
-            # ── ESCENA 2: TP ALCANZADO + Par (1.5-3.5s) ──
-            elif seconds < 3.5:
-                scene_t = (seconds - 1.5) / 2.0
+                # Chart box — más grande
+                draw.rounded_rectangle(
+                    [chart_left - 20, chart_top - 30, chart_right + 20, chart_bot + 30],
+                    radius=15, fill=(14, 17, 24), outline=(30, 34, 45), width=1)
+                for i in range(5):
+                    gy = chart_top + int(chart_h * i / 4)
+                    draw.line([(chart_left, gy), (chart_right, gy)], fill=(25, 30, 40), width=1)
+                    pl = p_max - (p_max - p_min) * i / 4
+                    draw.text((chart_right + 5, gy), f"{pl:.0f}", fill=(60, 66, 78),
+                              font=_get_font(16), anchor="lm")
 
-                # Barra verde TP ALCANZADO — slide in desde arriba
-                bar_y = int(-120 + 120 * min(scene_t * 3, 1.0))  # Slide down
-                if bar_y > -120:
-                    _draw_rounded_rect(draw, [80, 350 + bar_y, REEL_W - 80, 470 + bar_y],
-                                       radius=20, fill=COLOR_GREEN)
-                    draw.text((REEL_W // 2, 410 + bar_y), "TP ALCANZADO",
-                              fill=(10, 15, 10), font=_get_font(64, bold=True), anchor="mm")
+                # Candles — más grandes
+                for i in range(min(n_visible, n_candles)):
+                    x = chart_left + int(i * chart_w / n_candles)
+                    o_y, c_y = _p2y(candle_opens[i]), _p2y(candle_closes[i])
+                    h_y, l_y = _p2y(candle_highs[i]), _p2y(candle_lows[i])
+                    bull = candle_closes[i] >= candle_opens[i]
+                    color = COLOR_GREEN if bull else COLOR_RED
+                    cx = x + candle_w // 2
+                    draw.line([(cx, h_y), (cx, l_y)], fill=color, width=2)
+                    tb, bb = min(o_y, c_y), max(o_y, c_y)
+                    if bb - tb < 2:
+                        bb = tb + 2
+                    draw.rectangle([x, tb, x + candle_w, bb], fill=color)
 
-                # Par — fade in
-                if scene_t > 0.3:
-                    pair_alpha = min((scene_t - 0.3) / 0.4, 1.0)
-                    pair_color = tuple(int(c * pair_alpha) for c in COLOR_WHITE)
-                    draw.text((REEL_W // 2, 580), pair.upper(),
-                              fill=pair_color, font=_get_font(100, bold=True), anchor="mt")
+                # Entry line
+                if entry_price > 0 and p_min <= entry_price <= p_max:
+                    ey = _p2y(entry_price)
+                    for dx in range(chart_left, chart_right, 12):
+                        draw.line([(dx, ey), (dx + 6, ey)], fill=COLOR_ACCENT, width=2)
+                    draw.text((chart_left + 5, ey - 22), f"Entrada {entry_price:.0f}",
+                              fill=COLOR_ACCENT, font=_get_font(20, bold=True))
 
-                # Direccion — fade in
+                # TP line
+                if tp_price > 0 and p_min <= tp_price <= p_max:
+                    ty = _p2y(tp_price)
+                    for dx in range(chart_left, chart_right, 12):
+                        draw.line([(dx, ty), (dx + 6, ty)], fill=COLOR_GREEN, width=2)
+                    draw.text((chart_left + 5, ty - 22), f"TP {tp_price:.0f}",
+                              fill=COLOR_GREEN, font=_get_font(20, bold=True))
+
+                # Pips fade in — debajo del chart expandido
+                if scene_t > 0.6:
+                    alpha = min((scene_t - 0.6) / 0.3, 1.0)
+                    pc = tuple(int(c * alpha) for c in COLOR_GREEN)
+                    draw.text((REEL_W // 2, chart_bot + 60), pips, fill=pc,
+                              font=_get_font(100, bold=True), anchor="mt")
+
+                # Info adicional abajo
+                if scene_t > 0.8 and entry_price > 0:
+                    draw.text((REEL_W // 2, chart_bot + 180), f"Entrada: {entry_price:.0f}  |  TP: {tp_price:.0f}",
+                              fill=COLOR_GRAY, font=_get_font(30), anchor="mt")
+
+                draw.text((REEL_W // 2, REEL_H - 60), "buysell365.pro",
+                          fill=(40, 46, 58), font=_get_font(22), anchor="mt")
+
+            # ── ESCENA 2: Resultado (4.5-6.5s) — layout expandido ──
+            elif sec < 6.5:
+                scene_t = (sec - 4.5) / 2.0
+                draw.text((REEL_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(32, bold=True), anchor="mt")
+                draw.rounded_rectangle([80, 180, REEL_W - 80, 330], radius=25, fill=COLOR_GREEN)
+                draw.text((REEL_W // 2, 255), "TP ALCANZADO", fill=(10, 15, 10),
+                          font=_get_font(72, bold=True), anchor="mm")
+                draw.text((REEL_W // 2, 420), pair.upper(), fill=COLOR_WHITE,
+                          font=_get_font(110, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 570), dir_label, fill=dir_color,
+                          font=_get_font(54, bold=True), anchor="mt")
+                # Caja de pips más grande y centrada
+                draw.rounded_rectangle([60, 700, REEL_W - 60, 1100], radius=35,
+                                       fill=(10, 50, 20), outline=COLOR_GREEN, width=3)
+                draw.text((REEL_W // 2, 900), pips, fill=COLOR_GREEN,
+                          font=_get_font(150, bold=True), anchor="mm")
+                if scene_t > 0.3 and entry_price > 0:
+                    draw.text((REEL_W // 2, 1180), f"Entrada: {entry_price:.0f}",
+                              fill=COLOR_GRAY, font=_get_font(38), anchor="mt")
+                    draw.text((REEL_W // 2, 1240), f"Take Profit: {tp_price:.0f}",
+                              fill=COLOR_GREEN, font=_get_font(38), anchor="mt")
                 if scene_t > 0.5:
-                    dir_alpha = min((scene_t - 0.5) / 0.3, 1.0)
-                    d_color = tuple(int(c * dir_alpha) for c in dir_color)
-                    draw.text((REEL_W // 2, 710), f"{dir_icon} {dir_label}",
-                              fill=d_color, font=_get_font(50, bold=True), anchor="mt")
-
-                # Brand arriba
-                draw.text((REEL_W // 2, 100), "BUYSELL365 PRO",
-                          fill=(80, 90, 110), font=_get_font(32, bold=True), anchor="mt")
-
-            # ── ESCENA 3: PIPS grandes con efecto scale (3.5-5.5s) ──
-            elif seconds < 5.5:
-                scene_t = (seconds - 3.5) / 2.0
-
-                # Brand arriba
-                draw.text((REEL_W // 2, 100), "BUYSELL365 PRO",
-                          fill=(80, 90, 110), font=_get_font(32, bold=True), anchor="mt")
-
-                # Par arriba
-                draw.text((REEL_W // 2, 350), pair.upper(),
-                          fill=COLOR_GRAY, font=_get_font(48, bold=True), anchor="mt")
-
-                # Pips — escala de grande a normal (bounce effect)
-                scale_factor = 1.0 + max(0, (1.0 - scene_t * 2)) * 0.5
-                pips_size = int(130 * min(scale_factor, 1.5))
-                pips_font = _get_font(pips_size, bold=True)
-
-                # Caja verde de fondo
-                _draw_rounded_rect(draw, [80, 550, REEL_W - 80, 850],
-                                   radius=30, fill=(10, 50, 20))
-                _draw_rounded_rect(draw, [80, 550, REEL_W - 80, 850],
-                                   radius=30, fill=None, outline=(0, 160, 60), width=3)
-
-                draw.text((REEL_W // 2, 700), pips,
-                          fill=COLOR_GREEN, font=pips_font, anchor="mm")
-
-                # Texto bajo pips
-                if scene_t > 0.4:
-                    draw.text((REEL_W // 2, 920), "Otra se\u00f1al exitosa",
-                              fill=COLOR_GRAY, font=_get_font(36), anchor="mt")
-                    draw.text((REEL_W // 2, 970), "del Canal VIP",
+                    draw.text((REEL_W // 2, 1380), "Senal exitosa del Canal VIP",
                               fill=COLOR_GOLD, font=_get_font(40, bold=True), anchor="mt")
+                    draw.text((REEL_W // 2, 1460), "Unite — Link en bio",
+                              fill=COLOR_GRAY, font=_get_font(32), anchor="mt")
+                draw.text((REEL_W // 2, REEL_H - 80), "buysell365.pro",
+                          fill=(50, 56, 68), font=_get_font(24), anchor="mt")
 
-            # ── ESCENA 4: CTA final (5.5-8s) ──
+            # ── ESCENA 3: CTA (6.5-8s) — expandido ──
             else:
-                scene_t = (seconds - 5.5) / 2.5
-
-                # Si tenemos la imagen TP, mostrarla centrada
-                if tp_img:
-                    # Escalar imagen TP a caber en el reel
-                    tp_resized = tp_img.resize((900, 900), Image.LANCZOS)
-                    paste_x = (REEL_W - 900) // 2
-                    paste_y = 200
-                    img.paste(tp_resized, (paste_x, paste_y))
-                    draw = ImageDraw.Draw(img)
-
-                # Overlay oscuro abajo para CTA
-                for yy in range(REEL_H - 500, REEL_H):
-                    alpha_ov = min((yy - (REEL_H - 500)) / 250, 1.0) * 0.85
-                    for xx in range(REEL_W):
-                        px = img.getpixel((xx, yy))
-                        img.putpixel((xx, yy), tuple(int(p * (1 - alpha_ov)) for p in px))
-                draw = ImageDraw.Draw(img)
-
-                # CTA text
-                cta_alpha = min(scene_t * 2, 1.0)
-                cta_white = tuple(int(c * cta_alpha) for c in COLOR_WHITE)
-                cta_gold = tuple(int(c * cta_alpha) for c in COLOR_GOLD)
-                cta_accent = tuple(int(c * cta_alpha) for c in COLOR_ACCENT)
-
-                draw.text((REEL_W // 2, REEL_H - 380),
-                          "\u00bfQuieres estas se\u00f1ales?",
-                          fill=cta_white, font=_get_font(44, bold=True), anchor="mt")
-
-                # Boton CTA
+                scene_t = (sec - 6.5) / 1.5
+                draw.text((REEL_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(32, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 250), pair.upper(), fill=COLOR_GRAY,
+                          font=_get_font(60, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 350), pips, fill=COLOR_GREEN,
+                          font=_get_font(100, bold=True), anchor="mt")
+                draw.line([(REEL_W // 2 - 200, 500), (REEL_W // 2 + 200, 500)],
+                          fill=COLOR_GREEN, width=3)
+                alpha = min(scene_t * 2, 1.0)
+                cw = tuple(int(c * alpha) for c in COLOR_WHITE)
+                draw.text((REEL_W // 2, 580), "Quieres recibir", fill=cw,
+                          font=_get_font(52), anchor="mt")
+                draw.text((REEL_W // 2, 660), "estas senales?", fill=cw,
+                          font=_get_font(52), anchor="mt")
                 if scene_t > 0.3:
-                    btn_alpha = min((scene_t - 0.3) / 0.4, 1.0)
-                    btn_color = tuple(int(c * btn_alpha) for c in COLOR_ACCENT)
-                    _draw_rounded_rect(draw, [150, REEL_H - 290, REEL_W - 150, REEL_H - 210],
-                                       radius=30, fill=btn_color)
-                    draw.text((REEL_W // 2, REEL_H - 250),
-                              "\u00danete al VIP \u2014 Link en bio",
-                              fill=cta_white, font=_get_font(36, bold=True), anchor="mm")
-
-                # Web
-                draw.text((REEL_W // 2, REEL_H - 150), "buysell365.pro",
-                          fill=cta_gold, font=_get_font(32, bold=True), anchor="mt")
-
-                # Brand
-                draw.text((REEL_W // 2, REEL_H - 80), "BUYSELL365 PRO",
-                          fill=(60, 70, 90), font=_get_font(24, bold=True), anchor="mt")
+                    draw.rounded_rectangle([150, 790, REEL_W - 150, 900], radius=35, fill=COLOR_GREEN)
+                    draw.text((REEL_W // 2, 845), "UNIRSE AL CANAL VIP", fill=(10, 10, 16),
+                              font=_get_font(38, bold=True), anchor="mm")
+                if scene_t > 0.5:
+                    draw.text((REEL_W // 2, 980), "Link en bio", fill=COLOR_GRAY,
+                              font=_get_font(34), anchor="mt")
+                    draw.text((REEL_W // 2, 1040), "@BUYSELL_365_24_7", fill=COLOR_ACCENT,
+                              font=_get_font(38, bold=True), anchor="mt")
+                    draw.text((REEL_W // 2, 1150), "Senales en vivo con entrada,",
+                              fill=(100, 108, 120), font=_get_font(30), anchor="mt")
+                    draw.text((REEL_W // 2, 1200), "TP y SL exactos",
+                              fill=(100, 108, 120), font=_get_font(30), anchor="mt")
+                draw.text((REEL_W // 2, REEL_H - 80), "buysell365.pro",
+                          fill=(50, 56, 68), font=_get_font(24), anchor="mt")
 
             writer.append_data(np.array(img))
 
         writer.close()
-        log.info(f"Instagram: Reel profesional generado -> {reel_path.name}")
-        return reel_path
+        log.info(f"Instagram: Reel con velas reales generado -> {reel_path.name}")
+
+        # Agregar sonido cha-ching
+        final_path = _add_sound_to_video(reel_path)
+        return final_path
 
     except Exception as e:
+        # FIX 2026-04-16: Cerrar writer si falla durante la generación de frames
+        try:
+            writer.close()
+        except Exception:
+            pass
         log.warning(f"Instagram Reel generation error: {e}")
+        return None
+
+
+def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
+                                entry_price: float = 0, tp_price: float = 0,
+                                duration_s: float = 6.0,
+                                chart_image: bytes = None,
+                                header_text: str = "TP ALCANZADO") -> Optional[Path]:
+    """Genera video COMPACTO cuadrado (720x720) para Telegram CON VELAS ANIMADAS.
+    Escena 1: Velas reales de MT5 apareciendo una a una (0-3.5s)
+    Escena 2: Resultado grande + CTA (3.5-6s)
+    Fallback: si no hay velas MT5, usa chart_image estática con zoom.
+    """
+    try:
+        import imageio
+        import numpy as np
+    except ImportError:
+        log.warning("Telegram video: imageio/numpy no disponible")
+        return None
+
+    try:
+        TG_W, TG_H = 720, 720
+        FPS = 24
+        total_frames = int(duration_s * FPS)
+
+        is_buy = direction.upper() in ("BUY", "COMPRA")
+        dir_color = COLOR_GREEN if is_buy else COLOR_RED
+        dir_label = "COMPRA" if is_buy else "VENTA"
+
+        vid_path = IMAGES_DIR / f"tg_{pair.replace('/', '')}_{int(time.time())}.mp4"
+        writer = imageio.get_writer(str(vid_path), fps=FPS, codec="libx264",
+                                     quality=8, pixelformat="yuv420p",
+                                     macro_block_size=2)
+
+        # ── Obtener velas reales de MT5 ──
+        candle_opens, candle_closes, candle_highs, candle_lows = None, None, None, None
+        try:
+            import MetaTrader5 as _mt5t
+            _mt5_map = {
+                "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD", "XAU/USD": "GOLD",
+                "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+                "US30": "US30Cash", "DOW": "US30Cash",
+                "US500": "US500Cash", "SP500": "US500Cash",
+                "EURUSD": "EURUSD", "EUR/USD": "EURUSD",
+                "GBPUSD": "GBPUSD", "GBP/USD": "GBPUSD",
+                "AUDUSD": "AUDUSD", "AUD/USD": "AUDUSD",
+                "USDJPY": "USDJPY", "USD/JPY": "USDJPY",
+                "USDCAD": "USDCAD", "USD/CAD": "USDCAD",
+                "USDCHF": "USDCHF", "USD/CHF": "USDCHF",
+                "NZDUSD": "NZDUSD", "NZD/USD": "NZDUSD",
+                "GBPJPY": "GBPJPY", "GBP/JPY": "GBPJPY",
+                "EURJPY": "EURJPY", "EUR/JPY": "EURJPY",
+                "GBPAUD": "GBPAUD", "GBP/AUD": "GBPAUD",
+                "GBPCAD": "GBPCAD", "GBP/CAD": "GBPCAD",
+                "EURCAD": "EURCAD", "EUR/CAD": "EURCAD",
+                "NZDCHF": "NZDCHF", "NZD/CHF": "NZDCHF",
+            }
+            _pair_clean = pair.upper().replace("/", "")
+            _sym = _mt5_map.get(pair.upper(), _mt5_map.get(_pair_clean, _pair_clean))
+            if _mt5t.initialize():
+                try:
+                    _mt5t.symbol_select(_sym, True)
+                    _rates = _mt5t.copy_rates_from_pos(_sym, _mt5t.TIMEFRAME_M15, 0, 30)
+                finally:
+                    _mt5t.shutdown()
+                if _rates is not None and len(_rates) >= 10:
+                    candle_opens = [float(r["open"]) for r in _rates]
+                    candle_closes = [float(r["close"]) for r in _rates]
+                    candle_highs = [float(r["high"]) for r in _rates]
+                    candle_lows = [float(r["low"]) for r in _rates]
+                    log.info(f"Telegram video: {len(_rates)} velas MT5 para {_sym}")
+        except Exception as _e_mt5t:
+            log.debug(f"Telegram video: MT5 velas error: {_e_mt5t}")
+
+        has_candles = candle_opens is not None
+        n_candles = len(candle_opens) if has_candles else 0
+
+        # Chart geometry en cuadrado 720x720
+        chart_left, chart_right = 40, TG_W - 60
+        chart_top, chart_bot = 220, 560
+        chart_w = chart_right - chart_left
+        chart_h = chart_bot - chart_top
+
+        if has_candles:
+            p_min = min(candle_lows) - (max(candle_highs) - min(candle_lows)) * 0.05
+            p_max = max(candle_highs) + (max(candle_highs) - min(candle_lows)) * 0.05
+            candle_w = max(3, chart_w // n_candles - 2)
+        else:
+            p_min, p_max, candle_w = 0, 1, 10
+
+        def _p2y(price):
+            return int(chart_bot - (price - p_min) / max(p_max - p_min, 0.001) * chart_h)
+
+        # ── Fallback: chart image estática (si no hay velas MT5) ──
+        chart_img_base = None
+        if not has_candles and chart_image:
+            try:
+                import io as _io_chart
+                chart_img_base = Image.open(_io_chart.BytesIO(chart_image)).convert("RGB")
+                chart_img_base = chart_img_base.resize((TG_W, TG_H), Image.LANCZOS)
+                log.info(f"Telegram video: fallback gráfica estática (sin MT5)")
+            except Exception as _e_chart:
+                log.debug(f"Telegram video: error cargando gráfica: {_e_chart}")
+
+        has_chart = chart_img_base is not None
+
+        # Zoom suave: de 1.0 a 1.08 (solo para fallback estático)
+        zoom_start, zoom_end = 1.0, 1.08
+
+        for frame_i in range(total_frames):
+            sec = frame_i / FPS
+
+            # ── ESCENA 1: Velas MT5 animadas apareciendo una a una (0-3.5s) ──
+            if sec < 3.5 and has_candles:
+                scene_t = sec / 3.5
+                n_visible = max(1, int(scene_t * n_candles))
+
+                # Fondo oscuro con gradiente
+                img = Image.new("RGB", (TG_W, TG_H), (10, 14, 22))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, TG_H, 2):
+                    t = y / TG_H
+                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
+                    draw.line([(0, y), (TG_W, y)], fill=c)
+
+                # Header
+                draw.text((TG_W // 2, 15), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(18, bold=True), anchor="mt")
+                draw.rounded_rectangle([60, 45, TG_W - 60, 110], radius=14, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 77), header_text, fill=(10, 15, 10),
+                          font=_get_font(32, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 125), f"{pair.upper()}  {dir_label}",
+                          fill=COLOR_WHITE, font=_get_font(28, bold=True), anchor="mt")
+
+                # Chart box
+                draw.rounded_rectangle(
+                    [chart_left - 10, chart_top - 15, chart_right + 15, chart_bot + 15],
+                    radius=10, fill=(14, 17, 24), outline=(30, 34, 45), width=1)
+                # Grid lines + precios
+                for i in range(4):
+                    gy = chart_top + int(chart_h * i / 3)
+                    draw.line([(chart_left, gy), (chart_right, gy)], fill=(25, 30, 40), width=1)
+                    pl = p_max - (p_max - p_min) * i / 3
+                    draw.text((chart_right + 3, gy), f"{pl:.0f}" if pl >= 10 else f"{pl:.4f}",
+                              fill=(60, 66, 78), font=_get_font(11), anchor="lm")
+
+                # Velas — aparecen una por una
+                for i in range(min(n_visible, n_candles)):
+                    x = chart_left + int(i * chart_w / n_candles)
+                    o_y, c_y = _p2y(candle_opens[i]), _p2y(candle_closes[i])
+                    h_y, l_y = _p2y(candle_highs[i]), _p2y(candle_lows[i])
+                    bull = candle_closes[i] >= candle_opens[i]
+                    color = COLOR_GREEN if bull else COLOR_RED
+                    cx = x + candle_w // 2
+                    draw.line([(cx, h_y), (cx, l_y)], fill=color, width=1)
+                    tb, bb = min(o_y, c_y), max(o_y, c_y)
+                    if bb - tb < 2:
+                        bb = tb + 2
+                    draw.rectangle([x, tb, x + candle_w, bb], fill=color)
+
+                # Líneas Entrada / TP
+                if entry_price > 0 and p_min <= entry_price <= p_max:
+                    e_y = _p2y(entry_price)
+                    for _dx in range(0, chart_w, 8):
+                        draw.line([(chart_left + _dx, e_y), (chart_left + _dx + 4, e_y)],
+                                  fill=COLOR_ACCENT, width=2)
+                    draw.text((chart_right - 2, e_y - 8), f"E {entry_price:.0f}",
+                              fill=COLOR_ACCENT, font=_get_font(13, bold=True), anchor="rb")
+                if tp_price > 0 and p_min <= tp_price <= p_max:
+                    t_y = _p2y(tp_price)
+                    for _dx in range(0, chart_w, 8):
+                        draw.line([(chart_left + _dx, t_y), (chart_left + _dx + 4, t_y)],
+                                  fill=COLOR_GOLD, width=2)
+                    draw.text((chart_right - 2, t_y - 8), f"TP {tp_price:.0f}",
+                              fill=COLOR_GOLD, font=_get_font(13, bold=True), anchor="rb")
+
+                # Pips fade in (aparecen después del 50% de la escena)
+                if scene_t > 0.5:
+                    alpha_t = min((scene_t - 0.5) / 0.3, 1.0)
+                    pc = tuple(int(c * alpha_t) for c in COLOR_GREEN)
+                    draw.rounded_rectangle([100, 600, TG_W - 100, 680], radius=12,
+                                           fill=(10, 40, 18), outline=COLOR_GREEN, width=2)
+                    draw.text((TG_W // 2, 640), pips, fill=pc,
+                              font=_get_font(44, bold=True), anchor="mm")
+
+            # ── ESCENA 1 fallback: gráfica estática con zoom ──
+            elif sec < 3.5 and has_chart:
+                scene_t = sec / 3.5
+                t_smooth = scene_t * scene_t * (3 - 2 * scene_t)
+                zoom = zoom_start + (zoom_end - zoom_start) * t_smooth
+                zoomed_w = int(TG_W * zoom)
+                zoomed_h = int(TG_H * zoom)
+                zoomed = chart_img_base.resize((zoomed_w, zoomed_h), Image.LANCZOS)
+                cx = (zoomed_w - TG_W) // 2
+                cy = (zoomed_h - TG_H) // 2
+                img = zoomed.crop((cx, cy, cx + TG_W, cy + TG_H))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, 110):
+                    alpha = 0.75 - (y / 110) * 0.3
+                    for x in range(TG_W):
+                        px = img.getpixel((x, y))
+                        img.putpixel((x, y), tuple(int(p * (1 - alpha)) for p in px))
+                draw = ImageDraw.Draw(img)
+                draw.text((TG_W // 2, 8), "BUYSELL365 PRO", fill=(180, 190, 200),
+                          font=_get_font(16, bold=True), anchor="mt")
+                draw.rounded_rectangle([100, 30, TG_W - 100, 80], radius=12, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 55), header_text, fill=(10, 15, 10),
+                          font=_get_font(32, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 92), f"{pair.upper()}  {dir_label}",
+                          fill=COLOR_WHITE, font=_get_font(20, bold=True), anchor="mt")
+                if scene_t > 0.5:
+                    for y in range(TG_H - 100, TG_H):
+                        alpha = ((y - (TG_H - 100)) / 100) * 0.8
+                        for x in range(TG_W):
+                            px = img.getpixel((x, y))
+                            img.putpixel((x, y), tuple(int(p * (1 - alpha)) for p in px))
+                    draw = ImageDraw.Draw(img)
+                    alpha_t = min((scene_t - 0.5) / 0.3, 1.0)
+                    pc = tuple(int(c * alpha_t) for c in COLOR_GREEN)
+                    draw.text((TG_W // 2, TG_H - 55), pips, fill=pc,
+                              font=_get_font(52, bold=True), anchor="mm")
+
+            # ── ESCENA 1 sin gráfica: fondo oscuro con texto ──
+            elif sec < 3.5:
+                scene_t = sec / 3.5
+                img = Image.new("RGB", (TG_W, TG_H), (13, 17, 23))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, TG_H, 2):
+                    t = y / TG_H
+                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
+                    draw.line([(0, y), (TG_W, y)], fill=c)
+
+                draw.text((TG_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(24, bold=True), anchor="mt")
+                draw.rounded_rectangle([100, 140, TG_W - 100, 220], radius=16, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 180), header_text, fill=(10, 15, 10),
+                          font=_get_font(48, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 270), pair.upper(), fill=COLOR_WHITE,
+                          font=_get_font(64, bold=True), anchor="mt")
+                draw.text((TG_W // 2, 360), dir_label, fill=dir_color,
+                          font=_get_font(36, bold=True), anchor="mt")
+                if scene_t > 0.4:
+                    draw.text((TG_W // 2, 460), pips, fill=COLOR_GREEN,
+                              font=_get_font(80, bold=True), anchor="mt")
+                if scene_t > 0.7 and entry_price > 0:
+                    draw.text((TG_W // 2, 580), f"Entrada: {entry_price:.0f}  |  TP: {tp_price:.0f}",
+                              fill=COLOR_GRAY, font=_get_font(22), anchor="mt")
+
+            # ── ESCENA 2: Resultado + CTA (3.5-6s) ──
+            else:
+                scene_t = (sec - 3.5) / 2.5
+                img = Image.new("RGB", (TG_W, TG_H), (10, 14, 22))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, TG_H, 2):
+                    t = y / TG_H
+                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
+                    draw.line([(0, y), (TG_W, y)], fill=c)
+
+                draw.text((TG_W // 2, 15), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(20, bold=True), anchor="mt")
+                draw.rounded_rectangle([100, 50, TG_W - 100, 120], radius=16, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 85), header_text, fill=(10, 15, 10),
+                          font=_get_font(44, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 150), pair.upper(), fill=COLOR_WHITE,
+                          font=_get_font(64, bold=True), anchor="mt")
+                draw.text((TG_W // 2, 230), dir_label, fill=dir_color,
+                          font=_get_font(34, bold=True), anchor="mt")
+
+                draw.rounded_rectangle([60, 290, TG_W - 60, 460], radius=22,
+                                       fill=(10, 50, 20), outline=COLOR_GREEN, width=2)
+                draw.text((TG_W // 2, 375), pips, fill=COLOR_GREEN,
+                          font=_get_font(90, bold=True), anchor="mm")
+
+                if scene_t > 0.2 and entry_price > 0:
+                    draw.text((TG_W // 2, 490), f"Entrada: {entry_price:.0f}",
+                              fill=COLOR_GRAY, font=_get_font(24), anchor="mt")
+                    draw.text((TG_W // 2, 525), f"Take Profit: {tp_price:.0f}",
+                              fill=COLOR_GREEN, font=_get_font(24), anchor="mt")
+                if scene_t > 0.4:
+                    draw.text((TG_W // 2, 580), "Senal exitosa del Canal VIP",
+                              fill=COLOR_GOLD, font=_get_font(26, bold=True), anchor="mt")
+                if scene_t > 0.6:
+                    alpha_cta = min((scene_t - 0.6) / 0.3, 1.0)
+                    cw = tuple(int(c * alpha_cta) for c in COLOR_WHITE)
+                    draw.text((TG_W // 2, 635), "Unite al VIP — /vip",
+                              fill=cw, font=_get_font(22, bold=True), anchor="mt")
+                    draw.text((TG_W // 2, 670), "buysell365.pro",
+                              fill=tuple(int(c * alpha_cta) for c in (50, 56, 68)),
+                              font=_get_font(18), anchor="mt")
+
+            writer.append_data(np.array(img))
+
+        writer.close()
+        log.info(f"Telegram: Video compacto 720x720 con gráfica real -> {vid_path.name}")
+
+        final_path = _add_sound_to_video(vid_path)
+        return final_path
+
+    except Exception as e:
+        try:
+            writer.close()
+        except Exception:
+            pass
+        log.warning(f"Telegram video generation error: {e}")
         return None
 
 
@@ -1455,9 +1958,138 @@ def _draw_gradient_bg_custom(img: Image.Image, color_top: tuple, color_bottom: t
 
 # ── Funciones publicas (llamadas desde signal_copier.py) ──────
 
+# ── Traducción multi-idioma con Groq (ES → EN + PT) ───────────
+_groq_ig_client = None
+
+def _get_groq_client():
+    global _groq_ig_client
+    if _groq_ig_client is not None:
+        return _groq_ig_client
+    _key = os.getenv("GROQ_API_KEY", "")
+    if not _key:
+        return None
+    try:
+        from groq import Groq as _GroqClient
+        _groq_ig_client = _GroqClient(api_key=_key)
+        return _groq_ig_client
+    except Exception as _e:
+        log.debug(f"Groq no disponible para IG: {_e}")
+        return None
+
+
+def _translate_to_en_pt(text_es: str) -> tuple:
+    """Traduce ES → (EN, PT) usando Groq. Si falla, devuelve ("", "")."""
+    cl = _get_groq_client()
+    if not cl or not text_es.strip():
+        return ("", "")
+    try:
+        prompt = (
+            "Translate this Spanish Instagram caption to English and Portuguese (Brazil). "
+            "Keep emojis, line breaks, and tone. Return ONLY this exact format:\n"
+            "EN:\n<english translation>\n---\nPT:\n<portuguese translation>\n\n"
+            f"SPANISH CAPTION:\n{text_es}"
+        )
+        resp = cl.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            max_tokens=500,
+            temperature=0.3,
+        )
+        raw = resp.choices[0].message.content.strip()
+        en_part, pt_part = "", ""
+        if "EN:" in raw and "PT:" in raw:
+            after_en = raw.split("EN:", 1)[1]
+            en_part = after_en.split("---", 1)[0].strip() if "---" in after_en else ""
+            pt_part = raw.split("PT:", 1)[1].strip()
+        return (en_part, pt_part)
+    except Exception as _e:
+        log.debug(f"Traducción Groq falló: {_e}")
+        return ("", "")
+
+
+def _build_multilang_caption(caption_es: str, hashtags: str = "") -> str:
+    """Combina ES + EN + PT en una sola caption IG. Si falla traducción, solo ES."""
+    en, pt = _translate_to_en_pt(caption_es.replace(hashtags, "").strip() if hashtags else caption_es)
+    blocks = [caption_es.replace(hashtags, "").strip() if hashtags else caption_es]
+    if en:
+        blocks.append(f"━━━━━━━━━━\n🇬🇧 {en}")
+    if pt:
+        blocks.append(f"━━━━━━━━━━\n🇧🇷 {pt}")
+    out = "\n\n".join(blocks)
+    if hashtags and hashtags not in out:
+        out += f"\n\n{hashtags}"
+    # Instagram caption max 2200 chars
+    return out[:2180]
+
+
+def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIUM") -> bool:
+    """Publica SOLO una Story de teaser cuando hay nueva señal VIP.
+    No revela entrada/SL/TP — solo dirige al link en bio. Preserva exclusividad VIP."""
+    if not IG_ENABLED:
+        return False
+
+    def _do_post():
+        with _ig_lock:
+            try:
+                cl = _get_client()
+                if not cl:
+                    log.warning("Instagram: no se pudo conectar para teaser Story VIP")
+                    return
+
+                # Imagen 1080x1920 (formato Story) con teaser
+                img = Image.new("RGB", (1080, 1920), COLOR_BG)
+                _draw_gradient_bg(img, (15, 20, 30), (5, 8, 14))
+                draw = ImageDraw.Draw(img)
+
+                dir_emoji = "🟢" if direction.upper() in ("COMPRA", "BUY") else "🔴"
+                dir_text = "COMPRA / BUY" if direction.upper() in ("COMPRA", "BUY") else "VENTA / SELL"
+
+                # Título
+                f_title = _get_font(110, bold=True)
+                f_pair = _get_font(180, bold=True)
+                f_sub = _get_font(60, bold=True)
+                f_cta = _get_font(72, bold=True)
+                f_small = _get_font(44)
+
+                draw.text((540, 280), "⚡ NUEVA SEÑAL VIP", font=f_title, fill=COLOR_GOLD, anchor="mm")
+                draw.text((540, 420), "⚡ NEW VIP SIGNAL", font=f_small, fill=COLOR_GRAY, anchor="mm")
+
+                # Par grande
+                draw.text((540, 680), pair.upper(), font=f_pair, fill=COLOR_WHITE, anchor="mm")
+
+                # Dirección
+                color_dir = COLOR_GREEN if direction.upper() in ("COMPRA", "BUY") else COLOR_RED
+                draw.text((540, 880), f"{dir_emoji} {dir_text}", font=f_sub, fill=color_dir, anchor="mm")
+
+                # Nivel
+                draw.text((540, 980), f"⭐ {nivel}", font=f_small, fill=COLOR_ACCENT, anchor="mm")
+
+                # CTA bloque
+                _draw_rounded_rect(draw, (140, 1280, 940, 1540), 40, fill=COLOR_ACCENT)
+                draw.text((540, 1380), "🔓 DESBLOQUEA LA SEÑAL", font=f_cta, fill=COLOR_WHITE, anchor="mm")
+                draw.text((540, 1460), "Link en bio · Link in bio", font=f_small, fill=COLOR_WHITE, anchor="mm")
+
+                draw.text((540, 1720), "@BuySell365.pro", font=f_small, fill=COLOR_GRAY, anchor="mm")
+                draw.text((540, 1790), "Señales · Signals · Sinais", font=f_small, fill=COLOR_GRAY, anchor="mm")
+
+                story_path = IMAGES_DIR / f"teaser_{pair}_{int(time.time())}.jpg"
+                img.save(str(story_path), "JPEG", quality=92)
+
+                cl.photo_upload_to_story(story_path)
+                log.info(f"Instagram: teaser Story VIP {pair} {direction} publicado OK")
+            except Exception as _e:
+                log.warning(f"Instagram teaser Story error: {_e}")
+
+    threading.Thread(target=_do_post, daemon=True, name="ig_vip_teaser").start()
+    return True
+
+
 def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
-                        pips: str, source: str = "") -> bool:
-    """Genera imagen de TP y publica en Instagram (post + Story + Reel). Thread-safe."""
+                        pips: str, source: str = "", chart_path=None,
+                        reel_entry: float = 0, reel_tp: float = 0,
+                        is_gift: bool = False) -> bool:
+    """Publica TP en Instagram: carrusel + Story + Highlight + Reel con velas.
+    chart_path: JPG del gráfico. reel_entry/reel_tp: precios para el Reel animado."""
     if not IG_ENABLED:
         return False
 
@@ -1471,44 +2103,104 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                     return
 
                 hashtags = _get_hashtags("tp", pair)
-                caption = (
-                    f"TP ALCANZADO {pair.upper()} {pips}\n\n"
-                    f"Otra se\u00f1al exitosa de nuestro Canal VIP\n\n"
-                    f"Nuestros miembros recibieron esta se\u00f1al "
-                    f"antes de que el mercado se moviera.\n\n"
-                    f"\u00bfQuieres recibir las pr\u00f3ximas?\n"
-                    f"Link en bio para unirte\n\n"
-                    f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram\n\n"
-                    f"{hashtags}"
-                )
+                if is_gift:
+                    caption_es = (
+                        f"🎁 SENAL GRATIS GANADORA 🎁 {pair.upper()} {pips}\n\n"
+                        f"Esta senal la regalamos HOY en nuestro grupo publico\n"
+                        f"y fue GANADORA\n\n"
+                        f"Todos los dias regalamos senales en el grupo\n"
+                        f"Imaginate lo que pasa en el Canal VIP\n\n"
+                        f"Unite — Link en bio\n"
+                        f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram"
+                    )
+                else:
+                    caption_es = (
+                        f"TP ALCANZADO {pair.upper()} {pips}\n\n"
+                        f"Otra senal exitosa de nuestro Canal VIP\n\n"
+                        f"Nuestros miembros recibieron esta senal "
+                        f"antes de que el mercado se moviera.\n\n"
+                        f"Quieres recibir las proximas?\n"
+                        f"Link en bio para unirte\n\n"
+                        f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram"
+                    )
+                caption = _build_multilang_caption(caption_es, hashtags)
 
-                # 1) Post normal
-                cl.photo_upload(image_path, caption)
-                log.info(f"Instagram: TP {pair} post publicado OK")
+                # 1) Post — carrusel si tenemos gráfico, foto sola si no
+                _chart_ok = chart_path and Path(str(chart_path)).exists()
+                if _chart_ok:
+                    # Redimensionar chart a 1080x1080 para Instagram (mismo que imagen TP)
+                    try:
+                        _chart_img = Image.open(str(chart_path))
+                        _chart_sq = _chart_img.resize((IMG_W, IMG_H), Image.LANCZOS)
+                        _chart_sq_path = Path(str(chart_path)).with_name(
+                            Path(str(chart_path)).stem + "_sq.jpg"
+                        )
+                        _chart_sq.save(str(_chart_sq_path), "JPEG", quality=95)
+                        # Carrusel: [celebración, gráfico]
+                        cl.album_upload([image_path, _chart_sq_path], caption)
+                        log.info(f"Instagram: TP {pair} CARRUSEL publicado OK (celebracion + grafico)")
+                    except Exception as _e_album:
+                        log.warning(f"Instagram album error, fallback a foto: {_e_album}")
+                        cl.photo_upload(image_path, caption)
+                        log.info(f"Instagram: TP {pair} post publicado OK (sin carrusel)")
+                else:
+                    cl.photo_upload(image_path, caption)
+                    log.info(f"Instagram: TP {pair} post publicado OK")
 
-                # 2) Story
+                # 2) Story + agregar al Highlight "TPs"
                 time.sleep(random.randint(3, 8))
                 try:
-                    cl.photo_upload_to_story(image_path)
-                    log.info(f"Instagram: TP {pair} Story publicada OK")
+                    story = cl.photo_upload_to_story(image_path)
+                    story_id = story.pk if story else None
+                    log.info(f"Instagram: TP {pair} Story publicada OK (id={story_id})")
+
+                    # Agregar al Highlight "TPs"
+                    if story_id:
+                        time.sleep(random.randint(2, 5))
+                        try:
+                            global _highlight_tp_pk
+                            _hl_pk = _get_or_create_tp_highlight(cl)
+                            if _hl_pk:
+                                cl.highlight_add_stories(_hl_pk, [str(story_id)])
+                                log.info(f"Instagram: Story agregada al Highlight TPs")
+                            else:
+                                # Crear Highlight con esta primera Story
+                                hl = cl.highlight_create("TPs", [str(story_id)])
+                                _highlight_tp_pk = hl.pk
+                                log.info(f"Instagram: Highlight 'TPs' CREADO (pk={hl.pk})")
+                        except Exception as e_hl:
+                            log.warning(f"Instagram Highlight error: {e_hl}")
+
                 except Exception as e_st:
                     log.warning(f"Instagram Story error: {e_st}")
 
-                # 3) Reel con video profesional
-                time.sleep(random.randint(5, 15))
+                # 3) Reel con velas reales animadas + sonido
+                time.sleep(random.randint(5, 12))
                 try:
-                    reel_path = _generate_tp_reel_video(pair, direction, pips, image_path)
-                    if reel_path and reel_path.exists():
-                        thumbnail = _generate_reel_thumbnail(pair, pips, direction)
+                    _r_entry = reel_entry if reel_entry > 0 else entry
+                    _r_tp = reel_tp if reel_tp > 0 else tp
+                    reel_path = _generate_tp_reel_video(
+                        pair, direction, pips,
+                        entry_price=_r_entry, tp_price=_r_tp)
+                    if reel_path and Path(reel_path).exists():
                         reel_hashtags = _get_hashtags("reel", pair)
-                        reel_caption = (
-                            f"TP ALCANZADO {pair.upper()} {pips}\n\n"
-                            f"Se\u00f1al del Canal VIP\n"
-                            f"\u00danete \u2014 Link en bio\n\n"
-                            f"{reel_hashtags}"
-                        )
-                        cl.clip_upload(reel_path, reel_caption, thumbnail)
-                        log.info(f"Instagram: TP {pair} Reel publicado OK")
+                        if is_gift:
+                            reel_caption = (
+                                f"🎁 SENAL GRATIS GANADORA {pair.upper()} {pips}\n\n"
+                                f"Senal del Canal VIP\n"
+                                f"Unite — Link en bio\n\n"
+                                f"{reel_hashtags}"
+                            )
+                        else:
+                            reel_caption = (
+                                f"TP ALCANZADO {pair.upper()} {pips}\n\n"
+                                f"Senal del Canal VIP\n"
+                                f"Unite — Link en bio\n\n"
+                                f"{reel_hashtags}"
+                            )
+                        thumbnail = _generate_reel_thumbnail(pair, pips, direction)
+                        cl.clip_upload(Path(reel_path), reel_caption, thumbnail)
+                        log.info(f"Instagram: TP {pair} REEL con velas publicado OK")
                 except Exception as e_rl:
                     log.warning(f"Instagram Reel error: {e_rl}")
 

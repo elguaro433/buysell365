@@ -42,19 +42,31 @@ log = logging.getLogger("monitor_real")
 # ── Helpers ────────────────────────────────────────────────────
 
 def _pip_size(symbol: str) -> float:
-    """Retorna el tamaño de pip para calcular pips desde precio."""
+    """Retorna el tamaño de pip para calcular pips desde precio.
+    FIX 2026-04-17: Oro/índices/crypto miden en PUNTOS directos (pip=1.0), no décimas.
+    Antes GOLD=0.1 inflaba puntos x10; BTC caía a forex default generando 760M pips."""
     s = symbol.upper()
     if "JPY" in s:
         return 0.01
+    # Oro, índices, crypto → PUNTOS directos (pip=1.0)
     if any(x in s for x in ["GOLD", "XAUUSD", "GC"]):
-        return 0.1
+        return 1.0
     if any(x in s for x in ["NAS", "US100", "NDX"]):
         return 1.0
     if any(x in s for x in ["SPX", "US500", "SP500"]):
         return 1.0
-    if any(x in s for x in ["US30", "DOW", "DJI"]):
+    if any(x in s for x in ["US30", "DOW", "DJI", "DAX", "GER40", "UK100", "FTSE"]):
         return 1.0
-    return 0.0001  # Forex estándar
+    if any(x in s for x in ["BTC", "ETH", "BITCOIN"]):
+        return 1.0
+    # Petróleo → 0.01 (resolución céntimos)
+    if any(x in s for x in ["BRENT", "OIL", "WTI", "USOIL", "UKOIL"]):
+        return 0.01
+    # Forex clásico 6-letras → 0.0001
+    if len(s) == 6 and s.isalpha():
+        return 0.0001
+    # Fallback seguro (evita bug BTC): pip=1.0 en vez de 0.0001
+    return 1.0
 
 
 def _pips(symbol: str, price_open: float, price_close: float, is_buy: bool) -> float:
@@ -227,5 +239,56 @@ def main():
         time.sleep(CHECK_INTERVAL)
 
 
+def _ensure_single_instance():
+    """FIX 2026-04-17: Lock file para prevenir acumulación de instancias zombis.
+    Antes cada reinicio del launcher dejaba un monitor_real huérfano (8 acumulados).
+    Patrón idéntico al de signal_copier.py: si hay PID vivo en lock, salir.
+    Si hay PID muerto o sin lock, tomar el turno."""
+    import sys
+    lock_file = Path(__file__).parent / ".monitor_real.lock"
+    my_pid = os.getpid()
+
+    def _pid_alive(pid: int) -> bool:
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+        except Exception:
+            pass
+        return False
+
+    # Si hay lock existente con PID vivo → otro proceso corre, salir
+    if lock_file.exists():
+        try:
+            old_pid = int(lock_file.read_text().strip())
+            if old_pid != my_pid and _pid_alive(old_pid):
+                log.info(f"📡 Otra instancia monitor_real corriendo (PID={old_pid}). Saliendo.")
+                sys.exit(0)
+        except Exception:
+            pass  # Lock corrupto → sobrescribir
+
+    # Tomar el turno: escribir nuestro PID
+    try:
+        lock_file.write_text(str(my_pid))
+    except Exception as e:
+        log.warning(f"No se pudo escribir lock: {e}")
+
+    # Limpiar lock al salir (best-effort)
+    import atexit
+    def _cleanup():
+        try:
+            if lock_file.exists():
+                current = int(lock_file.read_text().strip())
+                if current == my_pid:
+                    lock_file.unlink()
+        except Exception:
+            pass
+    atexit.register(_cleanup)
+
+
 if __name__ == "__main__":
+    _ensure_single_instance()
     main()

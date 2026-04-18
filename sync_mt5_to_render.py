@@ -15,31 +15,85 @@ SYNC_SECRET = os.getenv("SYNC_SECRET", "buysell365_sync_2026")
 DIAS       = int(sys.argv[1]) if len(sys.argv) > 1 else 3
 
 # ── Mapa ticker → nombre y pip_size ────────────────────────────────────────
+# FIX 2026-04-17: Antes BTCUSD caía al default forex (0.0001) → generaba pips
+# absurdos (76.000 × 10.000 = 760M pips fantasma). Mapa ampliado + default mejor.
 ASSETS_MAP = {
-    "XAUUSD":   {"nombre": "ORO",       "pip": 0.01},
+    # ── Metales (puntos directos) ──
+    "XAUUSD":   {"nombre": "ORO",       "pip": 1.0},
+    "GOLD":     {"nombre": "ORO",       "pip": 1.0},
+    "XAGUSD":   {"nombre": "PLATA",     "pip": 0.01},
+    # ── Crypto (puntos directos) ──
+    "BTCUSD":   {"nombre": "BTC/USD",   "pip": 1.0},
+    "ETHUSD":   {"nombre": "ETH/USD",   "pip": 1.0},
+    # ── Forex USD ──
     "EURUSD":   {"nombre": "EUR/USD",   "pip": 0.0001},
-    "USDJPY":   {"nombre": "USD/JPY",   "pip": 0.01},
-    "GBPJPY":   {"nombre": "GBP/JPY",   "pip": 0.01},
-    "AUDUSD":   {"nombre": "AUD/USD",   "pip": 0.0001},
-    "AUDCAD":   {"nombre": "AUD/CAD",   "pip": 0.0001},
-    "EURCHF":   {"nombre": "EUR/CHF",   "pip": 0.0001},
-    "USDCAD":   {"nombre": "USD/CAD",   "pip": 0.0001},
     "GBPUSD":   {"nombre": "GBP/USD",   "pip": 0.0001},
+    "AUDUSD":   {"nombre": "AUD/USD",   "pip": 0.0001},
+    "NZDUSD":   {"nombre": "NZD/USD",   "pip": 0.0001},
+    "USDCAD":   {"nombre": "USD/CAD",   "pip": 0.0001},
+    "USDCHF":   {"nombre": "USD/CHF",   "pip": 0.0001},
+    "USDJPY":   {"nombre": "USD/JPY",   "pip": 0.01},
+    # ── Forex JPY cruzados ──
+    "EURJPY":   {"nombre": "EUR/JPY",   "pip": 0.01},
+    "GBPJPY":   {"nombre": "GBP/JPY",   "pip": 0.01},
+    "AUDJPY":   {"nombre": "AUD/JPY",   "pip": 0.01},
+    "NZDJPY":   {"nombre": "NZD/JPY",   "pip": 0.01},
+    "CADJPY":   {"nombre": "CAD/JPY",   "pip": 0.01},
+    "CHFJPY":   {"nombre": "CHF/JPY",   "pip": 0.01},
+    # ── Forex cross ──
+    "EURGBP":   {"nombre": "EUR/GBP",   "pip": 0.0001},
+    "EURAUD":   {"nombre": "EUR/AUD",   "pip": 0.0001},
+    "EURNZD":   {"nombre": "EUR/NZD",   "pip": 0.0001},
+    "EURCAD":   {"nombre": "EUR/CAD",   "pip": 0.0001},
+    "EURCHF":   {"nombre": "EUR/CHF",   "pip": 0.0001},
+    "GBPAUD":   {"nombre": "GBP/AUD",   "pip": 0.0001},
+    "GBPNZD":   {"nombre": "GBP/NZD",   "pip": 0.0001},
+    "GBPCAD":   {"nombre": "GBP/CAD",   "pip": 0.0001},
+    "GBPCHF":   {"nombre": "GBP/CHF",   "pip": 0.0001},
+    "AUDCAD":   {"nombre": "AUD/CAD",   "pip": 0.0001},
+    "AUDNZD":   {"nombre": "AUD/NZD",   "pip": 0.0001},
+    "AUDCHF":   {"nombre": "AUD/CHF",   "pip": 0.0001},
+    "NZDCAD":   {"nombre": "NZD/CAD",   "pip": 0.0001},
+    "NZDCHF":   {"nombre": "NZD/CHF",   "pip": 0.0001},
+    "CADCHF":   {"nombre": "CAD/CHF",   "pip": 0.0001},
+    # ── Índices ──
     "US100Cash":{"nombre": "NASDAQ",    "pip": 1.0},
+    "US30Cash": {"nombre": "DOW30",     "pip": 1.0},
     "US500Cash":{"nombre": "S&P 500",   "pip": 1.0},
+    "GER40Cash":{"nombre": "DAX",       "pip": 1.0},
     "DE40Cash": {"nombre": "DAX",       "pip": 1.0},
     "UK100Cash":{"nombre": "FTSE 100",  "pip": 1.0},
     "NDAQ":     {"nombre": "NASDAQ",    "pip": 1.0},
     "US100":    {"nombre": "NASDAQ",    "pip": 1.0},
+    "US30":     {"nombre": "DOW30",     "pip": 1.0},
     "US500":    {"nombre": "S&P 500",   "pip": 1.0},
+    # ── Petróleo ──
+    "BRENTCash":{"nombre": "BRENT",     "pip": 0.01},
+    "OILCash":  {"nombre": "WTI",       "pip": 0.01},
+    "USOIL":    {"nombre": "WTI",       "pip": 0.01},
+    "UKOIL":    {"nombre": "BRENT",     "pip": 0.01},
 }
 
+
 def get_pip_size(symbol):
+    """Retorna pip_size del símbolo. Fallback inteligente por precio si no hay match."""
+    sym_up = symbol.upper()
+    # Match exacto primero
+    if sym_up in ASSETS_MAP:
+        return ASSETS_MAP[sym_up]["pip"]
+    # Match parcial
     for k, v in ASSETS_MAP.items():
-        if k.upper() in symbol.upper() or symbol.upper() in k.upper():
+        if k.upper() in sym_up or sym_up in k.upper():
             return v["pip"]
-    # Default: 4-decimal forex
-    return 0.0001 if "JPY" not in symbol.upper() else 0.01
+    # FIX 2026-04-17: Default inteligente — BTC/índices (sin pares de 6 letras alfa)
+    # son pip=1.0; JPY cross = 0.01; forex 6-letras = 0.0001; resto = 1.0 (seguro).
+    if "JPY" in sym_up:
+        return 0.01
+    # Solo forex clásico (6 letras todas alfabéticas): 0.0001
+    if len(sym_up) == 6 and sym_up.isalpha():
+        return 0.0001
+    # Crypto / índices / cualquier otra cosa: pip=1.0 (evita 760M pips absurdos)
+    return 1.0
 
 def get_nombre(symbol):
     for k, v in ASSETS_MAP.items():
