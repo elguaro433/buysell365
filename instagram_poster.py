@@ -189,6 +189,57 @@ def _fmt_price(v: float) -> str:
     return f"{v:.2f}"
 
 
+def _annotate_chart_with_times(chart_path, pair: str, direction: str, pips: str,
+                                fecha: str = "", hora_entrada: str = "",
+                                hora_salida: str = "") -> Optional[Path]:
+    """Toma un chart JPG y le superpone barra con fecha + hora entrada + hora salida.
+    Devuelve nueva imagen (el original no se modifica). Fallback: original."""
+    try:
+        img = Image.open(str(chart_path)).convert("RGBA")
+        W, H = img.size
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+        bar_h = max(90, int(H * 0.11))
+        draw.rectangle([0, 0, W, bar_h], fill=(0, 0, 0, 200))
+        is_buy = direction.upper() in ("BUY", "COMPRA")
+        accent = COLOR_GREEN if is_buy else COLOR_RED
+        draw.rectangle([0, bar_h - 4, W, bar_h], fill=accent)
+
+        font_title = _get_font(max(26, int(W * 0.028)), bold=True)
+        font_body = _get_font(max(22, int(W * 0.022)), bold=False)
+
+        left_x = int(W * 0.025)
+        if fecha:
+            draw.text((left_x, 14), f"Fecha: {fecha}", fill=(255, 255, 255, 255), font=font_title)
+        hora_txt_parts = []
+        if hora_entrada:
+            hora_txt_parts.append(f"Entrada: {hora_entrada}")
+        if hora_salida:
+            hora_txt_parts.append(f"Salida: {hora_salida}")
+        if hora_txt_parts:
+            draw.text((left_x, 14 + int(W * 0.035)), "  |  ".join(hora_txt_parts),
+                       fill=(210, 215, 225, 255), font=font_body)
+
+        right_text = f"{pair.upper()} {pips}".strip()
+        draw.text((W - left_x, 14), right_text, fill=accent,
+                   font=font_title, anchor="rt")
+        draw.text((W - left_x, 14 + int(W * 0.035)),
+                   ("COMPRA" if is_buy else "VENTA"),
+                   fill=(210, 215, 225), font=font_body, anchor="rt")
+
+        merged = Image.alpha_composite(img, overlay).convert("RGB")
+        out_path = Path(str(chart_path)).with_name(Path(str(chart_path)).stem + "_ann.jpg")
+        merged.save(str(out_path), "JPEG", quality=95)
+        return out_path
+    except Exception as _e_ann:
+        log.warning(f"_annotate_chart_with_times error: {_e_ann}")
+        try:
+            return Path(str(chart_path))
+        except Exception:
+            return None
+
+
 def _generate_tp_image(pair: str, direction: str, entry: float, tp: float,
                        pips: str, source: str = "") -> Path:
     """Genera imagen de celebraci\u00f3n de TP — SIN precios (marketing only)."""
@@ -1249,11 +1300,14 @@ def _add_sound_to_video(video_path: Path) -> Path:
 
 def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                             tp_image_path: Path = None, duration_s: float = 8.0,
-                            entry_price: float = 0, tp_price: float = 0) -> Optional[Path]:
+                            entry_price: float = 0, tp_price: float = 0,
+                            fecha: str = "", hora_entrada: str = "",
+                            hora_salida: str = "") -> Optional[Path]:
     """Genera Reel con velas reales de MT5 animadas + marca de agua + sonido cha-ching.
     Escena 1: Velas apareciendo una a una con entry/TP (4.5s)
     Escena 2: Resultado grande — par + pips (2s)
     Escena 3: CTA — unirse al VIP (1.5s)
+    fecha/hora_entrada/hora_salida: se superponen en barra inferior durante todo el video.
     """
     try:
         import imageio
@@ -1348,6 +1402,30 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                              font=wm_font, anchor="lt")
         wm_rotated = wm_layer.rotate(30, expand=False, center=(REEL_W // 2, REEL_H // 2))
 
+        # Pre-generar overlay de fecha + horas (barra inferior persistente)
+        time_overlay = None
+        if fecha or hora_entrada or hora_salida:
+            time_overlay = Image.new("RGBA", (REEL_W, REEL_H), (0, 0, 0, 0))
+            t_draw = ImageDraw.Draw(time_overlay)
+            bar_top = REEL_H - 180
+            t_draw.rectangle([0, bar_top, REEL_W, REEL_H - 50], fill=(0, 0, 0, 210))
+            t_draw.rectangle([0, bar_top, REEL_W, bar_top + 4], fill=dir_color)
+            t_font_l = _get_font(36, bold=True)
+            t_font_m = _get_font(30, bold=False)
+            cy = bar_top + 30
+            if fecha:
+                t_draw.text((REEL_W // 2, cy), f"Fecha: {fecha}",
+                            fill=(240, 240, 240, 255), font=t_font_l, anchor="mt")
+                cy += 48
+            hora_bits = []
+            if hora_entrada:
+                hora_bits.append(f"Entrada {hora_entrada}")
+            if hora_salida:
+                hora_bits.append(f"Salida {hora_salida}")
+            if hora_bits:
+                t_draw.text((REEL_W // 2, cy), "   |   ".join(hora_bits),
+                            fill=(210, 215, 225, 255), font=t_font_m, anchor="mt")
+
         for frame_i in range(total_frames):
             sec = frame_i / FPS
             img = Image.new("RGB", (REEL_W, REEL_H), (10, 14, 22))
@@ -1360,9 +1438,11 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                 draw.line([(0, y), (REEL_W, y)], fill=c)
                 draw.line([(0, y + 1), (REEL_W, y + 1)], fill=c)
 
-            # Marca de agua
+            # Marca de agua + overlay fecha/horas (persistente)
             img = img.convert("RGBA")
             img = Image.alpha_composite(img, wm_rotated)
+            if time_overlay is not None:
+                img = Image.alpha_composite(img, time_overlay)
             img = img.convert("RGB")
             draw = ImageDraw.Draw(img)
 
@@ -2087,15 +2167,23 @@ def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIU
 def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                         pips: str, source: str = "", chart_path=None,
                         reel_entry: float = 0, reel_tp: float = 0,
-                        is_gift: bool = False) -> bool:
-    """Publica TP en Instagram: carrusel + Story + Highlight + Reel con velas.
-    chart_path: JPG del gráfico. reel_entry/reel_tp: precios para el Reel animado."""
+                        is_gift: bool = False,
+                        fecha: str = "", hora_entrada: str = "",
+                        hora_salida: str = "") -> bool:
+    """Publica TP en Instagram como UN SOLO carrusel [video + grafica anotada] +
+    Story + Highlight (sin Reel separado, para evitar publicacion duplicada en feed).
+    Si no se pasan fecha/horas se usan los de ahora mismo.
+    chart_path: JPG del grafico. reel_entry/reel_tp: precios para el video animado."""
     if not IG_ENABLED:
         return False
 
     def _do_post():
         with _ig_lock:
             try:
+                _fecha = fecha or datetime.now().strftime("%d/%m/%Y")
+                _hs = hora_salida or datetime.now().strftime("%H:%M")
+                _he = hora_entrada
+
                 image_path = _generate_tp_image(pair, direction, entry, tp, pips, source)
                 cl = _get_client()
                 if not cl:
@@ -2125,36 +2213,63 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                     )
                 caption = _build_multilang_caption(caption_es, hashtags)
 
-                # 1) Post — carrusel si tenemos gráfico, foto sola si no
-                _chart_ok = chart_path and Path(str(chart_path)).exists()
-                if _chart_ok:
-                    # Redimensionar chart a 1080x1080 para Instagram (mismo que imagen TP)
-                    try:
-                        _chart_img = Image.open(str(chart_path))
-                        _chart_sq = _chart_img.resize((IMG_W, IMG_H), Image.LANCZOS)
-                        _chart_sq_path = Path(str(chart_path)).with_name(
-                            Path(str(chart_path)).stem + "_sq.jpg"
-                        )
-                        _chart_sq.save(str(_chart_sq_path), "JPEG", quality=95)
-                        # Carrusel: [celebración, gráfico]
-                        cl.album_upload([image_path, _chart_sq_path], caption)
-                        log.info(f"Instagram: TP {pair} CARRUSEL publicado OK (celebracion + grafico)")
-                    except Exception as _e_album:
-                        log.warning(f"Instagram album error, fallback a foto: {_e_album}")
-                        cl.photo_upload(image_path, caption)
-                        log.info(f"Instagram: TP {pair} post publicado OK (sin carrusel)")
-                else:
-                    cl.photo_upload(image_path, caption)
-                    log.info(f"Instagram: TP {pair} post publicado OK")
+                # 1) Generar video con fecha/horas incrustadas
+                _r_entry = reel_entry if reel_entry > 0 else entry
+                _r_tp = reel_tp if reel_tp > 0 else tp
+                reel_path = None
+                try:
+                    reel_path = _generate_tp_reel_video(
+                        pair, direction, pips,
+                        entry_price=_r_entry, tp_price=_r_tp,
+                        fecha=_fecha, hora_entrada=_he, hora_salida=_hs)
+                except Exception as _e_rlgen:
+                    log.warning(f"Instagram: error generando video TP: {_e_rlgen}")
 
-                # 2) Story + agregar al Highlight "TPs"
+                # 2) Anotar grafica con fecha/horas (si hay chart)
+                chart_annotated = None
+                if chart_path and Path(str(chart_path)).exists():
+                    chart_annotated = _annotate_chart_with_times(
+                        chart_path, pair, direction, pips,
+                        _fecha, _he, _hs)
+
+                # 3) Publicar UN SOLO carrusel [video + chart anotado]
+                try:
+                    slides = []
+                    if reel_path and Path(str(reel_path)).exists():
+                        slides.append(Path(str(reel_path)))
+                    if chart_annotated and Path(str(chart_annotated)).exists():
+                        slides.append(Path(str(chart_annotated)))
+
+                    if len(slides) >= 2:
+                        cl.album_upload(slides, caption)
+                        log.info(f"Instagram: TP {pair} CARRUSEL [video+grafica] publicado OK")
+                    elif len(slides) == 1:
+                        _only = slides[0]
+                        if str(_only).lower().endswith(".mp4"):
+                            thumbnail = _generate_reel_thumbnail(pair, pips, direction)
+                            cl.clip_upload(_only, caption, thumbnail)
+                            log.info(f"Instagram: TP {pair} VIDEO solo publicado OK (sin chart)")
+                        else:
+                            cl.photo_upload(_only, caption)
+                            log.info(f"Instagram: TP {pair} GRAFICA sola publicada OK (sin video)")
+                    else:
+                        cl.photo_upload(image_path, caption)
+                        log.info(f"Instagram: TP {pair} post fallback (imagen celebracion) OK")
+                except Exception as _e_album:
+                    log.warning(f"Instagram album error, fallback a foto: {_e_album}")
+                    try:
+                        cl.photo_upload(image_path, caption)
+                        log.info(f"Instagram: TP {pair} post publicado OK (fallback)")
+                    except Exception as _e_ph:
+                        log.warning(f"Instagram fallback photo error: {_e_ph}")
+
+                # 4) Story + Highlight (NO aparece en el feed, solo en Stories/Highlights)
                 time.sleep(random.randint(3, 8))
                 try:
                     story = cl.photo_upload_to_story(image_path)
                     story_id = story.pk if story else None
                     log.info(f"Instagram: TP {pair} Story publicada OK (id={story_id})")
 
-                    # Agregar al Highlight "TPs"
                     if story_id:
                         time.sleep(random.randint(2, 5))
                         try:
@@ -2164,7 +2279,6 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                                 cl.highlight_add_stories(_hl_pk, [str(story_id)])
                                 log.info(f"Instagram: Story agregada al Highlight TPs")
                             else:
-                                # Crear Highlight con esta primera Story
                                 hl = cl.highlight_create("TPs", [str(story_id)])
                                 _highlight_tp_pk = hl.pk
                                 log.info(f"Instagram: Highlight 'TPs' CREADO (pk={hl.pk})")
@@ -2173,36 +2287,6 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
 
                 except Exception as e_st:
                     log.warning(f"Instagram Story error: {e_st}")
-
-                # 3) Reel con velas reales animadas + sonido
-                time.sleep(random.randint(5, 12))
-                try:
-                    _r_entry = reel_entry if reel_entry > 0 else entry
-                    _r_tp = reel_tp if reel_tp > 0 else tp
-                    reel_path = _generate_tp_reel_video(
-                        pair, direction, pips,
-                        entry_price=_r_entry, tp_price=_r_tp)
-                    if reel_path and Path(reel_path).exists():
-                        reel_hashtags = _get_hashtags("reel", pair)
-                        if is_gift:
-                            reel_caption = (
-                                f"🎁 SENAL GRATIS GANADORA {pair.upper()} {pips}\n\n"
-                                f"Senal del Canal VIP\n"
-                                f"Unite — Link en bio\n\n"
-                                f"{reel_hashtags}"
-                            )
-                        else:
-                            reel_caption = (
-                                f"TP ALCANZADO {pair.upper()} {pips}\n\n"
-                                f"Senal del Canal VIP\n"
-                                f"Unite — Link en bio\n\n"
-                                f"{reel_hashtags}"
-                            )
-                        thumbnail = _generate_reel_thumbnail(pair, pips, direction)
-                        cl.clip_upload(Path(reel_path), reel_caption, thumbnail)
-                        log.info(f"Instagram: TP {pair} REEL con velas publicado OK")
-                except Exception as e_rl:
-                    log.warning(f"Instagram Reel error: {e_rl}")
 
             except Exception as e:
                 log.warning(f"Instagram post TP error: {e}")

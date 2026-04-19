@@ -1582,9 +1582,16 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 _jpg_img = _png_img.convert("RGB")
                 _jpg_img.save(str(_chart_file), "JPEG", quality=95)
             from instagram_poster import post_tp_celebration as _ig_post_tp
+            from datetime import datetime as _dt_ig
+            _ts_open = signal.get("timestamp", 0) or signal.get("opened_at", 0) or 0
+            _he_tp = _dt_ig.fromtimestamp(_ts_open).strftime("%H:%M") if _ts_open else ""
+            _now_tp = _dt_ig.now()
             _ig_post_tp(pair_d, direction, entry, tp, pips_str if pips_str else "+0",
                         source=signal.get("source", ""), chart_path=_chart_file,
-                        reel_entry=entry, reel_tp=tp, is_gift=_was_gifted)
+                        reel_entry=entry, reel_tp=tp, is_gift=_was_gifted,
+                        fecha=_now_tp.strftime("%d/%m/%Y"),
+                        hora_entrada=_he_tp,
+                        hora_salida=_now_tp.strftime("%H:%M"))
             _mark_ig_post_sent("tp_post")
         except Exception as _ig_err:
             _ig_errstr = str(_ig_err).lower()
@@ -1735,10 +1742,14 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
     if _check_ig_rate_limit("close_post"):
         try:
             from instagram_poster import post_tp_celebration as _ig_post_tp
+            from datetime import datetime as _dt_ig_cl
+            _now_cl = _dt_ig_cl.now()
             _ig_post_tp(pair_d, direction, entry if entry > 0 else 0,
                         tp_approx, pips_str, source=source,
                         reel_entry=entry if entry > 0 else 0,
-                        reel_tp=tp_approx)
+                        reel_tp=tp_approx,
+                        fecha=_now_cl.strftime("%d/%m/%Y"),
+                        hora_salida=_now_cl.strftime("%H:%M"))
             _mark_ig_post_sent("close_post")
         except Exception as _ig_err:
             _ig_errstr = str(_ig_err).lower()

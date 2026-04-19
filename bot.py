@@ -3934,13 +3934,16 @@ def sync_mt5_positions():
             enviar_canal(msg)
             logger.info(f"🔔 {tipo_cierre}: {nombre} {tipo} | {signo}{p_txt}")
 
-            # 📸 Instagram: publicar TP ganador (post + Story + Reel multi-idioma)
+            # 📸 Instagram: publicar TP ganador (1 carrusel video+gráfica, fecha/horas incrustadas)
             if pips > 0:
                 try:
                     from instagram_poster import post_tp_celebration as _ig_tp
                     _ig_tp(nombre, _tipo_es, entrada, precio_cierre,
                            f"{signo}{p_txt}", source="VIP",
-                           reel_entry=entrada, reel_tp=precio_cierre)
+                           reel_entry=entrada, reel_tp=precio_cierre,
+                           fecha=ahora().strftime("%d/%m/%Y"),
+                           hora_entrada=op.get('hora', ''),
+                           hora_salida=_hora)
                 except Exception as _ig_err:
                     logger.debug(f"IG TP post skip ({nombre}): {_ig_err}")
 
