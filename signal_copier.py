@@ -2498,6 +2498,12 @@ def parse_signal(text, chat_title=""):
         source = "GoldForexMarket"
     elif "nasdaqmaster" in chat_lower or "nasdaqninja" in chat_lower or "nas100" in chat_lower or "nasdaqmaster" in text_lower or "nasdaqxninja" in text_lower:
         source = "NasdaqMasters"
+    elif "toptradingsignals" in chat_lower or "top trading" in chat_lower:
+        source = "TopTradingSignals"
+    elif "united kings" in chat_lower or "unitedkings" in chat_lower:
+        source = "UnitedKings"
+    elif "prosignalsfx" in chat_lower or "prosignals fx" in chat_lower:
+        source = "ProSignalsFx"
 
     # ── DETECTAR DIRECCIÓN ──
     # Learn2Trade usa ▲▲▲=BUY y ▼▼▼=SELL
@@ -3477,11 +3483,14 @@ def send_to_channel(signal, executed, detail):
     dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
     src_emoji = {
-        "SureShotFX":      "📡",
-        "Learn2Trade":     "📊",
-        "FXPremiere":      "🔔",
-        "GoldForexMarket": "🥇",
-        "NasdaqMasters":   "📈",
+        "SureShotFX":         "📡",
+        "Learn2Trade":        "📊",
+        "FXPremiere":         "🔔",
+        "GoldForexMarket":    "🥇",
+        "NasdaqMasters":      "📈",
+        "TopTradingSignals":  "🎯",
+        "UnitedKings":        "👑",
+        "ProSignalsFx":       "🐻",
     }.get(source, "🔔")
 
     pair_display = _get_display_pair(pair)
@@ -3667,6 +3676,9 @@ async def main():
         "Anabelsignals08",            # AnabelSignals — XAUUSD/Gold
         "Jerry77446",                 # GOLD FOREX MARKET — XAUUSD/Gold señales VIP
         "nas100group",                # NasdaqMasters / NASDaqxNinja's TRADES — US30 + NASDAQ (agregado 2026-04-16)
+        "top_tradingsignals",         # TopTradingSignals — Forex + Gold + Indexes (agregado 2026-04-19)
+        "unitedkings1",               # United Kings Signals — XAUUSD/Gold commentary (agregado 2026-04-19)
+        "prosignalsfxx",              # ProSignalsFx — Gold + Forex diario (agregado 2026-04-19)
     ]
     # Lista global de pares permitidos (aplica a TODOS los canales)
     # FIX 2026-04-16: Añadido US30/DOW para soporte canal NasdaqMasters
@@ -3688,8 +3700,13 @@ async def main():
         "gold forex market", "gold forex",  # GOLD FOREX MARKET (@Jerry77446)
         "nasdaqmasters", "nasdaq masters", "nasdaqninja", "nasdaq ninja",  # NasdaqMasters (nas100group)
         "nas100", "nas 100",
+        "top_tradingsignals", "toptradingsignals", "top trading signals",  # TopTradingSignals (2026-04-19)
+        "unitedkings", "united kings",                                     # United Kings (2026-04-19)
+        "prosignalsfx", "pro signals fx",                                  # ProSignalsFx (2026-04-19)
     ]
-    SIGNAL_KEYWORDS = ["sureshot", "learn", "fxpremiere", "anabel", "gold forex", "nasdaqmasters", "nasdaqninja"]
+    SIGNAL_KEYWORDS = ["sureshot", "learn", "fxpremiere", "anabel", "gold forex",
+                       "nasdaqmasters", "nasdaqninja",
+                       "toptradingsignals", "unitedkings", "prosignalsfx"]
 
     @client.on(events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
     async def handler(event):
