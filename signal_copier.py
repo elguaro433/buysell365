@@ -3677,6 +3677,7 @@ async def main():
         "Jerry77446",                 # GOLD FOREX MARKET — XAUUSD/Gold señales VIP
         "nas100group",                # NasdaqMasters / NASDaqxNinja's TRADES — US30 + NASDAQ (agregado 2026-04-16)
         "top_tradingsignals",         # TopTradingSignals — Forex + Gold + Indexes (agregado 2026-04-19)
+        "topforexsignals",            # TopTradingSignals alias (por si falla el primero)
         "unitedkings1",               # United Kings Signals — XAUUSD/Gold commentary (agregado 2026-04-19)
         "prosignalsfxx",              # ProSignalsFx — Gold + Forex diario (agregado 2026-04-19)
     ]
