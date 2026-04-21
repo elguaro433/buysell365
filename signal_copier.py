@@ -96,14 +96,19 @@ SYMBOL_MAP = {
 MAGIC_COPIER = 20260325
 TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 
-# Mapa de nombres para display — FIX 2026-04-06: mantener nombres originales del mercado
-# Antes: US30→"DOW 30", XAUUSD→"XAU/USD" — el usuario quiere los nombres estándar de trading
+# FIX 2026-04-21: Flag para mostrar/ocultar TODO rastro del servicio Copy Trading.
+# El usuario tiene el servicio pausado temporalmente. Cuando vuelva a activarlo,
+# poner True (o exportar COPY_TRADING_ENABLED=true en el entorno).
+COPY_TRADING_ENABLED = os.getenv("COPY_TRADING_ENABLED", "false").lower() in ("true", "1", "yes")
+
+# Mapa de nombres para display — FIX 2026-04-21: ORO unificado (no XAU/GOLD/XAUUSD)
+# Por petición del usuario: a partir de hoy el oro siempre se llama "ORO" en mensajes.
 _DISPLAY_MAP = {
     # MT5 symbols → nombre estándar de display
-    "GOLD": "XAUUSD", "US100Cash": "NAS100", "US500Cash": "US500",
+    "GOLD": "ORO", "US100Cash": "NAS100", "US500Cash": "US500",
     "US30Cash": "US30", "GER40Cash": "GER40", "BRENTCash": "BRENT", "OILCash": "USOIL",
     # Aliases → nombre estándar
-    "XAUUSD": "XAUUSD", "ORO": "XAUUSD",
+    "XAUUSD": "ORO", "XAU/USD": "ORO", "XAU": "ORO", "ORO": "ORO",
     "NAS100": "NAS100", "NASDAQ": "NAS100", "NASDAQ100": "NAS100", "NQ": "NAS100", "US100": "NAS100",
     "US30": "US30", "DOW": "US30", "DJ30": "US30",
     "SPX500": "US500", "SP500": "US500", "US500": "US500",
@@ -806,7 +811,7 @@ def _format_gift_message(signal: dict) -> str:
     tp3 = signal.get("tp3", 0)
 
     dir_emoji = "🟢" if direction.upper() == "BUY" else "🔴"
-    dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+    dir_label = "BUY" if direction.upper() == "BUY" else "SELL"
 
     fmt = lambda v: fmt_price(v, zero_label="Market")
     entry_display = "Market" if entry <= 0 else fmt(entry)
@@ -1035,9 +1040,11 @@ def _get_current_price(pair: str) -> float | None:
         else:
             yf_ticker = pair
 
-    # Spot-forex =X no tienen datos fiables en yfinance → ir directo a Twelve Data
-    # FIX 2026-04-07: GC=F y futuros SÍ funcionan en yfinance — solo skip =X (spot forex)
-    _use_yf = not yf_ticker.endswith("=X")
+    # FIX 2026-04-21: Probar yfinance TAMBIÉN para spot-forex (=X). Antes se saltaban
+    # y eso dejaba los pares EUR/JPY, USD/CAD, AUD/USD, etc. SIN precio cuando MT5 no
+    # respondía y TWELVE_KEY estaba vacío o sin créditos → señales huérfanas sin TP/SL.
+    # yfinance =X a veces tarda, pero suele responder con el último Close intradía.
+    _use_yf = True
     if _use_yf:
         try:
             import yfinance as yf
@@ -1308,7 +1315,7 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             pips_label = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
 
         # Título con pips
-        dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+        dir_label = "BUY" if direction.upper() == "BUY" else "SELL"
         if title_override:
             title = title_override
         else:
@@ -1437,7 +1444,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     elif tp > 0:
         tp_lines = f"\n✅ TP: {fmt(tp)}"
 
-    _dir_label_es = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+    _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
     msg = (
         f"🎯🎯 *TP ALCANZADO* 🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
@@ -1509,14 +1516,13 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 f"🎁 *¡La señal REGALO tocó TP!*\n"
                 f"🏆 Esto pasa todos los días en el VIP\n\n"
                 f"🔥 *¿Quieres TODAS las señales?*\n"
-                f"🤖 Copy Trading automático\n"
                 f"👉 Escribe */vip* para unirte"
             )
             log.info(f"🎁🎯 GIFT TP CELEBRATION: {pair_d} {pips_str}")
         else:
             _promos = [
                 "\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
-                "\n\n🤖 *Activa el Copy Trading*\nCopia estas operaciones automáticamente en tu cuenta.\n👉 Escribe */vip* para activarlo",
+                "\n\n📡 *Suscríbete al canal VIP*\nRecibe estas señales en tiempo real con entry, TP y SL exactos.\n👉 Escribe */vip* para activarlo",
                 "\n\n🔥 *Otra victoria más del equipo*\nNo te quedes fuera, únete al VIP.\n👉 Escribe */vip* y empieza hoy",
                 "\n\n📈 *Resultados reales, sin trucos*\nSeñales en vivo con entrada, TP y SL exactos.\n👉 Escribe */vip* para unirte",
             ]
@@ -1618,7 +1624,7 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
 
     pair_d = _get_display_pair(pair)
     dir_emoji = "🟢" if direction.upper() == "BUY" else "🔴"
-    _dir_label_es = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+    _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
 
     # Formatear pips según activo
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X") or entry >= 100:
@@ -1661,14 +1667,13 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
             f"🎁 *¡La señal REGALO fue ganadora!*\n"
             f"🏆 Esto pasa todos los días en el VIP\n\n"
             f"🔥 *¿Quieres TODAS las señales?*\n"
-            f"🤖 Copy Trading automático\n"
             f"👉 Escribe */vip* para unirte"
         )
         log.info(f"🎁🎯 GIFT CLOSE CELEBRATION: {pair_d} {pips_str}")
     else:
         _promos = [
             "\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
-            "\n\n🤖 *Activa el Copy Trading*\nCopia estas operaciones automáticamente en tu cuenta.\n👉 Escribe */vip* para activarlo",
+            "\n\n📡 *Suscríbete al canal VIP*\nRecibe estas señales en tiempo real con entry, TP y SL exactos.\n👉 Escribe */vip* para activarlo",
             "\n\n🔥 *Otra victoria más del equipo*\nNo te quedes fuera, únete al VIP.\n👉 Escribe */vip* y empieza hoy",
             "\n\n📈 *Resultados reales, sin trucos*\nSeñales en vivo con entrada, TP y SL exactos.\n👉 Escribe */vip* para unirte",
         ]
@@ -1795,7 +1800,7 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
 
     # FIX 2026-04-17: Verificar si la señal ya tocó TPs antes → mensaje CIERRE NETO
     tps_previos = signal.get("_tps_alcanzados", []) or []
-    _dir_label_es = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+    _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
 
     if tps_previos:
         # Calcular neto: suma de pips TPs - pips perdidos en último segmento
@@ -1851,6 +1856,133 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
             log.warning(f"SL notification error: {resp.status_code} {resp.text[:80]}")
     except Exception as e:
         log.warning(f"SL notification error: {e}")
+
+
+def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_msg_id: int = None) -> None:
+    """Notifica al canal el cierre de una señal que NO tocó TP/SL.
+
+    Casos:
+      - reason="expired": pasaron >72h sin tocar TP ni SL → cierre por tiempo
+      - reason="orphan":  el monitor no pudo obtener precio durante mucho tiempo (broker desconectado)
+      - reason="eod":     cierre forzado al final del día para no dejar señales abiertas
+
+    Calcula el neto al precio actual del mercado (si está disponible) y muestra
+    los TPs ya alcanzados. FIX 2026-04-21 — antes las señales expiradas se
+    eliminaban silenciosamente y quedaban como huérfanas en el canal.
+    """
+    import requests
+
+    direction = signal.get("direction", "BUY")
+    pair = signal.get("pair", "?")
+    entry = signal.get("entry", 0) or 0
+    pair_d = _get_display_pair(pair)
+    dir_emoji = "🟢" if direction == "BUY" else "🔴"
+    _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
+
+    # Precio actual (si lo conseguimos) para calcular neto realista
+    _live = None
+    try:
+        import MetaTrader5 as _mt5_e
+        _sym_clean = pair.upper().replace("/", "")
+        _sym_map = {"GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
+                    "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
+                    "US30": "US30Cash", "US500": "US500Cash"}
+        _sym = _sym_map.get(_sym_clean, _sym_clean)
+        if _mt5_e.initialize():
+            _resolved = _sym
+            if not _mt5_e.symbol_info(_resolved):
+                for _suf in ("m", "c", "i", ".pro", ".raw"):
+                    if _mt5_e.symbol_info(f"{_sym}{_suf}"):
+                        _resolved = f"{_sym}{_suf}"
+                        break
+            _mt5_e.symbol_select(_resolved, True)
+            _t = _mt5_e.symbol_info_tick(_resolved)
+            if _t and _t.bid > 0:
+                _live = _t.bid if direction == "BUY" else _t.ask
+    except Exception:
+        pass
+    if _live is None:
+        _live = _get_current_price(pair) or 0
+
+    def _fmt_pips(v, signo=""):
+        if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
+            return f"{signo}{v:.0f} pts"
+        elif "JPY" in pair.upper():
+            return f"{signo}{v * 100:.0f} pips"
+        elif entry >= 100:
+            return f"{signo}{v:.1f} pts"
+        else:
+            return f"{signo}{v * 10000:.0f} pips"
+
+    tps_previos = signal.get("_tps_alcanzados", []) or []
+    pips_ganados_tps = sum(t.get("pips", 0) for t in tps_previos)
+
+    # Pips del último segmento (al precio actual)
+    pips_resto = 0
+    if _live > 0 and entry > 0:
+        if direction == "BUY":
+            pips_resto = _live - entry
+        else:
+            pips_resto = entry - _live
+
+    # Si tocó TPs antes, neto = pips de TPs + pips_resto del último segmento (positivo o negativo)
+    # Si NO tocó TPs, neto = pips_resto solo
+    if tps_previos:
+        pips_netos = pips_ganados_tps + pips_resto
+    else:
+        pips_netos = pips_resto
+
+    signo_neto = "+" if pips_netos >= 0 else "-"
+    emoji_neto = "✅" if pips_netos >= 0 else "⚠️"
+
+    _titulo = {
+        "expired": "⏱ CIERRE POR TIEMPO",
+        "orphan":  "⏱ CIERRE — sin precio del broker",
+        "eod":     "🌙 CIERRE FIN DEL DÍA",
+    }.get(reason, "⏱ CIERRE POR TIEMPO")
+
+    if tps_previos:
+        tps_lines = "\n".join(
+            f"✅ TP{t['nivel']}: {_fmt_pips(t.get('pips',0),'+')}" for t in tps_previos
+        )
+        msg = (
+            f"{_titulo}\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
+            f"📍 Entrada: {fmt_price(entry)}\n"
+            f"{tps_lines}\n"
+            f"📊 Cierre actual: {fmt_price(_live) if _live > 0 else '—'}\n\n"
+            f"{emoji_neto} *Neto: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"📊 _BuySell365 Pro — {len(tps_previos)} TP(s) asegurado(s) antes del cierre_"
+        )
+    else:
+        msg = (
+            f"{_titulo}\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
+            f"📍 Entrada: {fmt_price(entry)}\n"
+            f"📊 Cierre actual: {fmt_price(_live) if _live > 0 else '—'}\n\n"
+            f"{emoji_neto} *Neto: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"📊 _BuySell365 Pro — operación finalizada_"
+        )
+
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
+        if reply_to_msg_id:
+            payload["reply_to_message_id"] = reply_to_msg_id
+        resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code == 400 and "message to be replied" in resp.text:
+            payload.pop("reply_to_message_id", None)
+            resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code == 200:
+            log.info(f"⏱ Cierre {reason} notificado: {direction} {pair} neto={pips_netos:.2f}")
+        else:
+            log.warning(f"Cierre {reason} error: {resp.status_code} {resp.text[:80]}")
+    except Exception as e:
+        log.warning(f"Cierre {reason} error: {e}")
 
 
 def _record_daily_result(signal: dict, result: str) -> None:
@@ -1962,7 +2094,6 @@ def _build_promo_report(hora_label: str) -> str | None:
         f"🔥 *Estas ganancias fueron en VIVO*\n"
         f"Nuestros suscriptores VIP las recibieron en tiempo real.\n\n"
         f"👉 Escribe */vip* y empieza a ganar con nosotros\n"
-        f"🤖 O activa el *Copy Trading* y opera sin hacer nada\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"_BuySell365 Pro — Resultados reales, verificados en MT5_"
     )
@@ -1978,16 +2109,13 @@ async def _loop_promo_reportes() -> None:
 
     _sent_today: dict = {}  # {"12": "2026-04-08", "17": "2026-04-08"}
 
-    _promo_buttons = json.dumps({
-        "inline_keyboard": [
-            [
-                {"text": "🤖 Empezar Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-            ],
-            [
-                {"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-            ]
-        ]
-    })
+    # FIX 2026-04-21: Botón Copy Trading oculto (servicio pausado).
+    # Cuando el usuario reactive el servicio, basta con setear COPY_TRADING_ENABLED=true.
+    _promo_rows = []
+    if COPY_TRADING_ENABLED:
+        _promo_rows.append([{"text": "🤖 Empezar Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}])
+    _promo_rows.append([{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}])
+    _promo_buttons = json.dumps({"inline_keyboard": _promo_rows})
 
     while True:
         try:
@@ -2275,6 +2403,30 @@ async def _monitor_tp_loop() -> None:
                 to_resolve.append((sig_id, sdata, "expired"))
                 continue
 
+            # FIX 2026-04-21: WATCHDOG — si llevamos >60 fallos de precio consecutivos
+            # (≈30 min con monitor cada 30s) cerrar como huérfana. Mejor un cierre con
+            # neto al precio actual (cuando se recupere) que dejar la señal en limbo.
+            if signal.get("_price_fails", 0) >= 60:
+                log.warning(f"🪦 Watchdog huérfana: {pair} {direction} con {signal['_price_fails']} fallos → cerrando como orphan")
+                to_resolve.append((sig_id, sdata, "orphan"))
+                continue
+
+            # FIX 2026-04-21: CIERRE FIN DE DÍA — entre 23:50 y 23:59 hora Andorra
+            # cerramos toda señal con >6h de antigüedad que no haya tocado TP final.
+            # Evita arrastrar huérfanas al día siguiente y "contamina" el resumen del día.
+            try:
+                from datetime import datetime as _dt_eod
+                import pytz as _pytz_eod
+                _now_and = _dt_eod.now(_pytz_eod.timezone("Europe/Andorra"))
+                if _now_and.hour == 23 and _now_and.minute >= 50 and age_hours > 6:
+                    # Si ya tocó TPs no urge cerrar — solo si no logró ningún TP final
+                    if not signal.get("_tps_alcanzados"):
+                        log.info(f"🌙 EOD cierre: {pair} {direction} ({age_hours:.1f}h sin TP)")
+                        to_resolve.append((sig_id, sdata, "eod"))
+                        continue
+            except Exception:
+                pass
+
             # FIX 2026-04-09: Usar precio MT5 (broker real) en vez de yfinance
             price = None
             try:
@@ -2313,8 +2465,19 @@ async def _monitor_tp_loop() -> None:
                 _pair_clean = pair.upper().replace("/", "")
                 _mt5_sym = _mt5_sym_map.get(_pair_clean, _pair_clean)
                 if _mt5_check.initialize():
-                    _mt5_check.symbol_select(_mt5_sym, True)
-                    _tick = _mt5_check.symbol_info_tick(_mt5_sym)
+                    # FIX 2026-04-21: Auto-detectar sufijo del broker (XM "m", IC ".", etc).
+                    # Si el símbolo limpio no existe, intentar variantes comunes para no
+                    # dejar pares Forex sin precio cuando el broker añade sufijo.
+                    _resolved_sym = _mt5_sym
+                    if not _mt5_check.symbol_info(_resolved_sym):
+                        for _suffix in ("m", "c", "i", ".pro", ".raw", ".m", "_pro"):
+                            _alt = f"{_mt5_sym}{_suffix}"
+                            if _mt5_check.symbol_info(_alt):
+                                _resolved_sym = _alt
+                                log.info(f"🔧 Símbolo broker detectado: {_mt5_sym} → {_resolved_sym}")
+                                break
+                    _mt5_check.symbol_select(_resolved_sym, True)
+                    _tick = _mt5_check.symbol_info_tick(_resolved_sym)
                     if _tick and _tick.bid > 0:
                         # FIX 2026-04-16: Usar bid para BUY, ask para SELL (precio real de cierre)
                         # BUY cierra al bid, SELL cierra al ask — no usar mid-price
@@ -2322,14 +2485,26 @@ async def _monitor_tp_loop() -> None:
                             price = _tick.bid  # BUY se cierra al bid
                         else:
                             price = _tick.ask  # SELL se cierra al ask
-                        log.info(f"💹 Precio MT5 {_mt5_sym}: bid={_tick.bid:.5f} ask={_tick.ask:.5f} -> usando {price:.5f}" if price < 100 else f"💹 Precio MT5 {_mt5_sym}: bid={_tick.bid:.2f} ask={_tick.ask:.2f} -> usando {price:.2f}")
-            except Exception:
-                pass
+                        log.info(f"💹 Precio MT5 {_resolved_sym}: bid={_tick.bid:.5f} ask={_tick.ask:.5f} -> usando {price:.5f}" if price < 100 else f"💹 Precio MT5 {_resolved_sym}: bid={_tick.bid:.2f} ask={_tick.ask:.2f} -> usando {price:.2f}")
+            except Exception as _e_mt5_price:
+                log.debug(f"MT5 price err {pair}: {_e_mt5_price}")
             # Fallback a yfinance solo si MT5 no disponible
             if price is None:
                 price = _get_current_price(pair)
             if price is None:
+                # FIX 2026-04-21: Antes era skip silencioso → señales huérfanas sin TP/SL.
+                # Ahora contamos fallos por señal: tras N intentos consecutivos avisamos por log
+                # y dejamos que el watchdog la procese (no la perdemos).
+                _fails = signal.get("_price_fails", 0) + 1
+                signal["_price_fails"] = _fails
+                if _fails in (1, 5, 20, 60):
+                    log.warning(f"⚠️ Sin precio para {pair} {direction} (fallos={_fails}) — MT5+yfinance+TwelveData fallaron")
                 continue
+            else:
+                # Resetear contador en cuanto vuelve a haber precio
+                if signal.get("_price_fails"):
+                    log.info(f"✅ Precio recuperado para {pair} {direction} tras {signal['_price_fails']} fallos")
+                    signal["_price_fails"] = 0
 
             # FIX 2026-04-09: Si entry=0, asignar precio live al primer chequeo
             _entry = signal.get("entry", 0) or 0
@@ -2428,6 +2603,12 @@ async def _monitor_tp_loop() -> None:
                     _send_sl_notification(signal, reply_to_msg_id=_reply_id)
 
                 _record_daily_result(signal, result)
+            elif result in ("expired", "orphan", "eod"):
+                # FIX 2026-04-21: Antes las señales expiradas/huérfanas se eliminaban
+                # silenciosamente del dict y dejaban al canal sin notificación de cierre.
+                # Ahora notificamos siempre con el neto al precio actual del mercado.
+                log.info(f"⏱ {result.upper()} notificado para {signal.get('pair','?')}")
+                _send_expired_notification(signal, reason=result, reply_to_msg_id=_reply_id)
           except Exception as _e_resolve:
             log.error(f"❌ Error procesando {result} para {sig_id}: {_e_resolve}")
 
@@ -3480,7 +3661,7 @@ def send_to_channel(signal, executed, detail):
     style      = signal.get("style", "")
 
     # FIX 2026-04-14: Señales en español
-    dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+    dir_label = "BUY" if direction.upper() == "BUY" else "SELL"
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
     src_emoji = {
         "SureShotFX":         "📡",
@@ -3536,15 +3717,37 @@ def send_to_channel(signal, executed, detail):
 
     msg = "\n".join(lines)
 
-    # Botones de afiliado XM — aparecen debajo de cada señal nueva
-    _xm_buttons = {
-        "inline_keyboard": [
-            [
-                {"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                {"text": "🤖 Copy Trading (ya tengo cuenta)", "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-            ]
-        ]
-    }
+    # Botones de afiliado XM + ANÁLISIS por petición — debajo de cada señal nueva
+    # FIX 2026-04-21: Botones de análisis abren DM con el bot vía deep link
+    # (los users del canal pulsan el botón → se abre el bot en privado y reciben el análisis)
+    _BOT_USERNAME = os.getenv("BOT_USERNAME", "Andoperandobot")
+    # Sugerir activos relevantes según el par publicado, más opciones generales
+    _pair_upper = (pair_display or pair or "").upper().replace("/", "")
+    _btn_pair_norm = "ORO" if _pair_upper in ("ORO", "GOLD", "XAUUSD") else _pair_upper
+    # FIX 2026-04-21: Botón Copy Trading oculto (servicio pausado)
+    _btn_rows = [
+        # Fila 1: análisis del activo señalado + ORO siempre disponible
+        [
+            {"text": f"🔍 Análisis {_btn_pair_norm}", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_{_btn_pair_norm.lower()}"},
+            {"text": "🥇 Análisis ORO", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_oro"},
+        ],
+        # Fila 2: análisis populares
+        [
+            {"text": "📈 NASDAQ", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_nasdaq"},
+            {"text": "📊 S&P 500", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_sp500"},
+            {"text": "🛢 Petróleo", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_usoil"},
+        ],
+        # Fila 3: pedir cualquier otro activo
+        [
+            {"text": "💬 Pedir análisis de otro activo", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis"},
+        ],
+    ]
+    # Fila 4: afiliado XM (+ Copy Trading solo si está activo)
+    _xm_row = [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}]
+    if COPY_TRADING_ENABLED:
+        _xm_row.append({"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"})
+    _btn_rows.append(_xm_row)
+    _xm_buttons = {"inline_keyboard": _btn_rows}
 
     # FIX 2026-04-08: Gráfica SOLO en TP/SL HIT, NO en señales nuevas
     # Las señales nuevas solo llevan texto + botones XM
@@ -3743,13 +3946,15 @@ async def main():
 
             # ── Deduplicación: evitar misma señal de CUALQUIER canal ──
             # FIX 2026-04-09: Doble check — por par+dirección+precio Y por par solo (cooldown 10min)
+            # FIX 2026-04-21: TTLs ampliados para frenar duplicados exactos como
+            # USD/JPY 19:36 + 21:18 con misma entrada 158.75 (1h42min de separación)
             if signal["type"] == "new_signal":
                 _entry_round = round(signal.get("entry", 0), 2)
                 _dedup_key = f"{signal['pair']}_{signal['direction']}_{_entry_round}"
                 _pair_key = f"{signal['pair']}_{signal['direction']}"
-                # Check 1: _recently_sent — mismo par+dirección+precio exacto (1h)
+                # Check 1: _recently_sent — mismo par+dirección+precio exacto (4h)
                 _prev_sent_time = _recently_sent.get(_dedup_key, 0)
-                if _prev_sent_time and (time.time() - _prev_sent_time) < 3600:
+                if _prev_sent_time and (time.time() - _prev_sent_time) < 14400:
                     log.info(f"⏭️ Señal duplicada ignorada (cache): {_dedup_key} (enviada hace {(time.time() - _prev_sent_time):.0f}s)")
                     return
                 # Check 2: cooldown por PAR+DIRECCIÓN+CANAL — máx 1 señal cada 30 min del mismo par POR CANAL
@@ -3760,11 +3965,20 @@ async def main():
                     log.info(f"⏭️ Cooldown activo: {_pair_key_with_ch} (última hace {(time.time() - _prev_pair_time):.0f}s < 1800s)")
                     return
                 # Check 3: _open_signals — ya hay señal abierta del mismo par+dirección
+                # FIX 2026-04-21: Si existe una abierta con MISMA entry (round 2 dec), bloquear
+                # SIN límite de tiempo (es literalmente la misma señal). Si entry distinto, mantener
+                # cooldown 1h como antes para no bloquear giros legítimos del mercado.
                 with _signals_lock:
                     for _sid, _sdata in _open_signals.items():
                         _s = _sdata.get("signal", {})
                         _existing_pair_key = f"{_s.get('pair','')}_{_s.get('direction','')}"
-                        if _existing_pair_key == _pair_key and (time.time() - _sdata.get("sent_at", 0)) < 3600:
+                        if _existing_pair_key != _pair_key:
+                            continue
+                        _existing_entry = round(_s.get("entry", 0) or 0, 2)
+                        if _existing_entry == _entry_round and _entry_round > 0:
+                            log.info(f"⏭️ Señal duplicada exacta ignorada: {_pair_key} entry={_entry_round} ya abierta")
+                            return
+                        if (time.time() - _sdata.get("sent_at", 0)) < 3600:
                             log.info(f"⏭️ Señal ignorada: ya hay {_pair_key} abierta (últimos 60 min)")
                             return
 
@@ -3869,10 +4083,11 @@ async def main():
                 _pk_ch = f"{_pk}_{chat.title}"
                 _recently_sent[_dk] = time.time()
                 _recently_sent[_pk_ch] = time.time()  # Cooldown por par+canal
-                # Limpiar entradas viejas (>2h) para no acumular memoria
+                # Limpiar entradas viejas (>5h) para no acumular memoria
                 # FIX 2026-04-16: dict.update() no borra claves → limpiar correctamente
+                # FIX 2026-04-21: subido a 5h porque dedup _dk ahora dura 4h
                 _now = time.time()
-                _stale_sent = [k for k, v in _recently_sent.items() if _now - v >= 7200]
+                _stale_sent = [k for k, v in _recently_sent.items() if _now - v >= 18000]
                 for _sk in _stale_sent:
                     _recently_sent.pop(_sk, None)
                 if msg_id:
