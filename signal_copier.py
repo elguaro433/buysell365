@@ -2618,6 +2618,15 @@ def parse_signal(text, chat_title=""):
     """Parse trading signal from text. Returns dict or None.
     Soporta formatos: SureShotFX, Learn2Trade VIP.
     """
+    try:
+        return _parse_signal_impl(text, chat_title)
+    except Exception as _e_parse:
+        log.exception(f"parse_signal crash en [{chat_title}]: {_e_parse} | text={text[:120].replace(chr(10),' ')!r}")
+        return None
+
+
+def _parse_signal_impl(text, chat_title=""):
+    """Implementación real de parse_signal (envuelta con try/except defensivo)."""
     if not text or len(text) < 10:
         return None
 
@@ -4104,7 +4113,7 @@ async def main():
                     log.info(f"📡 UPDATE MT5: {'✅' if executed else '❌'} {detail}")
 
         except Exception as e:
-            log.error(f"Error processing message: {e}")
+            log.exception(f"Error processing message: {e}")
 
     # ══════════════════════════════════════════════════════════════
     # Handler de mensajes EDITADOS — captura cuando el canal aliado
@@ -4199,7 +4208,7 @@ async def main():
             _published_msg_ids.add(msg_id)
 
         except Exception as e:
-            log.error(f"Error en edit_handler: {e}")
+            log.exception(f"Error en edit_handler: {e}")
 
     log.info("📡 Signal Copier iniciando...")
     log.info(f"📡 API ID: {API_ID}")
