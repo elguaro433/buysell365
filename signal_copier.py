@@ -56,6 +56,56 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [COPIER] %(message)s
                     handlers=_log_handlers)
 log = logging.getLogger("copier")
 
+# === FIX 2026-04-22: Capturar muertes silenciosas ===
+# El copier muere cada ~3 min sin logs. Instalamos handlers que capturan:
+# 1. faulthandler: segfaults y crashes de C extensions (MT5, cryptg, sqlite)
+# 2. sys.excepthook: excepciones no capturadas en thread principal
+# 3. threading.excepthook: excepciones en otros threads
+# 4. atexit: registra la salida del proceso (sea por donde sea)
+import sys, faulthandler, atexit, traceback as _tb
+try:
+    # faulthandler escribe al stderr en caso de segfault/fatal error
+    _fault_path = _log_dir / "copier_fault.log"
+    _fault_file = open(_fault_path, "a", encoding="utf-8")
+    faulthandler.enable(file=_fault_file, all_threads=True)
+    log.info(f"🔧 faulthandler activo → {_fault_path}")
+except Exception as _e_fh:
+    log.warning(f"🔧 faulthandler no se pudo activar: {_e_fh}")
+
+def _log_unhandled(exc_type, exc_value, exc_tb):
+    """Captura excepciones no capturadas en thread principal."""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    log.error("💥 EXCEPCIÓN NO CAPTURADA (thread principal):")
+    log.error("".join(_tb.format_exception(exc_type, exc_value, exc_tb)))
+sys.excepthook = _log_unhandled
+
+def _log_thread_exc(args):
+    """Captura excepciones en otros threads (Python 3.8+)."""
+    log.error(f"💥 EXCEPCIÓN EN THREAD {args.thread.name}:")
+    log.error("".join(_tb.format_exception(args.exc_type, args.exc_value, args.exc_traceback)))
+try:
+    threading.excepthook = _log_thread_exc
+except Exception:
+    pass
+
+@atexit.register
+def _log_exit():
+    """Loguea cuando el proceso sale (por cualquier motivo)."""
+    import sys as _sys_exit
+    log.warning(f"⚰️ COPIER SALIENDO — PID={os.getpid()}")
+    # Flush forzado para asegurar que el último log se escriba
+    for _h in log.handlers:
+        try: _h.flush()
+        except Exception: pass
+    try: _sys_exit.stderr.flush()
+    except Exception: pass
+
+# === GLOBALS para Story (FIX 2026-04-20) ===
+client = None          # TelegramClient global — se asigna en main()
+_main_loop = None      # Event loop principal — para run_coroutine_threadsafe desde hilos
+
 # === SYMBOL MAP — todos los pares de canales aliados (sin duplicados) ===
 SYMBOL_MAP = {
     # Oro
@@ -88,6 +138,8 @@ SYMBOL_MAP = {
     "CADCHF": "CADCHF",
     # Petróleo — XM usa "OILCash" (WTI) y "BRENTCash" (Brent)
     "USOIL": "OILCash", "WTI": "OILCash", "CRUDEOIL": "OILCash",
+    # Gas natural — XM usa "NGASCash"
+    "XNGUSD": "NGASCash", "NATGAS": "NGASCash", "NGAS": "NGASCash", "NG": "NGASCash",
     # Crypto (FxPremiere envía BTC/USD)
     # FIX 2026-04-12: XM usa "BTCUSD" (no "BTCUSDm")
     "BTCUSD": "BTCUSD",
@@ -111,6 +163,8 @@ _DISPLAY_MAP = {
     "BRENT": "BRENT", "UKOIL": "BRENT", "OIL": "BRENT",
     # Petróleo WTI
     "USOIL": "USOIL", "WTI": "USOIL",
+    # Gas natural
+    "NGASCash": "NATGAS", "XNGUSD": "NATGAS", "NATGAS": "NATGAS", "NGAS": "NATGAS",
     # Crypto
     "BTCUSD": "BTC/USD",
 }
@@ -125,11 +179,18 @@ def _get_display_pair(pair: str) -> str:
 
 
 def fmt_price(v, zero_label="—"):
-    """Formato de precio: 2 decimales para valores >= 100 (GOLD, índices),
-    hasta 5 decimales para forex. zero_label se muestra si v <= 0."""
+    """Formato de precio: 2 decimales para valores >= 100 (ORO, índices, JPY),
+    5 decimales fijos para Forex normal (sin trim de ceros — formato XM standard).
+    zero_label se muestra si v <= 0.
+
+    FIX 2026-04-21: antes hacía rstrip('0') y publicaba '1.358' en vez de '1.3580',
+    o '1.335' en vez de '1.3350' — se veía amateur. XM/MT5 usa 5 dec fijos en Forex
+    (5/3 en JPY pero 100<=v<200 cubre eso con 2 dec lo cual es aceptable, ej 158.79)."""
     if v <= 0:
         return zero_label
-    return f"{v:.2f}" if v >= 100 else f"{v:.5f}".rstrip("0").rstrip(".")
+    if v >= 100:
+        return f"{v:.2f}"
+    return f"{v:.5f}"
 
 
 # FIX 2026-04-12: Lock para yfinance — evita race condition entre señales simultáneas
@@ -160,6 +221,12 @@ OPEN_SIGNALS_FILE = Path(__file__).parent / "copier_open_signals.json"
 COPIER_STATS_FILE = Path(__file__).parent / "copier_stats.json"
 # Flag para enviar resumen diario solo una vez
 _daily_summary_sent: str = ""  # fecha "DD/MM/YYYY" del último resumen enviado
+_daily_publisher_sent: str = ""  # fecha "DD/MM/YYYY" del último publisher (19:00 Andorra → Canal VIP + Grupo + IG Story + Highlight)
+
+# === AUTO-CLOSE AL 50% DE GANANCIAS (INTERNO — sin mensaje al canal) ===
+# Set de tickets MT5 ya cerrados por esta regla (para no cerrar dos veces).
+_auto_half_closed_tickets: set = set()
+AUTO_HALF_CLOSE_PCT = 0.50  # Porcentaje del recorrido entry→TP para cerrar (50%)
 
 # === SEÑALES REGALO AL GRUPO PÚBLICO (2/día: 1 oro + 1 otra) ===
 # FIX 2026-04-17: Persistir a disco — antes se perdía en cada reinicio y se
@@ -169,6 +236,11 @@ _gift_tracker = {
     "date": "",            # "YYYY-MM-DD" — se resetea al cambiar el día
     "gold_gifted": False,  # ¿Ya se regaló la señal de oro hoy?
     "other_gifted": False, # ¿Ya se regaló la otra señal hoy?
+    # FIX 2026-04-23: tracking de par y resultado para resumen diario regalo
+    "gold_pair": None,     # Par regalado (oro), ej. "XAUUSD"
+    "other_pair": None,    # Par regalado (otro), ej. "EURAUD"
+    "gold_result": None,   # "tp" | "sl" | None (aún abierta)
+    "other_result": None,  # "tp" | "sl" | None (aún abierta)
 }
 _gift_lock = threading.Lock()
 
@@ -292,12 +364,27 @@ def _get_pips_info(pair: str, entry: float, exit_price: float) -> tuple:
 
 
 def _save_copier_stats(trade: dict) -> None:
-    """Persiste un trade cerrado a copier_stats.json. Limita a 90 días."""
+    """Persiste un trade cerrado a copier_stats.json. Limita a 90 días.
+    FIX 2026-04-19: write atómico con tmp+os.replace.
+    Antes: json.dump directo → si crash a media escritura (frecuente con watchdog activo),
+    el dashboard del launcher leía un JSON corrupto y mostraba el copier en 0.
+    """
     try:
         data = {"trades": []}
         if COPIER_STATS_FILE.exists():
-            with open(COPIER_STATS_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            try:
+                with open(COPIER_STATS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except json.JSONDecodeError:
+                # Si el archivo está corrupto, intentar el .bak
+                _bak = str(COPIER_STATS_FILE) + ".bak"
+                if os.path.exists(_bak):
+                    try:
+                        with open(_bak, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        log.warning(f"copier_stats principal corrupto — recuperado del .bak")
+                    except Exception:
+                        data = {"trades": []}
 
         data["trades"].append(trade)
 
@@ -305,8 +392,18 @@ def _save_copier_stats(trade: dict) -> None:
         cutoff = time.time() - (90 * 86400)
         data["trades"] = [t for t in data["trades"] if t.get("closed_at", 0) > cutoff]
 
-        with open(COPIER_STATS_FILE, "w", encoding="utf-8") as f:
+        # Backup rotativo
+        try:
+            if COPIER_STATS_FILE.exists():
+                import shutil as _sh
+                _sh.copy2(str(COPIER_STATS_FILE), str(COPIER_STATS_FILE) + ".bak")
+        except Exception:
+            pass
+        # Atomic write
+        _tmp = str(COPIER_STATS_FILE) + ".tmp"
+        with open(_tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(_tmp, str(COPIER_STATS_FILE))
     except Exception as e:
         log.warning(f"Error guardando copier_stats: {e}")
 
@@ -562,15 +659,16 @@ def _reconcile_open_vs_mt5() -> None:
             # Notificar al canal (sin celebración agresiva — solo info de cierre reconciliado)
             try:
                 import requests
-                emoji = "🎯" if result == "tp" else "🛑"
-                label = "TAKE PROFIT" if result == "tp" else "STOP LOSS"
-                sign = "+" if result == "tp" else "-"
-                msg = (
-                    f"{emoji} *{label} — {pair_d}*\n\n"
-                    f"Cierre detectado en MT5\n"
-                    f"Resultado: *{sign}{pips_num:.1f} {pips_unit}*\n"
-                    f"P&L: *${profit:.2f}*"
-                )
+                if result == "tp":
+                    msg = (
+                        f"🎯 *TAKE PROFIT — {pair_d}*\n\n"
+                        f"Resultado: *+{pips_num:.1f} {pips_unit}*\n"
+                        f"BuySell365 Pro ✅"
+                    )
+                else:
+                    # SL: mensaje motivacional con WR/Net del día (FIX 2026-04-21)
+                    _pips_str_rec = f" (-{pips_num:.0f} {pips_unit})" if pips_num > 0 else ""
+                    msg = _build_sl_motivational_msg(pair_d, pips_lost_str=_pips_str_rec, tps_previos=None)
                 url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
                 payload = {"chat_id": CHANNEL_ID, "text": msg, "parse_mode": "Markdown"}
                 if _reply_id:
@@ -747,6 +845,11 @@ def _should_gift_signal(pair: str) -> bool:
             _gift_tracker["date"] = today_str
             _gift_tracker["gold_gifted"] = False
             _gift_tracker["other_gifted"] = False
+            # FIX 2026-04-23: resetear también tracking de par y resultado
+            _gift_tracker["gold_pair"] = None
+            _gift_tracker["other_pair"] = None
+            _gift_tracker["gold_result"] = None
+            _gift_tracker["other_result"] = None
             _save_gift_tracker()
 
         # Si ya se regalaron las 2 del día, no regalar más
@@ -782,11 +885,15 @@ def _should_gift_signal(pair: str) -> bool:
                 prob = 0.10   # Madrugada — esperar
 
         if random.random() < prob:
-            # Marcar como regalada
+            # Marcar como regalada (FIX 2026-04-23: también guardar par para resumen diario)
             if is_gold:
                 _gift_tracker["gold_gifted"] = True
+                _gift_tracker["gold_pair"] = pair
+                _gift_tracker["gold_result"] = None  # pendiente
             else:
                 _gift_tracker["other_gifted"] = True
+                _gift_tracker["other_pair"] = pair
+                _gift_tracker["other_result"] = None  # pendiente
             _save_gift_tracker()  # FIX 2026-04-17: persistir tras mutar
             log.info(f"🎁 Señal REGALO seleccionada: {pair} ({'oro' if is_gold else 'otra'}) hora={hour} prob={prob:.0%}")
             return True
@@ -961,10 +1068,12 @@ def _validate_entry_vs_market(signal: dict) -> bool:
     live = None
     try:
         import MetaTrader5 as _mt5v
+        # FIX 2026-04-22: añadir GER40 (faltaba → caía a yfinance sin precio exacto del broker)
         _mt5_sym_map_v = {
             "GOLD": "GOLD", "XAUUSD": "GOLD", "ORO": "GOLD",
             "NAS100": "US100Cash", "NASDAQ": "US100Cash", "US100": "US100Cash",
             "US30": "US30Cash", "DOW": "US30Cash", "US500": "US500Cash",
+            "GER40": "GER40Cash", "DAX": "GER40Cash", "DE40": "GER40Cash",
             "USOIL": "OILCash", "BRENT": "BRENTCash", "BTCUSD": "BTCUSD",
         }
         _pair_clean = pair.upper().replace("/", "")
@@ -983,9 +1092,21 @@ def _validate_entry_vs_market(signal: dict) -> bool:
     if not live or live <= 0:
         return True  # sin precio de referencia no podemos validar
 
+    # FIX 2026-04-21 (M2): Tolerancia adaptativa por tipo de activo (antes 1.5% fijo — muy laxo).
+    # Forex: 0.5% (50 pips en un par 1.00000 = demasiado slippage)
+    # JPY pairs: 0.5% (mismo criterio — pip menor ya es 0.01)
+    # Oro/Índices: 0.8% (más volátiles, ~38 pts en ORO 4800)
+    # Crypto: 1.5% (volatilidad alta justificada)
+    _pair_u = pair.upper().replace("/", "")
+    if "BTC" in _pair_u or "ETH" in _pair_u:
+        _max_pct = 0.015  # 1.5% crypto
+    elif _pair_u in ("GOLD", "XAUUSD", "ORO") or _pair_u.endswith("CASH") or _pair_u in ("NAS100", "US30", "US500", "GER40", "USOIL", "BRENT"):
+        _max_pct = 0.008  # 0.8% oro/índices/petróleo
+    else:
+        _max_pct = 0.005  # 0.5% forex
     pct_diff = abs(entry - live) / live
-    if pct_diff > 0.015:  # >1.5% de diferencia → señal stale, descartar
-        log.warning(f"🚫 Entry stale RECHAZADA: {pair} entry={entry} difiere {pct_diff:.1%} del precio actual {live:.2f} (>1.5% → señal vieja, no publicable)")
+    if pct_diff > _max_pct:
+        log.warning(f"🚫 Entry stale RECHAZADA: {pair} entry={entry} difiere {pct_diff:.1%} del precio actual {live:.2f} (>{_max_pct:.1%} → señal vieja)")
         signal["_rejected_stale"] = True
         return False
     return True
@@ -1083,7 +1204,7 @@ def _get_current_price(pair: str) -> float | None:
     return None
 
 
-def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, title_override: str = "", tp_levels: list = None) -> bytes | None:
+def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, title_override: str = "", tp_levels: list = None, signal_sent_at: float = 0) -> bytes | None:
     """Generate professional chart using Twelve Data (primary) or yfinance (fallback) + matplotlib.
     title_override: si se pasa, usa ese título en vez de 'TP HIT'.
     tp_levels: lista de tuplas [("TP1", precio), ("TP2", precio), ...] para dibujar múltiples líneas."""
@@ -1120,31 +1241,44 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
             _mt5_sym_chart = _mt5_chart_map.get(pair.upper(), pair.upper())
             if _mt5_chart.initialize():
                 _mt5_chart.symbol_select(_mt5_sym_chart, True)
-                # Intentar varios timeframes/tamaños para que el gráfico incluya
-                # tanto la entrada como el TP (el precio pudo haber rebotado)
+                # FIX 2026-04-22: Si tenemos el timestamp de la señal, buscar desde ese momento
+                # para que el gráfico muestre el movimiento real de la operación.
                 _best_rates = None
-                _target_prices = [p for p in [entry, tp] if p > 0]
+                _target_tps  = [p for p in [tp] if p > 0]  # Solo TP para cobertura (entry puede ser stale)
+
+                # Calcular cuántas velas M15 necesitamos desde signal_sent_at hasta ahora
+                if signal_sent_at > 0:
+                    from datetime import datetime as _dt_c
+                    _elapsed_min = (time.time() - signal_sent_at) / 60
+                    # Añadir margen del 50% y limitar a 200 velas
+                    _m15_needed = min(int(_elapsed_min / 15 * 1.5) + 10, 200)
+                    _m5_needed  = min(int(_elapsed_min / 5  * 1.5) + 10, 200)
+                    log.info(f"📊 Señal tiene {_elapsed_min:.0f}min → buscando {_m15_needed} velas M15")
+                else:
+                    _m15_needed = 80
+                    _m5_needed  = 80
+
                 for _tf, _tf_name, _count in [
-                    (_mt5_chart.TIMEFRAME_M5, "M5", 80),
-                    (_mt5_chart.TIMEFRAME_M15, "M15", 80),
-                    (_mt5_chart.TIMEFRAME_M30, "M30", 60),
-                    (_mt5_chart.TIMEFRAME_H1, "H1", 50),
+                    (_mt5_chart.TIMEFRAME_M5,  "M5",  _m5_needed),
+                    (_mt5_chart.TIMEFRAME_M15, "M15", _m15_needed),
+                    (_mt5_chart.TIMEFRAME_M30, "M30", 100),
+                    (_mt5_chart.TIMEFRAME_H1,  "H1",  72),
                 ]:
                     _rates = _mt5_chart.copy_rates_from_pos(_mt5_sym_chart, _tf, 0, _count)
                     if _rates is None or len(_rates) < 10:
                         continue
-                    # Verificar que las velas cubren el rango entry-TP
-                    _all_lows = [float(r['low']) for r in _rates]
+                    _all_lows  = [float(r['low'])  for r in _rates]
                     _all_highs = [float(r['high']) for r in _rates]
-                    _data_min = min(_all_lows)
-                    _data_max = max(_all_highs)
-                    _covers_all = all(_data_min <= p <= _data_max for p in _target_prices)
-                    if _covers_all:
+                    _data_min  = min(_all_lows)
+                    _data_max  = max(_all_highs)
+                    # Cobertura solo por TPs (no forzar entry stale)
+                    _covers_tps = all(_data_min <= p <= _data_max for p in _target_tps)
+                    if _covers_tps:
                         _best_rates = _rates
-                        log.info(f"📊 Chart {_tf_name} cubre entry+TP ({len(_rates)} velas)")
+                        log.info(f"📊 Chart {_tf_name} cubre TPs ({len(_rates)} velas)")
                         break
                     if _best_rates is None:
-                        _best_rates = _rates  # Guardar como fallback
+                        _best_rates = _rates  # fallback
                 if _best_rates is not None and len(_best_rates) >= 10:
                     opens  = [float(r['open'])  for r in _best_rates]
                     closes = [float(r['close']) for r in _best_rates]
@@ -1325,17 +1459,36 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         ax.tick_params(colors=TEXT, labelsize=9)
         ax.set_xlim(-1, n + 9)  # Espacio para labels (más ancho para múltiples TPs)
 
-        # FIX 2026-04-15: Forzar eje Y para incluir entry y todos los TPs
-        # Si las velas no cubren el rango, el gráfico se veía cortado/incoherente
-        _y_prices = [v for v in [entry, tp] if v > 0]
-        for _tp_item in (_all_tps if tp_levels else []):
-            if _tp_item[1] > 0:
-                _y_prices.append(_tp_item[1])
-        if _y_prices and lows and highs:
-            _chart_min = min(min(lows), min(_y_prices))
-            _chart_max = max(max(highs), max(_y_prices))
-            _margin = (_chart_max - _chart_min) * 0.08
-            ax.set_ylim(_chart_min - _margin, _chart_max + _margin)
+        # FIX 2026-04-22: Eje Y inteligente — centrar en precio real (velas + TPs)
+        # Si el entry está muy lejos del rango de velas (señal con entry stale),
+        # NO forzar el eje a incluirlo: las velas quedarían comprimidas y la imagen se vería mal.
+        # Solo forzamos TPs (son precios que SÍ se alcanzaron o están cerca).
+        _tp_prices = [v for v in ([tp] + [t[1] for t in (_all_tps if tp_levels else [])]) if v > 0]
+        _candle_min = min(lows)
+        _candle_max = max(highs)
+        # Calcular rango base: velas + TPs (siempre incluir TPs porque son relevantes)
+        _range_min = min([_candle_min] + _tp_prices)
+        _range_max = max([_candle_max] + _tp_prices)
+        # Incluir entry en el eje solo si está dentro del 2% del rango de velas
+        _entry_in_range = (
+            entry > 0 and
+            _candle_min * 0.98 <= entry <= _candle_max * 1.02
+        )
+        if _entry_in_range:
+            _range_min = min(_range_min, entry)
+            _range_max = max(_range_max, entry)
+        _margin = (_range_max - _range_min) * 0.10
+        ax.set_ylim(_range_min - _margin, _range_max + _margin)
+        # Si entry está fuera de rango, reemplazar línea de entrada por una anotación en el borde
+        if not _entry_in_range and entry > 0:
+            # Dibujar solo una etiqueta en el borde del eje (sin línea)
+            _entry_y_pct = 0.97 if entry > _range_max else 0.03
+            ax.annotate(
+                f"↑ Entrada {fmt_price(entry)}" if entry > _range_max else f"↓ Entrada {fmt_price(entry)}",
+                xy=(n * 0.02, _range_min + (_range_max - _range_min) * _entry_y_pct),
+                fontsize=9, color=ENTRY_COLOR, fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="#131722", edgecolor=ENTRY_COLOR, alpha=0.8)
+            )
 
         for spine in ax.spines.values():
             spine.set_visible(False)
@@ -1451,7 +1604,11 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
         f"🚀 _BuySell365 Pro — señal exitosa_"
     )
 
-    chart_bytes = _fetch_chart_image(pair, direction, entry, tp, tp_levels=_valid_display if len(_valid_display) > 1 else None)
+    # FIX 2026-04-22: pasar sent_at para que el chart cubra el movimiento real de la señal
+    _chart_sent_at = signal.get("sent_at", 0) or signal.get("timestamp", 0) or 0
+    chart_bytes = _fetch_chart_image(pair, direction, entry, tp,
+                                     tp_levels=_valid_display if len(_valid_display) > 1 else None,
+                                     signal_sent_at=_chart_sent_at)
 
     # FIX 2026-04-16: Video compacto 720x720 solo para GRUPO, VIP recibe foto como siempre
     _tg_video_path = None   # Video compacto para grupo público
@@ -1498,6 +1655,19 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     if GROUP_ID and str(GROUP_ID) != str(CHANNEL_ID):
         import random
 
+        # FIX 2026-04-21: GRUPO PÚBLICO solo muestra el TP ALCANZADO, NUNCA los TPs
+        # pendientes (⏳). Eso es contenido VIP — los próximos niveles son parte del
+        # producto pagado y no deben filtrarse al grupo gratuito.
+        # Encontrar el último TP alcanzado (el más lejano de la entrada)
+        _tps_alcanzados_grupo = [(_lbl, _v) for _lbl, _v in _valid_display if _tp_hit(_v, tp)]
+        if _tps_alcanzados_grupo:
+            _ult_label, _ult_val = _tps_alcanzados_grupo[-1]
+            tp_lines_publico = f"\n✅ {_ult_label}: {fmt(_ult_val)}"
+        elif tp > 0:
+            tp_lines_publico = f"\n✅ TP: {fmt(tp)}"
+        else:
+            tp_lines_publico = ""
+
         if _was_gifted:
             # ── CELEBRACIÓN ESPECIAL para señales REGALO ──
             _msg_grupo = (
@@ -1505,7 +1675,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 f"━━━━━━━━━━━━━━\n"
                 f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
                 f"📍 Entrada: {fmt(entry)}"
-                f"{tp_lines}"
+                f"{tp_lines_publico}"
                 f"{pips_line}\n"
                 f"━━━━━━━━━━━━━━\n"
                 f"🎁 *¡La señal REGALO tocó TP!*\n"
@@ -1514,6 +1684,17 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 f"👉 Escribe */vip* para unirte"
             )
             log.info(f"🎁🎯 GIFT TP CELEBRATION: {pair_d} {pips_str}")
+            # FIX 2026-04-23: registrar resultado "tp" en gift_tracker para resumen diario
+            try:
+                with _gift_lock:
+                    _is_gold_g = pair.upper() in ("GOLD", "XAUUSD", "XAUUSD=X")
+                    if _is_gold_g:
+                        _gift_tracker["gold_result"] = "tp"
+                    else:
+                        _gift_tracker["other_result"] = "tp"
+                    _save_gift_tracker()
+            except Exception as _egt:
+                log.debug(f"gift_tracker tp update error: {_egt}")
         else:
             _promos = [
                 "\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
@@ -1526,7 +1707,7 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 f"━━━━━━━━━━━━━━\n"
                 f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
                 f"📍 Entrada: {fmt(entry)}"
-                f"{tp_lines}"
+                f"{tp_lines_publico}"
                 f"{pips_line}\n"
                 f"━━━━━━━━━━━━━━\n"
                 f"🚀 _BuySell365 Pro — señal exitosa_"
@@ -1665,6 +1846,17 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
             f"👉 Escribe */vip* para unirte"
         )
         log.info(f"🎁🎯 GIFT CLOSE CELEBRATION: {pair_d} {pips_str}")
+        # FIX 2026-04-23: registrar resultado "tp" en gift_tracker para resumen diario
+        try:
+            with _gift_lock:
+                _is_gold_gc = pair.upper() in ("GOLD", "XAUUSD", "XAUUSD=X")
+                if _is_gold_gc:
+                    _gift_tracker["gold_result"] = "tp"
+                else:
+                    _gift_tracker["other_result"] = "tp"
+                _save_gift_tracker()
+        except Exception as _egc:
+            log.debug(f"gift_tracker close tp update error: {_egc}")
     else:
         _promos = [
             "\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
@@ -1764,6 +1956,68 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
     log.info(f"🎉 Close celebration completa: {action} {pair_d} {pips_str}")
 
 
+def _build_sl_motivational_msg(pair_d: str, pips_lost_str: str = "", tps_previos: list = None) -> str:
+    """Construye el mensaje motivacional de SL que se publica al canal VIP.
+
+    FIX 2026-04-21: reemplaza el mensaje antiguo "SL tocado. Operación cerrada.
+    BuySell365 Pro 💪" por un formato que mantiene transparencia pero añade
+    contexto estadístico (WR del día, net del día) para que los suscriptores
+    entiendan que un SL aislado no define el resultado global.
+
+    Si tps_previos existe, genera variante "CIERRE TOTAL — X TPs asegurados antes".
+    """
+    # Calcular WR y Net del día desde _daily_results (tracker en memoria)
+    _wr_line = ""
+    _net_line = ""
+    try:
+        with _daily_results_lock:
+            _tps_hoy = [r for r in _daily_results if r.get("result") == "tp"]
+            _sls_hoy = [r for r in _daily_results if r.get("result") == "sl"]
+            _pips_tp = sum(r.get("pips_numeric", 0) for r in _tps_hoy)
+            _pips_sl = sum(r.get("pips_numeric", 0) for r in _sls_hoy)
+        _decididas = len(_tps_hoy) + len(_sls_hoy)
+        if _decididas > 0:
+            _wr = round(len(_tps_hoy) / _decididas * 100)
+            _wr_line = f"   ✅ Win Rate hoy: *{_wr}%*\n"
+        _net = _pips_tp - _pips_sl
+        if abs(_net) > 0:
+            _sign = "+" if _net >= 0 else ""
+            _net_line = f"   ✅ Net del día: *{_sign}{_net:.0f} pts/pips*\n"
+    except Exception:
+        pass
+
+    _stats_block = ""
+    if _wr_line or _net_line:
+        _stats_block = f"\n📊 *El sistema sigue ganando:*\n{_wr_line}{_net_line}"
+
+    if tps_previos:
+        # Variante con TPs alcanzados antes — CIERRE TOTAL motivacional
+        n_tps = len(tps_previos)
+        _tps_lines = "\n".join(f"✅ TP{t['nivel']}: +{abs(t.get('pips', 0)):.0f} pts asegurados" for t in tps_previos)
+        return (
+            f"🏁 *CIERRE TOTAL — {pair_d}*\n\n"
+            f"{_tps_lines}\n"
+            f"📉 Resto cerrado al SL{pips_lost_str}\n"
+            f"{_stats_block}\n"
+            f"💎 *Esta es la magia del multi-TP:*\n"
+            f"aseguramos ganancias antes que el mercado revierta.\n\n"
+            f"🔜 Próxima señal en camino 🚀\n"
+            f"━━━━━━━━━━━━━━\n"
+            f"_BuySell365 Pro — Disciplina que paga_"
+        )
+
+    return (
+        f"🛡️ *STOP LOSS — {pair_d}*\n\n"
+        f"📉 Operación cerrada con riesgo controlado{pips_lost_str}.\n"
+        f"{_stats_block}\n"
+        f"💎 *Perder poco cuando toca es lo que separa\n"
+        f"a un trader profesional de un aficionado.*\n\n"
+        f"🔜 Próxima señal en camino 🚀\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"_BuySell365 Pro — Disciplina que paga_"
+    )
+
+
 def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
     """Notify channel that SL was hit — same professional model as TP HIT.
     FIX 2026-04-17: Si la señal tocó TPs antes, mostrar el NETO real (no solo pérdida)."""
@@ -1794,45 +2048,10 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
             return f"{signo}{v * 10000:.0f} pips"
 
     # FIX 2026-04-17: Verificar si la señal ya tocó TPs antes → mensaje CIERRE NETO
+    # FIX 2026-04-21: Mensaje motivacional con WR/Net del día (ya no "SL tocado 💪")
     tps_previos = signal.get("_tps_alcanzados", []) or []
-    _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
-
-    if tps_previos:
-        # Calcular neto: suma de pips TPs - pips perdidos en último segmento
-        pips_ganados_tps = sum(t.get("pips", 0) for t in tps_previos)
-        # Asumimos gestión profesional: cada TP cierra 1/(N+1) de la posición, resto al SL
-        # Simplificación: neto = ganancias acumuladas de TPs - pérdida parcial restante
-        n_tps = len(tps_previos)
-        # Si tocaron todos los TPs declarados, el resto es pequeño; si no, el SL afecta proporcional
-        pips_netos = pips_ganados_tps - pips_lost
-        signo_neto = "+" if pips_netos >= 0 else ""
-        emoji_neto = "✅" if pips_netos >= 0 else "⚠️"
-
-        tps_lines = "\n".join(
-            f"✅ TP{t['nivel']}: {_fmt_pips(t.get('pips',0),'+')}" for t in tps_previos
-        )
-        msg = (
-            f"🏁 *CIERRE TOTAL* 🏁\n"
-            f"━━━━━━━━━━━━━━\n"
-            f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-            f"📍 Entrada: {fmt(entry)}\n"
-            f"{tps_lines}\n"
-            f"🛡️ SL final: {fmt(sl)}  ({_fmt_pips(pips_lost,'-')} última parte)\n\n"
-            f"{emoji_neto} *Neto: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
-            f"━━━━━━━━━━━━━━\n"
-            f"📊 _BuySell365 Pro — {n_tps} TP(s) asegurado(s) antes del cierre_"
-        )
-    else:
-        # Sin TPs previos: mensaje SL normal
-        msg = (
-            f"🛑🛑 *SL TOCADO* 🛑🛑\n"
-            f"━━━━━━━━━━━━━━\n"
-            f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-            f"📍 Entrada: {fmt(entry)}\n"
-            f"🛡️ SL: {fmt(sl)}  ({_fmt_pips(pips_lost,'-')})\n"
-            f"━━━━━━━━━━━━━━\n"
-            f"📊 _BuySell365 Pro — gestión de riesgo_"
-        )
+    _pips_str = f" ({_fmt_pips(pips_lost, '-')})" if pips_lost > 0 else ""
+    msg = _build_sl_motivational_msg(pair_d, pips_lost_str=_pips_str, tps_previos=tps_previos)
 
     # FIX 2026-04-07: Sin gráfica para SL — solo texto
     try:
@@ -2048,7 +2267,8 @@ def _build_promo_report(hora_label: str) -> str | None:
     with _daily_results_lock:
         # Solo resultados de hoy (por si acaso hay remanentes)
         today_start = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
-        results = [r for r in _daily_results if r["time"] >= today_start]
+        # FIX 2026-04-22: los dicts usan "closed_at" (no "time") — .get() para ambas claves
+        results = [r for r in _daily_results if r.get("closed_at", r.get("time", 0)) >= today_start]
 
     tps = [r for r in results if r["result"] == "tp"]
     sls = [r for r in results if r["result"] == "sl"]
@@ -2093,6 +2313,234 @@ def _build_promo_report(hora_label: str) -> str | None:
         f"_BuySell365 Pro — Resultados reales, verificados en MT5_"
     )
     return msg
+
+
+# ═══════════════════════════════════════════════════════════════
+# 📅 CALENDARIO ECONÓMICO DIARIO — 7:30 AM hora Andorra
+# Genera imagen + caption y lo publica en el canal VIP cada mañana
+# ═══════════════════════════════════════════════════════════════
+
+def _generar_imagen_calendario(eventos: list) -> bytes | None:
+    """Genera imagen estilo ProSignalsFX con los eventos de alto impacto del día."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import requests as _req
+        from io import BytesIO
+
+        FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        FONT_REG  = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        SIZE      = 1080
+        BG        = (10, 10, 10)
+        GOLD      = (212, 175, 55)
+        GOLD_L    = (230, 200, 90)
+        WHITE     = (245, 245, 245)
+
+        CURRENCY_CC = {
+            "USD":"us","EUR":"eu","GBP":"gb","CAD":"ca","JPY":"jp",
+            "AUD":"au","NZD":"nz","CHF":"ch","CNY":"cn","SEK":"se",
+            "NOK":"no","DKK":"dk","SGD":"sg","MXN":"mx","BRL":"br",
+        }
+
+        def _get_flag(cc, w=68, h=45):
+            try:
+                r = _req.get(f"https://flagcdn.com/w80/{cc}.png", timeout=5)
+                flag = Image.open(BytesIO(r.content)).convert("RGBA")
+                return flag.resize((w, h), Image.LANCZOS)
+            except:
+                return None
+
+        PAD     = 40
+        TITLE_H = 160
+        HDR_H   = 65
+        N       = max(len(eventos), 1)
+        ROW_H   = 112
+        TABLE_H = HDR_H + N * ROW_H
+        IMG_H   = TITLE_H + TABLE_H + PAD
+
+        img = Image.new("RGB", (SIZE, IMG_H), BG)
+        d   = ImageDraw.Draw(img)
+
+        f_brand = ImageFont.truetype(FONT_BOLD, 62)
+        f_sub   = ImageFont.truetype(FONT_BOLD, 30)
+        f_hdr   = ImageFont.truetype(FONT_BOLD, 22)
+        f_time  = ImageFont.truetype(FONT_BOLD, 32)
+        f_curr  = ImageFont.truetype(FONT_BOLD, 22)
+        f_event = ImageFont.truetype(FONT_BOLD, 25)
+
+        # Título
+        brand = "BuySell365 Pro"
+        bw = d.textlength(brand, font=f_brand)
+        d.text(((SIZE-bw)/2, 18), brand, font=f_brand, fill=GOLD)
+        sub = "H I G H   I M P A C T   N E W S"
+        sw = d.textlength(sub, font=f_sub)
+        d.text(((SIZE-sw)/2, 100), sub, font=f_sub, fill=GOLD_L)
+
+        TL = PAD; TR = SIZE - PAD; TT = TITLE_H; TB = TT + TABLE_H
+        col_curr = TL + 185; col_ev = TL + 400
+
+        d.rectangle([(TL, TT), (TR, TB)], outline=GOLD, width=3)
+        hdr_bot = TT + HDR_H
+        d.line([(TL, hdr_bot), (TR, hdr_bot)], fill=GOLD, width=3)
+        d.line([(col_curr, TT), (col_curr, hdr_bot)], fill=GOLD, width=2)
+        d.line([(col_ev,   TT), (col_ev,   hdr_bot)], fill=GOLD, width=2)
+        d.text((TL + 28,      TT + 20), "TIME",     font=f_hdr, fill=GOLD)
+        d.text((col_curr + 28, TT + 20), "CURRENCY", font=f_hdr, fill=GOLD)
+        d.text((col_ev   + 28, TT + 20), "EVENTS",   font=f_hdr, fill=GOLD)
+
+        for i, ev in enumerate(eventos):
+            y0 = hdr_bot + i * ROW_H; y1 = y0 + ROW_H; yc = (y0 + y1) // 2
+            d.line([(TL, y1), (TR, y1)], fill=GOLD, width=1)
+            d.line([(col_curr, y0), (col_curr, y1)], fill=GOLD, width=2)
+            d.line([(col_ev,   y0), (col_ev,   y1)], fill=GOLD, width=2)
+
+            tw = d.textlength(ev['time'], font=f_time)
+            d.text((TL + (col_curr - TL - tw)/2, yc - 17), ev['time'], font=f_time, fill=WHITE)
+
+            cc   = CURRENCY_CC.get(ev['currency'], 'un')
+            flag = _get_flag(cc)
+            fx   = col_curr + 18; fy = yc - 22
+            if flag:
+                img.paste(flag, (fx, fy), flag)
+            d.text((fx + 76, yc - 13), ev['currency'], font=f_curr, fill=WHITE)
+
+            max_w = TR - col_ev - 40
+            words = ev['title'].split(); lines, cur = [], ""
+            for w in words:
+                test = (cur + " " + w).strip()
+                if d.textlength(test, font=f_event) <= max_w:
+                    cur = test
+                else:
+                    if cur: lines.append(cur)
+                    cur = w
+            if cur: lines.append(cur)
+            lines = lines[:2]; lh = 32
+            ty = yc - (len(lines) * lh) // 2
+            for ln in lines:
+                d.text((col_ev + 22, ty), ln, font=f_event, fill=WHITE)
+                ty += lh
+
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception as _e:
+        log.warning(f"📅 Error generando imagen calendario: {_e}")
+        return None
+
+
+async def _loop_calendario_diario() -> None:
+    """Publica el calendario económico de alto impacto cada día a las 7:30h (hora Andorra)."""
+    import requests as _req
+    from datetime import datetime
+    import pytz
+
+    tz      = pytz.timezone("Europe/Andorra")
+    _sent   = {}  # {"2026-04-22": True}
+
+    CURRENCY_CC = {
+        "USD":"us","EUR":"eu","GBP":"gb","CAD":"ca","JPY":"jp",
+        "AUD":"au","NZD":"nz","CHF":"ch","CNY":"cn",
+    }
+    # Emojis bandera por moneda para el caption
+    FLAG_EMOJI = {
+        "USD":"🇺🇸","EUR":"🇪🇺","GBP":"🇬🇧","CAD":"🇨🇦","JPY":"🇯🇵",
+        "AUD":"🇦🇺","NZD":"🇳🇿","CHF":"🇨🇭","CNY":"🇨🇳","SEK":"🇸🇪",
+        "NOK":"🇳🇴","DKK":"🇩🇰","SGD":"🇸🇬","MXN":"🇲🇽","BRL":"🇧🇷",
+    }
+
+    while True:
+        try:
+            now     = datetime.now(tz)
+            hoy_str = now.strftime("%Y-%m-%d")
+
+            if now.hour == 7 and now.minute >= 30 and now.minute < 35 and _sent.get(hoy_str) != True:
+                _sent[hoy_str] = True
+
+                # Obtener eventos de hoy
+                try:
+                    _r = _req.get(
+                        "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+                        timeout=10, headers={"User-Agent": "Mozilla/5.0"}
+                    )
+                    _data = _r.json() if _r.status_code == 200 else []
+                except:
+                    _data = []
+
+                hoy = now.date()
+                eventos = []
+                for e in _data:
+                    if e.get("impact", "").lower() != "high":
+                        continue
+                    try:
+                        dt = datetime.fromisoformat(e["date"]).astimezone(tz)
+                        if dt.date() == hoy:
+                            eventos.append({
+                                "time":     dt.strftime("%H:%M"),
+                                "currency": e["country"],
+                                "title":    e["title"],
+                                "dt":       dt,
+                            })
+                    except:
+                        pass
+                eventos.sort(key=lambda x: x["dt"])
+
+                if not eventos:
+                    log.info("📅 Calendario: sin eventos de alto impacto hoy")
+                    await asyncio.sleep(60)
+                    continue
+
+                # Generar imagen
+                img_bytes = _generar_imagen_calendario(eventos)
+
+                # Caption corto y dinámico
+                divisas_unicas = list(dict.fromkeys(ev["currency"] for ev in eventos))
+                divisas_str    = ", ".join(
+                    f"{FLAG_EMOJI.get(d,'')}{d}" for d in divisas_unicas
+                )
+                # Evento más importante (prioridad: Fed/FOMC/CPI/NFP)
+                _CRITICOS = ["fed","fomc","nfp","cpi","gdp","rate","payroll","inflation","retail"]
+                top_ev = eventos[-1]  # fallback: último del día
+                for ev in eventos:
+                    if any(k in ev["title"].lower() for k in _CRITICOS):
+                        top_ev = ev
+                        break
+
+                caption = (
+                    f"⚠️ *CALENDARIO ECONÓMICO* ⚠️\n\n"
+                    f"📊 *{len(eventos)} eventos de alto impacto hoy* — Hora España (GMT+2)\n\n"
+                    f"❗️ Alta volatilidad esperada en pares de {divisas_str}. "
+                    f"¡Ten cuidado con tus operaciones abiertas\\!\n\n"
+                    f"🔥 Atención especial\\: *{top_ev['title']}* {top_ev['time']}h \\({top_ev['currency']}\\)\n\n"
+                    f"BuySell365 Pro"
+                )
+
+                # Enviar al canal
+                try:
+                    url_base = f"https://api.telegram.org/bot{BOT_TOKEN}"
+                    if img_bytes:
+                        import io as _io
+                        resp = _req.post(
+                            f"{url_base}/sendPhoto",
+                            data={"chat_id": CHANNEL_ID, "caption": caption, "parse_mode": "MarkdownV2"},
+                            files={"photo": ("calendario.png", _io.BytesIO(img_bytes), "image/png")},
+                            timeout=20,
+                        )
+                    else:
+                        resp = _req.post(
+                            f"{url_base}/sendMessage",
+                            json={"chat_id": CHANNEL_ID, "text": caption, "parse_mode": "MarkdownV2"},
+                            timeout=10,
+                        )
+                    if resp.status_code == 200:
+                        log.info(f"📅 Calendario económico publicado ({len(eventos)} eventos)")
+                    else:
+                        log.warning(f"📅 Error publicando calendario: {resp.status_code} {resp.text[:200]}")
+                except Exception as _e:
+                    log.warning(f"📅 Error enviando calendario: {_e}")
+
+        except Exception as _e:
+            log.warning(f"📅 Loop calendario error: {_e}")
+
+        await asyncio.sleep(60)
 
 
 async def _loop_promo_reportes() -> None:
@@ -2167,7 +2615,8 @@ async def _loop_promo_reportes() -> None:
                 if ADMIN_ID:
                     with _daily_results_lock:
                         today_start = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
-                        results = [r for r in _daily_results if r["time"] >= today_start]
+                        # FIX 2026-04-22: usar closed_at (no "time")
+                        results = [r for r in _daily_results if r.get("closed_at", r.get("time", 0)) >= today_start]
                     tps = [r for r in results if r["result"] == "tp"]
                     sls = [r for r in results if r["result"] == "sl"]
                     with _signals_lock:
@@ -2209,7 +2658,7 @@ async def _loop_promo_reportes() -> None:
 async def _monitor_tp_loop() -> None:
     """Async background loop — checks every 30s if any tracked signal hit TP or SL."""
     log.info("🎯 Monitor TP/SL loop iniciado (intervalo: 30s)")
-    global _daily_summary_sent
+    global _daily_summary_sent, _daily_publisher_sent
     _sent_today = {}  # FIX 2026-04-16: Variable local para promo/follow diarios (antes NameError)
     _reconcile_tick = 0  # FIX 2026-04-17: contador para reconciliación MT5 cada 3 min
     while True:
@@ -2224,18 +2673,108 @@ async def _monitor_tp_loop() -> None:
             except Exception as _e_rec:
                 log.warning(f"Reconcile error: {_e_rec}")
 
-        # ── FIX 2026-04-15: Resumen diario automático a las 22:00 hora Andorra ──
+        # ── AUTO-CLOSE AL 50% DE GANANCIAS (INTERNO — sin mensaje al canal) ──
+        # Cierra cualquier posición del copier cuando alcanza la mitad del camino entry→TP.
+        # Funciona para todos los activos. Silencioso: solo log, sin publicar al canal.
+        try:
+            import MetaTrader5 as _mt5_half
+            _all_pos_half = _mt5_half.positions_get() or []
+            for _p in _all_pos_half:
+                if getattr(_p, "magic", 0) != MAGIC_COPIER:
+                    continue
+                if _p.ticket in _auto_half_closed_tickets:
+                    continue
+                _entry_h = _p.price_open
+                _tp_h    = _p.tp        # TP configurado en la posición MT5
+                if _tp_h <= 0 or _entry_h <= 0:
+                    continue  # Sin TP fijado, no podemos calcular el 50%
+                # Precio actual de mercado
+                _tick_h = _mt5_half.symbol_info_tick(_p.symbol)
+                if not _tick_h:
+                    continue
+                _cur_h = _tick_h.bid if _p.type == 0 else _tick_h.ask  # BUY→bid, SELL→ask
+                # Calcular objetivo del 50%
+                _is_buy_h = (_p.type == 0)  # ORDER_TYPE_BUY = 0
+                if _is_buy_h:
+                    _half_target = _entry_h + (_tp_h - _entry_h) * AUTO_HALF_CLOSE_PCT
+                    _hit_half    = _cur_h >= _half_target
+                else:
+                    _half_target = _entry_h - (_entry_h - _tp_h) * AUTO_HALF_CLOSE_PCT
+                    _hit_half    = _cur_h <= _half_target
+                if not _hit_half:
+                    continue
+                # ── Cerrar la posición en MT5 silenciosamente ──
+                _close_type  = _mt5_half.ORDER_TYPE_SELL if _is_buy_h else _mt5_half.ORDER_TYPE_BUY
+                _close_price = _tick_h.bid if _is_buy_h else _tick_h.ask
+                _req_half = {
+                    "action":    _mt5_half.TRADE_ACTION_DEAL,
+                    "position":  _p.ticket,
+                    "symbol":    _p.symbol,
+                    "volume":    _p.volume,
+                    "type":      _close_type,
+                    "price":     _close_price,
+                    "deviation": 30,
+                    "magic":     MAGIC_COPIER,
+                    "comment":   f"AutoClose{int(AUTO_HALF_CLOSE_PCT*100)}%",
+                    "type_time":    _mt5_half.ORDER_TIME_GTC,
+                    "type_filling": _mt5_half.ORDER_FILLING_IOC,
+                }
+                _res_half = _mt5_half.order_send(_req_half)
+                if _res_half and _res_half.retcode == _mt5_half.TRADE_RETCODE_DONE:
+                    _auto_half_closed_tickets.add(_p.ticket)
+                    _pips_half = abs(_close_price - _entry_h)
+                    log.info(
+                        f"💰 AutoClose{int(AUTO_HALF_CLOSE_PCT*100)}%: {_p.symbol} "
+                        f"ticket={_p.ticket} | entry={_entry_h} → cierre={_close_price:.5f} "
+                        f"(+{_pips_half:.2f}) | TP era {_tp_h}"
+                    )
+                    # Limpiar ticket de la memoria si pasa de 5000 entradas
+                    if len(_auto_half_closed_tickets) > 5000:
+                        _auto_half_closed_tickets.clear()
+                else:
+                    _rc = getattr(_res_half, 'retcode', 'N/A')
+                    _cm = getattr(_res_half, 'comment', '')
+                    log.warning(
+                        f"⚠️ AutoClose50% FALLÓ: {_p.symbol} ticket={_p.ticket} "
+                        f"retcode={_rc} {_cm}"
+                    )
+        except Exception as _e_half:
+            log.warning(f"AutoClose50% error: {_e_half}")
+
+        # ── Setup hora Andorra (compartido por los bloques de abajo) ──
+        # FIX 2026-04-22: Resumen de las 22:00 DESACTIVADO — usuario pidió un solo resumen al día
+        # a las 19:00 vía publisher completo (ver bloque siguiente). La variable _daily_summary_sent
+        # queda por compatibilidad (por si se reactiva el resumen corto en el futuro).
         try:
             from datetime import datetime
             import pytz
             _tz_sum = pytz.timezone("Europe/Andorra")
             _now_sum = datetime.now(_tz_sum)
             _hoy_str = _now_sum.strftime("%d/%m/%Y")
-            if _now_sum.hour == 22 and _now_sum.minute < 5 and _daily_summary_sent != _hoy_str:
-                _daily_summary_sent = _hoy_str
-                _send_daily_summary()
         except Exception as _e_sum:
-            log.warning(f"Error en resumen diario: {_e_sum}")
+            log.warning(f"Error calculando hora Andorra: {_e_sum}")
+            _now_sum = None
+            _hoy_str = ""
+
+        # ── FIX 2026-04-22: Publisher completo (imagen 1080x1920) a las 19:00 Andorra ──
+        # Publica en: Canal VIP Telegram · Grupo gratis · Instagram Story · Highlight "Resultados" · Admin
+        try:
+            if _now_sum.hour == 19 and _now_sum.minute < 5 and _daily_publisher_sent != _hoy_str:
+                _daily_publisher_sent = _hoy_str
+
+                def _run_publisher():
+                    try:
+                        from daily_summary_publisher import publicar_resumen_diario
+                        ok = publicar_resumen_diario(force=False)
+                        log.info(f"📸 Publisher 19:00 — resultado: {'OK' if ok else 'sin eventos/ya publicado'}")
+                    except Exception as _e_pub:
+                        log.warning(f"Publisher 19:00 error: {_e_pub}")
+
+                threading.Thread(target=_run_publisher, daemon=True,
+                                 name="daily_publisher_19h").start()
+                log.info("📸 Publisher 19:00 lanzado en thread")
+        except Exception as _e_pub:
+            log.warning(f"Error programando publisher 19:00: {_e_pub}")
 
         # ── Publicidad diaria de Instagram en grupo Telegram (14:00) ──
         try:
@@ -2594,6 +3133,19 @@ async def _monitor_tp_loop() -> None:
                 else:
                     log.info(f"🛑 SL notificado para {signal.get('pair','?')} entry={_entry}")
                     _send_sl_notification(signal, reply_to_msg_id=_reply_id)
+                    # FIX 2026-04-23: registrar SL en gift_tracker si era señal regalo
+                    if _is_gifted_signal(signal.get("pair", "")):
+                        try:
+                            with _gift_lock:
+                                _sl_pair = signal.get("pair", "").upper()
+                                _is_gold_sl = _sl_pair in ("GOLD", "XAUUSD", "XAUUSD=X")
+                                if _is_gold_sl:
+                                    _gift_tracker["gold_result"] = "sl"
+                                else:
+                                    _gift_tracker["other_result"] = "sl"
+                                _save_gift_tracker()
+                        except Exception as _egsl:
+                            log.debug(f"gift_tracker sl update error: {_egsl}")
 
                 _record_daily_result(signal, result)
             elif result in ("expired", "orphan", "eod"):
@@ -2635,19 +3187,24 @@ def _parse_signal_impl(text, chat_title=""):
     upper_noslash = upper.replace("/", "")
 
     # ── FILTROS DE RUIDO — ignorar completamente ──
+    # FIX 2026-04-22: Quitado "HIT OUR RISK" (debería ser sl_hit, no ignorar)
+    # FIX 2026-04-22: Quitado "SMASHED" — ahora "TP SMASHED" se procesa como tp_hit
+    # (mantenemos otros celebration keywords para descartar ruido puro)
     _ignore_keywords = [
         "SSF COPIER", "SSF TRADE COPIER", "AUTOMATIZACION", "CUPON", "SURESHOTFX.COM",
         "INVALID PARAMETERS", "INVALID ORDER", "MARKET IS TOO VOLATILE",
         "GOLD ANALYSIS", "LET'S WAIT", "HOLA MIEMBROS", "HELLO VIP",
-        "SL UPDATED", "HIT OUR RISK",
+        "SL UPDATED",
         "ALGOBOT", "REVOLUTIONARY TRADING", "DAILY PICKS", "MATCHBETS",
         "BTC DOMINANCE", "ALTCOIN", "ETHEREUM", "BITCOIN",
         "WEEKLY OUTLOOK", "MARKET OUTLOOK", "RESEARCH DESK",
         "STAY SHARP", "SIGNALS WILL FOLLOW", "HEY TRADERS",
         "FAILED TO TRIGGER", "GETTING DELETED", "BECOME INVALID IF NOT TRIGGERED",
         "FED SPEAKERS", "GEOPOLITICAL", "ECONOMIC DATA",
-        # GOLD FOREX MARKET — celebraciones / actualizaciones de TP
-        "SMASHED", "BLAZING PROFIT", "BOOM BOOM", "POWER TRADE DONE",
+        # GOLD FOREX MARKET — celebraciones genéricas (no TP events)
+        # FIX 2026-04-22: Quitado "BLAZING PROFIT" porque mensajes tipo
+        # "TP5 SMASHED! 170+ PIPS BLAZING PROFIT" se descartaban — el TP manda.
+        "BOOM BOOM", "POWER TRADE DONE",
         "PATIENCE PAYS", "TRADE SMART", "STAY DISCIPLINED",
         "MARKET OPENING ALERT", "VOLATILITY EXPECTED",
         # NasdaqMasters / NASDaqxNinja — mensajes de celebración (NO son señales)
@@ -2658,14 +3215,22 @@ def _parse_signal_impl(text, chat_title=""):
         return None
 
     # ── MENSAJES DE ACTUALIZACIÓN ──
+    # FIX 2026-04-22: Ampliado para capturar:
+    #  - "TP SMASHED" de GOLD FOREX MARKET (TP intermedio o final)
+    #  - "HIT OUR RISK" de SureShot (equivale a SL)
+    #  - "CLOSE our trade", "READY TO CLOSE", "CLOSE some positions" de United Kings
+    #  - "Full close" corto de SureShot (el pair se deduce del canal)
     _update_keywords = [
         "CLOSE HALF", "CLOSE PARTIAL", "FULL CLOSE", "MOVE SL", "PIPS PROFIT",
-        "STOP LOSS HIT", "TP HIT", "HIT OUR RISK", "PIPS IN PROFIT",
+        "STOP LOSS HIT", "SL HIT", "TP HIT", "HIT OUR RISK", "PIPS IN PROFIT",
         "CIERRA LA MITAD", "CIERRE PARCIAL", "MOVER SL", "CERRAR COMPLETAMENTE",
         "RUNNING WITH", "CURRENTLY RUNNING",
+        "SMASHED",  # TP SMASHED de GOLD FOREX MARKET
+        "CLOSE OUR TRADE", "CLOSE OUR POSITIONS", "READY TO CLOSE",
+        "CLOSE SOME POSITIONS", "CLOSE THE TRADE",
     ]
     if any(w in upper for w in _update_keywords):
-        return _parse_update(text, upper_noslash)
+        return _parse_update(text, upper_noslash, chat_title)
 
     # ── DETECTAR FUENTE ──
     source = "Externa"
@@ -2848,11 +3413,9 @@ def _parse_signal_impl(text, chat_title=""):
     if not entry_match:
         entry_match = re.search(r'@\s*(\d{1,6}\.?\d*)', upper_clean)
 
-    # SL es obligatorio — si no hay SL ignorar la señal (demasiado arriesgado)
-    # TP es opcional — Learn2Trade y otros canales a veces publican "Take profit: OPEN"
-    # o sin TP en el primer mensaje (lo añaden vía edición)
-    if not sl_match:
-        return None
+    # FIX 2026-04-22: SL ya NO es obligatorio para publicar — se publica todo.
+    # MT5 no ejecutará sin SL, pero la señal llega al canal igualmente.
+    # (El usuario quiere que se publiquen TODAS las señales sin excepción)
 
     try:
         sl    = float(sl_match.group(1))
@@ -2888,25 +3451,67 @@ def _parse_signal_impl(text, chat_title=""):
         log.warning(f"⚠️ Parser: entry={entry} == tp={tp} — descartando entrada (falso positivo exacto)")
         entry = 0.0
 
-    # TP puede ser 0 (abierto) — solo SL es obligatorio
-    if sl <= 0:
-        return None
+    # FIX 2026-04-22: Sin filtros — se publica aunque SL=0 (no ejecuta en MT5, pero sí en canal)
 
     # ── Validación lógica: TP y SL deben estar en la dirección correcta ──
+    # FIX 2026-04-22: Formato zona doble "BUY 4796 4692" (AnabelSignals) → parser toma 4796 pero
+    # la entry real es 4692. Cuando la validación falla, buscar un segundo candidato en el texto.
+    def _try_fix_inverted_entry(cur_entry, direction, tp_val, sl_val, upper_text):
+        """Busca un número alternativo en el texto que haga válida la señal."""
+        # Busca todos los precios candidatos en el rango de XAUUSD/índices (>100)
+        _candidates = re.findall(r'\b(\d{3,6}\.?\d*)\b', upper_text)
+        _cands = []
+        for c in _candidates:
+            try:
+                v = float(c)
+                if v != cur_entry and v > 100:
+                    _cands.append(v)
+            except ValueError:
+                pass
+        # Para BUY: necesitamos entry < tp y entry > sl → buscar candidato menor que tp y mayor que sl
+        for _alt in _cands:
+            _tp_ok = (tp_val == 0) or (direction == "BUY" and _alt < tp_val) or (direction == "SELL" and _alt > tp_val)
+            _sl_ok = (sl_val == 0) or (direction == "BUY" and _alt > sl_val) or (direction == "SELL" and _alt < sl_val)
+            if _tp_ok and _sl_ok and abs(_alt - cur_entry) / max(cur_entry, 1) < 0.20:
+                return _alt
+        return None
+
+    # FIX 2026-04-22: Sin filtros de dirección — si entry parece invertida, intentar corrección.
+    # Si no se puede corregir, se publica con entry=0 (ejecuta a mercado). NUNCA descartar.
     if entry > 0 and tp > 0:
         if direction == "BUY" and tp < entry and abs(tp - entry) > 0.001:
-            log.warning(f"⚠️ Parser: BUY pero TP({tp}) < entry({entry}) — señal invertida, descartando")
-            return None
+            _alt = _try_fix_inverted_entry(entry, direction, tp, sl, upper_clean)
+            if _alt is not None:
+                log.info(f"⚠️ Parser: BUY TP({tp})<entry({entry}) → zona doble, usando {_alt}")
+                entry = _alt
+            else:
+                log.warning(f"⚠️ Parser: BUY TP({tp})<entry({entry}) — publicando con entry=0 (a mercado)")
+                entry = 0.0
         if direction == "SELL" and tp > entry and abs(tp - entry) > 0.001:
-            log.warning(f"⚠️ Parser: SELL pero TP({tp}) > entry({entry}) — señal invertida, descartando")
-            return None
+            _alt = _try_fix_inverted_entry(entry, direction, tp, sl, upper_clean)
+            if _alt is not None:
+                log.info(f"⚠️ Parser: SELL TP({tp})>entry({entry}) → zona doble, usando {_alt}")
+                entry = _alt
+            else:
+                log.warning(f"⚠️ Parser: SELL TP({tp})>entry({entry}) — publicando con entry=0 (a mercado)")
+                entry = 0.0
     if entry > 0 and sl > 0:
         if direction == "BUY" and sl > entry and abs(sl - entry) > 0.001:
-            log.warning(f"⚠️ Parser: BUY pero SL({sl}) > entry({entry}) — señal invertida, descartando")
-            return None
+            _alt = _try_fix_inverted_entry(entry, direction, tp, sl, upper_clean)
+            if _alt is not None:
+                log.info(f"⚠️ Parser: BUY SL({sl})>entry({entry}) → usando {_alt}")
+                entry = _alt
+            else:
+                log.warning(f"⚠️ Parser: BUY SL({sl})>entry({entry}) — publicando con entry=0 (a mercado)")
+                entry = 0.0
         if direction == "SELL" and sl < entry and abs(sl - entry) > 0.001:
-            log.warning(f"⚠️ Parser: SELL pero SL({sl}) < entry({entry}) — señal invertida, descartando")
-            return None
+            _alt = _try_fix_inverted_entry(entry, direction, tp, sl, upper_clean)
+            if _alt is not None:
+                log.info(f"⚠️ Parser: SELL SL({sl})<entry({entry}) → usando {_alt}")
+                entry = _alt
+            else:
+                log.warning(f"⚠️ Parser: SELL SL({sl})<entry({entry}) — publicando con entry=0 (a mercado)")
+                entry = 0.0
 
     # FIX 2026-04-07: Validar TP2-TP5 dirección y rango razonable
     # Si un TP está en la dirección contraria o es absurdamente lejano, descartarlo (no la señal entera)
@@ -2967,26 +3572,110 @@ def _parse_signal_impl(text, chat_title=""):
     }
 
 
-def _parse_update(text, upper):
+# FIX 2026-04-22: Default pair por título de canal — cuando el mensaje de update
+# es muy corto (ej. "Full close", "Hit our risk") y no menciona el par, deducimos
+# del nombre del canal. Solo canales DEDICADOS a un solo activo.
+_CHANNEL_DEFAULT_PAIR = [
+    ("sureshot gold", "XAUUSD", "GOLD"),
+    ("sure shot gold", "XAUUSD", "GOLD"),
+    ("goldsignals",    "XAUUSD", "GOLD"),
+    ("gold forex",     "XAUUSD", "GOLD"),
+    ("anabelsignals",  "XAUUSD", "GOLD"),
+    ("xauusd",         "XAUUSD", "GOLD"),
+    # SureShot INDICES mezcla US30/NAS100/GER40 → NO default, requiere que mencione el par
+]
+
+
+def _deducir_par_del_canal(chat_title):
+    """Si el mensaje no tiene par, intenta deducirlo del canal (solo canales dedicados)."""
+    if not chat_title:
+        return None
+    low = chat_title.lower()
+    for needle, alias, mt5 in _CHANNEL_DEFAULT_PAIR:
+        if needle in low:
+            return (alias, mt5)
+    return None
+
+
+# FIX 2026-04-22: Para canales multi-par (United Kings, SureShot INDICES),
+# cuando llega un "CLOSE our trade" sin par, usar el ÚLTIMO par abierto por
+# ese canal en _open_signals (la señal más reciente que seguimos rastreando).
+def _deducir_par_por_senal_activa(chat_title):
+    """Busca la señal abierta más reciente del canal — útil para updates sin par."""
+    if not chat_title:
+        return None
+    chat_low = chat_title.lower()
+    try:
+        with _signals_lock:
+            signals_snapshot = list(_open_signals.items())
+    except Exception:
+        return None
+    best = None
+    best_ts = 0
+    for _sid, _sdata in signals_snapshot:
+        sig = _sdata.get("signal", {})
+        src_low = str(sig.get("source", "")).lower()
+        src_chat = str(sig.get("chat_title", "")).lower()
+        # Match por source o por chat_title guardado
+        if src_chat and src_chat == chat_low:
+            pass
+        elif src_low and (src_low in chat_low or chat_low in src_low):
+            pass
+        else:
+            continue
+        ts = _sdata.get("sent_at", 0)
+        if ts > best_ts:
+            best_ts = ts
+            pair_alias = sig.get("pair", "")
+            mt5_sym = SYMBOL_MAP.get(pair_alias, pair_alias)
+            if pair_alias:
+                best = (pair_alias, mt5_sym)
+    return best
+
+
+def _parse_update(text, upper, chat_title=""):
     """Parse signal updates (close half, move SL, etc.) — English + Spanish.
 
     FIX 2026-04-17: Política "correr hasta último TP":
     - TP1/TP2/TP3/TP4 HIT intermedios → action="tp_partial" (NO cierra MT5, solo celebra nivel)
     - FULL TP HIT / TP HIT sin número / último TP → action="tp_hit" (cierra MT5)
     - CLOSE ALL / EXIT NOW / CIERRE TOTAL / CERRAR TODO → action="full_close"
+
+    FIX 2026-04-22: Ampliado para cubrir:
+    - "TP SMASHED" / "TPn SMASHED" de GOLD FOREX MARKET (antes ignorado por filtro "SMASHED")
+    - "HIT OUR RISK" de SureShot → sl_hit
+    - "CLOSE our trade", "READY TO CLOSE", "CLOSE some positions" de United Kings → full_close
+    - Mensajes cortos ("Full close", "Hit our risk") sin par → deducir del canal
     """
     action = None
     tp_level = 0  # para tp_partial
 
+    # FIX 2026-04-22 (prioridad alta): "TP SMASHED" es TP hit de GOLD FOREX MARKET.
+    # Formato típico: "🏆 XAUUSD TP1 SMASHED! 🏆" o "XAUUSD TP5 SMASHED! 170+ PIPS"
+    _smashed = re.search(r"TP\s*([12345])?\s*SMASHED", upper)
+    if _smashed:
+        _lvl = _smashed.group(1)
+        if _lvl:
+            tp_level = int(_lvl)
+            # Intermedio → tp_partial; último (5) o sin número → tp_hit
+            action = "tp_partial" if tp_level < 5 else "tp_hit"
+        else:
+            action = "tp_hit"
+    # FIX 2026-04-22: "HIT OUR RISK" = SL hit (SureShot lo usa así)
+    elif "HIT OUR RISK" in upper:
+        action = "sl_hit"
     # FIX 2026-04-17: Cierre explícito ampliado (EN + ES)
+    # FIX 2026-04-22: Añadidas variantes flexibles para United Kings
     # Debe detectarse ANTES que close_half/partial para no confundir
-    if any(w in upper for w in [
+    elif any(w in upper for w in [
         "CLOSE ALL", "CLOSE FULL", "FULL CLOSE", "EXIT NOW", "EXIT ALL",
         "CLOSE POSITION", "CLOSE TRADE", "CLOSE ORDER",
+        "CLOSE OUR TRADE", "CLOSE OUR POSITIONS", "CLOSE THE TRADE",
+        "CLOSE SOME POSITIONS", "READY TO CLOSE",
         "CERRAR COMPLETAMENTE", "CIERRE TOTAL", "CERRAR TODO",
         "CERRAR POSICION", "CERRAR POSICIÓN", "CIERRE MANUAL",
         "CIERRA COMPLETA", "CIERRE COMPLETO",
-    ]):
+    ]) or re.search(r"\bCLOSE\b[^.]{0,20}\b(TRADE|POSITIONS?)\b", upper):
         action = "full_close"
     # Close half (EN + ES)
     elif any(w in upper for w in ["CLOSE HALF", "CIERRA LA MITAD", "CIERRE DE LA MITAD", "CIERRE MEDIO"]):
@@ -3036,6 +3725,17 @@ def _parse_update(text, upper):
             pair_found = (alias, mt5_sym)
             break
 
+    # FIX 2026-04-22: Si no se detecta par en el texto, deducir del canal
+    # (solo canales dedicados a un solo activo — ver _CHANNEL_DEFAULT_PAIR).
+    # Cubre "Full close", "Hit our risk" sin mención del par.
+    if not pair_found:
+        pair_found = _deducir_par_del_canal(chat_title)
+
+    # FIX 2026-04-22: Último fallback — canales multi-par (United Kings, SureShot INDICES).
+    # Si siguen sin par, usar la última señal abierta de ese canal.
+    if not pair_found:
+        pair_found = _deducir_par_por_senal_activa(chat_title)
+
     if not pair_found:
         return None
 
@@ -3081,7 +3781,47 @@ def _mt5_init_and_login():
 # === MT5 EXECUTION ===
 def _check_mt5_circuit_breaker() -> bool:
     """Lee el estado del circuit breaker desde archivo compartido.
-    Retorna True si está ABIERTO (no operar)."""
+    Retorna True si está ABIERTO (no operar).
+
+    FIX 2026-04-21 (A3): auto-evaluación — si los últimos N trades cerrados
+    son SL consecutivos, abrir el breaker automáticamente por 2h."""
+    # 1) Auto-check: ¿5+ SLs consecutivos en las últimas 2h?
+    try:
+        if COPIER_STATS_FILE.exists():
+            with open(COPIER_STATS_FILE, "r", encoding="utf-8") as _f_acb:
+                _stats_cb = json.load(_f_acb)
+            _trades_cb = _stats_cb.get("trades", [])
+            _recent = sorted(_trades_cb, key=lambda t: t.get("closed_at", 0), reverse=True)[:10]
+            # Contar SLs al inicio de la lista (los más recientes)
+            _consec_sl = 0
+            for _t in _recent:
+                if _t.get("result") == "sl":
+                    _consec_sl += 1
+                else:
+                    break
+            if _consec_sl >= 5:
+                # Auto-abrir breaker por 2h
+                _cb_file_auto = Path(__file__).parent / "mt5_circuit_breaker.json"
+                _opened_at = time.time()
+                try:
+                    _cb_data_auto = {
+                        "state": "OPEN",
+                        "opened_at": _opened_at,
+                        "reason": f"auto: {_consec_sl} SL consecutivos",
+                        "cooldown_seg": 7200,  # 2h
+                    }
+                    _tmp_cb = str(_cb_file_auto) + ".tmp"
+                    with open(_tmp_cb, "w", encoding="utf-8") as _f_w:
+                        json.dump(_cb_data_auto, _f_w, ensure_ascii=False, indent=2)
+                    os.replace(_tmp_cb, str(_cb_file_auto))
+                    log.warning(f"🚨 Circuit Breaker AUTO-ABIERTO: {_consec_sl} SLs consecutivos — pausado 2h")
+                    return True
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 2) Check manual/persistente desde archivo
     try:
         _cb_file = Path(__file__).parent / "mt5_circuit_breaker.json"
         if _cb_file.exists():
@@ -3091,8 +3831,11 @@ def _check_mt5_circuit_breaker() -> bool:
             if _cb.get("state") == "OPEN":
                 import time as _time_cb
                 elapsed = _time_cb.time() - _cb.get("opened_at", 0)
-                if elapsed < 300:  # Cooldown 5 min
-                    log.warning(f"🚨 Circuit Breaker ABIERTO — MT5 pausado ({300 - elapsed:.0f}s restantes)")
+                # FIX: respetar el cooldown_seg configurado (default 2h para auto, 5min para manual)
+                _cooldown = _cb.get("cooldown_seg", 300)
+                if elapsed < _cooldown:
+                    _mins_left = (_cooldown - elapsed) / 60
+                    log.warning(f"🚨 Circuit Breaker ABIERTO — MT5 pausado ({_mins_left:.1f}min restantes)")
                     return True
     except Exception:
         pass
@@ -3104,6 +3847,19 @@ def execute_in_mt5(signal):
     # Circuit Breaker: si MT5 está pausado, no intentar
     if _check_mt5_circuit_breaker():
         return False, "Circuit Breaker OPEN — MT5 pausado"
+
+    # FIX 2026-04-21 (A4): Kill-switch compartido con bot.py
+    # Si el bot detectó demasiadas pérdidas diarias, el copier TAMBIÉN se detiene.
+    try:
+        _ks_file = Path(__file__).parent / "kill_switch.json"
+        if _ks_file.exists():
+            import json as _ksj
+            with open(_ks_file, "r", encoding="utf-8") as _f:
+                _ks = _ksj.load(_f)
+            if _ks.get("active", False):
+                return False, f"Kill-switch activo: {_ks.get('reason', 'desconocido')}"
+    except Exception:
+        pass
 
     try:
         import MetaTrader5 as mt5
@@ -3117,13 +3873,51 @@ def execute_in_mt5(signal):
     sym = signal["mt5_symbol"]
     info = mt5.symbol_info(sym)
     if not info:
-        return False, f"Symbol {sym} not found"
+        # FIX 2026-04-22: log todos los símbolos disponibles para diagnóstico
+        try:
+            _all_syms = [s.name for s in (mt5.symbols_get() or []) if any(k in s.name.upper() for k in ("GER", "US30", "DAX", "DOW", "NAS", "CAC", "FTSE"))]
+            log.warning(f"❌ MT5: Símbolo '{sym}' NO encontrado en el broker. Símbolos índices disponibles: {_all_syms[:20]}")
+        except Exception:
+            log.warning(f"❌ MT5: Símbolo '{sym}' NO encontrado. Verifica el nombre exacto en tu plataforma MT5.")
+        return False, f"Symbol {sym} not found in broker"
     if not info.visible:
         mt5.symbol_select(sym, True)
 
     tick = mt5.symbol_info_tick(sym)
     if not tick:
         return False, f"No tick for {sym}"
+
+    # FIX 2026-04-21 (C1): Check de spread ANTES de ejecutar — protección crítica real.
+    # Si spread anómalo (apertura domingo, noticias), abortar para evitar SL instantáneo.
+    # NOTA: spread_pts = (ask-bid)/point  →  para índices con point=0.01:
+    #   US30 spread normal 5-8 → 500-800 pts; GER40 spread normal 2-4 → 200-400 pts.
+    _spread_pts = (tick.ask - tick.bid) / info.point if info.point > 0 else 0
+    _max_spread = {
+        "GOLD": 150,          # Oro: punto=0.01, spread normal ~0.5-1 USD → 50-100 pts; máx 150
+        "XAUUSD": 150,
+        "US100Cash": 600,     # NAS100: spread normal 1-3 → 100-300 pts; máx 600
+        "US30Cash": 2000,     # DOW: spread normal 5-12 → 500-1200 pts; máx 2000
+        "US500Cash": 500,     # S&P500: spread normal 1-3 → 100-300 pts; máx 500
+        "GER40Cash": 1000,    # DAX: spread normal 2-5 → 200-500 pts; máx 1000
+        "OILCash": 50,        # WTI: punto=0.01, spread normal 0.03-0.05 → 3-5 pts
+        "BRENTCash": 50,
+        "BTCUSD": 500,        # Crypto
+    }.get(sym, 30)            # Forex default 30 points (3 pips)
+    if _spread_pts > _max_spread:
+        log.warning(f"🛡️ Spread alto en {sym}: {_spread_pts:.0f}pts > máx {_max_spread}pts — ABORTANDO orden")
+        return False, f"Spread alto: {_spread_pts:.0f}pts (máx {_max_spread})"
+
+    # FIX 2026-04-21 (C2): Límite de posiciones simultáneas del copier.
+    # Con cuenta real y margen limitado, evitar abrir >N posiciones a la vez.
+    try:
+        _max_positions = int(os.getenv("COPIER_MAX_POSITIONS", "8"))
+        _open_pos = mt5.positions_get() or []
+        _copier_open = [p for p in _open_pos if getattr(p, 'magic', 0) == MAGIC_COPIER]
+        if len(_copier_open) >= _max_positions:
+            log.warning(f"🛡️ Máx posiciones copier ({_max_positions}) alcanzado — ABORTANDO {sym}")
+            return False, f"Máx posiciones ({_max_positions}) alcanzado"
+    except Exception as _e_pos:
+        log.debug(f"positions_get check falló: {_e_pos}")
 
     price = tick.ask if signal["direction"] == "BUY" else tick.bid
     sl = signal["sl"]
@@ -3719,42 +4513,13 @@ def send_to_channel(signal, executed, detail):
 
     msg = "\n".join(lines)
 
-    # Botones de afiliado XM + ANÁLISIS por petición — debajo de cada señal nueva
-    # FIX 2026-04-21: Botones de análisis abren DM con el bot vía deep link
-    # (los users del canal pulsan el botón → se abre el bot en privado y reciben el análisis)
-    _BOT_USERNAME = os.getenv("BOT_USERNAME", "Andoperandobot")
-    # Sugerir activos relevantes según el par publicado, más opciones generales
-    _pair_upper = (pair_display or pair or "").upper().replace("/", "")
-    _btn_pair_norm = "ORO" if _pair_upper in ("ORO", "GOLD", "XAUUSD") else _pair_upper
-    # FIX 2026-04-21: Botón Copy Trading oculto (servicio pausado)
-    _btn_rows = [
-        # Fila 1: análisis del activo señalado + ORO siempre disponible
-        [
-            {"text": f"🔍 Análisis {_btn_pair_norm}", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_{_btn_pair_norm.lower()}"},
-            {"text": "🥇 Análisis ORO", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_oro"},
-        ],
-        # Fila 2: análisis populares
-        [
-            {"text": "📈 NASDAQ", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_nasdaq"},
-            {"text": "📊 S&P 500", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_sp500"},
-            {"text": "🛢 Petróleo", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis_usoil"},
-        ],
-        # Fila 3: pedir cualquier otro activo
-        [
-            {"text": "💬 Pedir análisis de otro activo", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis"},
-        ],
-    ]
-    _xm_buttons = {"inline_keyboard": _btn_rows}
-
-    # FIX 2026-04-08: Gráfica SOLO en TP/SL HIT, NO en señales nuevas
-    # Las señales nuevas solo llevan texto + botones de análisis
+    # FIX 2026-04-21: Señales sin botones — publicidad eliminada por petición del usuario
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     _payload = {
         "chat_id": CHANNEL_ID,
         "text": msg,
         "parse_mode": "Markdown",
-        "reply_markup": _xm_buttons,
     }
 
     # Retry hasta 3 veces con backoff
@@ -3942,42 +4707,67 @@ async def main():
             log.info(f"📡 SEÑAL DETECTADA en [{chat.title}]: {signal.get('direction', signal.get('action', '?'))} {signal['pair']}")
 
             # ── Deduplicación: evitar misma señal de CUALQUIER canal ──
-            # FIX 2026-04-09: Doble check — por par+dirección+precio Y por par solo (cooldown 10min)
-            # FIX 2026-04-21: TTLs ampliados para frenar duplicados exactos como
-            # USD/JPY 19:36 + 21:18 con misma entrada 158.75 (1h42min de separación)
+            # FIX 2026-04-21b: TODOS los checks + pre-registro dentro del mismo lock
+            # FIX 2026-04-21c: (1) normalizar pair canónico (GOLD/XAUUSD/ORO → mismo)
+            # y (2) tolerancia en entry (0.3% para cubrir diferencias de cotización
+            # entre canales: 4788 vs 4788.48 para oro, 1.17628 vs 1.17630 para forex).
             if signal["type"] == "new_signal":
-                _entry_round = round(signal.get("entry", 0), 2)
-                _dedup_key = f"{signal['pair']}_{signal['direction']}_{_entry_round}"
-                _pair_key = f"{signal['pair']}_{signal['direction']}"
-                # Check 1: _recently_sent — mismo par+dirección+precio exacto (4h)
-                _prev_sent_time = _recently_sent.get(_dedup_key, 0)
-                if _prev_sent_time and (time.time() - _prev_sent_time) < 14400:
-                    log.info(f"⏭️ Señal duplicada ignorada (cache): {_dedup_key} (enviada hace {(time.time() - _prev_sent_time):.0f}s)")
-                    return
-                # Check 2: cooldown por PAR+DIRECCIÓN+CANAL — máx 1 señal cada 30 min del mismo par POR CANAL
-                # FIX 2026-04-16: incluir canal en la clave para no bloquear señales de distintos canales
+                _raw_pair = signal.get("pair", "").upper().replace("/", "")
+                # Canonical: mapea a símbolo MT5 (GOLD/XAUUSD/ORO → "GOLD")
+                _pair_canon = SYMBOL_MAP.get(_raw_pair, _raw_pair)
+                _direction = signal.get("direction", "")
+                _entry_val = signal.get("entry", 0) or 0
+                _entry_round = round(_entry_val, 2)
+                # Tolerancia adaptativa: 0.3% del entry
+                _tol = abs(_entry_val) * 0.003 if _entry_val > 0 else 0
+                _dedup_key = f"{_pair_canon}_{_direction}_{_entry_round}"
+                _pair_key = f"{_pair_canon}_{_direction}"
                 _pair_key_with_ch = f"{_pair_key}_{chat.title}"
-                _prev_pair_time = _recently_sent.get(_pair_key_with_ch, 0)
-                if _prev_pair_time and (time.time() - _prev_pair_time) < 1800:
-                    log.info(f"⏭️ Cooldown activo: {_pair_key_with_ch} (última hace {(time.time() - _prev_pair_time):.0f}s < 1800s)")
-                    return
-                # Check 3: _open_signals — ya hay señal abierta del mismo par+dirección
-                # FIX 2026-04-21: Si existe una abierta con MISMA entry (round 2 dec), bloquear
-                # SIN límite de tiempo (es literalmente la misma señal). Si entry distinto, mantener
-                # cooldown 1h como antes para no bloquear giros legítimos del mercado.
+
+                def _entry_match(e1, e2, tol):
+                    """Dos entries se consideran la misma señal si difieren < tol."""
+                    if tol <= 0:
+                        return round(e1, 2) == round(e2, 2)
+                    return abs(e1 - e2) <= tol
+
                 with _signals_lock:
+                    # Check 1: mismo par canónico+dirección+precio ~aproximado (4h)
+                    # Barrer todas las keys _recently_sent que empiecen con pair_canon+direction
+                    _now_t = time.time()
+                    for _k, _ts in list(_recently_sent.items()):
+                        if not _k.startswith(f"{_pair_canon}_{_direction}_"):
+                            continue
+                        # Extraer entry del key: formato "PAIR_DIR_entry"
+                        try:
+                            _prev_entry = float(_k.rsplit("_", 1)[-1])
+                        except ValueError:
+                            continue
+                        if (_now_t - _ts) < 14400 and _entry_match(_entry_val, _prev_entry, _tol):
+                            log.info(f"⏭️ Señal duplicada (canónico+tolerancia): {_pair_canon} {_direction} @ {_entry_val} ≈ {_prev_entry} (hace {(_now_t - _ts):.0f}s)")
+                            return
+                    # Check 3: cooldown por canal (30 min) — sigue con pair canónico
+                    _prev_pair_time = _recently_sent.get(_pair_key_with_ch, 0)
+                    if _prev_pair_time and (_now_t - _prev_pair_time) < 1800:
+                        log.info(f"⏭️ Cooldown canal activo: {_pair_key_with_ch} (hace {(_now_t - _prev_pair_time):.0f}s < 1800s)")
+                        return
+                    # Check 4: señal abierta del mismo par canónico+dirección
                     for _sid, _sdata in _open_signals.items():
                         _s = _sdata.get("signal", {})
-                        _existing_pair_key = f"{_s.get('pair','')}_{_s.get('direction','')}"
-                        if _existing_pair_key != _pair_key:
+                        _s_raw = (_s.get("pair", "") or "").upper().replace("/", "")
+                        _s_canon = SYMBOL_MAP.get(_s_raw, _s_raw)
+                        if _s_canon != _pair_canon or _s.get("direction", "") != _direction:
                             continue
-                        _existing_entry = round(_s.get("entry", 0) or 0, 2)
-                        if _existing_entry == _entry_round and _entry_round > 0:
-                            log.info(f"⏭️ Señal duplicada exacta ignorada: {_pair_key} entry={_entry_round} ya abierta")
+                        _existing_entry = _s.get("entry", 0) or 0
+                        if _entry_val > 0 and _entry_match(_entry_val, _existing_entry, _tol):
+                            log.info(f"⏭️ Señal duplicada exacta (canónico+tol): {_pair_canon} {_direction} entry={_entry_val} ≈ {_existing_entry} ya abierta")
                             return
-                        if (time.time() - _sdata.get("sent_at", 0)) < 3600:
-                            log.info(f"⏭️ Señal ignorada: ya hay {_pair_key} abierta (últimos 60 min)")
+                        if (_now_t - _sdata.get("sent_at", 0)) < 3600:
+                            log.info(f"⏭️ Señal ignorada: ya hay {_pair_canon} {_direction} abierta (últimos 60 min)")
                             return
+                    # PRE-REGISTRAR — bloquea tareas concurrentes antes de cualquier await
+                    _recently_sent[_dedup_key] = _now_t
+                    _recently_sent[_pair_key] = _now_t               # cooldown global
+                    _recently_sent[_pair_key_with_ch] = _now_t       # cooldown por canal
 
             # ══════════════════════════════════════════════════════════════
             # 🟢 MT5 EXECUTION ACTIVADO — Cuenta DEMO (101595184)
@@ -3985,7 +4775,8 @@ async def main():
             # Cada señal del canal VIP se replica con lotaje mínimo (0.01)
             # Para desactivar: cambiar a False
             # ══════════════════════════════════════════════════════════════
-            MT5_EXECUTION_ENABLED = True  # ← Activado para cuenta demo
+            # FIX 2026-04-21 (M3): ahora por .env — default False por seguridad
+            MT5_EXECUTION_ENABLED = os.getenv("COPIER_MT5_ENABLED", "True").lower() in ("true", "1", "yes")
 
             if signal["type"] == "new_signal":
                 # Registrar msg_id para manejar ediciones futuras
@@ -4055,22 +4846,31 @@ async def main():
                         log.warning(f"⚠️ Todos los TPs inválidos para {_d} {signal.get('pair','')} entry={_e} — descartando señal")
                         return
 
-                # PASO 4: Validar entry vs precio actual (previene entries stale)
-                if not _validate_entry_vs_market(signal):
-                    log.warning(f"🚫 Señal {signal.get('pair','?')} descartada — entry stale >1.5% del mercado actual")
-                    return
+                # PASO 4: Validar entry vs precio actual
+                # FIX 2026-04-23: Si entry stale, ejecutar a MERCADO (entry=0) en vez de saltar MT5.
+                # Antes se omitía MT5 por completo — pero el usuario quiere que TODAS las señales abran.
+                # AnabelSignals / zonas pending: se abren a mercado con TP/SL originales.
+                _is_stale_entry = not _validate_entry_vs_market(signal)
+                if _is_stale_entry:
+                    log.info(f"⚠️ {signal.get('pair','?')} entry stale — se ejecutará a MERCADO (entry=0)")
 
-                # PASO 5: Ejecutar en MT5 (solo si TODAS las validaciones pasaron)
+                # PASO 5: Ejecutar en MT5 (siempre que MT5_EXECUTION_ENABLED)
                 executed, detail = False, "Ejecución MT5 desactivada (kill-switch activo)"
                 if MT5_EXECUTION_ENABLED:
                     aprobar, ia_comment = _ia_evaluar_senal(signal)
                     signal["ia_comment"] = ia_comment
                     if ia_comment:
                         log.info(f"🤖 IA: {ia_comment}")
-                    executed, detail = execute_in_mt5(signal)
+                    if _is_stale_entry:
+                        # Forzar market order: copiar señal con entry=0 para evitar mutar el dict
+                        _signal_market = dict(signal)
+                        _signal_market["entry"] = 0.0
+                        executed, detail = execute_in_mt5(_signal_market)
+                    else:
+                        executed, detail = execute_in_mt5(signal)
                     log.info(f"📡 MT5: {'✅' if executed else '❌'} {detail}")
 
-                # Publicar al canal VIP
+                # Publicar al canal VIP (siempre, incluso si entry stale)
                 send_to_channel(signal, executed, detail)
                 # FIX 2026-04-09: Registrar en cache anti-duplicados + cooldown por par
                 # FIX 2026-04-16: cooldown incluye canal (no bloquear canales distintos)
@@ -4141,7 +4941,28 @@ async def main():
                 return  # Ya publicado, ignorar ediciones cosméticas
 
             signal = parse_signal(text, chat_title=chat_title)
-            if not signal or signal.get("type") != "new_signal":
+            if not signal:
+                return
+
+            # FIX 2026-04-22: Si el EDIT es un UPDATE (close, TP hit, SL hit, etc.)
+            # procesarlo igual que en el handler principal. Antes solo miraba
+            # señales nuevas y perdía "Let's CLOSE our trade now" editados.
+            if signal.get("type") == "update":
+                log.info(f"📡 UPDATE (via edit) recibido: {signal.get('action','?')} {signal['pair']}")
+                try:
+                    send_to_channel(signal, False, "")
+                except Exception as _e_send:
+                    log.error(f"Error enviando update edit: {_e_send}")
+                MT5_EXECUTION_ENABLED = os.getenv("COPIER_MT5_ENABLED", "True").lower() in ("true", "1", "yes")
+                if MT5_EXECUTION_ENABLED:
+                    try:
+                        ok, det = handle_update_mt5(signal)
+                        log.info(f"📡 UPDATE MT5 (edit): {'✅' if ok else '❌'} {det}")
+                    except Exception as _e_mt5:
+                        log.error(f"Error MT5 update edit: {_e_mt5}")
+                return
+
+            if signal.get("type") != "new_signal":
                 return  # No es señal nueva completa — ignorar
 
             # FIX 2026-04-09: TODAS las señales pasan — sin filtro por activo
@@ -4169,17 +4990,15 @@ async def main():
                 return
 
             log.info(f"✏️ Señal capturada vía edición (msg_id={msg_id}): {signal.get('direction')} {signal.get('pair')}")
-            # FIX 2026-04-17: Validar entry vs precio actual — DESCARTAR si stale (>1.5%)
-            if not _validate_entry_vs_market(signal):
-                log.warning(f"🚫 Edit {signal.get('pair','?')} descartado — entry stale (señal vieja, no publicable)")
-                _published_msg_ids.add(msg_id)
-                return
+            # FIX 2026-04-22: Sin filtro de stale — publicar siempre (usuario quiere sin excepciones)
+            _validate_entry_vs_market(signal)  # solo para marcar _rejected_stale, no para bloquear
             # FIX 2026-04-15: No publicar si entry=0 (sin precio)
             if (signal.get("entry", 0) or 0) <= 0:
                 log.warning(f"✏️ Edit sin entry resuelto — NO publicando {signal.get('pair','?')}")
                 return
             # FIX 2026-04-16 BUG#2: edit_handler ahora ejecuta en MT5 igual que el handler principal
-            MT5_EXECUTION_ENABLED = True  # ← Activado (era False → señales vía edición nunca llegaban a MT5)
+            # FIX 2026-04-21 (M3): ahora por .env
+            MT5_EXECUTION_ENABLED = os.getenv("COPIER_MT5_ENABLED", "True").lower() in ("true", "1", "yes")
             executed, detail = False, "Ejecución MT5 desactivada (kill-switch activo)"
             if MT5_EXECUTION_ENABLED:
                 _aprobar, _ia_comment = _ia_evaluar_senal(signal)
@@ -4266,11 +5085,8 @@ async def main():
     # Auto-discover TODOS los canales de señales conocidos
     async for dialog in client.iter_dialogs():
         title_lower = (dialog.title or "").lower()
-        # Auto-agregar canales que coincidan con keywords de señales
         _es_canal = hasattr(dialog.entity, 'broadcast') or hasattr(dialog.entity, 'megagroup')
         _match = any(kw in title_lower for kw in AUTO_DISCOVER_KEYWORDS)
-        # BUG FIX: Telethon iter_dialogs devuelve IDs positivos para canales,
-        # pero event.chat_id es negativo (-100XXXXXXXXXX). Normalizar al formato negativo.
         _raw_id = dialog.id
         _norm_id = int(f"-100{_raw_id}") if _raw_id > 0 else _raw_id
         _already = _norm_id in ALLOWED_CHANNEL_IDS or _raw_id in ALLOWED_CHANNEL_IDS
@@ -4281,7 +5097,6 @@ async def main():
             log.info(f"📡 Monitoreando: {dialog.title} (ID: {_norm_id})")
 
     # Update event handlers with ALL channels (incluyendo auto-descubiertos)
-    # FIX: re-registrar AMBOS handlers — antes solo se actualizaba NewMessage, no MessageEdited
     client.remove_event_handler(handler)
     client.add_event_handler(handler, events.NewMessage(chats=list(ALLOWED_CHANNEL_IDS)))
     client.remove_event_handler(edit_handler)
@@ -4289,7 +5104,6 @@ async def main():
 
     # Iniciar monitor TP/SL en background
     asyncio.ensure_future(_monitor_tp_loop())
-    # Iniciar reportes promocionales (12:00 y 17:00 hora Andorra)
     asyncio.ensure_future(_loop_promo_reportes())
 
     log.info("📡 Signal Copier ACTIVO — escuchando todos los canales VIP...")
@@ -4301,7 +5115,6 @@ if __name__ == "__main__":
     _lock_file = Path(__file__).parent / ".copier.lock"
     _my_pid = os.getpid()
 
-    # ── Verificación de instancia única usando lock file + confirmación psutil ──
     if _lock_file.exists():
         try:
             _old_pid = int(_lock_file.read_text().strip())
@@ -4316,24 +5129,21 @@ if __name__ == "__main__":
                         log.warning(f"📡 Otra instancia del copier corriendo (PID={_old_pid}). Saliendo.")
                         sys.exit(0)
                 except Exception:
-                    pass  # Proceso muerto o inaccesible — ignorar lock obsoleto
+                    pass
         except Exception:
             pass
     _lock_file.write_text(str(_my_pid))
-    # FIX 2026-04-06c: Loop de reconexión — si run_until_disconnected() retorna (desconexión),
-    # reintentar en vez de salir con code=0 (que causa restart loop cada 2 min).
     _max_retries = 10
     _retry_count = 0
-    _retry_wait = 30  # segundos entre reintentos
+    _retry_wait = 30
     while _retry_count < _max_retries:
         try:
             asyncio.run(main())
-            # main() retornó normalmente (client desconectado) — reintentar
             _retry_count += 1
             if _retry_count < _max_retries:
                 log.warning(f"📡 Copier desconectado — reconectando en {_retry_wait}s (intento {_retry_count}/{_max_retries})...")
                 _time_lock.sleep(_retry_wait)
-                _retry_wait = min(_retry_wait * 2, 300)  # backoff hasta 5 min
+                _retry_wait = min(_retry_wait * 2, 300)
             else:
                 log.error(f"📡 Copier: {_max_retries} reconexiones fallidas — saliendo.")
             continue
@@ -4343,7 +5153,6 @@ if __name__ == "__main__":
         except Exception as e:
             _err_str = str(e)
             log.error(f"📡 Signal Copier error: {e}")
-            # Respetar FloodWaitError de Telegram — esperar en vez de reintentar en loop
             import re as _re_flood
             _flood_match = _re_flood.search(r'wait of (\d+) seconds', _err_str, _re_flood.IGNORECASE)
             if _flood_match:
@@ -4351,8 +5160,8 @@ if __name__ == "__main__":
                 _wait_mins = _wait_secs // 60
                 _wait_hrs = _wait_mins // 60
                 log.warning(f"⏳ Telegram FloodWait: esperando {_wait_hrs}h {_wait_mins % 60}m antes de reintentar...")
-                _time_lock.sleep(min(_wait_secs + 30, 86400))  # Esperar + 30s margen, máx 24h
-                _retry_count = 0  # Reset retries después de FloodWait
+                _time_lock.sleep(min(_wait_secs + 30, 86400))
+                _retry_count = 0
                 _retry_wait = 30
                 continue
             else:
@@ -4368,7 +5177,6 @@ if __name__ == "__main__":
         _lock_file.unlink(missing_ok=True)
     except Exception:
         pass
-    # FIX 2026-04-16 BUG#7: Cerrar conexión MT5 limpiamente al salir
     try:
         import MetaTrader5 as _mt5_final
         if _mt5_final.terminal_info() is not None:

@@ -241,8 +241,20 @@ def _annotate_chart_with_times(chart_path, pair: str, direction: str, pips: str,
 
 
 def _generate_tp_image(pair: str, direction: str, entry: float, tp: float,
-                       pips: str, source: str = "") -> Path:
-    """Genera imagen de celebraci\u00f3n de TP — SIN precios (marketing only)."""
+                       pips: str, source: str = "", sl: float = 0.0) -> Path:
+    """Genera imagen de celebraci\u00f3n de TP.
+    FIX 2026-04-22: Delega al nuevo m\u00f3dulo ig_cards (dise\u00f1o pro con chart real).
+    Mantiene firma compatible — direction se ignora (regla IG: sin BUY/SELL)."""
+    try:
+        import ig_cards
+        # SL derivado si no viene: espejo del TP respecto al entry
+        _sl = sl if sl and sl > 0 else (entry - (tp - entry) * 0.6 if entry else 0)
+        out_name = f"ig_tp_{pair.replace('/', '')}_{int(time.time())}.jpg"
+        return ig_cards.generate_tp_card(pair, pips, entry, tp, _sl, out_name=out_name)
+    except Exception as _e_newgen:
+        log.warning(f"ig_cards TP fallback a dise\u00f1o antiguo: {_e_newgen}")
+
+    # ── Fallback al dise\u00f1o antiguo si el m\u00f3dulo nuevo falla ──
     img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
     draw = ImageDraw.Draw(img)
 
@@ -333,7 +345,29 @@ def _generate_tp_image(pair: str, direction: str, entry: float, tp: float,
 
 
 def _generate_daily_summary_image(stats: dict) -> Path:
-    """Genera imagen de resumen diario — version premium."""
+    """Genera imagen de resumen diario.
+    FIX 2026-04-22: Delega a ig_cards.generate_daily_summary_card si hay datos.
+    Mapea stats antiguos {wr, tp_hits, sl_hits, pips_netos, ...} al nuevo formato."""
+    try:
+        import ig_cards
+        # Normalizar stats al formato que espera ig_cards
+        new_stats = {
+            'pips_net': int(stats.get('pips_netos', stats.get('pips_net', 0)) or 0),
+            'wr':       int(stats.get('wr', stats.get('win_rate', 0)) or 0),
+            'tp':       int(stats.get('tp', stats.get('tp_hits', stats.get('ganadas', 0))) or 0),
+            'total':    int(stats.get('total', stats.get('ops_total', 0)) or 0),
+            'top3':     stats.get('top3', []) or [],
+        }
+        # Si total no viene, derivar de tp + sl
+        if not new_stats['total']:
+            _sl = int(stats.get('sl_hits', stats.get('perdidas', 0)) or 0)
+            new_stats['total'] = new_stats['tp'] + _sl
+        out_name = f"ig_summary_{int(time.time())}.jpg"
+        return ig_cards.generate_daily_summary_card(new_stats, out_name=out_name)
+    except Exception as _e_newgen:
+        log.warning(f"ig_cards summary fallback a dise\u00f1o antiguo: {_e_newgen}")
+
+    # ── Fallback al dise\u00f1o antiguo si el m\u00f3dulo nuevo falla ──
     img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
     draw = ImageDraw.Draw(img)
 
@@ -455,8 +489,20 @@ def _generate_daily_summary_image(stats: dict) -> Path:
 
 
 def _generate_new_signal_image(pair: str, direction: str, entry: float,
-                                tp: float, sl: float, source: str = "") -> Path:
-    """Genera imagen de nueva se\u00f1al publicada — version premium."""
+                                tp: float, sl: float, source: str = "",
+                                extra_tps: list = None) -> Path:
+    """Genera imagen de nueva se\u00f1al.
+    FIX 2026-04-22: Delega a ig_cards.generate_new_signal_card (layout de niveles).
+    Mantiene firma — direction se ignora (regla IG sin BUY/SELL)."""
+    try:
+        import ig_cards
+        out_name = f"ig_new_{pair.replace('/', '')}_{int(time.time())}.jpg"
+        return ig_cards.generate_new_signal_card(
+            pair, entry, tp, sl, extra_tps=extra_tps, out_name=out_name)
+    except Exception as _e_newgen:
+        log.warning(f"ig_cards new_signal fallback a dise\u00f1o antiguo: {_e_newgen}")
+
+    # ── Fallback al dise\u00f1o antiguo si el m\u00f3dulo nuevo falla ──
     img = Image.new("RGB", (IMG_W, IMG_H), COLOR_BG)
     _draw_gradient_bg(img, (8, 12, 18), (18, 24, 32))
     draw = ImageDraw.Draw(img)
@@ -1446,10 +1492,41 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
             img = img.convert("RGB")
             draw = ImageDraw.Draw(img)
 
-            # ── ESCENA 1: Velas animadas (0-4.5s) ──
-            # FIX 2026-04-16: Layout expandido — chart más grande, menos espacio vacío
-            if sec < 4.5 and has_candles:
-                scene_t = sec / 4.5
+            # FIX 2026-04-19: ORDEN INVERTIDO — Resultado PRIMERO (thumbnail Instagram),
+            # velas animadas DESPUÉS como contexto narrativo. CTA al final igual que antes.
+
+            # ── ESCENA 1 (PRIMERA): Resultado GIGANTE (0-2.5s) ──
+            # ESTO ES EL THUMBNAIL DE INSTAGRAM
+            if sec < 2.5:
+                draw.text((REEL_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(32, bold=True), anchor="mt")
+                draw.rounded_rectangle([80, 180, REEL_W - 80, 330], radius=25, fill=COLOR_GREEN)
+                draw.text((REEL_W // 2, 255), "TP ALCANZADO", fill=(10, 15, 10),
+                          font=_get_font(72, bold=True), anchor="mm")
+                draw.text((REEL_W // 2, 420), pair.upper(), fill=COLOR_WHITE,
+                          font=_get_font(110, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 570), dir_label, fill=dir_color,
+                          font=_get_font(54, bold=True), anchor="mt")
+                draw.rounded_rectangle([60, 700, REEL_W - 60, 1100], radius=35,
+                                       fill=(10, 50, 20), outline=COLOR_GREEN, width=3)
+                draw.text((REEL_W // 2, 900), pips, fill=COLOR_GREEN,
+                          font=_get_font(150, bold=True), anchor="mm")
+                # Entrada/TP/CTA visibles desde el inicio (eran fade in)
+                if entry_price > 0:
+                    draw.text((REEL_W // 2, 1180), f"Entrada: {entry_price:.0f}",
+                              fill=COLOR_GRAY, font=_get_font(38), anchor="mt")
+                    draw.text((REEL_W // 2, 1240), f"Take Profit: {tp_price:.0f}",
+                              fill=COLOR_GREEN, font=_get_font(38), anchor="mt")
+                draw.text((REEL_W // 2, 1380), "Senal exitosa del Canal VIP",
+                          fill=COLOR_GOLD, font=_get_font(40, bold=True), anchor="mt")
+                draw.text((REEL_W // 2, 1460), "Unite — Link en bio",
+                          fill=COLOR_GRAY, font=_get_font(32), anchor="mt")
+                draw.text((REEL_W // 2, REEL_H - 80), "buysell365.pro",
+                          fill=(50, 56, 68), font=_get_font(24), anchor="mt")
+
+            # ── ESCENA 2 (SEGUNDA): Velas animadas (2.5-6.5s) ──
+            elif sec < 6.5 and has_candles:
+                scene_t = (sec - 2.5) / 4.0
                 n_visible = max(1, int(scene_t * n_candles))
 
                 draw.text((REEL_W // 2, 40), "BUYSELL365 PRO", fill=(80, 90, 110),
@@ -1462,7 +1539,6 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                 draw.text((REEL_W // 2, 340), dir_label, fill=dir_color,
                           font=_get_font(44, bold=True), anchor="mt")
 
-                # Chart box — más grande
                 draw.rounded_rectangle(
                     [chart_left - 20, chart_top - 30, chart_right + 20, chart_bot + 30],
                     radius=15, fill=(14, 17, 24), outline=(30, 34, 45), width=1)
@@ -1473,7 +1549,6 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                     draw.text((chart_right + 5, gy), f"{pl:.0f}", fill=(60, 66, 78),
                               font=_get_font(16), anchor="lm")
 
-                # Candles — más grandes
                 for i in range(min(n_visible, n_candles)):
                     x = chart_left + int(i * chart_w / n_candles)
                     o_y, c_y = _p2y(candle_opens[i]), _p2y(candle_closes[i])
@@ -1487,7 +1562,6 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                         bb = tb + 2
                     draw.rectangle([x, tb, x + candle_w, bb], fill=color)
 
-                # Entry line
                 if entry_price > 0 and p_min <= entry_price <= p_max:
                     ey = _p2y(entry_price)
                     for dx in range(chart_left, chart_right, 12):
@@ -1495,7 +1569,6 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                     draw.text((chart_left + 5, ey - 22), f"Entrada {entry_price:.0f}",
                               fill=COLOR_ACCENT, font=_get_font(20, bold=True))
 
-                # TP line
                 if tp_price > 0 and p_min <= tp_price <= p_max:
                     ty = _p2y(tp_price)
                     for dx in range(chart_left, chart_right, 12):
@@ -1503,24 +1576,17 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                     draw.text((chart_left + 5, ty - 22), f"TP {tp_price:.0f}",
                               fill=COLOR_GREEN, font=_get_font(20, bold=True))
 
-                # Pips fade in — debajo del chart expandido
-                if scene_t > 0.6:
-                    alpha = min((scene_t - 0.6) / 0.3, 1.0)
-                    pc = tuple(int(c * alpha) for c in COLOR_GREEN)
-                    draw.text((REEL_W // 2, chart_bot + 60), pips, fill=pc,
-                              font=_get_font(100, bold=True), anchor="mt")
-
-                # Info adicional abajo
-                if scene_t > 0.8 and entry_price > 0:
+                # Pips siempre visible (no fade in)
+                draw.text((REEL_W // 2, chart_bot + 60), pips, fill=COLOR_GREEN,
+                          font=_get_font(100, bold=True), anchor="mt")
+                if entry_price > 0:
                     draw.text((REEL_W // 2, chart_bot + 180), f"Entrada: {entry_price:.0f}  |  TP: {tp_price:.0f}",
                               fill=COLOR_GRAY, font=_get_font(30), anchor="mt")
-
                 draw.text((REEL_W // 2, REEL_H - 60), "buysell365.pro",
                           fill=(40, 46, 58), font=_get_font(22), anchor="mt")
 
-            # ── ESCENA 2: Resultado (4.5-6.5s) — layout expandido ──
+            # ── ESCENA 2 fallback: sin velas, solo resultado expandido (2.5-6.5s) ──
             elif sec < 6.5:
-                scene_t = (sec - 4.5) / 2.0
                 draw.text((REEL_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
                           font=_get_font(32, bold=True), anchor="mt")
                 draw.rounded_rectangle([80, 180, REEL_W - 80, 330], radius=25, fill=COLOR_GREEN)
@@ -1530,21 +1596,10 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                           font=_get_font(110, bold=True), anchor="mt")
                 draw.text((REEL_W // 2, 570), dir_label, fill=dir_color,
                           font=_get_font(54, bold=True), anchor="mt")
-                # Caja de pips más grande y centrada
                 draw.rounded_rectangle([60, 700, REEL_W - 60, 1100], radius=35,
                                        fill=(10, 50, 20), outline=COLOR_GREEN, width=3)
                 draw.text((REEL_W // 2, 900), pips, fill=COLOR_GREEN,
                           font=_get_font(150, bold=True), anchor="mm")
-                if scene_t > 0.3 and entry_price > 0:
-                    draw.text((REEL_W // 2, 1180), f"Entrada: {entry_price:.0f}",
-                              fill=COLOR_GRAY, font=_get_font(38), anchor="mt")
-                    draw.text((REEL_W // 2, 1240), f"Take Profit: {tp_price:.0f}",
-                              fill=COLOR_GREEN, font=_get_font(38), anchor="mt")
-                if scene_t > 0.5:
-                    draw.text((REEL_W // 2, 1380), "Senal exitosa del Canal VIP",
-                              fill=COLOR_GOLD, font=_get_font(40, bold=True), anchor="mt")
-                    draw.text((REEL_W // 2, 1460), "Unite — Link en bio",
-                              fill=COLOR_GRAY, font=_get_font(32), anchor="mt")
                 draw.text((REEL_W // 2, REEL_H - 80), "buysell365.pro",
                           fill=(50, 56, 68), font=_get_font(24), anchor="mt")
 
@@ -1706,148 +1761,18 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
         # Zoom suave: de 1.0 a 1.08 (solo para fallback estático)
         zoom_start, zoom_end = 1.0, 1.08
 
+        # FIX 2026-04-19: ORDEN INVERTIDO de escenas — el RESULTADO va PRIMERO (0-2.5s)
+        # para que sea el thumbnail de Instagram, y las VELAS van DESPUÉS (2.5-6s) como
+        # contexto narrativo. Antes: velas primero (thumbnail apagado), resultado al final.
+        SCENE_RESULT_END = 2.5  # Duración de la escena resultado (PRIMERA)
+
         for frame_i in range(total_frames):
             sec = frame_i / FPS
 
-            # ── ESCENA 1: Velas MT5 animadas apareciendo una a una (0-3.5s) ──
-            if sec < 3.5 and has_candles:
-                scene_t = sec / 3.5
-                n_visible = max(1, int(scene_t * n_candles))
-
-                # Fondo oscuro con gradiente
-                img = Image.new("RGB", (TG_W, TG_H), (10, 14, 22))
-                draw = ImageDraw.Draw(img)
-                for y in range(0, TG_H, 2):
-                    t = y / TG_H
-                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
-                    draw.line([(0, y), (TG_W, y)], fill=c)
-
-                # Header
-                draw.text((TG_W // 2, 15), "BUYSELL365 PRO", fill=(80, 90, 110),
-                          font=_get_font(18, bold=True), anchor="mt")
-                draw.rounded_rectangle([60, 45, TG_W - 60, 110], radius=14, fill=COLOR_GREEN)
-                draw.text((TG_W // 2, 77), header_text, fill=(10, 15, 10),
-                          font=_get_font(32, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 125), f"{pair.upper()}  {dir_label}",
-                          fill=COLOR_WHITE, font=_get_font(28, bold=True), anchor="mt")
-
-                # Chart box
-                draw.rounded_rectangle(
-                    [chart_left - 10, chart_top - 15, chart_right + 15, chart_bot + 15],
-                    radius=10, fill=(14, 17, 24), outline=(30, 34, 45), width=1)
-                # Grid lines + precios
-                for i in range(4):
-                    gy = chart_top + int(chart_h * i / 3)
-                    draw.line([(chart_left, gy), (chart_right, gy)], fill=(25, 30, 40), width=1)
-                    pl = p_max - (p_max - p_min) * i / 3
-                    draw.text((chart_right + 3, gy), f"{pl:.0f}" if pl >= 10 else f"{pl:.4f}",
-                              fill=(60, 66, 78), font=_get_font(11), anchor="lm")
-
-                # Velas — aparecen una por una
-                for i in range(min(n_visible, n_candles)):
-                    x = chart_left + int(i * chart_w / n_candles)
-                    o_y, c_y = _p2y(candle_opens[i]), _p2y(candle_closes[i])
-                    h_y, l_y = _p2y(candle_highs[i]), _p2y(candle_lows[i])
-                    bull = candle_closes[i] >= candle_opens[i]
-                    color = COLOR_GREEN if bull else COLOR_RED
-                    cx = x + candle_w // 2
-                    draw.line([(cx, h_y), (cx, l_y)], fill=color, width=1)
-                    tb, bb = min(o_y, c_y), max(o_y, c_y)
-                    if bb - tb < 2:
-                        bb = tb + 2
-                    draw.rectangle([x, tb, x + candle_w, bb], fill=color)
-
-                # Líneas Entrada / TP
-                if entry_price > 0 and p_min <= entry_price <= p_max:
-                    e_y = _p2y(entry_price)
-                    for _dx in range(0, chart_w, 8):
-                        draw.line([(chart_left + _dx, e_y), (chart_left + _dx + 4, e_y)],
-                                  fill=COLOR_ACCENT, width=2)
-                    draw.text((chart_right - 2, e_y - 8), f"E {entry_price:.0f}",
-                              fill=COLOR_ACCENT, font=_get_font(13, bold=True), anchor="rb")
-                if tp_price > 0 and p_min <= tp_price <= p_max:
-                    t_y = _p2y(tp_price)
-                    for _dx in range(0, chart_w, 8):
-                        draw.line([(chart_left + _dx, t_y), (chart_left + _dx + 4, t_y)],
-                                  fill=COLOR_GOLD, width=2)
-                    draw.text((chart_right - 2, t_y - 8), f"TP {tp_price:.0f}",
-                              fill=COLOR_GOLD, font=_get_font(13, bold=True), anchor="rb")
-
-                # Pips fade in (aparecen después del 50% de la escena)
-                if scene_t > 0.5:
-                    alpha_t = min((scene_t - 0.5) / 0.3, 1.0)
-                    pc = tuple(int(c * alpha_t) for c in COLOR_GREEN)
-                    draw.rounded_rectangle([100, 600, TG_W - 100, 680], radius=12,
-                                           fill=(10, 40, 18), outline=COLOR_GREEN, width=2)
-                    draw.text((TG_W // 2, 640), pips, fill=pc,
-                              font=_get_font(44, bold=True), anchor="mm")
-
-            # ── ESCENA 1 fallback: gráfica estática con zoom ──
-            elif sec < 3.5 and has_chart:
-                scene_t = sec / 3.5
-                t_smooth = scene_t * scene_t * (3 - 2 * scene_t)
-                zoom = zoom_start + (zoom_end - zoom_start) * t_smooth
-                zoomed_w = int(TG_W * zoom)
-                zoomed_h = int(TG_H * zoom)
-                zoomed = chart_img_base.resize((zoomed_w, zoomed_h), Image.LANCZOS)
-                cx = (zoomed_w - TG_W) // 2
-                cy = (zoomed_h - TG_H) // 2
-                img = zoomed.crop((cx, cy, cx + TG_W, cy + TG_H))
-                draw = ImageDraw.Draw(img)
-                for y in range(0, 110):
-                    alpha = 0.75 - (y / 110) * 0.3
-                    for x in range(TG_W):
-                        px = img.getpixel((x, y))
-                        img.putpixel((x, y), tuple(int(p * (1 - alpha)) for p in px))
-                draw = ImageDraw.Draw(img)
-                draw.text((TG_W // 2, 8), "BUYSELL365 PRO", fill=(180, 190, 200),
-                          font=_get_font(16, bold=True), anchor="mt")
-                draw.rounded_rectangle([100, 30, TG_W - 100, 80], radius=12, fill=COLOR_GREEN)
-                draw.text((TG_W // 2, 55), header_text, fill=(10, 15, 10),
-                          font=_get_font(32, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 92), f"{pair.upper()}  {dir_label}",
-                          fill=COLOR_WHITE, font=_get_font(20, bold=True), anchor="mt")
-                if scene_t > 0.5:
-                    for y in range(TG_H - 100, TG_H):
-                        alpha = ((y - (TG_H - 100)) / 100) * 0.8
-                        for x in range(TG_W):
-                            px = img.getpixel((x, y))
-                            img.putpixel((x, y), tuple(int(p * (1 - alpha)) for p in px))
-                    draw = ImageDraw.Draw(img)
-                    alpha_t = min((scene_t - 0.5) / 0.3, 1.0)
-                    pc = tuple(int(c * alpha_t) for c in COLOR_GREEN)
-                    draw.text((TG_W // 2, TG_H - 55), pips, fill=pc,
-                              font=_get_font(52, bold=True), anchor="mm")
-
-            # ── ESCENA 1 sin gráfica: fondo oscuro con texto ──
-            elif sec < 3.5:
-                scene_t = sec / 3.5
-                img = Image.new("RGB", (TG_W, TG_H), (13, 17, 23))
-                draw = ImageDraw.Draw(img)
-                for y in range(0, TG_H, 2):
-                    t = y / TG_H
-                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
-                    draw.line([(0, y), (TG_W, y)], fill=c)
-
-                draw.text((TG_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
-                          font=_get_font(24, bold=True), anchor="mt")
-                draw.rounded_rectangle([100, 140, TG_W - 100, 220], radius=16, fill=COLOR_GREEN)
-                draw.text((TG_W // 2, 180), header_text, fill=(10, 15, 10),
-                          font=_get_font(48, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 270), pair.upper(), fill=COLOR_WHITE,
-                          font=_get_font(64, bold=True), anchor="mt")
-                draw.text((TG_W // 2, 360), dir_label, fill=dir_color,
-                          font=_get_font(36, bold=True), anchor="mt")
-                if scene_t > 0.4:
-                    draw.text((TG_W // 2, 460), pips, fill=COLOR_GREEN,
-                              font=_get_font(80, bold=True), anchor="mt")
-                if scene_t > 0.7 and entry_price > 0:
-                    draw.text((TG_W // 2, 580), f"Entrada: {entry_price:.0f}  |  TP: {tp_price:.0f}",
-                              fill=COLOR_GRAY, font=_get_font(22), anchor="mt")
-
-            # ── ESCENA 2: Resultado + CTA (3.5-6s) ──
-            else:
-                scene_t = (sec - 3.5) / 2.5
+            # ── ESCENA 1 (PRIMERA): Resultado GIGANTE + CTA (0-2.5s) ──
+            # ESTO ES EL THUMBNAIL DE INSTAGRAM
+            if sec < SCENE_RESULT_END:
+                scene_t = sec / SCENE_RESULT_END
                 img = Image.new("RGB", (TG_W, TG_H), (10, 14, 22))
                 draw = ImageDraw.Draw(img)
                 for y in range(0, TG_H, 2):
@@ -1870,22 +1795,142 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
                 draw.text((TG_W // 2, 375), pips, fill=COLOR_GREEN,
                           font=_get_font(90, bold=True), anchor="mm")
 
-                if scene_t > 0.2 and entry_price > 0:
+                # Entrada/TP visibles desde el inicio (era con scene_t > 0.2)
+                if entry_price > 0:
                     draw.text((TG_W // 2, 490), f"Entrada: {entry_price:.0f}",
                               fill=COLOR_GRAY, font=_get_font(24), anchor="mt")
                     draw.text((TG_W // 2, 525), f"Take Profit: {tp_price:.0f}",
                               fill=COLOR_GREEN, font=_get_font(24), anchor="mt")
-                if scene_t > 0.4:
-                    draw.text((TG_W // 2, 580), "Senal exitosa del Canal VIP",
-                              fill=COLOR_GOLD, font=_get_font(26, bold=True), anchor="mt")
-                if scene_t > 0.6:
-                    alpha_cta = min((scene_t - 0.6) / 0.3, 1.0)
-                    cw = tuple(int(c * alpha_cta) for c in COLOR_WHITE)
-                    draw.text((TG_W // 2, 635), "Unite al VIP — /vip",
-                              fill=cw, font=_get_font(22, bold=True), anchor="mt")
-                    draw.text((TG_W // 2, 670), "buysell365.pro",
-                              fill=tuple(int(c * alpha_cta) for c in (50, 56, 68)),
-                              font=_get_font(18), anchor="mt")
+                # CTA visible desde el inicio (era con scene_t > 0.4 y > 0.6)
+                draw.text((TG_W // 2, 580), "Senal exitosa del Canal VIP",
+                          fill=COLOR_GOLD, font=_get_font(26, bold=True), anchor="mt")
+                draw.text((TG_W // 2, 635), "Unite al VIP — /vip",
+                          fill=COLOR_WHITE, font=_get_font(22, bold=True), anchor="mt")
+                draw.text((TG_W // 2, 670), "buysell365.pro",
+                          fill=(50, 56, 68), font=_get_font(18), anchor="mt")
+
+            # ── ESCENA 2 (DESPUÉS): Velas MT5 animadas (2.5-6s) ──
+            elif has_candles:
+                scene_t = (sec - SCENE_RESULT_END) / max(duration_s - SCENE_RESULT_END, 0.1)
+                n_visible = max(1, int(scene_t * n_candles))
+
+                img = Image.new("RGB", (TG_W, TG_H), (10, 14, 22))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, TG_H, 2):
+                    t = y / TG_H
+                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
+                    draw.line([(0, y), (TG_W, y)], fill=c)
+
+                draw.text((TG_W // 2, 15), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(18, bold=True), anchor="mt")
+                draw.rounded_rectangle([60, 45, TG_W - 60, 110], radius=14, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 77), header_text, fill=(10, 15, 10),
+                          font=_get_font(32, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 125), f"{pair.upper()}  {dir_label}",
+                          fill=COLOR_WHITE, font=_get_font(28, bold=True), anchor="mt")
+
+                draw.rounded_rectangle(
+                    [chart_left - 10, chart_top - 15, chart_right + 15, chart_bot + 15],
+                    radius=10, fill=(14, 17, 24), outline=(30, 34, 45), width=1)
+                for i in range(4):
+                    gy = chart_top + int(chart_h * i / 3)
+                    draw.line([(chart_left, gy), (chart_right, gy)], fill=(25, 30, 40), width=1)
+                    pl = p_max - (p_max - p_min) * i / 3
+                    draw.text((chart_right + 3, gy), f"{pl:.0f}" if pl >= 10 else f"{pl:.4f}",
+                              fill=(60, 66, 78), font=_get_font(11), anchor="lm")
+
+                for i in range(min(n_visible, n_candles)):
+                    x = chart_left + int(i * chart_w / n_candles)
+                    o_y, c_y = _p2y(candle_opens[i]), _p2y(candle_closes[i])
+                    h_y, l_y = _p2y(candle_highs[i]), _p2y(candle_lows[i])
+                    bull = candle_closes[i] >= candle_opens[i]
+                    color = COLOR_GREEN if bull else COLOR_RED
+                    cx = x + candle_w // 2
+                    draw.line([(cx, h_y), (cx, l_y)], fill=color, width=1)
+                    tb, bb = min(o_y, c_y), max(o_y, c_y)
+                    if bb - tb < 2:
+                        bb = tb + 2
+                    draw.rectangle([x, tb, x + candle_w, bb], fill=color)
+
+                if entry_price > 0 and p_min <= entry_price <= p_max:
+                    e_y = _p2y(entry_price)
+                    for _dx in range(0, chart_w, 8):
+                        draw.line([(chart_left + _dx, e_y), (chart_left + _dx + 4, e_y)],
+                                  fill=COLOR_ACCENT, width=2)
+                    draw.text((chart_right - 2, e_y - 8), f"E {entry_price:.0f}",
+                              fill=COLOR_ACCENT, font=_get_font(13, bold=True), anchor="rb")
+                if tp_price > 0 and p_min <= tp_price <= p_max:
+                    t_y = _p2y(tp_price)
+                    for _dx in range(0, chart_w, 8):
+                        draw.line([(chart_left + _dx, t_y), (chart_left + _dx + 4, t_y)],
+                                  fill=COLOR_GOLD, width=2)
+                    draw.text((chart_right - 2, t_y - 8), f"TP {tp_price:.0f}",
+                              fill=COLOR_GOLD, font=_get_font(13, bold=True), anchor="rb")
+
+                # Caja con +pts SIEMPRE visible (era fade in con scene_t > 0.5)
+                draw.rounded_rectangle([100, 600, TG_W - 100, 680], radius=12,
+                                       fill=(10, 40, 18), outline=COLOR_GREEN, width=2)
+                draw.text((TG_W // 2, 640), pips, fill=COLOR_GREEN,
+                          font=_get_font(44, bold=True), anchor="mm")
+
+            # ── ESCENA 2 fallback: gráfica estática con zoom (2.5-6s) ──
+            elif has_chart:
+                scene_t = (sec - SCENE_RESULT_END) / max(duration_s - SCENE_RESULT_END, 0.1)
+                t_smooth = scene_t * scene_t * (3 - 2 * scene_t)
+                zoom = zoom_start + (zoom_end - zoom_start) * t_smooth
+                zoomed_w = int(TG_W * zoom)
+                zoomed_h = int(TG_H * zoom)
+                zoomed = chart_img_base.resize((zoomed_w, zoomed_h), Image.LANCZOS)
+                cx = (zoomed_w - TG_W) // 2
+                cy = (zoomed_h - TG_H) // 2
+                img = zoomed.crop((cx, cy, cx + TG_W, cy + TG_H))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, 110):
+                    alpha = 0.75 - (y / 110) * 0.3
+                    for x in range(TG_W):
+                        px = img.getpixel((x, y))
+                        img.putpixel((x, y), tuple(int(p * (1 - alpha)) for p in px))
+                draw = ImageDraw.Draw(img)
+                draw.text((TG_W // 2, 8), "BUYSELL365 PRO", fill=(180, 190, 200),
+                          font=_get_font(16, bold=True), anchor="mt")
+                draw.rounded_rectangle([100, 30, TG_W - 100, 80], radius=12, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 55), header_text, fill=(10, 15, 10),
+                          font=_get_font(32, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 92), f"{pair.upper()}  {dir_label}",
+                          fill=COLOR_WHITE, font=_get_font(20, bold=True), anchor="mt")
+                # Pips siempre visible al final
+                for y in range(TG_H - 100, TG_H):
+                    alpha = ((y - (TG_H - 100)) / 100) * 0.8
+                    for x in range(TG_W):
+                        px = img.getpixel((x, y))
+                        img.putpixel((x, y), tuple(int(p * (1 - alpha)) for p in px))
+                draw = ImageDraw.Draw(img)
+                draw.text((TG_W // 2, TG_H - 55), pips, fill=COLOR_GREEN,
+                          font=_get_font(52, bold=True), anchor="mm")
+
+            # ── ESCENA 2 sin gráfica: fondo oscuro con texto (2.5-6s) ──
+            else:
+                img = Image.new("RGB", (TG_W, TG_H), (13, 17, 23))
+                draw = ImageDraw.Draw(img)
+                for y in range(0, TG_H, 2):
+                    t = y / TG_H
+                    c = (int(10 + 8 * t), int(14 + 6 * t), int(22 + 15 * t))
+                    draw.line([(0, y), (TG_W, y)], fill=c)
+
+                draw.text((TG_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
+                          font=_get_font(24, bold=True), anchor="mt")
+                draw.rounded_rectangle([100, 140, TG_W - 100, 220], radius=16, fill=COLOR_GREEN)
+                draw.text((TG_W // 2, 180), header_text, fill=(10, 15, 10),
+                          font=_get_font(48, bold=True), anchor="mm")
+                draw.text((TG_W // 2, 270), pair.upper(), fill=COLOR_WHITE,
+                          font=_get_font(64, bold=True), anchor="mt")
+                draw.text((TG_W // 2, 360), dir_label, fill=dir_color,
+                          font=_get_font(36, bold=True), anchor="mt")
+                draw.text((TG_W // 2, 460), pips, fill=COLOR_GREEN,
+                          font=_get_font(80, bold=True), anchor="mt")
+                if entry_price > 0:
+                    draw.text((TG_W // 2, 580), f"Entrada: {entry_price:.0f}  |  TP: {tp_price:.0f}",
+                              fill=COLOR_GRAY, font=_get_font(22), anchor="mt")
 
             writer.append_data(np.array(img))
 
@@ -2177,6 +2222,17 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
     if not IG_ENABLED:
         return False
 
+    # FIX 2026-04-22: Regla IG SOLO-GANANCIAS (feedback_instagram_solo_ganancias.md).
+    # No publicar si pips es negativo — IG es escaparate, no auditoria.
+    try:
+        _pips_clean = str(pips or "").strip().lower().replace("pts", "").replace("pips", "").strip()
+        _pips_num = float(_pips_clean.replace("+", "").replace(",", "."))
+        if _pips_num < 0:
+            log.info(f"IG skip — pips negativos ({pips}), regla solo-ganancias")
+            return False
+    except Exception:
+        pass  # Si no se puede parsear, proceder (asumimos formato OK del caller)
+
     def _do_post():
         with _ig_lock:
             try:
@@ -2299,6 +2355,15 @@ def post_daily_summary(stats: dict) -> bool:
     """Genera imagen de resumen diario y publica en Instagram (post + Story)."""
     if not IG_ENABLED:
         return False
+
+    # FIX 2026-04-22: Regla IG SOLO-GANANCIAS — no publicar d\u00edas con neto negativo.
+    try:
+        _pips_net = int(stats.get("pips_netos", stats.get("pips_net", 0)) or 0)
+        if _pips_net < 0:
+            log.info(f"IG daily summary skip — d\u00eda neto negativo ({_pips_net} pts)")
+            return False
+    except Exception:
+        pass
 
     def _do_post():
         with _ig_lock:

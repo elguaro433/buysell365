@@ -44,7 +44,7 @@ import ssl
 import matplotlib
 matplotlib.use('Agg') # Evitar que abra ventanas en el servidor
 import mplfinance as mpf
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
 import logging
 import queue
 import heapq
@@ -183,6 +183,21 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
 if not TELEGRAM_TOKEN:
     raise RuntimeError("❌ TELEGRAM_TOKEN no configurado en .env — bot no puede arrancar sin token")
 BOT_USERNAME   = "Andoperandobot"  # Username del bot (sin @) — usado en URLs de t.me
+
+# FIX 2026-04-21: Flag para desactivar TODOS los filtros de bloqueo del scanner propio
+# (noticias, horario, MTF contra-tendencia, fear&greed, correlación).
+# Por decisión del usuario: trabajamos principalmente con señales de canales aliados
+# (signal_copier), el scanner propio ya no debe autocensurarse por filtros de criterio.
+# Bloqueos de SEGURIDAD (precio inválido, df vacío, max trades) SE MANTIENEN.
+# Para reactivar los filtros: SCANNER_BLOCKS_ENABLED=true en .env
+SCANNER_BLOCKS_ENABLED = os.getenv("SCANNER_BLOCKS_ENABLED", "false").lower() in ("true", "1", "yes")
+
+# FIX 2026-04-21: Flag para desactivar COMPLETAMENTE el scanner propio del bot.
+# Trabajamos SOLO con las señales del signal_copier (canales aliados).
+# El monitor de operaciones (revisar_niveles_operaciones) SIGUE ACTIVO para que
+# las operaciones ya abiertas se cierren correctamente con TP/SL/cambio tendencia.
+# Para reactivar el scanner propio: SCANNER_PROPIO_ENABLED=true en .env
+SCANNER_PROPIO_ENABLED = os.getenv("SCANNER_PROPIO_ENABLED", "false").lower() in ("true", "1", "yes")
 
 CHANNEL_ID     = os.getenv("CHANNEL_ID", "-1003729609114").strip()
 # 👥 Grupo de Logs/Alertas (Entrada: https://t.me/BUYSELL_365_24_7)
@@ -683,6 +698,25 @@ def mt5_cb_is_open() -> bool:
 # 🧵 THREAD POOL para procesamiento de webhooks — limitar concurrencia (prevenir DoS)
 _pool_webhook = ThreadPoolExecutor(max_workers=4, thread_name_prefix="webhook")
 
+# FIX 2026-04-22: Pool dedicado para llamadas MT5 con timeout.
+# MT5 Python API no tiene timeout nativo — si el terminal se cuelga,
+# terminal_info()/initialize() pueden bloquear un hilo indefinidamente.
+# Usamos ThreadPoolExecutor para imponer timeout externo.
+_pool_mt5 = ThreadPoolExecutor(max_workers=2, thread_name_prefix="mt5call")
+
+def _mt5_call_timeout(func, *args, timeout=5, default=None, **kwargs):
+    """Llama a una función MT5 con timeout (Windows-safe). Si excede, retorna default."""
+    try:
+        fut = _pool_mt5.submit(func, *args, **kwargs)
+        return fut.result(timeout=timeout)
+    except FuturesTimeout:
+        logger.warning(f"⚠️ MT5 call timeout ({timeout}s): {getattr(func, '__name__', func)}")
+        return default
+    except Exception as _e_mt5c:
+        logger.warning(f"⚠️ MT5 call error: {_e_mt5c}")
+        return default
+
+
 def _mt5_switch_account(account):
     """Cambia la sesión MT5 activa a otra cuenta. Retorna True si exitoso."""
     try:
@@ -901,6 +935,31 @@ def guardar_estado():
                 shutil.copy2(ESTADO_FILE, bak_file)
         except Exception:
             pass  # No bloquear guardado si backup falla
+
+        # FIX 2026-04-22: Backup histórico diario de estado.json (contiene VIPs).
+        # Guarda 1 backup por día en backups/estado_YYYYMMDD.json, mantiene 30 días.
+        # Protege contra corrupción en cascada (.bak se sobreescribe cada save; el
+        # histórico permite recuperar VIPs de hace N días si hoy se corrompió todo).
+        try:
+            _bk_dir = os.path.join(os.path.dirname(os.path.abspath(ESTADO_FILE)), "backups")
+            os.makedirs(_bk_dir, exist_ok=True)
+            _today_str = datetime.now().strftime("%Y%m%d")
+            _daily_bak = os.path.join(_bk_dir, f"estado_{_today_str}.json")
+            if not os.path.exists(_daily_bak) and os.path.exists(ESTADO_FILE):
+                import shutil as _sh_bak
+                _sh_bak.copy2(ESTADO_FILE, _daily_bak)
+                # Limpiar backups > 30 días
+                try:
+                    _cutoff = time.time() - (30 * 86400)
+                    for _f in os.listdir(_bk_dir):
+                        if _f.startswith("estado_") and _f.endswith(".json"):
+                            _p = os.path.join(_bk_dir, _f)
+                            if os.path.getmtime(_p) < _cutoff:
+                                os.remove(_p)
+                except Exception:
+                    pass
+        except Exception:
+            pass  # No bloquear guardado si backup diario falla
 
         # Guardado ATÓMICO: escribir en temporal y luego reemplazar para evitar corrupción
         temp_file = f"{ESTADO_FILE}.tmp"
@@ -1128,6 +1187,10 @@ ACTIVOS = {
 # Mapa de palabras clave simplificado
 KEYWORDS_ACTIVOS = {
     # ❌ BITCOIN y ETHEREUM eliminados
+
+    # ORO / GOLD — FIX 2026-04-21: añadir "oro", "gold", "xauusd" que faltaban
+    "oro": "GOLD", "gold": "GOLD", "xauusd": "GOLD", "xau/usd": "GOLD",
+    "xau": "GOLD", "el oro": "GOLD", "analisis oro": "GOLD",
 
     # EUR/USD
     "eurusd": "EUR/USD", "eur/usd": "EUR/USD", "euro": "EUR/USD",
@@ -3975,6 +4038,10 @@ def en_horario_mercado(ticker):
     Incluye filtro de fin de semana para activos tradicionales.
     (BTC/ETH eliminados del bot)
     """
+    # FIX 2026-04-21: Si el usuario desactivó bloqueos, permitir siempre
+    if not SCANNER_BLOCKS_ENABLED:
+        return True
+
     now_utc   = datetime.now(pytz.UTC)
     fecha_hoy = now_utc.strftime("%Y-%m-%d")
     es_fin_de_semana = now_utc.weekday() >= 5 # 5=Sábado, 6=Domingo
@@ -4035,7 +4102,7 @@ def activos_disponibles_hoy() -> tuple:
         nombres = []  # Mercados cerrados
         return nombres, True, motivo
     else:
-        nombres = ["eurusd", "nasdaq", "sp500"]
+        nombres = ["oro", "eurusd", "nasdaq", "sp500"]
         return nombres, False, ""
 
 
@@ -4070,11 +4137,15 @@ def cargar_calendario_economico():
     return _cache_noticias["datos"] or []
 
 # Noticias de MÁXIMO impacto que causan movimientos extremos
+# FIX 2026-04-22: Añadidas keywords de eventos que ProSignalsFX marca como HIGH
+# pero ForexFactory a veces clasifica como "low" (Consumer Confidence, PCE, etc.)
 _NOTICIAS_CRITICAS = {
     "non-farm", "nonfarm", "nfp", "fomc", "fed interest", "rate decision",
     "cpi", "consumer price", "gdp", "ecb press", "ecb interest",
     "boe interest", "boj interest", "unemployment rate", "retail sales",
-    "pmi", "jackson hole", "powell", "lagarde", "payroll"
+    "pmi", "jackson hole", "powell", "lagarde", "payroll",
+    "consumer confidence", "pce", "core pce", "ppi", "producer price",
+    "adp", "ism", "durable goods", "trade balance", "industrial production"
 }
 
 def _es_noticia_critica(titulo):
@@ -4082,71 +4153,6 @@ def _es_noticia_critica(titulo):
     titulo_lower = titulo.lower()
     return any(kw in titulo_lower for kw in _NOTICIAS_CRITICAS)
 
-def hay_noticia_alto_impacto(ticker, horas_antes=3, horas_despues=2):
-    """True si hay noticia de ALTO impacto (🔴 roja / 3 estrellas) en ventana de bloqueo.
-    - Noticias críticas (NFP, FOMC, CPI): ventana extendida 4h antes / 3h después
-    - Alto impacto normal: bloquea horas_antes/horas_despues (default 2h/1h)
-    - Medio impacto: NO bloquea (solo se loguea como info)"""
-    try:
-        noticias = cargar_calendario_economico()
-        if not noticias:
-            return False
-        divisas   = DIVISAS_POR_TICKER.get(ticker, [])
-        ahora_utc = datetime.now(pytz.UTC)
-        tz_ny     = pytz.timezone("America/New_York")
-        for n in noticias:
-            impacto = n.get("impact", "").lower()
-            # ── SOLO bloquear por noticias ROJAS (High / 3 estrellas) ──
-            if impacto != "high":
-                continue
-            if n.get("country", "") not in divisas:
-                continue
-            try:
-                fecha_str = n.get("date", "")
-                hora_str  = n.get("time", "").strip().lower()
-                dt_utc = None
-                # FIX 2026-04-17: Soporte ISO 8601 nuevo formato FF
-                if "T" in fecha_str:
-                    try:
-                        _dt_iso = datetime.fromisoformat(fecha_str)
-                        if _dt_iso.tzinfo:
-                            dt_utc = _dt_iso.astimezone(pytz.UTC)
-                        else:
-                            dt_utc = pytz.UTC.localize(_dt_iso)
-                    except Exception:
-                        pass
-                if not dt_utc and fecha_str and hora_str not in ("", "all day", "tentative"):
-                    for _fmt in ("%m-%d-%Y %I:%M%p", "%Y-%m-%d %I:%M%p", "%m/%d/%Y %I:%M%p"):
-                        try:
-                            _dt = datetime.strptime(f"{fecha_str} {hora_str}", _fmt)
-                            dt_utc = tz_ny.localize(_dt).astimezone(pytz.UTC)
-                            break
-                        except Exception:
-                            continue
-                if not dt_utc:
-                    continue
-                diff   = (dt_utc - ahora_utc).total_seconds() / 3600
-                # diff > 0 = evento en el futuro, diff < 0 = evento ya pasó
-                titulo = n.get("title", "Desconocido")
-
-                # Ventanas dinámicas según tipo de noticia
-                if _es_noticia_critica(titulo):
-                    # NFP, FOMC, CPI, etc. = ventana EXTENDIDA
-                    _h_antes, _h_despues = 4, 3
-                else:
-                    # Alto impacto normal = ventana más ajustada
-                    _h_antes, _h_despues = horas_antes, horas_despues
-
-                if -_h_despues <= diff <= _h_antes:
-                    _pais = n.get("country", "?")
-                    _tipo_imp = "🔴 CRÍTICA" if _es_noticia_critica(titulo) else "🔴 ALTA"
-                    logger.info(f"🚨 NOTICIA BLOQUEANTE {_tipo_imp}: {_pais} {titulo} | {ticker} | en {diff:+.1f}h | ventana: -{_h_despues}h/+{_h_antes}h")
-                    return True
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return False
 
 def proteger_operaciones_por_noticias():
     """Cierra operaciones abiertas del bot si se acerca una noticia CRÍTICA (NFP, FOMC, CPI).
@@ -4234,22 +4240,6 @@ def get_fear_greed():
     except Exception:
         return _cache_fear_greed["valor"], _cache_fear_greed["class"]
 
-def filtro_fear_greed(ticker, tipo):
-    """Filtro Fear & Greed — desactivado (solo aplicaba a crypto, eliminado del bot)."""
-    return True
-    # Código legacy mantenido como referencia:
-    if ticker not in ("BTC-USD", "ETH-USD"):
-        return True
-    fg, _ = get_fear_greed()
-    if fg <= 0:
-        return True  # Sin datos → no bloquear
-    if fg > 75 and tipo == "COMPRA":
-        print(f"⚠️ Fear&Greed {fg} (codicia extrema) — bloqueando COMPRA {ticker}")
-        return False
-    if fg < 25 and tipo == "VENTA":
-        print(f"⚠️ Fear&Greed {fg} (miedo extremo) — bloqueando VENTA {ticker}")
-        return False
-    return True
 
 def _obtener_tendencia_tf(ticker, interval, cache_dict, ttl=900):
     """
@@ -4281,67 +4271,6 @@ def _obtener_tendencia_tf(ticker, interval, cache_dict, ttl=900):
     except Exception:
         return None
 
-def confirmar_tendencia_1h(ticker, tipo, **kwargs):
-    """
-    Verifica que la tendencia en 1H y 4H coincidan con la dirección de la señal.
-    Sistema de doble filtro: ambas temporalidades deben alinearse (o ser neutras).
-    """
-    global _cache_mtf_1h, _cache_mtf_4h
-
-    try:
-        # RSI extremo bypass — en sobreventa/sobrecompra extrema, ignorar MTF
-        _rsi_val = kwargs.get("rsi", 50) if kwargs else 50
-        if _rsi_val < 25 or _rsi_val > 75:
-            logger.info(f"✅ MTF bypass: RSI={_rsi_val:.0f} extremo — señal {tipo} {ticker} permitida sin filtro MTF")
-            return True
-
-        # ── TEMPORALIDAD 1H ─────────────────────────────────────
-        alcista_1h = _obtener_tendencia_tf(ticker, "1h", _cache_mtf_1h, ttl=900)
-
-        if alcista_1h is not None:
-            if tipo == "COMPRA" and not alcista_1h:
-                logger.info(f"⚠️ MTF 1H bloqueado: COMPRA pero 1H bajista en {ticker}")
-                return False
-            if tipo == "VENTA" and alcista_1h:
-                logger.info(f"⚠️ MTF 1H bloqueado: VENTA pero 1H alcista en {ticker}")
-                return False
-
-        # ── TEMPORALIDAD 4H (segunda capa de confirmación) ──────
-        alcista_4h = _obtener_tendencia_tf(ticker, "4h", _cache_mtf_4h, ttl=3600)
-
-        if alcista_4h is not None:
-            if tipo == "COMPRA" and not alcista_4h:
-                logger.info(f"⚠️ MTF 4H bloqueado: COMPRA pero 4H bajista en {ticker}")
-                return False
-            if tipo == "VENTA" and alcista_4h:
-                logger.info(f"⚠️ MTF 4H bloqueado: VENTA pero 4H alcista en {ticker}")
-                return False
-
-        return True  # Tendencias alineadas o neutras → señal válida
-
-    except Exception as e:
-        logger.warning(f"⚠️ Error en confirmar_tendencia_1h/4H ({ticker}): {e}")
-        return True  # En caso de error, no bloquear
-
-def hay_correlacion_peligrosa(ticker_nuevo, tipo_nuevo):
-    """Anti-contradicción índices US: S&P500 ↔ NASDAQ (bidireccional)."""
-    _US_INDEX_PAIRS = {"ES=F": "NQ=F", "NQ=F": "ES=F"}
-    if ticker_nuevo in _US_INDEX_PAIRS:
-        _par = _US_INDEX_PAIRS[ticker_nuevo]
-        with _lock_ops:
-            for _v in operaciones_activas.values():
-                if _v.get('ticker') == _par:
-                    _dir = _v.get('tipo', '')
-                    if _dir and _dir != tipo_nuevo:
-                        _nombre = "NASDAQ" if _par == "NQ=F" else "S&P500"
-                        print(f"🔗 CORRELACIÓN: {ticker_nuevo} {tipo_nuevo} bloqueado — {_nombre} tiene {_dir}")
-                        return True
-                    break
-    return False
-
-# ============================================================
-#  MENSAJE DE NUEVA SEÑAL - PROFESIONAL
-# ============================================================
 
 def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente="BuySell365", premium=False, skip_mt5_razon="", nivel_senal="PREMIUM"):
     cat  = get_categoria(ticker)
@@ -4369,10 +4298,15 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 
     # FIX 2026-04-21: Cabecera con BUY/SELL (inglés) — solo el indicador de dirección
     # se mantiene en inglés. El resto del mensaje (Entrada, TP, SL) sigue en español.
+    # Además, normalizar "GOLD" → "ORO" (el dict ACTIVOS usa "GOLD" como clave interna
+    # pero el usuario quiere que se muestre "ORO" en todos los mensajes públicos).
+    _nombre_display = {
+        "GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO",
+    }.get(nombre, nombre)
     if tipo == "COMPRA":
-        cabecera = f"🟢 *BUY — {nombre}*"
+        cabecera = f"🟢 *BUY — {_nombre_display}*"
     else:
-        cabecera = f"🔴 *SELL — {nombre}*"
+        cabecera = f"🔴 *SELL — {_nombre_display}*"
 
     sl_dist  = dist(precio, niveles['sl'])
     tp1_dist = dist(precio, niveles['tp1'])
@@ -4411,6 +4345,8 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
 
 def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="TP", duracion_seg=None, perc_profit=None, fuente=None, mt5_real=False):
     # FIX 2026-04-14: Formato en español
+    # FIX 2026-04-21: GOLD → ORO
+    nombre = {"GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO"}.get(nombre, nombre)
     f_ = lambda v: fmt(v, ticker)
     tipo_emoji = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
     _unidad = unidad_medida(ticker)
@@ -4440,6 +4376,53 @@ def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
     # FIX 2026-04-14: Formato en español
+    # FIX 2026-04-21: GOLD → ORO
+    nombre = {"GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO"}.get(nombre, nombre)
+    cat = get_categoria(ticker)
+    pips_abs = abs(pips)
+    if cat == "crypto":
+        p_txt = f"{pips_abs:.2f}%"
+    elif cat == "forex":
+        p_txt = f"{pips_abs:.1f} pips"
+    else:
+        p_txt = f"{pips_abs:.1f} pts"
+    # FIX 2026-04-21: Mensaje SL motivacional (con WR/Net del día)
+    # Calcular WR y Net del scanner propio (si tenemos historial)
+    _wr_line = ""
+    _net_line = ""
+    try:
+        _hoy_str = ahora().strftime("%d/%m/%Y")
+        _hist_hoy = [h for h in historial_operaciones if h.get("fecha") == _hoy_str]
+        _tps = [h for h in _hist_hoy if h.get("resultado") == "WIN"]
+        _sls = [h for h in _hist_hoy if h.get("resultado") == "LOSS"]
+        if (_tps or _sls):
+            _wr = round(len(_tps) / max(1, len(_tps) + len(_sls)) * 100)
+            _wr_line = f"   ✅ Win Rate hoy: *{_wr}%*\n"
+        _pips_net = sum(h.get("pips", 0) for h in _hist_hoy)
+        if abs(_pips_net) > 0:
+            _sign = "+" if _pips_net >= 0 else ""
+            _net_line = f"   ✅ Net del día: *{_sign}{_pips_net:.0f} pts/pips*\n"
+    except Exception:
+        pass
+    _stats_block = ""
+    if _wr_line or _net_line:
+        _stats_block = f"\n📊 *El sistema sigue ganando:*\n{_wr_line}{_net_line}"
+
+    return (
+        f"🛡️ *STOP LOSS — {nombre}*\n\n"
+        f"📉 Operación cerrada con riesgo controlado (-{p_txt}).\n"
+        f"{_stats_block}\n"
+        f"💎 *Perder poco cuando toca es lo que separa\n"
+        f"a un trader profesional de un aficionado.*\n\n"
+        f"🔜 Próxima señal en camino 🚀\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"_BuySell365 Pro — Disciplina que paga_"
+    )
+
+def mensaje_cambio_tendencia_total(nombre, tipo, entrada, salida, pips, ticker, razon="cambio de tendencia"):
+    """Cierre total por cambio de tendencia detectado — se envía al canal VIP."""
+    # FIX 2026-04-21: GOLD → ORO
+    nombre = {"GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO"}.get(nombre, nombre)
     cat = get_categoria(ticker)
     pips_abs = abs(pips)
     if cat == "crypto":
@@ -4449,19 +4432,43 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, 
     else:
         p_txt = f"{pips_abs:.1f} pts"
     f_ = lambda v: fmt(v, ticker)
-    cabecera = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
+    _tipo_es = "BUY" if tipo == "COMPRA" else "SELL"
+    emoji = "🟢" if pips > 0 else "⚠️"
+    signo = "+" if pips > 0 else "-"
+    _dir_contraria = "bajista" if tipo == "COMPRA" else "alcista"
     return (
-        f"🛑🛑🛑 *SL TOCADO* 🛑🛑🛑\n"
+        f"🔄 *CAMBIO DE TENDENCIA* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"{cabecera}  {nombre}\n\n"
+        f"Detectamos reversión *{_dir_contraria}* mientras estábamos en *{_tipo_es}*.\n"
+        f"Cerramos la posición para proteger capital.\n\n"
         f"📍 Entrada: {f_(entrada)}\n"
-        f"🛡️ SL: {f_(salida)}\n"
+        f"📊 Cierre: {f_(salida)}\n"
+        f"{emoji} *Neto: {signo}{p_txt}*\n"
         f"━━━━━━━━━━━━━━\n"
-        f"📊 _BuySell365 Pro — gestión de riesgo_"
+        f"📊 _BuySell365 Pro — gestión dinámica_"
     )
+
+
+def mensaje_cierre_parcial_tendencia(nombre, tipo, pips_asegurados, ticker, porc=50):
+    """Cierre parcial X% por debilidad de tendencia — asegura ganancia."""
+    nombre = {"GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO"}.get(nombre, nombre)
+    cat = get_categoria(ticker)
+    if cat == "crypto":
+        p_txt = f"{pips_asegurados:.2f}%"
+    elif cat == "forex":
+        p_txt = f"{pips_asegurados * 10000:.0f} pips" if abs(pips_asegurados) < 1 else f"{pips_asegurados:.1f} pips"
+    else:
+        p_txt = f"{pips_asegurados:.1f} pts"
+    return (
+        f"⚡ *CIERRE PARCIAL {porc}%* — {nombre}\n"
+        f"💰 +{p_txt} asegurados. Debilitamiento de tendencia, protegemos ganancia cerrando parte."
+    )
+
 
 def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
     # FIX 2026-04-14: Formato en español
+    # FIX 2026-04-21: GOLD → ORO
+    nombre = {"GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO"}.get(nombre, nombre)
     cat = get_categoria(ticker)
     p_txt = f"{pips:.2f}%" if cat == "crypto" else f"{pips:.1f} {unidad_medida(ticker)}"
     f_ = lambda v: fmt(v, ticker)
@@ -4478,6 +4485,8 @@ def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
     )
 
 def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
+    # FIX 2026-04-21: GOLD → ORO
+    nombre = {"GOLD": "ORO", "XAUUSD": "ORO", "XAU/USD": "ORO"}.get(nombre, nombre)
     cat = get_categoria(ticker)
     p_txt = f"{pips:.2f}%" if cat == "crypto" else f"{pips:.1f} {unidad_medida(ticker)}"
     f_ = lambda v: fmt(v, ticker)
@@ -8484,6 +8493,8 @@ INTENCIONES = {
 
 # Aliases de activos para fuzzy matching
 ALIASES_ACTIVOS_FUZZY = {
+    "oro": "GOLD", "gold": "GOLD", "xauusd": "GOLD", "xau": "GOLD",
+    "xau/usd": "GOLD", "el oro": "GOLD",
     "eurusd": "EUR/USD", "euro": "EUR/USD", "eur": "EUR/USD",
     "eurodolar": "EUR/USD", "dolareuro": "EUR/USD", "ed": "EUR/USD",
     "nasdaq": "NASDAQ", "nq": "NASDAQ", "ndq": "NASDAQ",
@@ -12909,7 +12920,8 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         # OBS-2 FIX: Mover BLOQUEO TOTAL de horario ANTES de ejecutar MT5
         # Si está fuera de horario total → limpiar reserva ANTES de intentar MT5
-        if not en_horario_mt5(ticker_yf):
+        # FIX 2026-04-21: envuelto con SCANNER_BLOCKS_ENABLED
+        if SCANNER_BLOCKS_ENABLED and not en_horario_mt5(ticker_yf):
             with _lock_ops:
                 operaciones_activas.pop(op_id, None)
                 estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 0) - 1)
@@ -13140,8 +13152,40 @@ def _traducir_titulo_briefing(t):
     return t
 
 
+_BRIEFING_LAST_MSG_FILE = Path(__file__).parent / ".briefing_last_msg.txt"
+
+
+def _briefing_borrar_anterior():
+    """Borra el briefing anterior del canal si existe message_id guardado.
+    FIX 2026-04-23: evita briefings duplicados al re-enviar con /briefing."""
+    try:
+        if not _BRIEFING_LAST_MSG_FILE.exists():
+            return
+        mid = _BRIEFING_LAST_MSG_FILE.read_text().strip()
+        if not mid.isdigit():
+            return
+        import requests as _req_del
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
+        _req_del.post(url, data={"chat_id": CHANNEL_ID, "message_id": int(mid)}, timeout=8)
+        _BRIEFING_LAST_MSG_FILE.unlink(missing_ok=True)
+    except Exception as _e_del:
+        logger.warning(f"No se pudo borrar briefing anterior: {_e_del}")
+
+
+def _briefing_guardar_msg_id(msg_id):
+    """Persiste el message_id del briefing enviado (para poder borrarlo al siguiente)."""
+    if not msg_id:
+        return
+    try:
+        _BRIEFING_LAST_MSG_FILE.write_text(str(msg_id))
+    except Exception:
+        pass
+
+
 def enviar_briefing_matutino():
     """Envía el briefing del mercado a las 7:00 AM hora Andorra al canal VIP."""
+    # FIX 2026-04-23: Borrar briefing anterior si existe (evita duplicados al /briefing)
+    _briefing_borrar_anterior()
     hora = ahora().strftime("%H:%M")
     # FIX 2026-04-17: get_fear_greed() devuelve TUPLA (valor, clasificacion) — desempacar
     try:
@@ -13158,21 +13202,33 @@ def enviar_briefing_matutino():
     noticias_high = []
     noticias_medium = []
     noticias_todo_dia = []
+    # FIX 2026-04-23: Listas paralelas estructuradas para generar imagen news_image.py
+    eventos_img_high = []      # [(hora_HHMM, moneda3, titulo), ...]
+    eventos_img_medium = []
+    eventos_img_todo_dia = []
     for n in (noticias or []):
         impacto = n.get("impact", "").lower()
+        # FIX 2026-04-22: ForexFactory marca como "low" muchas noticias que SÍ
+        # mueven mercado (Core CPI, PMIs, Retail Sales, Consumer Confidence).
+        # Si el título coincide con _NOTICIAS_CRITICAS, elevamos a "high".
+        # Así el briefing matutino muestra los 6 eventos como ProSignalsFX.
         if impacto not in ("high", "medium"):
-            continue
+            if _es_noticia_critica(n.get("title", "")):
+                impacto = "high"
+            else:
+                continue
         try:
             fecha_str = n.get("date", "")
             hora_str  = n.get("time", "").strip().lower()
             dt_utc = None
-            es_all_day = hora_str in ("", "all day", "tentative")
+            # FIX 2026-04-21: ForexFactory NO trae campo "time" separado — la hora va
+            # embebida en "date" (formato "2026-04-21T14:30:00-04:00"). Antes marcábamos
+            # TODAS las noticias como "all day" porque hora_str siempre estaba vacío.
+            # Ahora solo es all_day si "time" lo dice explícito ("all day" / "tentative").
+            es_all_day = hora_str in ("all day", "tentative")
             if "T" in fecha_str:
                 try:
                     _dt_iso = datetime.fromisoformat(fecha_str)
-                    # Detectar All Day: hora 00:00 sin hora explícita en "time"
-                    if _dt_iso.hour == 0 and _dt_iso.minute == 0 and not any(x in hora_str for x in ("am","pm",":")):
-                        es_all_day = True
                     if _dt_iso.tzinfo:
                         dt_utc = _dt_iso.astimezone(pytz.UTC)
                     else:
@@ -13200,19 +13256,26 @@ def enviar_briefing_matutino():
             _pais = _PAISES_ES_BRIEFING.get(n.get("country", ""), n.get("country", ""))
             _titulo = _traducir_titulo_briefing(n.get("title", ""))
             _emoji = "🔴" if impacto == "high" else "🟠"
+            # FIX 2026-04-23: También acumular los eventos como tuplas estructuradas
+            # para la imagen (hora HH:MM, moneda 3-letras, título evento).
+            _moneda_code = (n.get("country", "") or "").upper()[:3]
             if es_all_day:
                 _line = f"   {_emoji} Todo el día — {_pais} {_titulo}"
                 noticias_todo_dia.append(_line)
+                eventos_img_todo_dia.append(("Todo el día", _moneda_code, _titulo))
             else:
                 _hora_local = _dt_loc.strftime("%H:%M")
                 _line = f"   {_emoji} {_hora_local} — {_pais} {_titulo}"
                 if impacto == "high":
                     noticias_high.append(_line)
+                    eventos_img_high.append((_hora_local, _moneda_code, _titulo))
                 else:
                     noticias_medium.append(_line)
+                    eventos_img_medium.append((_hora_local, _moneda_code, _titulo))
         except Exception:
             continue
     noticias_hoy = (noticias_high + noticias_medium + noticias_todo_dia)[:6]
+    eventos_para_imagen = (eventos_img_high + eventos_img_medium + eventos_img_todo_dia)[:6]
 
     _hora_actual = ahora().replace(tzinfo=None).hour
     if _hora_actual < 12:
@@ -13281,22 +13344,63 @@ def enviar_briefing_matutino():
         _fg_insight = " — codicia extrema, precaución en longs ⚠️"
     lineas.append(f"\n😱 *Miedo y Codicia:* {_fg_val}/100 ({_fg_class}){_fg_insight}")
 
-    if noticias_hoy:
-        lineas.append("\n📰 *Alto impacto hoy:*")
-        lineas.extend(noticias_hoy[:5])
+    # FIX 2026-04-23: Si hay eventos de alto impacto, generar IMAGEN estilo
+    # ProSignalsFX y enviarla como foto con el briefing como caption.
+    # Si no hay eventos o la imagen falla → fallback a texto plano con noticias.
+    _imagen_generada = None
+    if eventos_para_imagen:
+        try:
+            import news_image
+            from io import BytesIO
+            _fecha_img = ahora().strftime("%d / %m / %Y")
+            _path_img = news_image.generar_imagen_noticias(
+                eventos_para_imagen, _fecha_img,
+                fname=f"briefing_{ahora().strftime('%Y%m%d')}.jpg")
+            _imagen_generada = _path_img
+        except Exception as _e_img:
+            logger.warning(f"news_image briefing fallback a texto: {_e_img}")
 
-    if _ia_outlook:
-        lineas.append(f"\n💡 *Perspectiva:*\n{_ia_outlook[:400]}")
-
-    # Operaciones activas overnight
-    with _lock_ops:
-        n_activas = len(operaciones_activas)
-    if n_activas > 0:
-        lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
-
-    lineas.append("━━━━━━━━━━━━━━━━━━━━")
-
-    enviar_canal("\n".join(lineas))
+    if _imagen_generada:
+        # Texto ligero: panorama + IA + ops (sin duplicar noticias — ya están en la imagen)
+        if _ia_outlook:
+            lineas.append(f"\n💡 *Perspectiva:*\n{_ia_outlook[:400]}")
+        with _lock_ops:
+            n_activas = len(operaciones_activas)
+        if n_activas > 0:
+            lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
+        lineas.append("━━━━━━━━━━━━━━━━━━━━")
+        caption = "\n".join(lineas)
+        # Telegram caption máx 1024 chars
+        if len(caption) > 1020:
+            caption = caption[:1017] + "..."
+        try:
+            with open(_imagen_generada, "rb") as _fimg:
+                _photo_bytes = _fimg.read()
+            _msg_id = enviar_canal_foto(_photo_bytes, caption)
+            _briefing_guardar_msg_id(_msg_id)
+        except Exception as _e_send:
+            logger.warning(f"Error enviando briefing como foto: {_e_send} — fallback texto")
+            # Fallback: texto plano con las noticias
+            if noticias_hoy:
+                lineas.insert(-1, "\n📰 *Alto impacto hoy:*")
+                for _l in noticias_hoy[:5]:
+                    lineas.insert(-1, _l)
+            _msg_id = enviar_canal("\n".join(lineas))
+            _briefing_guardar_msg_id(_msg_id)
+    else:
+        # Sin imagen → flujo original texto
+        if noticias_hoy:
+            lineas.append("\n📰 *Alto impacto hoy:*")
+            lineas.extend(noticias_hoy[:5])
+        if _ia_outlook:
+            lineas.append(f"\n💡 *Perspectiva:*\n{_ia_outlook[:400]}")
+        with _lock_ops:
+            n_activas = len(operaciones_activas)
+        if n_activas > 0:
+            lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
+        lineas.append("━━━━━━━━━━━━━━━━━━━━")
+        _msg_id = enviar_canal("\n".join(lineas))
+        _briefing_guardar_msg_id(_msg_id)
 
 
 def enviar_cierre_nocturno():
@@ -13545,6 +13649,71 @@ def revisar_niveles_operaciones():
         _en_profit = _pips_actual > 0
         _dist_sl = abs(calcular_pips(op['entrada'], op['sl'], ticker))
         _perdida_minima = _dist_sl > 0 and (_pips_actual > -(_dist_sl * 0.30))  # Pérdida < 30% del SL
+
+        # 🔄 CAMBIO DE TENDENCIA — cerrar total o parcial + avisar al canal
+        # FIX 2026-04-21: el bot propio ahora detecta reversiones y gestiona dinámicamente
+        # la posición en lugar de esperar solo a TP/SL fijos.
+        try:
+            _cached_ind_tend = _cache_ind.get(ticker, {})
+            if _cached_ind_tend and not op.get('_cambio_tendencia_procesado', False):
+                _accion = _detectar_cambio_tendencia(op, precio_mon, _cached_ind_tend)
+                if _accion == "total":
+                    # Cierre total + aviso canal
+                    log_op(f"🔄 CAMBIO TENDENCIA TOTAL: {nombre} {tipo} @ {precio_mon} (pips={_pips_actual:.1f})")
+                    _msg_ct = mensaje_cambio_tendencia_total(nombre, tipo, op['entrada'], precio_mon, _pips_actual, ticker)
+                    try:
+                        enviar_canal(_msg_ct)
+                    except Exception:
+                        pass
+                    # Cerrar MT5 real si existe
+                    _ticket_ct = op.get('ticket_mt5')
+                    if _ticket_ct and MT5_AVAILABLE:
+                        try:
+                            cerrar_posicion_mt5(ticker, ticket_id=_ticket_ct)
+                        except Exception:
+                            pass
+                    # Marcar para no procesar dos veces; revisar_niveles siguiente ciclo
+                    # registrará historial y limpiará operaciones_activas por timeout o TP/SL virtual.
+                    with _lock_ops:
+                        if op_id in operaciones_activas:
+                            operaciones_activas[op_id]['_cambio_tendencia_procesado'] = True
+                            # Forzar cierre en próximo ciclo: SL a precio actual
+                            operaciones_activas[op_id]['sl'] = precio_mon
+                    continue  # siguiente op
+                elif _accion == "parcial" and _pips_actual > 0 and not op.get('_parcial_tendencia_enviado', False):
+                    # Solo parcial si está en profit (asegurar ganancia)
+                    log_op(f"⚡ CIERRE PARCIAL TENDENCIA: {nombre} {tipo} +{_pips_actual:.1f}")
+                    _msg_cp = mensaje_cierre_parcial_tendencia(nombre, tipo, _pips_actual, ticker, porc=50)
+                    try:
+                        enviar_canal(_msg_cp)
+                    except Exception:
+                        pass
+                    # Mover SL a breakeven para que el resto corra sin riesgo
+                    _ticket_cp = op.get('ticket_mt5')
+                    if _ticket_cp and MT5_AVAILABLE:
+                        try:
+                            mt5_sym_cp = MT5_TICKER_MAP.get(ticker, ticker)
+                            with _lock_mt5:
+                                _si_cp = mt5.symbol_info(mt5_sym_cp)
+                            if _si_cp:
+                                _be_sl = round(op['entrada'], _si_cp.digits)
+                                _req_cp = {
+                                    "action": mt5.TRADE_ACTION_SLTP,
+                                    "position": _ticket_cp,
+                                    "symbol": mt5_sym_cp,
+                                    "sl": _be_sl,
+                                    "tp": round(float(op.get('tp1', 0)), _si_cp.digits),
+                                }
+                                with _lock_mt5:
+                                    mt5.order_send(_req_cp)
+                        except Exception:
+                            pass
+                    with _lock_ops:
+                        if op_id in operaciones_activas:
+                            operaciones_activas[op_id]['_parcial_tendencia_enviado'] = True
+                            operaciones_activas[op_id]['sl'] = op['entrada']  # SL a BE
+        except Exception as _e_tend:
+            logger.debug(f"Detección cambio tendencia {ticker}: {_e_tend}")
 
         # Cierre definitivo — TP1, SL, o Auto-cierre 24h (sin cierre anticipado por tiempo)
         if toca_tp1 or sl_alcanzado or (_edad_op > TIEMPO_AUTOCIERRE):
@@ -13889,630 +14058,6 @@ def obtener_tendencia_4h(ticker):
     except Exception:
         return "NEUTRAL"
 
-def filtro_multi_timeframe(ticker, tipo):
-    """Bloquea señales que van contra la tendencia de 4H. Retorna True si OK."""
-    tendencia = obtener_tendencia_4h(ticker)
-    if tendencia == "NEUTRAL":
-        return True  # Sin filtro si no hay tendencia clara
-
-    # Bloquear COMPRA en tendencia bajista 4H y VENTA en tendencia alcista 4H
-    if tipo == "COMPRA" and tendencia == "BAJISTA":
-        print(f"🔻 MTF FILTER: {ticker} COMPRA bloqueada — tendencia 4H BAJISTA")
-        return False
-    if tipo == "VENTA" and tendencia == "ALCISTA":
-        print(f"🔺 MTF FILTER: {ticker} VENTA bloqueada — tendencia 4H ALCISTA")
-        return False
-    return True
-
-def analizar_mercado():
-    """Escanea los activos del bot: EUR/USD, NASDAQ, S&P500."""
-    global ultimo_recordatorio, ultimo_briefing
-
-    momento = ahora()
-    now_utc = datetime.now(pytz.UTC)
-    hora_utc = now_utc.hour
-    fecha_hoy = now_utc.strftime("%Y-%m-%d")
-    dia_semana = now_utc.weekday()
-    es_fin_de_semana = dia_semana >= 5  # sáb=5, dom=6
-
-    # Limpiar caché diario de notificaciones pasadas para evitar fuga de memoria
-    claves_obsoletas = [k for k in _sesiones_notificadas.keys() if fecha_hoy not in k]
-    for k in claves_obsoletas:
-        del _sesiones_notificadas[k]
-
-    # Resumen diario — DESACTIVADO (usuario prefiere solo señales)
-    # if not es_fin_de_semana and hora_utc == 21 and (time.time() - ultimo_resumen > 3600):
-    #     enviar_resumen_diario()
-    # Resumen semanal — DESACTIVADO
-    # if dia_semana == 6 and hora_utc == 20:
-    #     enviar_resumen_semanal()
-
-    # 🔧 AUTO-CALIBRACIÓN — cada 12 horas
-    auto_calibrar_umbrales()
-
-    # ━━━ HORARIO GLOBAL: Solo operar y enviar señales de 8:00 a 18:00 Andorra (L-V) ━━━
-    now_local = datetime.now(BOT_TZ)
-    hora_local = now_local.hour + now_local.minute / 60.0
-    if es_fin_de_semana or hora_local < HORA_APERTURA_LOCAL or hora_local >= HORA_CORTE_LOCAL:
-        return  # Fuera de horario: ni señales Telegram ni MT5
-
-    # ✅ ESCANEAR ACTIVOS EN PARALELO (reduce ciclo de ~60s a ~12s)
-    # Todos los activos usan analizar_activo
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    with ThreadPoolExecutor(max_workers=len(ACTIVOS)) as executor:
-        futures = {}
-        for nombre, ticker in ACTIVOS.items():
-            futures[executor.submit(analizar_activo, nombre, ticker)] = nombre
-        for future in as_completed(futures):
-            nombre_fut = futures[future]
-            try:
-                future.result()
-            except Exception as e:
-                print(f"⚠️ Error en hilo {nombre_fut}: {e}")
-
-
-def analizar_activo(nombre, ticker):
-    """Analiza un activo individual con sistema profesional"""
-    global operaciones_activas, escaneo_pausado
-    try:
-        # Intento de descarga con reintento en caso de glitch
-        df = None
-        es_precio_valido = False
-        precio_mon = None
-        fuente_precio = "desconocida"
-        for intento in range(3):
-            df = descargar_datos_seguro(ticker)
-            if df is None or df.empty or len(df) < 100:
-                time.sleep(1)
-                continue
-                
-            precio_yf = float(df['Close'].iloc[-1])
-            cot = obtener_cotizacion(ticker)
-            if cot:
-                precio_mon = cot['precio']
-                fuente_precio = cot.get('fuente', 'BuySell365')
-            else:
-                precio_mon = obtener_precio_actual(ticker, df)
-                fuente_precio = "yfinance (fallback)"
-
-            if precio_mon is None:
-                precio_mon = precio_yf
-                fuente_precio = "yfinance (último recurso)"
-            
-            # 🛡️ VALIDACIÓN DE INTEGRIDAD DE PRECIO (Anti-Glitches)
-            cat_local = get_categoria(ticker)
-            es_precio_valido = True
-            
-            # Filtros de cordura (Sanity Checks)
-            if cat_local == "forex":
-                if "JPY" in ticker and (precio_mon < 80 or precio_mon > 250): es_precio_valido = False
-                elif "JPY" not in ticker and (precio_mon < 0.5 or precio_mon > 2.0): es_precio_valido = False
-            if ticker == "NQ=F" and (precio_mon < 15000 or precio_mon > 40000): es_precio_valido = False
-            if ticker == "ES=F" and (precio_mon < 4000 or precio_mon > 12000): es_precio_valido = False
-            # ORO: GC=F futuros COMEX (~1500-8000 rango razonable)
-            if ticker in ("XAUUSD=X", "GC=F") and (precio_mon < 1500 or precio_mon > 8000): es_precio_valido = False
-            if es_precio_valido:
-                break
-            else:
-                logger.warning(f"🔄 Reintentando {nombre} ({intento+1}/3)... Glitch detectado: {precio_mon}")
-                time.sleep(2)
-        
-        # FIX: Abortar si precio inválido tras 3 reintentos (antes continuaba con datos corruptos)
-        if not es_precio_valido:
-            logger.error(f"❌ Glitch persistente | Activo: {nombre} | Ticker: {ticker} | Precio: {precio_mon} — ABORTANDO análisis")
-            return
-
-        if df is None or df.empty:
-            return
-
-        precio = precio_mon
-
-        # ── 🛑 CIRCUIT BREAKER: DESACTIVADO por el usuario ──
-        # Las señales deben fluir siempre, sin pausas
-        # _racha = _calcular_racha_perdidas_actual()
-        # if _racha >= 4:
-        #     _last_loss_time = _get_last_loss_time()
-        #     if _last_loss_time and (time.time() - _last_loss_time) < 3600:
-        #         logger.info(f"🛑 CIRCUIT BREAKER: {nombre} — {_racha} pérdidas seguidas, pausa 1h")
-        #         return
-
-        # ── 🚨 FILTRO DE NOTICIAS (ANTES de generar señales) ────────────
-        # FIX 2026-03-20: 2h→1h antes (2h bloqueaba demasiado tiempo)
-        if hay_noticia_alto_impacto(ticker, horas_antes=1, horas_despues=0.5):
-            logger.info(f"🚨 {nombre}: BLOQUEADO por noticia 🔴 ROJA de alto impacto")
-            return
-
-        # ── BUSCAR NUEVAS SEÑALES ────────────────────────
-        ind = calcular_indicadores_profesionales(df, precio, ticker)
-        if not ind:
-            return
-
-        _cache_ind[ticker] = ind
-        tipo, score, razones = evaluar_senal_profesional(ind, ticker)
-        min_score = get_min_score_efectivo()
-
-        if tipo is None:
-            logger.info(f"📊 {nombre}: sin señal — {razones[0] if razones else 'no cumple criterios'}")
-            return
-
-        # 🔴 FILTRO DURO VOLUMEN: vol < 0.05x = mercado completamente muerto
-        # Umbral bajo para no bloquear futuros (GC=F, NQ=F) con volumen reducido fuera de horas
-        _vol_r = ind.get('vol_ratio', 1.0)
-        if _vol_r < 0.05:
-            logger.info(f"🚫 VOLUMEN BAJO: {nombre} {tipo} — Vol={_vol_r:.1f}x (mín 0.05x) — señal descartada")
-            return
-
-        # [4] CONFIRMACIÓN INTER-MERCADO: +1 al score si el activo correlacionado confirma
-        try:
-            if _confirmar_inter_mercado(ticker, tipo):
-                score = min(5, score + 1)
-                razones.append("🔗 Confirmación inter-mercado positiva (+1 score)")
-        except Exception:
-            pass
-
-        # [3] TRACKING POR ESTRATEGIA: verificar si la estrategia está permitida
-        _estrategia_temprana = ""
-        for _r in razones:
-            if "Asian Range" in _r: _estrategia_temprana = "asian_breakout"; break
-            elif "Breakout" in _r: _estrategia_temprana = "breakout"; break
-            elif "Reversi" in _r or "Divergencia" in _r: _estrategia_temprana = "reversion"; break
-        if _estrategia_temprana:
-            try:
-                if not _estrategia_permitida(_estrategia_temprana):
-                    logger.info(f"⏸️ {nombre}: estrategia {_estrategia_temprana} auto-pausada por bajo WR")
-                    return
-            except Exception:
-                pass
-
-        # [10] AUTO-OPTIMIZACIÓN: verificar si el activo está desactivado por optimización
-        try:
-            if ticker in _activos_desactivados_auto:
-                logger.info(f"🔧 {nombre}: desactivado por auto-optimización semanal (WR < 30%)")
-                return
-        except Exception:
-            pass
-
-        # [9] SCORE DE CONFIANZA 0-100: calcular y adjuntar a indicadores
-        try:
-            _confianza_score = _calcular_confianza(ind, ticker, tipo)
-            ind['confianza_score_100'] = _confianza_score
-        except Exception:
-            ind['confianza_score_100'] = 0
-
-        # 🛡️ FILTRO ANTI-CONTRADICCIÓN TÉCNICA: NO dar SELL cuando 15m es claramente alcista (y viceversa)
-        # EXCEPCIÓN: Estrategia Reversión Extrema (score 5 con divergencia) SÍ puede ir contra técnicos
-        _ema20_gt_50 = ind['ema20'] > ind['ema50']
-        _macd_gt_sig = ind['macd'] > ind['signal']
-        _price_gt_50 = ind['precio'] > ind['ema50']
-        _tech_unanime_alcista = (_ema20_gt_50 and _macd_gt_sig and _price_gt_50)
-        _tech_unanime_bajista = (not _ema20_gt_50 and not _macd_gt_sig and not _price_gt_50)
-        _es_reversion = any("Reversi" in r or "Divergencia" in r for r in razones)
-
-        if tipo == "VENTA" and _tech_unanime_alcista and not _es_reversion:
-            print(f"🛡️ ANTI-CONTRADICCIÓN: {nombre} VENTA bloqueada — técnicos 15m son unanimemente ALCISTAS (EMA20>50, MACD>Signal, P>EMA50)")
-            return
-        if tipo == "COMPRA" and _tech_unanime_bajista and not _es_reversion:
-            print(f"🛡️ ANTI-CONTRADICCIÓN: {nombre} COMPRA bloqueada — técnicos 15m son unanimemente BAJISTAS (EMA20<50, MACD<Signal, P<EMA50)")
-            return
-        if _es_reversion and ((tipo == "VENTA" and _tech_unanime_alcista) or (tipo == "COMPRA" and _tech_unanime_bajista)):
-            print(f"🔄 REVERSIÓN PERMITIDA: {nombre} {tipo} — técnicos contradicen pero es Reversión Extrema")
-
-        # Log de estrategia activada
-        _estrategia_log = razones[0] if razones else "Desconocida"
-        print(f"🎯 SEÑAL DETECTADA: {nombre} {tipo} Score:{score}/5 — {_estrategia_log}")
-        # Score calibrado por auto-calibración (ajuste dinámico por win rate del activo)
-        min_score_calib = get_min_score_calibrado(ticker)
-        if score < min_score_calib:
-            print(f"📊 {nombre}: score {score}/{min_score_calib} insuficiente (calib: {min_score_calib})")
-            return
-
-        if nombre in activos_desactivados:
-            return
-
-        # Detectar estrategia temprano (necesario para filtros)
-        _estrategia_tipo = ""
-        for _r in razones:
-            if "Asian Range" in _r: _estrategia_tipo = "asian_breakout"; break
-            elif "Breakout" in _r: _estrategia_tipo = "breakout"; break
-            elif "Pullback" in _r: _estrategia_tipo = "pullback"; break
-            elif "Reversi" in _r or "Divergencia" in _r: _estrategia_tipo = "reversion"; break
-
-        # 📉 FILTRO EUR/USD: backtest mostró 24.7% win rate
-        # FIX 2026-03-20: score<5→score<4 (permitir score 4 también, solo bloquear score 3)
-        if ticker == "EURUSD=X" and score < 4 and _estrategia_tipo != "breakout":
-            print(f"📉 EUR/USD FILTRADO: {_estrategia_tipo} score {score}/5 — mínimo score 4 o Breakout")
-            return
-
-        # 🚫 FILTRO ANTI-CONTRADICCIÓN: No abrir SELL si hay BUY abierto (y viceversa)
-        _base_symbol = ticker.replace("=X", "").replace("=F", "").replace("-", "").upper()
-        _dir_opuesta = "VENTA" if tipo == "COMPRA" else "COMPRA"
-        with _lock_ops:
-            _ops_snapshot = list(operaciones_activas.items())
-        for _op_key, _op_val in _ops_snapshot:
-            _op_ticker = _op_val.get('ticker', '').replace("=X", "").replace("=F", "").replace("-", "").upper()
-            _op_tipo = _op_val.get('tipo', '')
-            if _op_ticker == _base_symbol and _op_tipo == _dir_opuesta:
-                print(f"🚫 ANTI-CONTRADICCIÓN: {nombre} {tipo} bloqueado — ya hay {_op_tipo} abierto en {_base_symbol}")
-                return
-
-        # 🛡️ ANTI-CONTRADICCIÓN MT5: Verificar dirección real en MT5
-        # NOTA: Si MT5 bloquea, la señal SIGUE enviándose a Telegram (usuarios VIP la reciben)
-        # ══ MT5 DESACTIVADO — Solo generar y publicar señales en Telegram ══
-        # Para reactivar MT5: cambiar a _skip_mt5 = False
-        _skip_mt5 = True
-        _skip_mt5_razon = "Solo Telegram (evaluacion)"
-        _dir_mt5 = obtener_direccion_mt5(ticker)
-        if _dir_mt5:
-            _tipo_mt5 = "COMPRA" if _dir_mt5 == "BUY" else "VENTA"
-            if _dir_mt5 == "BOTH":
-                _skip_mt5 = True
-                _skip_mt5_razon = f"MT5 tiene BUY+SELL en {nombre}"
-                print(f"⚠️ ANTI-CONTRADICCIÓN MT5: {nombre} tiene BUY+SELL — señal se envía pero NO se ejecuta en MT5")
-            elif (_dir_mt5 == "BUY" and tipo == "VENTA") or (_dir_mt5 == "SELL" and tipo == "COMPRA"):
-                _skip_mt5 = True
-                _skip_mt5_razon = f"MT5 tiene {_tipo_mt5} abierto"
-                print(f"⚠️ ANTI-CONTRADICCIÓN MT5: {nombre} {tipo} — MT5 tiene {_tipo_mt5} — señal se envía pero NO se ejecuta")
-
-        # 🚫 FILTRO ANTI-DUPLICADO: No abrir más de 1 operación por activo del escáner
-        with _lock_ops:
-            _ops_mismo_activo = sum(1 for _ok, _ov in operaciones_activas.items()
-                                    if _ov.get('ticker', '').replace("=X","").replace("=F","").replace("-","").upper() == _base_symbol)
-        if _ops_mismo_activo >= 1:
-            print(f"🚫 ANTI-DUPLICADO: {nombre} ya tiene {_ops_mismo_activo} op(s) abierta(s) — máx 1 por activo")
-            return
-
-        # 🛡️ ANTI-DUPLICADO MT5: Verificar posiciones reales en MT5
-        if tiene_posicion_mt5(ticker) and not _skip_mt5:
-            _skip_mt5 = True
-            _skip_mt5_razon = f"Ya tiene posición abierta en MT5"
-            print(f"⚠️ ANTI-DUPLICADO MT5: {nombre} — señal se envía pero NO se ejecuta en MT5")
-
-        # Límite de trades simultáneos (protección de capital)
-        with _lock_ops:
-            _n_trades_activos = len(operaciones_activas)
-        if _n_trades_activos >= MAX_TRADES_SIMULTANEOS:
-            print(f"⏳ {nombre}: máx trades ({MAX_TRADES_SIMULTANEOS}) alcanzado — esperando")
-            return
-
-        # Filtros adicionales
-        if not en_horario_mercado(ticker) or hay_noticia_alto_impacto(ticker, horas_antes=2, horas_despues=1):
-            return
-        if not filtro_fear_greed(ticker, tipo):
-            return
-        if hay_correlacion_peligrosa(ticker, tipo):
-            return
-        # 🔻 FILTRO MULTI-TIMEFRAME 4H — Soft: penaliza en confianza pero NO bloquea
-        # Reversiones de alta calidad (score 5) pueden ir contra 4H
-        _mtf_4h_ok = filtro_multi_timeframe(ticker, tipo)
-        _rsi_extremo = ind.get('rsi', 50) < 25 or ind.get('rsi', 50) > 75
-        if not _mtf_4h_ok and not _es_reversion and not _rsi_extremo:
-            log_op(f"⛔ MTF 4H BLOQUEADO: {nombre} {tipo} va contra tendencia 4H — señal descartada")
-            return
-        if not _mtf_4h_ok and _rsi_extremo:
-            print(f"✅ MTF 4H contra señal pero RSI EXTREMO ({ind.get('rsi', 50):.0f}) PERMITIDO: {nombre} {tipo}")
-        if not _mtf_4h_ok and _es_reversion:
-            print(f"⚠️ MTF 4H contra señal pero REVERSIÓN PERMITIDA: {nombre} {tipo}")
-
-        # Kill Switch: solo bloquea MT5, señales siguen a Telegram
-        if _kill_switch_activo() and not _skip_mt5:
-            _skip_mt5 = True
-            _skip_mt5_razon = "Kill switch activo (muchas pérdidas hoy)"
-
-        # Cooldown y Registro (60 min entre señales del mismo activo+dirección)
-        # Backtest mostró que re-entrar rápido tras SL = más pérdidas
-        cooldown_seg = 3600
-        # _estrategia_tipo ya detectado arriba
-        niveles = calcular_niveles_3tp(precio, tipo, ind['atr_1h'], ticker, estrategia=_estrategia_tipo)
-
-        # 🚫 Validar R:R mínimo
-        _sl_dist_a = abs(precio - niveles['sl'])
-        _tp1_dist_a = abs(niveles['tp1'] - precio)
-        _rr_a = _tp1_dist_a / _sl_dist_a if _sl_dist_a > 0 else 0
-        if _rr_a < MIN_RR_RATIO:
-            print(f"🚫 R:R RECHAZADO: {nombre} {tipo} — R:R={_rr_a:.2f}:1 < mínimo {MIN_RR_RATIO}:1")
-            return
-
-        # Validar COT institucional
-        cot_peso = 0.0
-        cot_desc = "COT no disponible"
-        try:
-            cot_ok, cot_desc, cot_peso = cot_confirma_senal(ticker, tipo)
-            if not cot_ok and cot_peso >= 0.5:
-                log_op(f"🚫 COT BLOQUEO REAL: {nombre} {tipo} - {cot_desc}")
-                return  # ← Bloqueo real: señal contraria a institucionales
-            if not cot_ok:
-                print(f"COT débil contra: {nombre} {tipo} - {cot_desc}")
-            if cot_peso > 0:
-                print(f"COT: {cot_desc}")
-        except Exception:
-            pass
-
-        # Validar FinBERT sentimiento
-        sent_peso = 0.0
-        sent_desc = "Sin noticias"
-        try:
-            if FINBERT_AVAILABLE:
-                sent_ok, sent_desc, sent_peso = sentimiento_confirma_senal(ticker, tipo)
-                if not sent_ok and sent_peso >= 0.5:
-                    log_op(f"🚫 FINBERT BLOQUEO REAL: {nombre} {tipo} - {sent_desc}")
-                    return  # ← Bloqueo real: sentimiento fuertemente en contra
-                if not sent_ok:
-                    print(f"FINBERT débil contra: {nombre} {tipo} - {sent_desc}")
-                if sent_peso > 0:
-                    print(f"SENTIMIENTO: {sent_desc}")
-        except Exception:
-            pass
-
-        # SISTEMA DE VOTACION MULTI-IA (v2 — más flexible para Trend Following)
-        # FIX 2026-04-06: Si ML no disponible, NO contar su peso en el total
-        # Antes: ML daba 0 votos pero sumaba 25 al peso → imposible llegar a 25% con score=3
-        votos_favor = 0
-        peso_total = 0
-        ml_prob = ind.get('ml_prob_alcista', 50.0)
-        _ml_no_disponible = (ml_prob == 50.0)  # Sentinel: ML falló o no disponible
-        if _ml_no_disponible:
-            pass  # ML bypass: NO sumar peso — excluir del cálculo completamente
-        else:
-            if tipo == "COMPRA":
-                if ml_prob > 52: votos_favor += 25
-                elif ml_prob > 50: votos_favor += 12
-            elif tipo == "VENTA":
-                if ml_prob < 48: votos_favor += 25
-                elif ml_prob < 50: votos_favor += 12
-            peso_total += 25
-        # Score técnico: crédito completo para score >= 3
-        # FIX 2026-04-06: score=3 subido de 15→25 pts. Momentum (score=3) es estrategia legítima,
-        # no débil. Con 15pts + ML excluido = 20% < 25% min → SIEMPRE bloqueado. Con 25pts = 33% → pasa.
-        if score >= 3:
-            votos_favor += 25
-        peso_total += 25
-        votos_favor += int(cot_peso * 20)
-        peso_total += 20
-        votos_favor += int(sent_peso * 15)
-        peso_total += 15
-        try:
-            mtf_ok = confirmar_tendencia_1h(ticker, tipo, rsi=ind.get('rsi', 50))
-            if mtf_ok:
-                votos_favor += 15
-        except Exception as e_mtf:
-            logger.warning(f"⚠️ confirmar_tendencia_1h({ticker}) falló: {e_mtf} — 15 votos MTF perdidos")
-        peso_total += 15
-        # Penalización si MTF 4H está en contra (pero no bloquea)
-        if not _mtf_4h_ok:
-            votos_favor = max(0, votos_favor - 10)
-        confianza_total = round((votos_favor / peso_total) * 100) if peso_total > 0 else 0
-        print(f"MULTI-IA {nombre}: {confianza_total}% confianza ({votos_favor}/{peso_total})")
-        ind['cot_desc'] = cot_desc
-        ind['sent_desc'] = sent_desc
-        ind['confianza_multi_ia'] = confianza_total
-        # Umbral dinámico: Score 4-5 requiere 40%, Score 3 (Trend Following) requiere 25%
-        # FIX 2026-03-27: bajado de 50%→40% para score 4-5 (sin ML, 50% era casi imposible)
-        _min_conf = 25 if score <= 3 else 40
-        if confianza_total < _min_conf:
-            print(f"MULTI-IA BLOQUEO: {nombre} {tipo} - confianza {confianza_total}% < {_min_conf}%")
-            return
-
-        # ── VALIDAR SPREAD ANTES DE EJECUTAR EN MT5 ──────────────
-        # Spread alto = no ejecutar en MT5, pero SÍ enviar señal a Telegram
-        if MT5_AVAILABLE and not _skip_mt5:
-            try:
-                _mt5_sym = MT5_TICKER_MAP.get(ticker)
-                if _mt5_sym:
-                    with _lock_mt5:  # H-01 FIX
-                        _si = mt5.symbol_info(_mt5_sym)
-                    if _si:
-                        _spread_actual = _si.spread
-                        _spread_max = MAX_SPREAD_ALLOWED.get(ticker, 9999)
-                        if _spread_actual > _spread_max:
-                            _skip_mt5 = True
-                            _skip_mt5_razon = f"Spread {_spread_actual} > máx {_spread_max}"
-                            print(f"⚠️ SPREAD ALTO: {nombre} — spread {_spread_actual} > máx {_spread_max} — señal se envía pero NO se ejecuta en MT5")
-            except Exception as e_spread:
-                pass  # Si no se puede verificar, continuar
-
-        # 🕐 BLOQUEO TOTAL fuera de horario — ni Telegram ni MT5
-        if not en_horario_mt5(ticker):
-            print(f"🕐 HORARIO: {nombre} — fuera de horario — descartado")
-            return
-
-        # ⭐ CLASIFICACIÓN DE SEÑALES — PREMIUM + STANDARD
-        # FIX 2026-04-12: Relajar a score>=3.5 conf>=55% para no perder señales válidas
-        # Score>=4 + conf>=65% era demasiado restrictivo (eliminaba ~40% señales)
-        _es_premium = (score >= 4 and confianza_total >= 65)
-        _es_standard = (score >= 3.5 and confianza_total >= 55)
-
-        # Bloquear SELL en tendencia alcista SOLO si RSI no indica sobrecompra
-        # FIX 2026-04-12: RSI>70 = oportunidad de reversión incluso en tendencia alcista
-        # FIX 2026-04-15: usar _diagnostico_activos (antes: variable 'diagnostico' undefined → NameError)
-        _diag_ticker = _diagnostico_activos.get(ticker, {})
-        if tipo == "VENTA" and _diag_ticker.get("ema_bull", False):
-            _rsi_val = _diag_ticker.get("rsi", 50)
-            if _rsi_val < 70:
-                print(f"🔒 FILTRO: {nombre} VENTA bloqueada — tendencia alcista + RSI {_rsi_val:.0f}<70 → sin sobrecompra")
-                return
-            else:
-                print(f"🔄 VENTA permitida en alcista: {nombre} RSI {_rsi_val:.0f}>=70 (sobrecompra = oportunidad reversión)")
-
-        if _es_premium:
-            _nivel_senal = "PREMIUM"
-        elif _es_standard:
-            _nivel_senal = "STANDARD"
-            print(f"📊 STANDARD: {nombre} {tipo} Score:{score}/5 Conf:{confianza_total}% — cumple umbral relajado")
-        else:
-            print(f"🔒 FILTRO: {nombre} {tipo} — Score:{score}/5 Conf:{confianza_total}% — no cumple mínimo (≥3.5 score, ≥55% conf) → descartada")
-            return
-
-        # ═══ C-03 FIX: RESERVA ATÓMICA — Todos los checks + reserva en UN lock ═══
-        # Patrón idéntico al webhook handler: previene TOCTOU race condition
-        op_id = None
-        with _lock_ops:
-            # Check 1: Cooldown mismo ticker+dirección (20 min)
-            ya_existe = any(v.get('ticker') == ticker and v.get('tipo') == tipo
-                           and (time.time() - v.get('timestamp', 0)) < cooldown_seg
-                           for v in operaciones_activas.values())
-            if ya_existe:
-                return
-
-            # Check 2: Re-verificar anti-duplicado (pudo cambiar entre check previo y aquí)
-            _ops_mismo_2 = sum(1 for _ok2, _ov2 in operaciones_activas.items()
-                               if _ov2.get('ticker', '').replace("=X","").replace("=F","").replace("-","").upper() == _base_symbol)
-            if _ops_mismo_2 >= 1:
-                return
-
-            # Check 3: Re-verificar max trades
-            if len(operaciones_activas) >= MAX_TRADES_SIMULTANEOS:
-                return
-
-            # Check 4: Cooldown desde cierre reciente
-            _cd_key = (ticker.replace("=X","").replace("=F","").replace("-","").upper(), tipo)
-            if _cd_key in _cooldown_cierres and (time.time() - _cooldown_cierres[_cd_key]) < cooldown_seg:
-                print(f"🔄 COOLDOWN (cierre reciente): {nombre} {tipo}")
-                return
-
-
-
-            # Check 6: Anti-contradicción índices US (dentro del lock atómico)
-            _US_INDEX_PAIRS = {"ES=F": "NQ=F", "NQ=F": "ES=F"}
-            if ticker in _US_INDEX_PAIRS and not _skip_mt5:
-                _par_idx = _US_INDEX_PAIRS[ticker]
-                for _v in operaciones_activas.values():
-                    if _v.get('ticker') == _par_idx:
-                        _dir_corr_idx = _v.get('tipo', '')
-                        if _dir_corr_idx and _dir_corr_idx != tipo:
-                            _skip_mt5 = True
-                            _nombre_idx = "NASDAQ" if _par_idx == "NQ=F" else "S&P500"
-                            _skip_mt5_razon = f"Correlación: {_nombre_idx} tiene {_dir_corr_idx}"
-                            log_op(f"🔗 CORRELACIÓN: {nombre} {tipo} bloqueado MT5 — {_nombre_idx} tiene {_dir_corr_idx} (señal Telegram sigue)")
-                        break
-
-            # BUG-3 FIX: Check 7: Anti doble ejecución webhook+scanner (señal reciente < 60s)
-            if _base_symbol in _senal_reciente and (time.time() - _senal_reciente[_base_symbol]) < 60:
-                logger.warning(f"🚫 ANTI-DOBLE SCANNER: {nombre} bloqueado — señal reciente hace {int(time.time()-_senal_reciente[_base_symbol])}s")
-                return
-
-            # ✅ TODOS LOS CHECKS PASADOS — RESERVAR SLOT (atómico con checks)
-            _senal_reciente[_base_symbol] = time.time()  # BUG-3: Marcar señal reciente
-            # FIX 2026-04-15: Microsegundos para evitar colisión teórica
-            op_id = f"{ticker}_{int(time.time() * 1000000)}"
-            operaciones_activas[op_id] = {
-                'ticker': ticker, 'nombre': nombre, 'tipo': tipo, 'entrada': precio,
-                'tp1': niveles['tp1'], 'tp2': niveles['tp2'], 'tp3': niveles['tp3'], 'sl': niveles['sl'],
-                'score': score, 'timestamp': time.time(), 'hora': ahora().strftime("%H:%M"),
-                'tp1_hit': False, 'tp2_hit': False, 'aviso_sl_enviado': False, 'trailing_activo': False,
-                'confianza_multi_ia': confianza_total,
-                'confianza': confianza_total,
-                'confianza_score_100': ind.get('confianza_score_100', 0),  # [9] Score 0-100
-                'estrategia': _estrategia_tipo,  # [3] Para tracking por estrategia
-                'mt5_ejecutado': False,
-                'ticket_mt5': None,
-                'skip_mt5_razon': _skip_mt5_razon if _skip_mt5 else '',
-                'premium': _es_premium,
-                'nivel_senal': _nivel_senal,
-                'riesgo_usado': 0,
-                '_reservado': True,  # Reserva: se confirma tras MT5
-            }
-            estadisticas_diarias["senales_hoy"] = estadisticas_diarias.get("senales_hoy", 0) + 1
-
-        # ═══ FUERA DEL LOCK: MT5 pausado, riesgo, ejecución ═══
-
-        # ⏸️ MT5 pausado manualmente
-        if mt5_pausado and not _skip_mt5:
-            if mt5_solo_premium and _es_premium:
-                logger.info(f"💎 MT5 SOLO-PREMIUM: {nombre} {tipo} — señal premium pasa a MT5")
-            else:
-                _skip_mt5 = True
-                _skip_mt5_razon = "MT5 pausado manualmente"
-
-        # 🔒 mt5_solo_premium sin pausa
-        if mt5_solo_premium and not mt5_pausado and not _es_premium and not _skip_mt5:
-            _skip_mt5 = True
-            _skip_mt5_razon = "Solo señales premium pasan a MT5"
-
-        # 💎 Lotaje por activo + premium
-        _riesgo = RIESGO_PREMIUM if _es_premium else RIESGO_POR_TRADE
-
-        # Ejecutar trade en MT5 (solo si no hay flag _skip_mt5)
-        mt5_ok = True
-        mt5_ejecutado = False
-        _activo_ticket_mt5 = None
-        if MT5_AVAILABLE and AUTO_TRADING and not _skip_mt5:
-            _mt5_result = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, _riesgo, precio, niveles['sl'], niveles['tp1'], es_premium=_es_premium)
-            mt5_ok = bool(_mt5_result)
-            if mt5_ok:
-                mt5_ejecutado = True
-                # FIX 2026-04-15: Línea duplicada sobreescribía ticket con boolean
-                _activo_ticket_mt5 = _mt5_result if isinstance(_mt5_result, int) else None
-
-        # Actualizar reserva con resultados MT5 o limpiar si falló
-        _debe_registrar = mt5_ok or _skip_mt5 or not (MT5_AVAILABLE and AUTO_TRADING)
-        if _debe_registrar and op_id:
-            with _lock_ops:
-                if op_id in operaciones_activas:
-                    operaciones_activas[op_id].update({
-                        'mt5_ejecutado': mt5_ejecutado,
-                        'ticket_mt5': _activo_ticket_mt5,
-                        'skip_mt5_razon': _skip_mt5_razon if _skip_mt5 else '',
-                        'riesgo_usado': _riesgo,
-                        '_reservado': False,  # Confirmar reserva
-                    })
-
-            guardar_estado()
-            _skip_razon_display = _skip_mt5_razon if _skip_mt5 else ""
-            _btn_senal_vip = {"inline_keyboard": [
-                [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-            ]}
-            _msg_canal_id = enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_btn_senal_vip)
-            # Guardar message_id INMEDIATAMENTE para que TP/SL haga reply correcto
-            if op_id:
-                with _lock_ops:
-                    if op_id in operaciones_activas:
-                        operaciones_activas[op_id]['telegram_msg_id'] = _msg_canal_id or 0
-                        operaciones_activas[op_id]['_reservado'] = False
-
-            # 📸 Instagram: teaser Story para promocionar canal VIP (sin revelar entrada/SL/TP)
-            try:
-                from instagram_poster import post_vip_signal_teaser_story as _ig_teaser
-                _ig_teaser(nombre, tipo, nivel=_nivel_senal)
-            except Exception as _ig_t_err:
-                logger.debug(f"IG teaser Story skip ({nombre}): {_ig_t_err}")
-
-            # 🚨 FOMO desactivado — solo TP ganadores van al grupo como publicidad
-            # notificar_fomo_grupo(nombre, tipo)
-
-            _mt5_tag = " [MT5 ✅]" if mt5_ejecutado else f" [Solo Telegram — {_skip_mt5_razon}]" if _skip_mt5 else " [Sin MT5]"
-            _nivel_log = f" ⭐{_nivel_senal}" if _es_premium else f" 📊{_nivel_senal}"
-            log_senal(f"✅ SEÑAL ENVIADA: {nombre} | {tipo} | Score:{score}/5{_nivel_log} | Entrada:{precio} | SL:{niveles['sl']} | TP1:{niveles['tp1']} TP2:{niveles['tp2']} TP3:{niveles['tp3']}{_mt5_tag}")
-            print(f"✅ Nueva señal PROFESIONAL: {nombre} - {tipo} (Score: {score}/5{_nivel_log}){_mt5_tag}")
-        elif op_id:
-            # MT5 falló sin _skip_mt5 → limpiar reserva huérfana
-            with _lock_ops:
-                if op_id in operaciones_activas and operaciones_activas[op_id].get('_reservado'):
-                    # CRÍTICO-1 FIX: usar .pop() en lugar de del para evitar KeyError en condición de carrera
-                    operaciones_activas.pop(op_id, None)
-                    estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 1) - 1)
-            log_op(f"⚠️ MT5 rechazó orden {nombre} {tipo} — reserva limpiada")
-
-    except Exception as e:
-        log_senal(f"❌ ERROR generando señal {nombre}: {e}", "error")
-        print(f"⚠️ Error en {nombre}: {e}")
-        import traceback
-        traceback.print_exc()
-        # BUG-1 FIX: Limpiar reservación huérfana si crasheó después de reservar slot
-        try:
-            if op_id and op_id in operaciones_activas:
-                with _lock_ops:
-                    _orphan_scan = operaciones_activas.get(op_id, {})
-                    if _orphan_scan.get('_reservado', False) and not _orphan_scan.get('mt5_ejecutado', False):
-                        # CRÍTICO-1 FIX: usar .pop() en lugar de del para evitar KeyError en condición de carrera
-                        operaciones_activas.pop(op_id, None)
-                        estadisticas_diarias["senales_hoy"] = max(0, estadisticas_diarias.get("senales_hoy", 1) - 1)
-                        logger.warning(f"🧹 Scanner: reservación huérfana limpiada tras excepción: {op_id}")
-        except Exception:
-            pass
-
-_HEALTH_CHECK_INTERVALO = 600  # Verificar cada 10 minutos
-_ultimo_health_check    = time.time()
-_mt5_desconectado_desde = 0.0  # Timestamp desde que MT5 está desconectado
 
 def _reconectar_mt5(max_intentos=3):
     """Intenta reconectar MT5 con hasta N reintentos."""
@@ -14558,43 +14103,47 @@ def _reconectar_mt5(max_intentos=3):
         time.sleep(3)
     return False
 
+# Globals para loop_health_check (restaurados 2026-04-21 tras cleanup del scanner)
+_HEALTH_CHECK_INTERVALO = 600  # Verificar cada 10 minutos
+_ultimo_health_check    = time.time()
+_mt5_desconectado_desde = 0.0  # Timestamp desde que MT5 está desconectado
+
+
 def loop_health_check():
     """
-    Hilo de health check: verifica cada 10 min que el scanner sigue vivo.
-    También verifica conexión MT5 y reconecta si es necesario.
+    Hilo de health check: verifica conexión MT5 cada 10 min.
+    FIX 2026-04-21: Blindado — el hilo NUNCA debe morir. Try/except envuelve TODO,
+    el scanner-alive check fue eliminado (scanner ya no existe), y el time.sleep
+    usa valor hardcoded 600s en vez de variable global (inmune a NameError).
     """
-    global _ultimo_health_check, _mt5_desconectado_desde
-    time.sleep(60)  # Esperar 1 min antes del primer chequeo
+    global _mt5_desconectado_desde
+    _INTERVALO = 600  # 10 min — hardcoded para inmunidad a NameError
+    try:
+        time.sleep(60)  # Esperar 1 min antes del primer chequeo
+    except Exception:
+        pass
     while True:
         try:
-            # ── Check 1: Scanner activo ──
-            tiempo_sin_scan = time.time() - ultimo_escaneo
-            if ultimo_escaneo > 0 and tiempo_sin_scan > _HEALTH_CHECK_INTERVALO and not escaneo_pausado:
-                mins = int(tiempo_sin_scan / 60)
-                logger.error(f"🚨 HEALTH CHECK: Scanner sin actividad hace {mins} minutos!")
-                enviar_grupo(
-                    "🚨 *ALERTA DE SALUD — BuySell365.pro*\n"
-                    "━━━━━━━━━━\n"
-                    f"⚠️ El scanner lleva *{mins} minutos* sin ejecutarse.\n"
-                    "Puede haber un problema de conexión o el servidor se colgó.\n\n"
-                    "💡 Verifica el servidor y reinicia si es necesario.\n"
-                    f"🕐 {ahora().strftime('%H:%M:%S')}",
-                    incluir_promo=False
-                )
-                _ultimo_health_check = time.time()
-
-            # ── Check 2: MT5 conexión + Circuit Breaker ──
+            # ── Check MT5 conexión + Circuit Breaker ──
             if MT5_AVAILABLE and AUTO_TRADING:
                 try:
-                    _tinfo = mt5.terminal_info()
+                    # FIX 2026-04-22: terminal_info() con timeout 5s — si MT5
+                    # se cuelga, no bloqueamos el health check indefinido.
+                    _tinfo = _mt5_call_timeout(mt5.terminal_info, timeout=5, default=None)
                     if _tinfo is None or not _tinfo.connected:
-                        _mt5_cb_record_failure("health_check: terminal disconnected")
+                        try:
+                            _mt5_cb_record_failure("health_check: terminal disconnected")
+                        except Exception:
+                            pass
                         if _mt5_desconectado_desde == 0:
                             _mt5_desconectado_desde = time.time()
                         log_op("⚠️ MT5 desconectado — intentando reconectar...", "warning")
                         if _reconectar_mt5():
                             _mt5_desconectado_desde = 0.0
-                            _mt5_cb_record_success()
+                            try:
+                                _mt5_cb_record_success()
+                            except Exception:
+                                pass
                         else:
                             mins_off = int((time.time() - _mt5_desconectado_desde) / 60)
                             if mins_off >= 10:
@@ -14611,14 +14160,26 @@ def loop_health_check():
                         if _mt5_desconectado_desde > 0:
                             log_op("✅ MT5 conexión restaurada")
                             _mt5_desconectado_desde = 0.0
-                            _mt5_cb_record_success()
+                            try:
+                                _mt5_cb_record_success()
+                            except Exception:
+                                pass
                 except Exception as e_mt5:
-                    _mt5_cb_record_failure(f"health_check exception: {e_mt5}")
+                    try:
+                        _mt5_cb_record_failure(f"health_check exception: {e_mt5}")
+                    except Exception:
+                        pass
                     log_op(f"⚠️ Error verificando MT5: {e_mt5}", "warning")
-
         except Exception as e:
-            logger.warning(f"⚠️ Error en health check: {e}")
-        time.sleep(_HEALTH_CHECK_INTERVALO)
+            try:
+                logger.warning(f"⚠️ Error en health check (capturado): {e}")
+            except Exception:
+                pass
+        # sleep TAMBIÉN envuelto en try — protección final
+        try:
+            time.sleep(_INTERVALO)
+        except Exception:
+            time.sleep(600)
 
 
 def _auditar_membresías():
@@ -15591,58 +15152,6 @@ def loop_sync_mt5_real():
             logger.error(f"⚠️ Error en loop_sync_mt5_real: {e}")
         time.sleep(15)
 
-
-def loop_escaneo():
-    """Hilo dedicado al escaneo continuo de SEÑALES."""
-    global ultimo_escaneo
-    print("━━━━━━━━━━")
-    print(f"🚀 BuySell365 Pro BOT | SCANNER DE SEÑALES | {ahora().strftime('%H:%M:%S')}")
-    print("━━━━━━━━━━")
-
-    _errores_consecutivos = 0
-
-    while True:
-        # 📩 Procesar comandos del launcher (force scan, pause, etc.)
-        _launcher_cmd = _procesar_comandos_launcher()
-        _forzar_escaneo = (_launcher_cmd == "force_scan")
-
-        if not escaneo_pausado or _forzar_escaneo:
-            try:
-                # 💰 ACTUALIZAR CAPITAL DESDE MT5 (cada ciclo = cada 3 min)
-                _actualizar_capital_desde_mt5()
-
-                # [10] AUTO-OPTIMIZACIÓN SEMANAL: Domingos 23:00 Andorra
-                try:
-                    _now_opt = ahora()
-                    if (_now_opt.weekday() == 6 and _now_opt.hour == 23
-                            and (time.time() - _ultima_optimizacion_semanal) > 82800):
-                        _auto_optimizar_semanal()
-                except Exception as e_opt:
-                    logger.warning(f"⚠️ Error auto-optimización: {e_opt}")
-
-                logger.info(f"🔍 Iniciando ciclo de escaneo Premium...")
-                analizar_mercado()
-                ultimo_escaneo = time.time()
-                limpiar_caches_memoria()
-                _errores_consecutivos = 0
-                logger.info(f"✅ Ciclo completado. Siguiente en {INTERVALO_ESCANEO}s...")
-            except Exception as e:
-                _errores_consecutivos += 1
-                logger.error(f"⚠️ Error en loop de escaneo (#{_errores_consecutivos}): {e}")
-                import traceback
-                traceback.print_exc()
-                # Si hay 5 errores seguidos, avisar por Telegram
-                if _errores_consecutivos == 5:
-                    enviar_grupo(
-                        "🔴 *ERROR REPETIDO EN SCANNER*\n"
-                        f"5 ciclos consecutivos fallaron.\nÚltimo error: `{str(e)[:200]}`\n"
-                        f"🕐 {ahora().strftime('%H:%M:%S')}",
-                        incluir_promo=False
-                    )
-        else:
-            logger.info("⏸️ Escaneo pausado, esperando...")
-
-        time.sleep(INTERVALO_ESCANEO)
 
 
 def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
@@ -16846,17 +16355,26 @@ RULES:
 
 USER MESSAGE: {pregunta}"""
 
-    try:
-        response = _groq_client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            max_tokens=400,
-            temperature=0.7,
-        )
-        return response.choices[0].message.content[:1000]
-    except Exception as e:
-        logger.warning(f"🤖 Groq error: {e}")
-        return None
+    # FIX 2026-04-22: 2 reintentos con backoff + timeout 15s.
+    # Antes: un solo intento sin timeout → si Groq se lagueaba, briefing/señales
+    # esperaban minutos y el briefing matutino podía salir sin IA.
+    _last_err = None
+    for _intento in range(3):
+        try:
+            response = _groq_client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                max_tokens=400,
+                temperature=0.7,
+                timeout=15,
+            )
+            return response.choices[0].message.content[:1000]
+        except Exception as e:
+            _last_err = e
+            if _intento < 2:
+                time.sleep(1.5 * (_intento + 1))  # 1.5s, 3s
+    logger.warning(f"🤖 Groq error tras 3 intentos: {_last_err}")
+    return None
 
 
 _ia_cooldown_grupo: dict = {}   # user_id → timestamp último uso IA en grupo
@@ -17707,6 +17225,59 @@ def _cb_registrar_resultado(pnl_usd, es_loss):
 #  [6] TRAILING STOP INTELIGENTE
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+def _detectar_cambio_tendencia(posicion, precio_actual, indicadores):
+    """Detecta si la tendencia ha cambiado contra la dirección de la posición.
+
+    Devuelve un string con la acción sugerida:
+      - "total": cerrar la posición completa (tendencia totalmente invertida)
+      - "parcial": asegurar 50% (tendencia debilitándose pero no invertida)
+      - None: no hacer nada, tendencia sigue alineada
+
+    FIX 2026-04-21: añadido por petición del usuario — el bot propio debe
+    detectar reversiones y avisar al canal con cierre parcial/total.
+
+    Criterios:
+      - Necesita EMA9, EMA21, EMA50, RSI del dict indicadores
+      - Solo se activa si la operación lleva >10 min (evitar whipsaws iniciales)
+      - BUY se cierra si: EMA9 < EMA21 Y RSI < 45 (cruce bajista + momentum)
+      - SELL se cierra si: EMA9 > EMA21 Y RSI > 55 (cruce alcista + momentum)
+      - Parcial: solo 1 condición (EMA o RSI) se cumple — debilitamiento
+    """
+    if not indicadores:
+        return None
+
+    tipo = posicion.get('tipo', '').upper()
+    es_compra = tipo in ("COMPRA", "BUY", "LONG")
+    if not es_compra and tipo not in ("VENTA", "SELL", "SHORT"):
+        return None
+
+    # Evitar actuar en whipsaws iniciales: necesita >10 min de edad
+    _edad_seg = time.time() - posicion.get('timestamp', time.time())
+    if _edad_seg < 600:
+        return None
+
+    ema9  = indicadores.get('ema9', 0)
+    ema21 = indicadores.get('ema21', 0)
+    rsi   = indicadores.get('rsi', 50)
+    if ema9 <= 0 or ema21 <= 0:
+        return None
+
+    # Cruce EMA en contra
+    cruce_contra = (es_compra and ema9 < ema21) or (not es_compra and ema9 > ema21)
+    # RSI en contra (momentum)
+    rsi_contra = (es_compra and rsi < 45) or (not es_compra and rsi > 55)
+    # RSI extremo (posible fin de movimiento)
+    rsi_extremo = (es_compra and rsi > 75) or (not es_compra and rsi < 25)
+
+    # Reversión FUERTE: cruce EMA + RSI momentum en contra → cerrar total
+    if cruce_contra and rsi_contra:
+        return "total"
+    # DEBILITAMIENTO: solo una condición → cierre parcial 50% (asegurar)
+    if cruce_contra or rsi_contra or rsi_extremo:
+        return "parcial"
+    return None
+
+
 def _trailing_stop_dinamico(posicion, precio_actual, indicadores):
     """
     Calcula el nuevo SL trailing basado en volatilidad (ADX + ATR).
@@ -18098,6 +17669,31 @@ def _iniciar_hilo(nombre, target_func):
     _hilos_registrados[nombre] = hilo
     return hilo
 
+
+def _meta_watchdog():
+    """🐕🐕 META-WATCHDOG — si el watchdog principal muere, este lo revive.
+    FIX 2026-04-21 (A2): proteger el watchdog de excepciones fatales."""
+    time.sleep(180)  # dar tiempo al watchdog principal
+    while True:
+        try:
+            _wd = _hilos_registrados.get("watchdog")
+            if _wd is None or not _wd.is_alive():
+                log_sistema("🚨 META-WATCHDOG: watchdog principal MUERTO — reviviendo...", "error")
+                try:
+                    _iniciar_hilo("watchdog", _watchdog)
+                    log_sistema("✅ META-WATCHDOG: watchdog principal revivido")
+                except Exception as _e:
+                    log_sistema(f"❌ META-WATCHDOG: no pudo revivir watchdog: {_e}", "error")
+        except Exception as _e_meta:
+            try:
+                logger.warning(f"Meta-watchdog error: {_e_meta}")
+            except Exception:
+                pass
+        try:
+            time.sleep(300)  # 5 min entre chequeos
+        except Exception:
+            time.sleep(300)
+
 def _watchdog():
     """
     🐕 WATCHDOG — Vigila que TODOS los hilos estén vivos.
@@ -18105,8 +17701,8 @@ def _watchdog():
     Corre cada 60 segundos.
     """
     time.sleep(90)  # Esperar a que arranquen todos
+    # FIX 2026-04-21: Scanner propio eliminado — ya no hay "scanner" en el map
     _target_map = {
-        "scanner":    loop_escaneo,
         "monitor":    loop_monitor_alta_frecuencia,
         "polling":    loop_polling,
         "health":     loop_health_check,
@@ -18349,8 +17945,13 @@ def _arrancar_interno():
         print("☁️ BuySell365 Pro — Web-Cloud iniciado...")
 
     # ── INICIAR TODOS LOS HILOS (registrados para watchdog) ──
-    _iniciar_hilo("scanner",    loop_escaneo)
-    _iniciar_hilo("monitor",    loop_monitor_alta_frecuencia)
+    # FIX 2026-04-21: Scanner propio ELIMINADO por decisión del usuario.
+    # Trabajamos SOLO con señales de canales aliados (signal_copier).
+    # Las funciones loop_escaneo, analizar_mercado, analizar_activo,
+    # filtro_multi_timeframe, confirmar_tendencia_1h, hay_noticia_alto_impacto,
+    # filtro_fear_greed y hay_correlacion_peligrosa fueron BORRADAS físicamente
+    # del archivo (~843 líneas eliminadas). Backup: bot.py.backup_pre_scanner_cleanup_2026-04-21
+    _iniciar_hilo("monitor",    loop_monitor_alta_frecuencia)  # necesario para cerrar operaciones ya abiertas
     _iniciar_hilo("polling",    loop_polling)
     _iniciar_hilo("health",     loop_health_check)
     _iniciar_hilo("vip",        loop_vip_check)
@@ -18380,30 +17981,46 @@ def _arrancar_interno():
             pass
         # FIX 2026-04-06b: Matar TODOS los procesos signal_copier viejos antes de lanzar
         # Evita que procesos zombies (durmiendo en FloodWait) bloqueen el log file
+        # FIX 2026-04-22: Si terminate() no basta, forzar kill(). Además esperar
+        # 1s extra tras el kill para que Windows libere el proceso antes de relanzar
+        # (evita race condition "Otra instancia corriendo" → sys.exit(0) del copier nuevo).
         try:
             import psutil
             _my_pid = os.getpid()
+            _killed_any = False
             for _proc in psutil.process_iter(['pid', 'cmdline', 'status']):
                 try:
                     _cmd = ' '.join(_proc.info.get('cmdline') or [])
                     if 'signal_copier' in _cmd and _proc.pid != _my_pid:
                         logger.info(f"📡 Matando copier viejo PID={_proc.pid} ({_proc.info.get('status','')})")
                         _proc.terminate()
-                        _proc.wait(timeout=5)
+                        try:
+                            _proc.wait(timeout=5)
+                        except psutil.TimeoutExpired:
+                            logger.warning(f"📡 PID={_proc.pid} ignoró terminate() — forzando kill()")
+                            _proc.kill()
+                            _proc.wait(timeout=3)
+                        _killed_any = True
                 except (psutil.NoSuchProcess, psutil.TimeoutExpired, psutil.AccessDenied):
                     pass
+            if _killed_any:
+                time.sleep(1)  # margen para que Windows libere el PID antes del Popen
         except Exception as _e_kill:
             logger.warning(f"📡 No se pudo limpiar copiers viejos: {_e_kill}")
         # FIX 2026-04-06b: Redirigir stderr a archivo para diagnóstico (en vez de DEVNULL)
+        # FIX 2026-04-22: Capturar TAMBIÉN stdout + python -u (unbuffered) para ver
+        # print()/excepciones asyncio no capturadas que explican las muertes silenciosas.
         _logs_dir = os.path.join(_copier_dir, "logs")
         os.makedirs(_logs_dir, exist_ok=True)
         _stderr_path = os.path.join(_logs_dir, "copier_stderr.log")
+        _stdout_path = os.path.join(_logs_dir, "copier_stdout.log")
         try:
             _stderr_file = open(_stderr_path, "a", encoding="utf-8")
+            _stdout_file = open(_stdout_path, "a", encoding="utf-8")
             _copier_process = subprocess.Popen(
-                [sys.executable, copier_script],
+                [sys.executable, "-u", copier_script],
                 cwd=_copier_dir,
-                stdout=subprocess.DEVNULL,
+                stdout=_stdout_file,
                 stderr=_stderr_file,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
             )
@@ -18445,37 +18062,136 @@ def _arrancar_interno():
     # 📊 MONITOR CUENTA REAL — desactivado (cambiar login rompe AutoTrading en MT5)
     # Las señales de MSC Gold se monitorean desde mql5.com
 
-    log_sistema("✅ Todos los hilos iniciados: scanner, monitor, polling, health, vip, watchdog")
+    log_sistema("✅ Todos los hilos iniciados: monitor, polling, health, vip, watchdog, publicidad")
 
     # 🐕 WATCHDOG — vigila y reinicia hilos muertos cada 60s
     _iniciar_hilo("watchdog", _watchdog)
+    # 🐕🐕 META-WATCHDOG — FIX 2026-04-21 (A2): revive el watchdog si muere
+    _iniciar_hilo("meta_watchdog", _meta_watchdog)
 
     # 🌐 WEB SYNC — enviar datos a la web en Render cada 30s
     if _WEB_SYNC_AVAILABLE:
         def _get_web_state():
-            """Collect current state for web sync."""
-            # Leer historial_real.json (trades reales MT5) para sincronizar a Render
+            """Collect current state for web sync.
+
+            FIX 2026-04-21 (v3): Transparencia total — el dashboard web muestra:
+              - Señales del canal VIP (copier_*)
+              - Operaciones REALES de MT5 (cuenta real 335215928) en vivo
+              - Historial de trades MT5 cerrados
+              - Posiciones abiertas con P&L flotante
+            Los clientes ven lo que realmente pasa en la cuenta.
+            """
+            import json as _jr
+            _base = os.path.dirname(__file__)
+
+            # 1) COPIER — trades cerrados + señales vivas (canal VIP)
+            _copier_closed = []
+            try:
+                _cs_path = os.path.join(_base, "copier_stats.json")
+                if os.path.exists(_cs_path):
+                    with open(_cs_path, "r", encoding="utf-8") as _f:
+                        _cs = _jr.load(_f)
+                    _copier_closed = _cs.get("trades", [])
+            except Exception:
+                _copier_closed = []
+
+            _copier_open = []
+            try:
+                _co_path = os.path.join(_base, "copier_open_signals.json")
+                if os.path.exists(_co_path):
+                    with open(_co_path, "r", encoding="utf-8") as _f:
+                        _open_raw = _jr.load(_f)
+                    for _sid, _sd in _open_raw.items():
+                        _s = _sd.get("signal", {}) if isinstance(_sd, dict) else {}
+                        if not _s:
+                            continue
+                        _raw_pair = (_s.get("pair", "") or "").upper().replace("/", "")
+                        _display_pair = {
+                            "XAUUSD": "ORO", "GOLD": "ORO", "XAU": "ORO",
+                            "US100CASH": "NAS100", "US500CASH": "US500", "US30CASH": "US30",
+                            "GER40CASH": "GER40", "BRENTCASH": "BRENT", "OILCASH": "USOIL",
+                        }.get(_raw_pair, _raw_pair)
+                        _copier_open.append({
+                            "id": _sid,
+                            "pair": _display_pair,
+                            "direction": _s.get("direction", ""),
+                            "entry": _s.get("entry", 0),
+                            "sl": _s.get("sl", 0),
+                            "tp": _s.get("tp", 0),
+                            "tp2": _s.get("tp2", 0),
+                            "tp3": _s.get("tp3", 0),
+                            "source": _s.get("source", "VIP"),
+                            "sent_at": _sd.get("sent_at", 0),
+                        })
+            except Exception:
+                _copier_open = []
+
+            # 2) MT5 REAL — historial (escrito por loop_sync_mt5_real)
             _hist_real_sync = []
             try:
-                _hr_path = os.path.join(os.path.dirname(__file__), "historial_real.json")
+                _hr_path = os.path.join(_base, "historial_real.json")
                 if os.path.exists(_hr_path):
-                    import json as _jr
                     with open(_hr_path, "r", encoding="utf-8") as _hrf:
                         _hist_real_sync = _jr.load(_hrf)
             except Exception:
+                _hist_real_sync = []
+
+            # 3) MT5 REAL — posiciones abiertas en vivo con P&L (escrito por monitor_real.py)
+            _mt5_live = {"posiciones_abiertas": [], "historial_hoy": [], "stats_hoy": {}}
+            try:
+                _mt5rt_path = os.path.join(_base, "mt5_realtime.json")
+                if os.path.exists(_mt5rt_path):
+                    with open(_mt5rt_path, "r", encoding="utf-8") as _mtf:
+                        _mt5_live = _jr.load(_mtf)
+            except Exception:
                 pass
+
+            # 4) Estadísticas del copier (solo HOY)
+            from datetime import datetime, timezone, timedelta
+            _tz_and = timezone(timedelta(hours=2))
+            _hoy_start = datetime.now(_tz_and).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+            _hoy = [t for t in _copier_closed if t.get("closed_at", 0) >= _hoy_start]
+            _tps_hoy = [t for t in _hoy if t.get("result") == "tp"]
+            _sls_hoy = [t for t in _hoy if t.get("result") == "sl"]
+            _wr_hoy = round(len(_tps_hoy) / max(1, len(_tps_hoy) + len(_sls_hoy)) * 100, 0)
+
+            # 5) Operaciones del bot (operaciones_activas del monitor) — para trades en curso
             with _lock_ops:
-                return {
-                    "operaciones_activas": {k: {kk: vv for kk, vv in v.items() if kk != 'df'} for k, v in operaciones_activas.items() if isinstance(v, dict)},
-                    "historial_operaciones": historial_operaciones[-200:],  # Last 200
-                    "historial_real": _hist_real_sync,  # Trades reales MT5 para landing page
-                    "estadisticas_diarias": dict(estadisticas_diarias),
-                    "winning_trades": _cargar_winning_trades()[-100:],  # Last 100
-                    "bot_active": True,
-                    "auto_trading": AUTO_TRADING,
-                    "assets_count": len(ACTIVOS),
-                    "active_ops_detail": _build_active_ops_for_web(),
+                _ops_activas_web = {
+                    k: {kk: vv for kk, vv in v.items() if kk != 'df'}
+                    for k, v in operaciones_activas.items() if isinstance(v, dict)
                 }
+                _active_ops_detail = _build_active_ops_for_web()
+
+            return {
+                # === CANAL VIP (señales del copier) ===
+                "copier_open_signals": _copier_open,
+                "copier_closed_trades": _copier_closed[-200:],
+                "copier_stats_today": {
+                    "tps": len(_tps_hoy),
+                    "sls": len(_sls_hoy),
+                    "total_closed": len(_hoy),
+                    "win_rate": _wr_hoy,
+                },
+                # === MT5 EN VIVO (transparencia — cuenta real 335215928) ===
+                "mt5_live": _mt5_live,                         # posiciones abiertas + stats hoy + historial día
+                "historial_real": _hist_real_sync,             # historial completo MT5 real
+                "operaciones_activas": _ops_activas_web,       # desde el bot
+                "active_ops_detail": _active_ops_detail,       # posiciones con progreso visual
+                # === Stats + meta ===
+                "estadisticas_diarias": {
+                    "ganadas": len(_tps_hoy),
+                    "perdidas": len(_sls_hoy),
+                    "senales_hoy": len(_hoy) + len(_copier_open),
+                },
+                "winning_trades": [t for t in _copier_closed[-100:] if t.get("result") == "tp"],
+                "bot_active": True,
+                "auto_trading": AUTO_TRADING,                  # refleja estado real
+                "assets_count": len(ACTIVOS),
+                "data_source": "copier_plus_mt5_live",          # nueva marca: ambas fuentes
+                "account_type": "real",                         # cuenta real activada 21/04/2026
+                "account_login": os.getenv("MT5_LOGIN", ""),
+            }
 
         def _build_active_ops_for_web():
             """Build active ops list for web dashboard (no MT5 calls)."""
@@ -18526,16 +18242,17 @@ def _arrancar_interno():
             return result
 
         def _on_web_signal(signal):
-            """Process a webhook signal received from the web."""
-            data = signal.get("data", {})
-            raw = signal.get("raw", "")
-            if data or raw:
-                log_sistema(f"📡 Señal recibida desde web: {str(data)[:200]}")
-                # Process via existing webhook handler
-                try:
-                    _pool_webhook.submit(_procesar_webhook_bg, data, str(data.get("ticker", "")), str(data.get("source", "Web")), raw)
-                except Exception:
-                    pass
+            """Process a webhook signal received from the web.
+
+            FIX 2026-04-21 (C3): Webhook DESACTIVADO por decisión del usuario.
+            Solo operamos con señales de canales aliados (signal_copier).
+            Además, _procesar_webhook_bg depende de funciones del scanner que fueron
+            eliminadas — llamarlo causaría NameError. Rechazamos silenciosamente
+            cualquier señal entrante por webhook.
+            """
+            if signal:
+                log_sistema(f"🛡️ Señal webhook ignorada (webhook desactivado): {str(signal.get('data', {}))[:100]}")
+            return
 
         _start_web_sync(_get_web_state, _on_web_signal)
         log_sistema("🌐 Web sync iniciado → datos se envían a Render cada 30s")

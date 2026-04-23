@@ -251,9 +251,16 @@ def load_estado() -> dict:
 
 
 def save_estado(data: dict):
+    """FIX 2026-04-19: write atómico con tmp+os.replace.
+    Antes: json.dump directo → si crash a media escritura (o race con bot.py
+    que también escribe estado.json), el archivo quedaba corrupto/vacío.
+    Esto significaría perder VIPs, depósitos procesados, suscripciones — duplicar pagos.
+    """
     try:
-        with open(ESTADO_FILE, "w", encoding="utf-8") as f:
+        _tmp = ESTADO_FILE + ".tmp"
+        with open(_tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
+        os.replace(_tmp, ESTADO_FILE)
     except Exception as e:
         _log(f"Error guardando estado.json: {e}")
 

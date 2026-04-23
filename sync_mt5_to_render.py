@@ -124,8 +124,11 @@ def mt5_deals_to_historial(dias=3):
 
     print(f"✅ MT5 conectado: cuenta {login}")
 
-    date_from = datetime.now() - timedelta(days=dias)
-    date_to   = datetime.now() + timedelta(days=1)
+    # FIX 2026-04-19: epoch UTC en vez de datetime naive (DST drift)
+    import time as _t_sync
+    _now_utc = int(_t_sync.time())
+    date_from = _now_utc - dias * 86400
+    date_to   = _now_utc + 86400
 
     deals = mt5.history_deals_get(date_from, date_to)
     mt5.shutdown()
