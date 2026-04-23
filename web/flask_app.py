@@ -1031,7 +1031,8 @@ section{{padding:60px 20px}}
 /* ═══ PRICING ═══ */
 .pricing{{background:linear-gradient(180deg,rgba(0,255,204,0.03) 0%,var(--bg2) 40%,rgba(251,191,36,0.03) 100%);padding:80px 20px!important;position:relative}}
 .pricing::before{{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:2px;background:linear-gradient(90deg,transparent,#00ffcc,#fbbf24,#00ffcc,transparent);border-radius:2px}}
-.pricing-cards{{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;max-width:1200px;margin:0 auto}}
+.pricing-cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:32px;max-width:900px;margin:0 auto;justify-items:center}}
+.pricing-cards .price-card{{width:100%;max-width:420px}}
 @media(max-width:900px){{.pricing-cards{{grid-template-columns:1fr!important}}}}
 .price-card{{background:linear-gradient(160deg,rgba(22,32,53,0.97),rgba(14,22,40,0.97));border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 32px;text-align:center;position:relative;transition:all .5s cubic-bezier(.25,.8,.25,1);backdrop-filter:blur(16px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}}
 .price-card:hover{{transform:translateY(-14px) scale(1.03);box-shadow:0 28px 70px rgba(0,0,0,.5),0 0 50px rgba(0,255,204,0.15),0 0 80px rgba(0,255,204,0.08);border-color:rgba(0,255,204,0.4)}}
@@ -1375,7 +1376,7 @@ if('serviceWorker' in navigator){{
     <h2 style="font-size:clamp(2rem,5vw,3rem);filter:drop-shadow(0 0 20px rgba(251,191,36,0.2))">\U0001f4b0 <span data-i18n="pricing.title" style="background:linear-gradient(135deg,#fff 20%,#fbbf24 50%,#00ffcc 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Servicios y Planes</span></h2>
     <p data-i18n="pricing.subtitle" style="font-size:1.15rem;color:#a0aec0">Elige el plan que mejor se adapte a tu estilo de trading.</p>
   </div>
-  <div class="pricing-cards" style="grid-template-columns:repeat(3,1fr)">
+  <div class="pricing-cards">
     <div class="price-card" style="border:1px solid rgba(77,159,255,0.3);box-shadow:0 0 30px rgba(77,159,255,0.1)">
       <div class="price-name" style="color:#4d9fff;font-size:1.4rem" data-i18n="pricing.community">Comunidad</div>
       <div class="price-amount" style="color:#4d9fff;text-shadow:0 0 30px rgba(77,159,255,0.6);font-size:2rem" data-i18n="pricing.free">Acceso Libre</div>
