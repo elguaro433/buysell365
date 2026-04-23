@@ -51,6 +51,11 @@ try:
 except Exception:
     pass
 
+# FIX 2026-04-23: Historial del canal VIP (trades publicados por signal_copier)
+# Se sincroniza desde el bot local via POST /api/sync con key 'copier_trades'.
+# Reemplaza a _historial_real (MT5 personal) como fuente del dashboard público.
+_copier_trades: list = []
+
 # Bot state — pushed by the bot every ~30 seconds
 _store = {
     "operaciones_activas": {},
@@ -396,6 +401,13 @@ def api_sync():
                 incoming_real = data["historial_real"]
                 if isinstance(incoming_real, list) and incoming_real:
                     _historial_real = incoming_real
+            # FIX 2026-04-23: copier_trades — historial del canal VIP (signal_copier)
+            # Reemplaza la lista completa en cada sync.
+            if "copier_trades" in data:
+                global _copier_trades
+                incoming_copier = data["copier_trades"]
+                if isinstance(incoming_copier, list):
+                    _copier_trades = incoming_copier
             # historial_operaciones: merge (dedupe by id or ticker+fecha+hora)
             if "historial_operaciones" in data:
                 incoming = data["historial_operaciones"]
@@ -737,80 +749,82 @@ def index_web():
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
 
     # ============================================================
-    #  SECCIÓN #en-vivo — Datos del dashboard integrados en landing
+    #  SECCIÓN #en-vivo — Señales del Canal VIP (desde signal_copier)
+    #  FIX 2026-04-23: Fuente de datos = _copier_trades (lo que publica el
+    #  canal VIP), NO _historial_real (trades MT5 del usuario — son cosas
+    #  distintas). Quitada la sección "Operaciones Activas" por petición.
     # ============================================================
-    _losses = total - wins
-    _profit_color_live = '#00e676' if _raw_profit >= 0 else '#ff3b30'
-    _wr_color_live = '#00d4aa' if wr >= 60 else ('#f0b90b' if wr >= 45 else '#ff3b30')
+    _WIN_RESULTS = ("tp", "close_half", "close_partial", "full_close")
+    _copier_sorted = sorted(_copier_trades, key=lambda t: t.get("closed_at", 0))
+    _total_senales = len(_copier_sorted)
+    _wins_vip = sum(1 for t in _copier_sorted
+                    if t.get("result") in _WIN_RESULTS and float(t.get("pips", 0) or 0) > 0)
+    _losses_vip = sum(1 for t in _copier_sorted if t.get("result") == "sl")
+    _closed_total = _wins_vip + _losses_vip
+    _wr_vip = round(_wins_vip / _closed_total * 100, 1) if _closed_total > 0 else 0
+    _pips_totales = round(sum(float(t.get("pips", 0) or 0) for t in _copier_sorted), 1)
+    _wins_count_card = _wins_vip
+    _losses_count_card = _losses_vip
 
-    # Racha ganadora actual (desde la última pérdida)
+    _profit_color_live = '#00e676' if _pips_totales >= 0 else '#ff3b30'
+    _wr_color_live = '#00d4aa' if _wr_vip >= 60 else ('#f0b90b' if _wr_vip >= 45 else '#ff3b30')
+
+    # Racha ganadora actual — consecutivos con resultado positivo desde el más reciente
     _current_streak = 0
-    for _h in reversed(hist):
-        if float(_h.get('pips', 0)) > 0:
+    for _t in reversed(_copier_sorted):
+        _r = _t.get("result", "")
+        _p = float(_t.get("pips", 0) or 0)
+        if _r in _WIN_RESULTS and _p > 0:
             _current_streak += 1
-        else:
+        elif _r == "sl":
             break
+        else:
+            # resultados neutros no cuentan ni rompen la racha
+            continue
 
-    # Historial reciente — últimos 10 trades cerrados
+    # Historial reciente — últimas 10 señales cerradas del canal VIP
+    _result_icon = {
+        "tp": ("&#9989;", "#00e676"),          # ✅ verde
+        "close_half": ("&#9889;", "#00d4aa"),  # ⚡ turquesa
+        "close_partial": ("&#9889;", "#00d4aa"),
+        "full_close": ("&#128274;", "#00d4aa"),# 🔒
+        "sl": ("&#128721;", "#ff3b30"),        # 🛑 rojo
+    }
     _recent_trades_html = ""
-    for _rt in list(reversed(hist))[:10]:
+    for _rt in list(reversed(_copier_sorted))[:10]:
         _rt_fecha = _rt.get("fecha", "")
-        _rt_nombre = _rt.get("nombre", _rt.get("ticker", "N/A"))
-        _rt_tipo = _rt.get("tipo", "COMPRA")
-        _rt_pips = float(_rt.get("pips", 0))
-        _rt_profit = float(_rt.get("profit_mt5", 0) or 0)
-        _rt_is_win = _rt_pips > 0
-        _rt_color = "#00e676" if _rt_is_win else "#ff3b30"
-        _rt_tipo_en = "BUY" if _rt_tipo == "COMPRA" else "SELL"
-        _rt_sign = "+" if _rt_profit >= 0 else "-"
+        _rt_nombre = _rt.get("pair_display") or _rt.get("pair", "N/A")
+        _rt_tipo_en = _rt.get("direction", "")
+        _rt_pips = float(_rt.get("pips", 0) or 0)
+        _rt_unit = _rt.get("pips_unit", "pips")
+        _rt_result = _rt.get("result", "")
+        _rt_icon, _rt_color = _result_icon.get(_rt_result, ("&#9679;", "#8b9fc4"))
+        _tipo_color = "#00e676" if _rt_tipo_en == "BUY" else "#ff3b30"
+        _pips_sign = "+" if _rt_pips >= 0 else ""
         _recent_trades_html += (
             f'<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
             f'<td style="padding:8px;color:#8b9fc4;font-size:12px">{_rt_fecha}</td>'
             f'<td style="padding:8px;font-weight:700;color:#fff;font-size:13px">{_rt_nombre}</td>'
-            f'<td style="padding:8px;font-size:12px"><span style="color:{_rt_color}">&#9679;</span> {_rt_tipo_en}</td>'
-            f'<td style="padding:8px;font-family:monospace;font-size:12px;color:{_rt_color}">{_rt_pips:+.1f} pips</td>'
-            f'<td style="padding:8px;text-align:right;font-weight:700;font-size:13px;color:{_rt_color}">{_rt_sign}${abs(_rt_profit):,.2f}</td>'
+            f'<td style="padding:8px;font-size:12px"><span style="color:{_tipo_color}">&#9679;</span> {_rt_tipo_en}</td>'
+            f'<td style="padding:8px;font-family:monospace;font-size:12px;color:{_rt_color}">{_pips_sign}{_rt_pips:.1f} {_rt_unit}</td>'
+            f'<td style="padding:8px;text-align:right;font-size:14px">{_rt_icon}</td>'
             f'</tr>'
         )
     if not _recent_trades_html:
-        _recent_trades_html = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#8b9fc4;font-size:12px">Sin historial de operaciones a\xfan</td></tr>'
+        _recent_trades_html = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#8b9fc4;font-size:12px">A\xfan no hay se\xf1ales publicadas</td></tr>'
 
-    # Operaciones activas en vivo
-    _active_ops_list = [op for op in _store.get("operaciones_activas", {}).values() if isinstance(op, dict) and op.get('mt5_ejecutado', False)]
-    _active_ops_html = ""
-    if _active_ops_list:
-        for _aop in _active_ops_list[:6]:
-            _aop_name = str(_aop.get('nombre', _aop.get('ticker', 'N/A')))
-            _aop_tipo = _aop.get('tipo', 'COMPRA')
-            _aop_entry = float(_aop.get('entrada', 0))
-            _aop_color = "#00e676" if _aop_tipo == "COMPRA" else "#ff3b30"
-            _aop_tipo_en = "BUY" if _aop_tipo == "COMPRA" else "SELL"
-            _active_ops_html += (
-                f'<div style="background:rgba(10,15,30,.6);border:1px solid {_aop_color}40;border-radius:10px;padding:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
-                f'<span style="width:10px;height:10px;border-radius:50%;background:{_aop_color};animation:pulse 1.5s infinite;flex-shrink:0"></span>'
-                f'<strong style="color:#fff;font-size:14px">{_aop_name}</strong>'
-                f'<span style="color:{_aop_color};font-weight:700;font-size:12px">{_aop_tipo_en}</span>'
-                f'<span style="color:#8b9fc4;font-family:monospace;font-size:12px;margin-left:auto">{_aop_entry:,.4f}</span>'
-                f'</div>'
-            )
-    else:
-        _active_ops_html = (
-            '<div style="text-align:center;padding:24px;color:#8b9fc4">'
-            '<div style="font-size:14px;margin-bottom:6px">&#128308; Sin operaciones activas en este momento</div>'
-            '<div style="font-size:12px;opacity:.7">El bot opera de lunes a viernes en horario de mercado europeo</div>'
-            '</div>'
-        )
-
-    # Rendimiento por activo — reusar lógica de dashboard_visual
+    # Rendimiento por activo — agrupar señales del canal
     _asset_perf = {}
-    for _h in hist:
-        _nombre = _h.get('nombre', _h.get('ticker', 'N/A'))
+    for _t in _copier_sorted:
+        _nombre = _t.get("pair_display") or _t.get("pair", "N/A")
         if _nombre not in _asset_perf:
             _asset_perf[_nombre] = {'wins': 0, 'total': 0, 'pips': 0.0}
         _asset_perf[_nombre]['total'] += 1
-        if float(_h.get('pips', 0)) > 0:
+        _r = _t.get("result", "")
+        _p = float(_t.get("pips", 0) or 0)
+        if _r in _WIN_RESULTS and _p > 0:
             _asset_perf[_nombre]['wins'] += 1
-        _asset_perf[_nombre]['pips'] += float(_h.get('pips', 0))
+        _asset_perf[_nombre]['pips'] += _p
     _asset_groups = [
         ('ORO', '#f0b90b', ['ORO', 'GOLD', 'XAUUSD', 'XAU']),
         ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100']),
@@ -1283,7 +1297,7 @@ if('serviceWorker' in navigator){{
         <span data-i18n="live.title" style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Rendimiento en Vivo</span>
       </span>
     </h2>
-    <p style="color:#a0aec0;font-size:1rem" data-i18n="live.subtitle">Resultados reales de la cuenta MT5 &bull; Actualizaci&oacute;n autom&aacute;tica cada 30s</p>
+    <p style="color:#a0aec0;font-size:1rem" data-i18n="live.subtitle">Se&ntilde;ales publicadas en el Canal VIP con TP, cierre parcial y resultado real</p>
   </div>
 
   <div style="max-width:1100px;margin:0 auto">
@@ -1292,44 +1306,32 @@ if('serviceWorker' in navigator){{
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px">
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(0,212,170,.25);border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
         <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.signals">Se&ntilde;ales Totales</div>
-        <div style="font-size:2rem;font-weight:900;color:#00d4aa">{total}</div>
-        <div style="font-size:11px;color:#8b9fc4;margin-top:4px">{wins}W &bull; {_losses}L</div>
+        <div style="font-size:2rem;font-weight:900;color:#00d4aa">{_total_senales}</div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px">{_wins_count_card}W &bull; {_losses_count_card}L</div>
       </div>
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid {_wr_color_live}50;border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
         <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.winrate">Win Rate</div>
-        <div style="font-size:2rem;font-weight:900;color:{_wr_color_live}">{wr}%</div>
-        <div style="margin-top:6px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden"><div style="width:{wr}%;height:100%;background:{_wr_color_live}"></div></div>
+        <div style="font-size:2rem;font-weight:900;color:{_wr_color_live}">{_wr_vip}%</div>
+        <div style="margin-top:6px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden"><div style="width:{_wr_vip}%;height:100%;background:{_wr_color_live}"></div></div>
       </div>
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid {_profit_color_live}50;border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
-        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.profit">Beneficio Real MT5</div>
-        <div style="font-size:2rem;font-weight:900;color:{_profit_color_live}">{profit_str}</div>
-        <div style="font-size:11px;color:#8b9fc4;margin-top:4px">{pips:+.1f} pips netos</div>
+        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.profit">Pips Netos</div>
+        <div style="font-size:2rem;font-weight:900;color:{_profit_color_live}">{_pips_totales:+.1f}</div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px" data-i18n="live.profit_sub">Sumatoria total del canal VIP</div>
       </div>
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(251,191,36,.25);border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
         <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.streak">Racha Ganadora Actual</div>
         <div style="font-size:2rem;font-weight:900;color:#fbbf24">{_current_streak}</div>
-        <div style="font-size:11px;color:#8b9fc4;margin-top:4px" data-i18n="live.streak_sub">Operaciones ganadoras</div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px" data-i18n="live.streak_sub">Se&ntilde;ales consecutivas</div>
       </div>
     </div>
 
-    <!-- ACTIVE OPS + RECENT HISTORY -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-bottom:28px">
-      <!-- ACTIVE OPERATIONS -->
-      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px">
-        <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:14px;margin-bottom:14px">
-          <span style="font-size:16px">&#9889;</span>
-          <span data-i18n="live.active_title">Operaciones Activas</span>
-          <span style="margin-left:auto;font-size:11px;color:#00d4aa;font-weight:600">{n_ops} <span data-i18n="live.open">abierta(s)</span></span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          {_active_ops_html}
-        </div>
-      </div>
-      <!-- RECENT TRADES -->
+    <!-- RECENT HISTORY (ancho completo) -->
+    <div style="margin-bottom:28px">
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px">
         <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:14px;margin-bottom:14px">
           <span style="font-size:16px">&#128200;</span>
-          <span data-i18n="live.history_title">Historial Reciente</span>
+          <span data-i18n="live.history_title">Se&ntilde;ales Recientes del Canal VIP</span>
           <span style="margin-left:auto;font-size:11px;color:#8b9fc4">&Uacute;ltimas 10</span>
         </div>
         <div style="overflow-x:auto">
@@ -1340,7 +1342,7 @@ if('serviceWorker' in navigator){{
                 <td style="padding:8px;font-weight:600" data-i18n="live.col_asset">Activo</td>
                 <td style="padding:8px;font-weight:600" data-i18n="live.col_type">Tipo</td>
                 <td style="padding:8px;font-weight:600" data-i18n="live.col_pips">Pips</td>
-                <td style="padding:8px;text-align:right;font-weight:600" data-i18n="live.col_pnl">P&amp;L</td>
+                <td style="padding:8px;text-align:right;font-weight:600" data-i18n="live.col_result">Resultado</td>
               </tr>
             </thead>
             <tbody>{_recent_trades_html}</tbody>

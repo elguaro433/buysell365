@@ -363,11 +363,39 @@ def _get_pips_info(pair: str, entry: float, exit_price: float) -> tuple:
         return round(pips_raw * 10000, 1), "pips"
 
 
+def _sync_copier_stats_to_web() -> None:
+    """FIX 2026-04-23: Envía copier_stats.json completo al servidor web (Render)
+    para que la landing muestre las señales del canal VIP.
+    Nonblocking — si falla no detiene el copier.
+    """
+    try:
+        _web_url = os.getenv("WEB_URL", "").strip()
+        _sync_secret = os.getenv("SYNC_SECRET", "").strip()
+        if not _web_url or not _sync_secret:
+            return  # sin URL o secret no hacemos nada
+        if not COPIER_STATS_FILE.exists():
+            return
+        with open(COPIER_STATS_FILE, "r", encoding="utf-8") as f:
+            _stats = json.load(f)
+        _trades_list = _stats.get("trades", []) if isinstance(_stats, dict) else []
+        import requests as _rq
+        _rq.post(
+            f"{_web_url.rstrip('/')}/api/sync",
+            headers={"X-Sync-Secret": _sync_secret, "Content-Type": "application/json"},
+            json={"copier_trades": _trades_list},
+            timeout=8,
+        )
+    except Exception as _e_sync:
+        # No logueamos como warning porque si Render está caído lo haría cada trade
+        log.debug(f"Sync copier_stats → web falló (no crítico): {_e_sync}")
+
+
 def _save_copier_stats(trade: dict) -> None:
     """Persiste un trade cerrado a copier_stats.json. Limita a 90 días.
     FIX 2026-04-19: write atómico con tmp+os.replace.
     Antes: json.dump directo → si crash a media escritura (frecuente con watchdog activo),
     el dashboard del launcher leía un JSON corrupto y mostraba el copier en 0.
+    FIX 2026-04-23: al final, sincroniza copier_stats.json con la web (Render).
     """
     try:
         data = {"trades": []}
@@ -404,6 +432,11 @@ def _save_copier_stats(trade: dict) -> None:
         with open(_tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(_tmp, str(COPIER_STATS_FILE))
+        # FIX 2026-04-23: push a la web (Render) para que la landing lo muestre
+        try:
+            _sync_copier_stats_to_web()
+        except Exception:
+            pass
     except Exception as e:
         log.warning(f"Error guardando copier_stats: {e}")
 
@@ -464,19 +497,31 @@ def _record_close_result(pair: str, action: str, pips: float, direction: str = "
 
 
 def _reconcile_open_vs_mt5() -> None:
-    """FIX 2026-04-17: Reconcilia copier_open_signals.json con posiciones reales MT5.
+    """Reconcilia copier_open_signals.json con posiciones reales MT5.
 
-    Problema detectado: si MT5 cierra una posición (TP/SL automático) y el canal VIP
-    no publica un mensaje explícito de cierre, la señal queda huérfana en
-    _open_signals para siempre (hasta auto-expire a 48h).
+    FIX 2026-04-23: Solo se ejecuta si MT5_EXECUTION_ENABLED=True (el bot ejecuta
+    las señales en MT5 con MAGIC_COPIER). Cuando está desactivado, MT5 es del
+    USUARIO (trades manuales/personales) y esos deals NO pertenecen al canal VIP:
+    asociarlos a las señales publicadas genera TPs falsos (como cuando el usuario
+    cierra manualmente una operación con pequeña ganancia y el bot lo anuncia como
+    TAKE PROFIT aunque el precio nunca tocó el TP).
 
-    Esta función cada 3 min:
+    Solo tiene sentido reconciliar cuando el bot es el que ejecuta las ordenes.
+
+    Lógica (solo si MT5_EXECUTION_ENABLED):
     1. Para cada señal abierta → busca posición MT5 viva con MAGIC_COPIER.
     2. Si no hay posición pero sí hay deal cerrado en últimas 48h con ese magic:
        → celebra como TP (profit>0) o SL (profit<0), registra stats y limpia.
     3. Si no hay posición ni deal reciente (>2h sin match): limpia silenciosamente
        porque la señal probablemente nunca se ejecutó (rechazada por el EA).
     """
+    # FIX 2026-04-23: Desactivar reconcile cuando el bot no ejecuta en MT5.
+    # Los deals de MT5 del usuario (cierres manuales) NO deben afectar al
+    # seguimiento de las señales del canal — son cosas distintas.
+    _mt5_exec = os.getenv("COPIER_MT5_ENABLED", "True").lower() in ("true", "1", "yes")
+    if not _mt5_exec:
+        return
+
     try:
         import MetaTrader5 as mt5
         from datetime import datetime, timedelta
@@ -637,6 +682,42 @@ def _reconcile_open_vs_mt5() -> None:
             # Calcular pips con precio real de salida
             pips_num, pips_unit = _get_pips_info(pair, entry, exit_price)
             result = "tp" if profit > 0 else "sl"
+
+            # FIX 2026-04-23: Sanity — el precio de salida debe haber TOCADO
+            # realmente el TP/SL. Si se cerró a mitad de camino (cierre manual
+            # o parcial), NO publicar como TP/SL completo. Esto evita falsos
+            # "TAKE PROFIT" cuando hay deals huérfanos con el magic del copier
+            # que no corresponden a la señal actual.
+            _sig_tp = sig.get("tp", 0) or 0
+            _sig_sl = sig.get("sl", 0) or 0
+            _tol_pct = 0.0015  # 0.15% de tolerancia (broker spread + slippage)
+            _touched_tp = False
+            _touched_sl = False
+            if _sig_tp > 0 and exit_price > 0:
+                if direction == "BUY":
+                    _touched_tp = exit_price >= _sig_tp * (1 - _tol_pct)
+                else:  # SELL
+                    _touched_tp = exit_price <= _sig_tp * (1 + _tol_pct)
+            if _sig_sl > 0 and exit_price > 0:
+                if direction == "BUY":
+                    _touched_sl = exit_price <= _sig_sl * (1 + _tol_pct)
+                else:  # SELL
+                    _touched_sl = exit_price >= _sig_sl * (1 - _tol_pct)
+            if result == "tp" and not _touched_tp:
+                log.warning(
+                    f"🚫 Reconcile skip: {pair_d} {direction} exit={exit_price} NO tocó TP={_sig_tp} "
+                    f"(profit=${profit:.2f}, pips={pips_num:.1f}) — cierre parcial/manual, no es TP real"
+                )
+                _save_open_signals()
+                continue
+            if result == "sl" and not _touched_sl and abs(profit) < 5.0:
+                # SL tampoco tocado y la pérdida es mínima → probable deal fantasma
+                log.warning(
+                    f"🚫 Reconcile skip: {pair_d} {direction} exit={exit_price} NO tocó SL={_sig_sl} "
+                    f"(profit=${profit:.2f}) — deal ajeno a esta señal, ignorado"
+                )
+                _save_open_signals()
+                continue
 
             # Anti-duplicado: si otro flujo ya notificó este cierre, skip
             _notif_key = f"{pair}_{direction}_{result}_reconcile"
@@ -5032,6 +5113,14 @@ async def main():
         with _daily_results_lock:
             _daily_results.extend(_today_stats)
         log.info(f"📊 {len(_today_stats)} resultados de hoy restaurados desde copier_stats.json")
+
+    # FIX 2026-04-23: Sync inicial de copier_stats.json → Render (web pública)
+    # Así la landing muestra el historial completo desde el arranque.
+    try:
+        _sync_copier_stats_to_web()
+        log.info("📡 copier_stats.json sincronizado con la web al arranque")
+    except Exception as _e_init_sync:
+        log.debug(f"Sync inicial copier_stats → web falló: {_e_init_sync}")
 
     # Intentar conectar con sesión existente PRIMERO (sin enviar código SMS)
     # FIX 2026-04-06: Si la sesión no se reconoce, limpiar WAL/SHM y reintentar
