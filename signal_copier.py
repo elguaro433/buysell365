@@ -3480,7 +3480,7 @@ def send_to_channel(signal, executed, detail):
             _razon_partial = "Protegemos ganancia cerrando parte."
 
         # FIX 2026-04-17: tp_partial = TP intermedio → la posición sigue corriendo
-        _tp_lvl = update.get("tp_level", 0) if isinstance(update, dict) else 0
+        _tp_lvl = signal.get("tp_level", 0) if isinstance(signal, dict) else 0
         _tp_partial_msg = (
             f"🎯 *TP{_tp_lvl} ALCANZADO* — {_pair_d}\n"
             f"✅ Nivel asegurado. La operación *sigue corriendo* hasta el próximo objetivo."
@@ -3606,7 +3606,7 @@ def send_to_channel(signal, executed, detail):
                 # FIX 2026-04-17: tp_partial (TP intermedio) → avanzar _tp_idx y registrar
                 # en stats sin limpiar la señal. La posición MT5 sigue corriendo.
                 if _action == "tp_partial":
-                    _tp_lvl_adv = update.get("tp_level", 0) if isinstance(update, dict) else 0
+                    _tp_lvl_adv = signal.get("tp_level", 0) if isinstance(signal, dict) else 0
                     with _signals_lock:
                         for _sid_p, _sdata_p in _open_signals.items():
                             _s_p = _sdata_p.get("signal", {})

@@ -421,6 +421,8 @@ _depositos_procesados_vip: set = set()       # TxIDs ya procesados (evitar dupli
 _vip_trials_usados: set = set()              # User IDs que ya usaron trial gratis (promo única)
 _trial_intentos: dict = {}                   # {user_id: int} — intentos de trial (máx 3)
 _cache_miembros: dict = {}                   # {user_id: (timestamp, bool)} — caché getChatMember TTL 300s
+_cooldown_bienvenida: dict = {}              # {user_id: timestamp} — evitar spam de bienvenida (max 5000 entries)
+_MAX_COOLDOWN_ENTRIES = 5000
 _ultima_auditoria: float = 0.0              # Timestamp última auditoría de membresías
 _codigos_invitacion: dict = {}              # {code: {creado_por, dias, creado, max_usos, usos, usado_por}}
 _ultimo_reporte_diario: str = ""            # "YYYY-MM-DD" — evita enviar doble
@@ -15722,9 +15724,6 @@ def loop_escaneo():
 
         time.sleep(INTERVALO_ESCANEO)
 
-
-_cooldown_bienvenida: dict = {}  # {user_id: timestamp} — evitar spam de bienvenida (max 5000 entries)
-_MAX_COOLDOWN_ENTRIES = 5000
 
 def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     """Redirige al usuario al chat privado con menú completo de ayuda.
