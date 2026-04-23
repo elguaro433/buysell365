@@ -664,8 +664,8 @@ def _generate_carousel_slides(brand_image_path: str = None) -> list:
         ("Resultados transparentes",
          "Mostramos TODOS los resultados:\nlos buenos Y los malos. Sin filtros.",
          COLOR_GOLD),
-        ("Copy Trading autom\u00e1tico",
-         "Conecta tu cuenta y replica nuestras\noperaciones autom\u00e1ticamente.",
+        ("An\u00e1lisis con IA",
+         "Cada se\u00f1al pasa por filtros de IA\npara maximizar la probabilidad.",
          COLOR_ACCENT),
         ("Estad\u00edsticas diarias",
          "Resumen completo cada d\u00eda:\nWin Rate, pips, mejor/peor se\u00f1al.",
@@ -728,7 +728,7 @@ def _generate_carousel_slides(brand_image_path: str = None) -> list:
     benefits = [
         ("\u2713  Se\u00f1ales diarias con entrada, TP y SL", COLOR_GREEN),
         ("\u2713  Resultados verificados en tiempo real", COLOR_GREEN),
-        ("\u2713  Copy Trading autom\u00e1tico disponible", COLOR_GREEN),
+        ("\u2713  An\u00e1lisis con IA en tiempo real", COLOR_GREEN),
         ("\u2713  Soporte y comunidad activa 24/7", COLOR_GREEN),
         ("\u2713  Dashboard web con estad\u00edsticas", COLOR_GREEN),
     ]

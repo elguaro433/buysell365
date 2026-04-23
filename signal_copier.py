@@ -96,11 +96,6 @@ SYMBOL_MAP = {
 MAGIC_COPIER = 20260325
 TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 
-# FIX 2026-04-21: Flag para mostrar/ocultar TODO rastro del servicio Copy Trading.
-# El usuario tiene el servicio pausado temporalmente. Cuando vuelva a activarlo,
-# poner True (o exportar COPY_TRADING_ENABLED=true en el entorno).
-COPY_TRADING_ENABLED = os.getenv("COPY_TRADING_ENABLED", "false").lower() in ("true", "1", "yes")
-
 # Mapa de nombres para display — FIX 2026-04-21: ORO unificado (no XAU/GOLD/XAUUSD)
 # Por petición del usuario: a partir de hoy el oro siempre se llama "ORO" en mensajes.
 _DISPLAY_MAP = {
@@ -2109,12 +2104,10 @@ async def _loop_promo_reportes() -> None:
 
     _sent_today: dict = {}  # {"12": "2026-04-08", "17": "2026-04-08"}
 
-    # FIX 2026-04-21: Botón Copy Trading oculto (servicio pausado).
-    # Cuando el usuario reactive el servicio, basta con setear COPY_TRADING_ENABLED=true.
-    _promo_rows = []
-    if COPY_TRADING_ENABLED:
-        _promo_rows.append([{"text": "🤖 Empezar Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}])
-    _promo_rows.append([{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}])
+    _promo_rows = [
+        [{"text": "💎 VER CANAL VIP", "url": f"https://t.me/{os.getenv('BOT_USERNAME','Andoperandobot')}?start=vip"}],
+        [{"text": "🌐 Dashboard en vivo", "url": "https://buysell365.pro"}],
+    ]
     _promo_buttons = json.dumps({"inline_keyboard": _promo_rows})
 
     while True:
@@ -3751,15 +3744,10 @@ def send_to_channel(signal, executed, detail):
             {"text": "💬 Pedir análisis de otro activo", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis"},
         ],
     ]
-    # Fila 4: afiliado XM (+ Copy Trading solo si está activo)
-    _xm_row = [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}]
-    if COPY_TRADING_ENABLED:
-        _xm_row.append({"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"})
-    _btn_rows.append(_xm_row)
     _xm_buttons = {"inline_keyboard": _btn_rows}
 
     # FIX 2026-04-08: Gráfica SOLO en TP/SL HIT, NO en señales nuevas
-    # Las señales nuevas solo llevan texto + botones XM
+    # Las señales nuevas solo llevan texto + botones de análisis
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     _payload = {

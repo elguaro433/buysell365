@@ -772,10 +772,10 @@ def index_web():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con Inteligencia Artificial</title>
-<meta name="description" content="Se\u00f1ales de trading en tiempo real con Inteligencia Artificial. Oro (XAUUSD), EUR/USD, NASDAQ, S&amp;P 500, US30 y m\u00e1s. Copy Trading autom\u00e1tico en MT5 con broker regulado XM. Entrada, TP y SL exactos.">
-<meta name="keywords" content="se\u00f1ales trading telegram, se\u00f1ales forex gratis, se\u00f1ales oro telegram, gold signals, copy trading MT5, bot trading telegram, se\u00f1ales NASDAQ, se\u00f1ales EUR/USD, trading con IA, BuySell365, se\u00f1ales XAUUSD, forex signals free, trading bot, se\u00f1ales de trading gratis, copy trading XM">
+<meta name="description" content="Se\u00f1ales de trading en tiempo real con Inteligencia Artificial. Oro (XAUUSD), EUR/USD, NASDAQ, S&amp;P 500, US30 y m\u00e1s. Entrada, TP y SL exactos.">
+<meta name="keywords" content="se\u00f1ales trading telegram, se\u00f1ales forex gratis, se\u00f1ales oro telegram, gold signals, bot trading telegram, se\u00f1ales NASDAQ, se\u00f1ales EUR/USD, trading con IA, BuySell365, se\u00f1ales XAUUSD, forex signals free, trading bot, se\u00f1ales de trading gratis">
 <meta property="og:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta property="og:description" content="Se\u00f1ales de Oro, Forex y NASDAQ en tiempo real. Copy Trading autom\u00e1tico en MT5. Entrada, TP y SL exactos. \u00danete gratis al grupo.">
+<meta property="og:description" content="Se\u00f1ales de Oro, Forex y NASDAQ en tiempo real. Entrada, TP y SL exactos. \u00danete gratis al grupo.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -784,7 +784,7 @@ def index_web():
 <meta property="og:site_name" content="BuySell365 Pro">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="BuySell365 Pro \u2014 Trading con IA">
-<meta name="twitter:description" content="Se\u00f1ales de Oro, Forex y NASDAQ en tiempo real. Copy Trading autom\u00e1tico. \u00danete gratis.">
+<meta name="twitter:description" content="Se\u00f1ales de Oro, Forex y NASDAQ en tiempo real. \u00danete gratis.">
 <meta name="twitter:image" content="https://buysell365.pro/img/og_image.png">
 <meta name="twitter:site" content="@buysell365pro">
 <link rel="canonical" href="https://buysell365.pro">
@@ -813,10 +813,8 @@ def index_web():
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {{"@type":"Question","name":"\u00bfC\u00f3mo funciona el Copy Trading con XM?","acceptedAnswer":{{"@type":"Answer","text":"El Copy Trading replica autom\u00e1ticamente todas nuestras operaciones en tu cuenta MT5. Solo necesitas abrir cuenta en XM (broker regulado), conectar tu cuenta a nuestro perfil de copy y elegir tu nivel de riesgo. Cada operaci\u00f3n se copia con los mismos SL y TP \u2014 sin que tengas que hacer nada."}}}},
     {{"@type":"Question","name":"\u00bfNecesito experiencia en trading?","acceptedAnswer":{{"@type":"Answer","text":"No. Las se\u00f1ales son claras y f\u00e1ciles de seguir. Te decimos exactamente d\u00f3nde entrar, d\u00f3nde colocar el Stop Loss y los Take Profits. Adem\u00e1s, nuestra comunidad te ayudar\u00e1 a aprender."}}}},
-    {{"@type":"Question","name":"\u00bfCu\u00e1nto capital m\u00ednimo necesito?","acceptedAnswer":{{"@type":"Answer","text":"Para el Copy Trading recomendamos un m\u00ednimo de $100 USD. XM permite empezar con menos. Para seguir se\u00f1ales VIP manualmente puedes empezar con el capital que tengas."}}}},
-    {{"@type":"Question","name":"\u00bfPuedo retirar mi dinero cuando quiera?","acceptedAnswer":{{"@type":"Answer","text":"S\u00ed. Tu capital est\u00e1 en tu propia cuenta del broker \u2014 nosotros nunca lo tocamos. Puedes retirar en cualquier momento directamente desde XM, sin restricciones ni penalizaciones."}}}},
+    {{"@type":"Question","name":"\u00bfPuedo retirar mi dinero cuando quiera?","acceptedAnswer":{{"@type":"Answer","text":"S\u00ed. Tu capital est\u00e1 en tu propia cuenta del broker \u2014 nosotros nunca lo tocamos. Puedes retirar en cualquier momento directamente desde tu broker, sin restricciones ni penalizaciones."}}}},
     {{"@type":"Question","name":"\u00bfCu\u00e1ntas se\u00f1ales recibo al d\u00eda?","acceptedAnswer":{{"@type":"Answer","text":"En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los +20 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad."}}}}
   ]
 }}
@@ -940,25 +938,6 @@ section{{padding:60px 20px}}
   filter:drop-shadow(0 0 24px rgba(0,255,204,0.25))}}
 .cta p{{color:var(--text2);margin-bottom:32px;font-size:1.1rem}}
 
-/* ═══ XM BROKER SECTION ═══ */
-.xm-section{{background:linear-gradient(135deg,rgba(10,14,23,0.98) 0%,rgba(30,26,5,0.98) 100%);border-top:1px solid rgba(255,215,0,.2);border-bottom:1px solid rgba(255,215,0,.2);padding:60px 20px;text-align:center;position:relative;overflow:hidden}}
-.xm-section::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#FFD700,#FFA500,#FFD700,transparent)}}
-.xm-section-logo{{font-size:52px;font-weight:900;color:#FFD700;letter-spacing:6px;margin-bottom:6px;text-shadow:0 0 40px rgba(255,215,0,.4)}}
-.xm-section-sub{{font-size:12px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:2px;margin-bottom:20px}}
-.xm-bonus-badge{{display:inline-block;background:linear-gradient(135deg,#1a1500,#2d2200);border:2px solid #FFD700;border-radius:16px;padding:16px 32px;margin-bottom:24px;position:relative}}
-.xm-bonus-badge::before{{content:'&#127873; BONO EXCLUSIVO';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#FFD700;color:#000;font-size:10px;font-weight:800;padding:3px 12px;border-radius:20px;letter-spacing:1px;white-space:nowrap}}
-.xm-bonus-text{{font-size:26px;font-weight:800;color:#FFD700;line-height:1.2}}
-.xm-bonus-text span{{font-size:14px;color:rgba(255,255,255,.7);font-weight:400;display:block;margin-top:4px}}
-.xm-section-pills{{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:20px 0 24px}}
-.xm-section-pill{{background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.25);border-radius:24px;padding:6px 16px;font-size:12px;color:#FFD700}}
-.xm-section-code{{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.35);border-radius:10px;padding:10px 20px;display:inline-block;margin-bottom:20px;font-size:14px;color:rgba(255,255,255,.8)}}
-.xm-section-code b{{font-size:20px;color:#FFD700;letter-spacing:3px;font-weight:900}}
-.xm-section-cta{{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#b8960a,#FFD700 40%,#FFA500 70%,#b8960a);color:#000;text-decoration:none;padding:16px 40px;border-radius:14px;font-weight:800;font-size:16px;transition:all .3s;box-shadow:0 6px 30px rgba(255,215,0,.35);letter-spacing:.3px}}
-.xm-section-cta:hover{{box-shadow:0 8px 40px rgba(255,215,0,.6);transform:translateY(-3px)}}
-.xm-section-note{{font-size:10px;color:rgba(139,148,158,.4);margin-top:14px}}
-.xm-nav-btn{{background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);color:#000!important;padding:10px 20px!important;border-radius:10px;font-weight:900!important;font-size:14px!important;transition:all .3s;box-shadow:0 3px 14px rgba(255,215,0,.4);line-height:1.2;text-align:center}}
-.xm-nav-btn:hover{{box-shadow:0 5px 24px rgba(255,215,0,.65)!important;transform:translateY(-2px)}}
-.xm-nav-btn small{{display:block;font-size:10px;font-weight:700;opacity:.85;letter-spacing:.3px}}
 /* ═══ FOOTER ═══ */
 .footer{{background:var(--bg2);border-top:1px solid var(--border);padding:40px 20px;text-align:center}}
 .footer-links{{display:flex;justify-content:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}}
@@ -1037,7 +1016,6 @@ section{{padding:60px 20px}}
   .nav-logo img{{width:48px;height:48px;min-width:48px;min-height:48px;display:block!important;visibility:visible!important}}
   .nav-links{{display:none}}
   .hamburger{{display:block}}
-  .xm-nav-btn{{display:none}}
   .stats-bar{{gap:16px;flex-wrap:wrap;justify-content:center;padding:18px 14px}}
   .stat-value{{font-size:1.5rem}}
   .hero{{padding:80px 12px 30px}}
@@ -1059,11 +1037,6 @@ section{{padding:60px 20px}}
   .footer-links{{gap:12px}}
   .float-telegram{{bottom:16px;right:16px;width:50px;height:50px}}
   .back-to-top{{bottom:76px;right:20px;width:38px;height:38px}}
-  .xm-section{{padding:40px 16px}}
-  .xm-section-logo{{font-size:36px;letter-spacing:4px}}
-  .xm-bonus-badge{{padding:12px 16px;margin:0 8px 20px}}
-  .xm-bonus-text{{font-size:20px}}
-  .xm-section-cta{{padding:14px 24px;font-size:14px}}
   section{{padding:40px 12px}}
   .pricing{{padding:50px 12px!important}}
   /* Hero mockup: ocultar tabla en móvil, mostrar solo stats grid */
@@ -1082,8 +1055,6 @@ section{{padding:60px 20px}}
   .asset-tag{{font-size:.65rem}}
   .faq-q{{padding:16px 18px;font-size:.88rem}}
   .price-card{{padding:28px 18px}}
-  .xm-section-pills{{gap:6px}}
-  .xm-section-pill{{font-size:10px;padding:4px 10px}}
   .promo-features{{gap:8px}}
 }}
 </style>
@@ -1121,7 +1092,6 @@ if('serviceWorker' in navigator){{
       </div>
     </div>
   </div>
-    <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-nav-btn">&#127974; XM Broker<small data-i18n="nav.xm_bonus">&#127873; Bono 100% hasta $100</small></a>
   <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()">
     <span></span><span></span><span></span>
   </button>
@@ -1241,69 +1211,7 @@ if('serviceWorker' in navigator){{
       </ul>
       <a href="https://t.me/Andoperandobot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s"><span data-i18n="pricing.subscribe_vip">&#128081; Suscribirme al VIP</span></a>
     </div>
-    <div class="price-card" style="position:relative;border:2px solid #00ffcc;box-shadow:0 0 50px rgba(0,255,204,0.25),0 0 100px rgba(0,255,204,0.08)">
-      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00ffcc);box-shadow:0 0 30px rgba(0,255,204,.7);animation:glowPulse 3s infinite;font-size:15px;padding:10px 32px">&#9989; <span data-i18n="pricing.copy_badge">ACTIVO</span></div>
-      <div class="price-name" style="color:#00ffcc;font-size:1.5rem;text-shadow:0 0 20px rgba(0,255,204,0.3)" data-i18n="pricing.copy_name">Copy Trading</div>
-      <div class="price-amount" style="font-size:2rem;color:#00ffcc;font-weight:900;text-shadow:0 0 30px rgba(0,255,204,0.5)" data-i18n="pricing.copy_price">Sin cuota fija</div>
-      <p style="color:#b0bec5;margin-bottom:16px;font-size:1rem" data-i18n="pricing.copy_desc">Tu cuenta MT5 replica autom\u00e1ticamente nuestras operaciones con XM \u2014 el broker m\u00e1s usado del mundo</p>
-      <ul class="price-list" style="color:#e0e0e0">
-        <li style="color:#00e676" data-i18n="pricing.cp1">&#128640; Copia autom\u00e1tica de todas nuestras operaciones</li>
-        <li style="color:#00e676" data-i18n="pricing.cp2">&#127919; Entry, SL y TP exactos \u2014 sin hacer nada t\u00fa</li>
-        <li style="color:#00e676" data-i18n="pricing.cp3">&#128202; EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s activos</li>
-        <li style="color:#00e676" data-i18n="pricing.cp4">&#127963; Broker XM regulado internacionalmente</li>
-        <li style="color:#ffd740" data-i18n="pricing.cp5">&#128176; Sin cuota mensual \u2014 pagas solo si ganas</li>
-        <li style="color:#00e676" data-i18n="pricing.cp6">&#128065; Ves cada operaci\u00f3n en tiempo real</li>
-        <li style="color:#00e676" data-i18n="pricing.cp7">&#128275; Retira tu capital cuando quieras</li>
-        <li style="color:#00e676" data-i18n="pricing.cp8">&#129302; Totalmente autom\u00e1tico \u2014 sin experiencia requerida</li>
-      </ul>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
-        <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#b8960a,#FFD700,#b8960a);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(255,215,0,.35);transition:all .3s;line-height:1.3">
-          <span data-i18n="pricing.open_xm">&#127873; Abrir Cuenta XM</span><span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8" data-i18n="pricing.open_xm_sub">Bono 100% hasta $100</span>
-        </a>
-        <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px 10px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:13px;text-decoration:none;box-shadow:0 4px 20px rgba(0,230,118,.4);transition:all .3s;line-height:1.3">
-          <span data-i18n="pricing.start_copy">&#128640; Empezar Copy Trading</span><span style="font-size:11px;font-weight:700;margin-top:3px;opacity:.8" data-i18n="pricing.start_copy_sub">Ya tengo cuenta XM</span>
-        </a>
-      </div>
-      <a id="guide-pdf-btn" href="/static/BuySell365_Guia_CopyTrading.pdf" download style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;padding:12px 20px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.05));border:1.5px solid rgba(59,130,246,.4);border-radius:12px;color:#60a5fa;font-weight:700;font-size:13px;text-decoration:none;transition:all .3s">
-        &#128218; <span data-i18n="pricing.guide_btn">Descargar Gu\u00eda Copy Trading (PDF)</span><span style="font-size:10px;opacity:.7;margin-left:4px" data-i18n="pricing.guide_sub">Paso a paso desde cero</span>
-      </a>
-      <script>
-      (function(){{
-        var pdfMap={{es:'/static/BuySell365_Guia_CopyTrading.pdf',en:'/static/BuySell365_Guide_CopyTrading_EN.pdf',pt:'/static/BuySell365_Guide_CopyTrading_PT.pdf',fr:'/static/BuySell365_Guide_CopyTrading_FR.pdf'}};
-        function updatePdfLink(){{var lang=(localStorage.getItem('buysell365_lang')||'es').toLowerCase();var btn=document.getElementById('guide-pdf-btn');if(btn)btn.href=pdfMap[lang]||pdfMap.es;}}
-        updatePdfLink();
-        window.addEventListener('storage',updatePdfLink);
-        setInterval(updatePdfLink,2000);
-      }})();
-      </script>
-    </div>
   </div>
-</section>
-
-<!-- XM BROKER SECTION -->
-<section class="xm-section fade-in">
-  <div class="xm-section-logo">XM</div>
-  <div class="xm-section-sub" data-i18n="xm.sub">Broker oficial de BuySell365 Pro &mdash; Regulado internacionalmente</div>
-  <div class="xm-bonus-badge">
-    <div class="xm-bonus-text" data-i18n="xm.bonus">&#127873; Reciba un bono del 100% hasta $100</div>
-    <div style="font-size:12px;opacity:.8" data-i18n="xm.bonus_sub">Dep&oacute;sito m&iacute;nimo $5 &bull; Retira tus ganancias cuando quieras</div>
-  </div>
-  <div class="xm-section-pills">
-    <span class="xm-section-pill" data-i18n="xm.pill1">&#10003; Regulado CySEC &middot; ASIC &middot; FCA</span>
-    <span class="xm-section-pill" data-i18n="xm.pill2">&#128176; Dep&oacute;sito desde $5</span>
-    <span class="xm-section-pill" data-i18n="xm.pill3">&#9889; Sin re-quotes</span>
-    <span class="xm-section-pill">&#128241; App iOS &amp; Android</span>
-    <span class="xm-section-pill" data-i18n="xm.pill5">&#128274; Fondos segregados</span>
-    <span class="xm-section-pill" data-i18n="xm.pill6">&#127758; +5M clientes</span>
-  </div>
-  <div class="xm-section-code" data-i18n="xm.code">
-    Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b>
-  </div><br>
-  <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-section-cta">
-    <span data-i18n="xm.cta">&#128640; Abrir Cuenta Real &mdash; Gratis</span>
-  </a>
-  <div class="xm-section-note" data-i18n="xm.risk">Trading implica riesgo. Capital en riesgo. &bull; Bono sujeto a condiciones XM.</div>
-  <div style="font-size:11px;color:rgba(139,159,180,.45);margin-top:8px" data-i18n="xm.affiliate">&#128276; Divulgaci\u00f3n de afiliado: BuySell365 Pro es afiliado de XM y puede recibir comisi\u00f3n si abres una cuenta a trav\u00e9s de nuestros enlaces. Esto no afecta el coste para ti.</div>
 </section>
 
 <!-- HOW IT WORKS -->
@@ -1328,8 +1236,8 @@ if('serviceWorker' in navigator){{
     <div style="flex:1;min-width:250px;max-width:320px;background:linear-gradient(135deg,rgba(0,230,118,.05),rgba(0,180,90,.05));border:1px solid rgba(0,230,118,.2);border-radius:16px;padding:28px;text-align:center;position:relative">
       <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00e676,#00c853);color:#000;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">3</div>
       <div style="font-size:2.5rem;margin:12px 0">\U0001f4b0</div>
-      <h3 style="color:#00e676;font-size:1.1rem;margin-bottom:8px" data-i18n="how.step3_title">Opera o Copia</h3>
-      <p style="color:var(--text2);font-size:.9rem" data-i18n="how.step3_desc">Ejecuta las se\u00f1ales manualmente o activa el Copy Trading para que se copien autom\u00e1ticamente en tu MT5.</p>
+      <h3 style="color:#00e676;font-size:1.1rem;margin-bottom:8px" data-i18n="how.step3_title">Opera a tu ritmo</h3>
+      <p style="color:var(--text2);font-size:.9rem" data-i18n="how.step3_desc">Sigue las se\u00f1ales en el canal VIP. T\u00fa decides cu\u00e1ndo entrar y salir.</p>
     </div>
   </div>
 </section>
@@ -1499,7 +1407,7 @@ if('serviceWorker' in navigator){{
   <div class="faq-list">
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q1">¿Cómo funciona el grupo de comunidad?</div>
-      <div class="faq-a" data-i18n="faq.a1">El grupo público de Telegram te da acceso a resúmenes diarios de mercado, educación y análisis general. Para recibir señales VIP en tiempo real con Entry, TP y SL exactos, necesitas el plan VIP Pro. El Copy Trading funciona sin cuota fija — solo pagas un pequeño % si ganas.</div>
+      <div class="faq-a" data-i18n="faq.a1">El grupo público de Telegram te da acceso a resúmenes diarios de mercado, educación y análisis general. Para recibir señales VIP en tiempo real con Entry, TP y SL exactos, necesitas el plan VIP Pro.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q2">\u00bfC\u00f3mo recibo las se\u00f1ales?</div>
@@ -1511,11 +1419,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q4">\u00bfQu\u00e9 broker necesito?</div>
-      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para aprovechar nuestro servicio de Copy Trading activo.</div>
-    </div>
-    <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q_copy">\u00bfC\u00f3mo funciona el Copy Trading con XM?</div>
-      <div class="faq-a" data-i18n="faq.a_copy">El Copy Trading te permite replicar autom\u00e1ticamente todas nuestras operaciones en tu propia cuenta. Solo necesitas: 1) Abrir una cuenta en XM (broker regulado internacionalmente), 2) Conectar tu cuenta a nuestro perfil de copy a trav\u00e9s del enlace que te proporcionamos, 3) Elegir tu nivel de riesgo y monto. A partir de ah\u00ed, cada vez que nuestro bot ejecuta una operaci\u00f3n, se replica autom\u00e1ticamente en tu cuenta con los mismos SL y TP. No necesitas estar pendiente ni tener experiencia \u2014 todo es 100% autom\u00e1tico.</div>
+      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para mejor ejecuci\u00f3n de las se\u00f1ales.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q5">\u00bfC\u00f3mo cancelo mi suscripci\u00f3n VIP?</div>
@@ -1524,22 +1428,6 @@ if('serviceWorker' in navigator){{
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q6">\u00bfCu\u00e1ntas se\u00f1ales recibo al d\u00eda?</div>
       <div class="faq-a" data-i18n="faq.a6">En promedio entre 5 y 15 se\u00f1ales diarias repartidas entre los +20 activos. El bot analiza el mercado cada 3 minutos y solo env\u00eda se\u00f1ales cuando detecta una oportunidad de alta probabilidad.</div>
-    </div>
-    <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q_copy">\u00bfC\u00f3mo funciona el Copy Trading con XM?</div>
-      <div class="faq-a" data-i18n="faq.a_copy">El Copy Trading replica autom\u00e1ticamente todas nuestras operaciones en tu cuenta MT5. Solo necesitas: 1) Abrir cuenta en XM (broker regulado internacionalmente), 2) Conectar tu cuenta a nuestro perfil de copy, 3) Elegir tu nivel de riesgo. A partir de ah\u00ed cada operaci\u00f3n se copia en tu cuenta con los mismos SL y TP \u2014 sin que tengas que hacer nada.</div>
-    </div>
-    <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q7">\u00bfCu\u00e1nto capital m\u00ednimo necesito?</div>
-      <div class="faq-a" data-i18n="faq.a7">Para el Copy Trading recomendamos un m\u00ednimo de $100 USD, aunque XM permite empezar con menos. Para seguir se\u00f1ales VIP manualmente puedes empezar con el capital que tengas, aplicando siempre una gesti\u00f3n de riesgo adecuada.</div>
-    </div>
-    <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q8">\u00bfPuedo retirar mi dinero cuando quiera?</div>
-      <div class="faq-a" data-i18n="faq.a8">S\u00ed. Tu capital est\u00e1 en tu propia cuenta del broker \u2014 nosotros nunca lo tocamos. Puedes retirar en cualquier momento directamente desde XM, sin restricciones ni penalizaciones de nuestra parte.</div>
-    </div>
-    <div class="faq-item" onclick="this.classList.toggle('open')">
-      <div class="faq-q" data-i18n="faq.q9">\u00bfQu\u00e9 pasa si una operaci\u00f3n tiene p\u00e9rdidas?</div>
-      <div class="faq-a" data-i18n="faq.a9">El trading siempre conlleva riesgo. Todas nuestras operaciones llevan Stop Loss autom\u00e1tico para limitar la exposici\u00f3n. En el Copy Trading, si una operaci\u00f3n cierra en negativo no pagas ninguna comisi\u00f3n \u2014 solo se cobra un peque\u00f1o % cuando hay ganancias reales.</div>
     </div>
   </div>
 </section>
@@ -1559,14 +1447,6 @@ if('serviceWorker' in navigator){{
       <div style="font-size:2.2rem;margin-bottom:10px">\U0001f916</div>
       <h4 style="color:#00ffc8;margin-bottom:8px" data-i18n="why.ai_title">IA Real, No Opiniones</h4>
       <p style="color:var(--text2);font-size:.85rem" data-i18n="why.ai_desc">Nuestro bot analiza datos reales cada 3 minutos. Sin emociones, sin sesgos \u2014 solo datos y algoritmos.</p>
-    </div>
-    <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
-         onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
-         onmouseout="this.style.transform='';this.style.borderColor='rgba(255,255,255,0.1)'"
-         >
-      <div style="font-size:2.2rem;margin-bottom:10px">\U0001f4b0</div>
-      <h4 style="color:#ffd700;margin-bottom:8px" data-i18n="why.copy_title">Copy Trading Sin Cuota</h4>
-      <p style="color:var(--text2);font-size:.85rem" data-i18n="why.copy_desc">No pagas nada hasta que ganas. Solo un peque\u00f1o porcentaje de tus ganancias reales.</p>
     </div>
     <div style="flex:1;min-width:220px;max-width:260px;background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.25);transition:all .3s"
          onmouseover="this.style.transform='translateY(-6px)';this.style.borderColor='rgba(0,255,204,0.35)'"
@@ -1612,10 +1492,9 @@ if('serviceWorker' in navigator){{
 <!-- CTA -->
 <section class="cta fade-in" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
   <h2>\U0001f680 <span style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text" data-i18n="cta.title">Empieza a Operar con IA</span></h2>
-  <p style="font-size:1.1rem" data-i18n="cta.subtitle">Elige entre VIP Pro o Copy Trading. Sin contratos, cancela cuando quieras.</p>
+  <p style="font-size:1.1rem" data-i18n="cta.subtitle">Accede al Canal VIP Pro. Sin contratos, cancela cuando quieras.</p>
   <div class="hero-buttons">
     <a href="#pricing" class="btn btn-primary"><span data-i18n="cta.plans">\U0001f451 Ver Planes</span></a>
-    <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="btn btn-secondary" style="border-color:rgba(0,230,118,0.3);color:#00e676">&#128640; Copy Trading</a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary"><span data-i18n="cta.community">\U0001f4ac Comunidad Gratis</span></a>
     <a href="https://www.instagram.com/buysell365.pro_tradingsignals/" target="_blank" class="btn btn-secondary" style="border-color:rgba(225,48,108,0.4);color:#fff;background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);font-weight:700;padding:12px 28px"><svg viewBox="0 0 24 24" width="18" height="18" fill="#fff" style="vertical-align:middle;margin-right:6px"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>Instagram</a>
   </div>
@@ -2198,7 +2077,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     .filter-bar{{gap:4px}}
     .filter-btn{{padding:4px 10px;font-size:11px}}
     .date-filter-btn{{padding:4px 10px;font-size:11px}}
-    .xm-broker-strip{{padding:20px 14px}}
     .card{{padding:16px}}
     #winning-trades-container table{{min-width:560px}}
 }}
@@ -2217,9 +2095,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     .promo{{padding:20px 14px}}
     .promo h2{{font-size:16px}}
     .promo p{{font-size:12px}}
-    .xm-logo{{font-size:22px}}
-    .xm-pills{{gap:4px}}
-    .xm-pill{{font-size:10px;padding:3px 8px}}
     .streak-number{{font-size:24px}}
     .bell-btn{{padding:4px 8px;font-size:16px}}
 }}
@@ -2234,18 +2109,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 .bell-btn.notif-on{{border-color:rgba(240,185,11,.6);background:rgba(240,185,11,.12)}}
 .bell-dot{{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ff3b30;border:1px solid var(--bg);display:none}}
 .bell-dot.show{{display:block}}
-.xm-hdr-btn{{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,#b8960a 0%,#FFD700 50%,#b8960a 100%);color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;text-decoration:none;cursor:pointer;transition:all .3s;white-space:nowrap;box-shadow:0 2px 8px rgba(255,215,0,.25)}}
-.xm-hdr-btn:hover{{box-shadow:0 4px 16px rgba(255,215,0,.5);transform:translateY(-1px)}}
-.xm-broker-strip{{background:linear-gradient(135deg,rgba(22,27,34,.95),rgba(28,26,8,.95));border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:24px 20px;margin:24px 0;text-align:center;position:relative;overflow:hidden}}
-.xm-broker-strip::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#FFD700,transparent)}}
-.xm-logo{{font-size:28px;font-weight:900;color:#FFD700;letter-spacing:3px;margin-bottom:4px}}
-.xm-pills{{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0 16px}}
-.xm-pill{{background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);border-radius:20px;padding:4px 11px;font-size:11px;color:#FFD700}}
-.xm-code{{background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.4);border-radius:8px;padding:7px 14px;font-size:13px;color:#FFD700;display:inline-block;margin-bottom:14px}}
-.xm-code b{{font-size:15px;letter-spacing:2px}}
-.xm-cta{{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#b8960a 0%,#FFD700 50%,#b8960a 100%);color:#000;text-decoration:none;padding:11px 26px;border-radius:10px;font-weight:700;font-size:14px;transition:all .3s;box-shadow:0 4px 16px rgba(255,215,0,.25)}}
-.xm-cta:hover{{box-shadow:0 6px 24px rgba(255,215,0,.5);transform:translateY(-2px)}}
-@media(max-width:480px){{.xm-btn-text{{display:none}}}}
 </style>
 <!-- Auto-reload removido: el polling JS (setInterval) ya actualiza los datos sin recargar -->
 </head>
@@ -2272,9 +2135,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                     <a onclick="setLang('fr')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1eb\U0001f1f7 Fran\u00e7ais</a>
                 </div>
             </div>
-            <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-hdr-btn" title="Abre tu cuenta en XM — broker recomendado">
-                &#127974; <span class="xm-btn-text">XM Broker</span>
-            </a>
             <div class="live-badge"><div class="pulse"></div><span data-i18n="dash.live">{'EN VIVO' if is_alive else 'OFFLINE'}</span> &mdash; {now_str}</div>
         </div>
     </div>
@@ -2364,11 +2224,9 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     <div class="promo" style="margin-bottom:24px;background:linear-gradient(135deg,#0d1a2a 0%,#1a0d2e 50%,#0a1520 100%);border:1px solid rgba(168,85,247,.2)">
         <div style="position:relative">
             <h2 style="font-size:22px" data-i18n="dash.promo_unified_title">&#128640; &Uacute;nete a BuySell365 Pro</h2>
-            <p style="font-size:14px;max-width:520px;margin:8px auto 20px" data-i18n="dash.promo_unified_sub">Se&ntilde;ales de IA + Copy Trading autom&aacute;tico en tu cuenta MT5 con broker regulado XM</p>
+            <p style="font-size:14px;max-width:520px;margin:8px auto 20px" data-i18n="dash.promo_unified_sub">Se&ntilde;ales de IA en tiempo real con Entry, TP y SL exactos</p>
             <div class="promo-features" style="margin-bottom:20px">
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat1">Se&ntilde;ales con TP y SL exactos</span></div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat2">Copy Trading autom\u00e1tico</span></div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat3">Broker regulado XM</span></div>
                 <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat4">SL y TP autom&aacute;ticos</span></div>
             </div>
             <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:16px 20px;max-width:420px;margin:0 auto 20px;text-align:left">
@@ -2385,7 +2243,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
             </div>
             <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
                 <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px"><span data-i18n="dash.cta_channel">&#128172; ÚNETE AL CANAL</span></a>
-                <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" class="cta-btn" style="background:linear-gradient(135deg,#00c853,#00e676);border:none;padding:12px 24px"><span data-i18n="dash.cta_copy">&#128640; EMPEZAR COPY TRADING</span></a>
             </div>
             <p style="font-size:11px;color:var(--muted);margin-top:12px" data-i18n="dash.promo_note">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
         </div>
@@ -2395,25 +2252,6 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     <div class="card" style="margin-bottom:24px">
         <div class="card-title"><i>&#128178;</i> <span data-i18n="dash.asset_perf">Rendimiento por Activo</span></div>
         <div class="asset-grid">{asset_cards_html}</div>
-    </div>
-
-    <!-- XM BROKER SECTION -->
-    <div class="xm-broker-strip" style="margin-bottom:24px">
-        <div class="xm-logo">XM</div>
-        <div style="font-size:14px;color:#e6edf3;font-weight:600;margin-bottom:4px" data-i18n="xm.title">Broker Recomendado</div>
-        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px" data-i18n="xm.sub">El broker que usa BuySell365 Pro</div>
-        <div class="xm-pills">
-            <span class="xm-pill" data-i18n="dash.xm_pill1">&#10003; Regulado CySEC &middot; ASIC</span>
-            <span class="xm-pill" data-i18n="dash.xm_pill2">&#128176; Dep&oacute;sito desde $5</span>
-            <span class="xm-pill" data-i18n="dash.xm_pill3">&#9889; Sin re-quotes</span>
-            <span class="xm-pill" data-i18n="dash.xm_pill4">&#128241; App iOS &amp; Android</span>
-        </div>
-        <div class="xm-code" data-i18n="xm.code">Para Copy Trading usa el c&oacute;digo: <b>6CTHK</b></div><br>
-        <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-cta">
-            <span data-i18n="dash.xm_cta">&#128640; Abrir Cuenta Real &mdash; Gratis</span>
-        </a>
-        <div style="font-size:10px;color:rgba(139,148,158,.5);margin-top:12px" data-i18n="dash.xm_risk">Trading implica riesgo. Capital en riesgo.</div>
-        <div style="font-size:10px;color:rgba(139,148,158,.35);margin-top:6px" data-i18n="dash.xm_affiliate">&#128276; Enlace de afiliado: podemos recibir comisi&oacute;n si abres una cuenta en XM a trav&eacute;s de este enlace.</div>
     </div>
 
     <!-- FOOTER -->
@@ -3197,23 +3035,23 @@ a{{color:var(--green);text-decoration:none}}
 </div>
 
 <section class="about-hero">
-  <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px" data-i18n="about.hero.badge">&#9989; CUENTA REAL MT5 XM &mdash; RESULTADOS VERIFICADOS</div>
+  <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px" data-i18n="about.hero.badge">&#9989; CUENTA REAL MT5 &mdash; RESULTADOS VERIFICADOS</div>
   <h1 data-i18n="about.hero.title">Trading automatizado en<br><span>GOLD y NASDAQ con IA</span></h1>
-  <p data-i18n="about.hero.subtitle">Creado por Emmanuel Diaz, trader real operando con cuenta verificada en XM MT5. BuySell365 Pro combina IA propia + se\u00f1ales de canales VIP internacionales para operar GOLD (XAUUSD) y NASDAQ (NAS100) las 24 horas.</p>
+  <p data-i18n="about.hero.subtitle">Creado por Emmanuel Diaz, trader real operando con cuenta verificada en MT5. BuySell365 Pro combina IA propia + se\u00f1ales de canales VIP internacionales para operar GOLD (XAUUSD) y NASDAQ (NAS100) las 24 horas.</p>
 </section>
 
 <div class="about-stats">
   <div class="astat"><div class="astat-val">{wr}%</div><div class="astat-label" data-i18n="about.stats.winrate">Win Rate Verificado</div></div>
   <div class="astat"><div class="astat-val blue">{total_ops}+</div><div class="astat-label" data-i18n="about.stats.operations">Operaciones Cerradas</div></div>
   <div class="astat"><div class="astat-val" style="color:#a855f7">24/5</div><div class="astat-label" data-i18n="about.stats.bot_active">Bot Activo</div></div>
-  <div class="astat"><div class="astat-val gold">MT5</div><div class="astat-label" data-i18n="about.stats.real_account">Cuenta Real XM</div></div>
+  <div class="astat"><div class="astat-val gold">MT5</div><div class="astat-label" data-i18n="about.stats.real_account">Cuenta Real MT5</div></div>
 </div>
 
 <section class="about-section">
   <h2 data-i18n="about.history.title"><span class="emoji">&#128065;</span>Nuestra Historia Real</h2>
   <p data-i18n="about.history.p1">Mi nombre es <strong>Emmanuel Diaz</strong>, trader retail desde Andorra. Como muchos, empec\u00e9 cometiendo los errores cl\u00e1sicos: dejar correr las p\u00e9rdidas, cortar las ganancias, y operar por emoci\u00f3n.</p>
   <p data-i18n="about.history.p2">La soluci\u00f3n fue la <strong>automatizaci\u00f3n</strong>. Dise\u00f1\u00e9 un bot de IA que analiza GOLD y NASDAQ cada 3 minutos \u2014 sin emociones, sin fatiga. Adem\u00e1s, integr\u00e9 un <strong>Signal Copier</strong> que replica se\u00f1ales de canales VIP internacionales verificados.</p>
-  <p data-i18n="about.history.p3">BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>yo mismo uso</strong> para operar en mi cuenta real verificada en XM MT5. Todos los resultados son p\u00fablicos en el <a href="/dashboard" style="color:#00d4aa">dashboard</a>.</p>
+  <p data-i18n="about.history.p3">BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>yo mismo uso</strong> para operar en mi cuenta real verificada en MT5. Todos los resultados son p\u00fablicos en el <a href="/dashboard" style="color:#00d4aa">dashboard</a>.</p>
 
   <h2 style="margin-top:40px" data-i18n="about.timeline.title"><span class="emoji">&#128336;</span>Cronolog\u00eda del Proyecto</h2>
   <div class="timeline">
@@ -3226,8 +3064,8 @@ a{{color:var(--green);text-decoration:none}}
     <div class="tl-item">
       <div class="tl-dot"></div>
       <div class="tl-date" data-i18n="about.timeline.t2.date">Marzo 2026</div>
-      <div class="tl-title" data-i18n="about.timeline.t2.title">Cuenta real XM en MT5 — Lanzamiento VIP</div>
-      <div class="tl-text" data-i18n="about.timeline.t2.text">Apertura de cuenta real, canal VIP en Telegram, Copy Trading activo, y dashboard p\u00fablico con resultados en tiempo real.</div>
+      <div class="tl-title" data-i18n="about.timeline.t2.title">Cuenta real MT5 — Lanzamiento VIP</div>
+      <div class="tl-text" data-i18n="about.timeline.t2.text">Apertura de cuenta real, canal VIP en Telegram, y dashboard p\u00fablico con resultados en tiempo real.</div>
     </div>
     <div class="tl-item">
       <div class="tl-dot"></div>
@@ -3274,10 +3112,9 @@ a{{color:var(--green);text-decoration:none}}
   <div class="about-cta">
     <div style="font-size:2.5rem;margin-bottom:12px">&#128640;</div>
     <h2 data-i18n="about.cta.title">&#218;nete a BuySell365 Pro</h2>
-    <p data-i18n="about.cta.subtitle">Accede al Copy Trading o a las se\u00f1ales VIP. Sin contratos, cancela cuando quieras.</p>
+    <p data-i18n="about.cta.subtitle">Accede a las se\u00f1ales del Canal VIP. Sin contratos, cancela cuando quieras.</p>
     <div class="btn-row">
-      <a href="https://social.tp-redirect.com/s/WRE0V7jm" target="_blank" rel="noopener" class="btn-p" data-i18n="about.cta.btn_copy">&#129302; Empezar Copy Trading</a>
-      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" rel="noopener" class="btn-s" data-i18n="about.cta.btn_vip">&#128081; Canal VIP Pro</a>
+      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" rel="noopener" class="btn-p" data-i18n="about.cta.btn_vip">&#128081; Canal VIP Pro</a>
       <a href="/dashboard" class="btn-s" data-i18n="about.cta.btn_results">&#128202; Ver Resultados</a>
     </div>
   </div>
@@ -3368,8 +3205,8 @@ def pagina_unete():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Se&ntilde;ales de Trading Gratis &mdash; Oro, Forex, NASDAQ | BuySell365 Pro</title>
-<meta name="description" content="Recibe se&ntilde;ales de trading gratis en Telegram. Oro (XAUUSD), EUR/USD, NASDAQ, US30. Entrada, TP y SL exactos. Copy Trading autom&aacute;tico disponible.">
-<meta name="keywords" content="se&ntilde;ales trading gratis, se&ntilde;ales forex telegram, se&ntilde;ales oro telegram, copy trading MT5, bot trading, se&ntilde;ales XAUUSD gratis">
+<meta name="description" content="Recibe se&ntilde;ales de trading gratis en Telegram. Oro (XAUUSD), EUR/USD, NASDAQ, US30. Entrada, TP y SL exactos.">
+<meta name="keywords" content="se&ntilde;ales trading gratis, se&ntilde;ales forex telegram, se&ntilde;ales oro telegram, bot trading, se&ntilde;ales XAUUSD gratis">
 <meta property="og:title" content="Se&ntilde;ales de Trading Gratis en Telegram">
 <meta property="og:description" content="Oro, Forex, NASDAQ en tiempo real. &Uacute;nete gratis y recibe se&ntilde;ales con Entrada, TP y SL exactos.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
@@ -3466,10 +3303,6 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 <div class="text"><h3>Alertas instant&aacute;neas</h3><p>Recibes cada se&ntilde;al directo en Telegram con Entrada, TP y SL exactos. Sin retrasos.</p></div>
 </div>
 <div class="benefit">
-<div class="icon">&#x1F504;</div>
-<div class="text"><h3>Copy Trading autom&aacute;tico</h3><p>Tu cuenta opera sola en MT5 con broker regulado (XM). Pagas solo si ganas.</p></div>
-</div>
-<div class="benefit">
 <div class="icon">&#x1F4CA;</div>
 <div class="text"><h3>Resultados transparentes</h3><p>Dashboard en vivo en buysell365.pro. Cada operaci&oacute;n verificada en MT5.</p></div>
 </div>
@@ -3481,8 +3314,6 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 <a href="https://t.me/BUYSELL_365_24_7" class="btn btn-green">&#x1F4F1; Unirme al Grupo Gratis</a>
 <br>
 <a href="https://t.me/BuySell365_bot?start=vip" class="btn btn-blue">&#x1F48E; Canal VIP &mdash; Se&ntilde;ales Premium</a>
-<br>
-<a href="https://social.tp-redirect.com/s/WRE0V7jm" class="btn btn-gold">&#x1F916; Activar Copy Trading</a>
 <p class="note">Sin tarjeta. Sin compromiso. Cancela cuando quieras.</p>
 </div>
 
