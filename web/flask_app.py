@@ -736,6 +736,109 @@ def index_web():
     activos = _store.get("assets_count", 6)
     is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
 
+    # ============================================================
+    #  SECCIÓN #en-vivo — Datos del dashboard integrados en landing
+    # ============================================================
+    _losses = total - wins
+    _profit_color_live = '#00e676' if _raw_profit >= 0 else '#ff3b30'
+    _wr_color_live = '#00d4aa' if wr >= 60 else ('#f0b90b' if wr >= 45 else '#ff3b30')
+
+    # Racha ganadora actual (desde la última pérdida)
+    _current_streak = 0
+    for _h in reversed(hist):
+        if float(_h.get('pips', 0)) > 0:
+            _current_streak += 1
+        else:
+            break
+
+    # Historial reciente — últimos 10 trades cerrados
+    _recent_trades_html = ""
+    for _rt in list(reversed(hist))[:10]:
+        _rt_fecha = _rt.get("fecha", "")
+        _rt_nombre = _rt.get("nombre", _rt.get("ticker", "N/A"))
+        _rt_tipo = _rt.get("tipo", "COMPRA")
+        _rt_pips = float(_rt.get("pips", 0))
+        _rt_profit = float(_rt.get("profit_mt5", 0) or 0)
+        _rt_is_win = _rt_pips > 0
+        _rt_color = "#00e676" if _rt_is_win else "#ff3b30"
+        _rt_tipo_en = "BUY" if _rt_tipo == "COMPRA" else "SELL"
+        _rt_sign = "+" if _rt_profit >= 0 else "-"
+        _recent_trades_html += (
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
+            f'<td style="padding:8px;color:#8b9fc4;font-size:12px">{_rt_fecha}</td>'
+            f'<td style="padding:8px;font-weight:700;color:#fff;font-size:13px">{_rt_nombre}</td>'
+            f'<td style="padding:8px;font-size:12px"><span style="color:{_rt_color}">&#9679;</span> {_rt_tipo_en}</td>'
+            f'<td style="padding:8px;font-family:monospace;font-size:12px;color:{_rt_color}">{_rt_pips:+.1f} pips</td>'
+            f'<td style="padding:8px;text-align:right;font-weight:700;font-size:13px;color:{_rt_color}">{_rt_sign}${abs(_rt_profit):,.2f}</td>'
+            f'</tr>'
+        )
+    if not _recent_trades_html:
+        _recent_trades_html = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#8b9fc4;font-size:12px">Sin historial de operaciones a\xfan</td></tr>'
+
+    # Operaciones activas en vivo
+    _active_ops_list = [op for op in _store.get("operaciones_activas", {}).values() if isinstance(op, dict) and op.get('mt5_ejecutado', False)]
+    _active_ops_html = ""
+    if _active_ops_list:
+        for _aop in _active_ops_list[:6]:
+            _aop_name = str(_aop.get('nombre', _aop.get('ticker', 'N/A')))
+            _aop_tipo = _aop.get('tipo', 'COMPRA')
+            _aop_entry = float(_aop.get('entrada', 0))
+            _aop_color = "#00e676" if _aop_tipo == "COMPRA" else "#ff3b30"
+            _aop_tipo_en = "BUY" if _aop_tipo == "COMPRA" else "SELL"
+            _active_ops_html += (
+                f'<div style="background:rgba(10,15,30,.6);border:1px solid {_aop_color}40;border-radius:10px;padding:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+                f'<span style="width:10px;height:10px;border-radius:50%;background:{_aop_color};animation:pulse 1.5s infinite;flex-shrink:0"></span>'
+                f'<strong style="color:#fff;font-size:14px">{_aop_name}</strong>'
+                f'<span style="color:{_aop_color};font-weight:700;font-size:12px">{_aop_tipo_en}</span>'
+                f'<span style="color:#8b9fc4;font-family:monospace;font-size:12px;margin-left:auto">{_aop_entry:,.4f}</span>'
+                f'</div>'
+            )
+    else:
+        _active_ops_html = (
+            '<div style="text-align:center;padding:24px;color:#8b9fc4">'
+            '<div style="font-size:14px;margin-bottom:6px">&#128308; Sin operaciones activas en este momento</div>'
+            '<div style="font-size:12px;opacity:.7">El bot opera de lunes a viernes en horario de mercado europeo</div>'
+            '</div>'
+        )
+
+    # Rendimiento por activo — reusar lógica de dashboard_visual
+    _asset_perf = {}
+    for _h in hist:
+        _nombre = _h.get('nombre', _h.get('ticker', 'N/A'))
+        if _nombre not in _asset_perf:
+            _asset_perf[_nombre] = {'wins': 0, 'total': 0, 'pips': 0.0}
+        _asset_perf[_nombre]['total'] += 1
+        if float(_h.get('pips', 0)) > 0:
+            _asset_perf[_nombre]['wins'] += 1
+        _asset_perf[_nombre]['pips'] += float(_h.get('pips', 0))
+    _asset_groups = [
+        ('ORO', '#f0b90b', ['ORO', 'GOLD', 'XAUUSD', 'XAU']),
+        ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100']),
+        ('S&amp;P 500', '#3b82f6', ['S&P', 'SP500', 'US500', 'ES']),
+        ('EUR/USD', '#a855f7', ['EUR/USD', 'EURUSD']),
+        ('USD/JPY', '#ef4444', ['USD/JPY', 'USDJPY']),
+        ('AUD/CAD', '#22c55e', ['AUD/CAD', 'AUDCAD']),
+    ]
+    _live_asset_cards = ""
+    for _display, _accent, _aliases in _asset_groups:
+        _st = {'wins': 0, 'total': 0, 'pips': 0.0}
+        for _k, _v in _asset_perf.items():
+            if any(_a.lower() in _k.lower() for _a in _aliases):
+                _st['wins'] += _v['wins']
+                _st['total'] += _v['total']
+                _st['pips'] += _v['pips']
+        _a_wr = round(_st['wins'] / _st['total'] * 100) if _st['total'] > 0 else 0
+        _a_pips = round(_st['pips'], 1)
+        _a_pc = "#00e676" if _a_pips >= 0 else "#ff3b30"
+        _live_asset_cards += (
+            f'<div style="background:rgba(10,15,30,.6);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center;min-width:120px;flex:1">'
+            f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;color:#fff;font-size:13px;margin-bottom:6px"><span style="width:8px;height:8px;border-radius:50%;background:{_accent}"></span>{_display}</div>'
+            f'<div style="font-size:1.5rem;font-weight:800;color:{_accent};text-shadow:0 0 20px {_accent}40">{_a_wr}%</div>'
+            f'<div style="font-size:10px;color:#8b9fc4;margin-top:2px">Win Rate &bull; {_st["total"]} ops</div>'
+            f'<div style="font-size:11px;color:{_a_pc};font-weight:700;margin-top:4px">{_a_pips:+.1f} pips</div>'
+            f'</div>'
+        )
+
     _html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1080,8 +1183,7 @@ if('serviceWorker' in navigator){{
     <a href="#features" data-i18n="nav.technology">Tecnolog\u00eda</a>
     <a href="#assets" data-i18n="nav.assets">Activos</a>
     <a href="#pricing" data-i18n="nav.pricing">Servicios</a>
-    <a href="/dashboard" data-i18n="nav.dashboard">Trading en Vivo</a>
-    <a href="/about" data-i18n="nav.about">Qui\u00e9nes Somos</a>
+    <a href="#en-vivo" data-i18n="nav.dashboard">En Vivo</a>
     <div class="lang-selector" id="langSelector" style="position:relative">
       <button class="lang-btn" onclick="toggleLangMenu()"><span id="currentFlag">\U0001f1ea\U0001f1f8</span><span style="font-size:12px;color:#00d4aa;font-weight:700">\u25bc</span></button>
       <div class="lang-menu" id="langMenu">
@@ -1100,10 +1202,9 @@ if('serviceWorker' in navigator){{
 <!-- MOBILE MENU OVERLAY -->
 <div class="mobile-overlay" id="mobileMenu">
   <a href="#features" onclick="closeMobileMenu()" data-i18n="nav.technology">Tecnolog\u00eda</a>
-  <a href="/about" onclick="closeMobileMenu()" data-i18n="nav.about">Qui\u00e9nes Somos</a>
   <a href="#assets" onclick="closeMobileMenu()" data-i18n="nav.assets">Activos</a>
   <a href="#pricing" onclick="closeMobileMenu()" data-i18n="nav.pricing">Precios</a>
-  <a href="/dashboard" data-i18n="nav.dashboard">Trading en Vivo</a>
+  <a href="#en-vivo" onclick="closeMobileMenu()" data-i18n="nav.dashboard">En Vivo</a>
   <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="background:linear-gradient(135deg,#00d4aa,#00b894);color:#0a0e17;font-weight:700">\U0001f4ac Telegram</a>
   <div class="mob-lang">
     <a onclick="setLang('es');closeMobileMenu()">\U0001f1ea\U0001f1f8</a>
@@ -1121,7 +1222,7 @@ if('serviceWorker' in navigator){{
     <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px"><span data-i18n="hero.btn_start">\U0001f680 Empezar Ahora</span></a>
-      <a href="/dashboard" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
+      <a href="#en-vivo" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>
       <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="btn btn-secondary">\U0001f4e2 <span data-i18n="hero.btn_telegram">Telegram</span></a>
     </div>
     <div class="stats-bar" id="statsBar">
@@ -1137,7 +1238,7 @@ if('serviceWorker' in navigator){{
         <div style="width:10px;height:10px;border-radius:50%;background:#ff5f57"></div>
         <div style="width:10px;height:10px;border-radius:50%;background:#febc2e"></div>
         <div style="width:10px;height:10px;border-radius:50%;background:#28c840"></div>
-        <span style="margin-left:8px;font-size:11px;color:#8b9fc4;font-family:monospace">buysell365.pro/dashboard</span>
+        <span style="margin-left:8px;font-size:11px;color:#8b9fc4;font-family:monospace">buysell365.pro</span>
         <span style="margin-left:auto;font-size:11px;color:#00ffc8">&#9679; BOT ACTIVO</span>
       </div>
       <div class="hero-mockup-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
@@ -1167,8 +1268,101 @@ if('serviceWorker' in navigator){{
         {_hero_rows}
       </table>
       <div style="text-align:center;margin-top:12px">
-        <a href="/dashboard" style="font-size:11px;color:#00ffc8;text-decoration:none">&#128202; Ver dashboard completo en vivo &rarr;</a>
+        <a href="#en-vivo" style="font-size:11px;color:#00ffc8;text-decoration:none">&#128202; Ver rendimiento completo en vivo &rarr;</a>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- EN VIVO — Sección integrada con datos del dashboard -->
+<section class="fade-in" id="en-vivo" style="padding:60px 20px;background:linear-gradient(180deg,transparent,rgba(0,212,170,0.03),transparent)">
+  <div class="section-title" style="margin-bottom:32px">
+    <h2 style="font-size:clamp(1.8rem,4.5vw,2.6rem)">
+      <span style="display:inline-flex;align-items:center;gap:10px">
+        <span style="width:12px;height:12px;border-radius:50%;background:{'#00e676' if is_alive else '#8b9fc4'};box-shadow:0 0 14px {'#00e676' if is_alive else '#8b9fc4'};animation:pulse 1.5s infinite"></span>
+        <span data-i18n="live.title" style="background:linear-gradient(135deg,#fff 20%,#00ffcc 60%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Rendimiento en Vivo</span>
+      </span>
+    </h2>
+    <p style="color:#a0aec0;font-size:1rem" data-i18n="live.subtitle">Resultados reales de la cuenta MT5 &bull; Actualizaci&oacute;n autom&aacute;tica cada 30s</p>
+  </div>
+
+  <div style="max-width:1100px;margin:0 auto">
+
+    <!-- STAT CARDS -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px">
+      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(0,212,170,.25);border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.signals">Se&ntilde;ales Totales</div>
+        <div style="font-size:2rem;font-weight:900;color:#00d4aa">{total}</div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px">{wins}W &bull; {_losses}L</div>
+      </div>
+      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid {_wr_color_live}50;border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.winrate">Win Rate</div>
+        <div style="font-size:2rem;font-weight:900;color:{_wr_color_live}">{wr}%</div>
+        <div style="margin-top:6px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden"><div style="width:{wr}%;height:100%;background:{_wr_color_live}"></div></div>
+      </div>
+      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid {_profit_color_live}50;border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.profit">Beneficio Real MT5</div>
+        <div style="font-size:2rem;font-weight:900;color:{_profit_color_live}">{profit_str}</div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px">{pips:+.1f} pips netos</div>
+      </div>
+      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(251,191,36,.25);border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
+        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.streak">Racha Ganadora Actual</div>
+        <div style="font-size:2rem;font-weight:900;color:#fbbf24">{_current_streak}</div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px" data-i18n="live.streak_sub">Operaciones ganadoras</div>
+      </div>
+    </div>
+
+    <!-- ACTIVE OPS + RECENT HISTORY -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-bottom:28px">
+      <!-- ACTIVE OPERATIONS -->
+      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:14px;margin-bottom:14px">
+          <span style="font-size:16px">&#9889;</span>
+          <span data-i18n="live.active_title">Operaciones Activas</span>
+          <span style="margin-left:auto;font-size:11px;color:#00d4aa;font-weight:600">{n_ops} <span data-i18n="live.open">abierta(s)</span></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          {_active_ops_html}
+        </div>
+      </div>
+      <!-- RECENT TRADES -->
+      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:14px;margin-bottom:14px">
+          <span style="font-size:16px">&#128200;</span>
+          <span data-i18n="live.history_title">Historial Reciente</span>
+          <span style="margin-left:auto;font-size:11px;color:#8b9fc4">&Uacute;ltimas 10</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="color:#8b9fc4;border-bottom:1px solid rgba(255,255,255,.08)">
+                <td style="padding:8px;font-weight:600" data-i18n="live.col_date">Fecha</td>
+                <td style="padding:8px;font-weight:600" data-i18n="live.col_asset">Activo</td>
+                <td style="padding:8px;font-weight:600" data-i18n="live.col_type">Tipo</td>
+                <td style="padding:8px;font-weight:600" data-i18n="live.col_pips">Pips</td>
+                <td style="padding:8px;text-align:right;font-weight:600" data-i18n="live.col_pnl">P&amp;L</td>
+              </tr>
+            </thead>
+            <tbody>{_recent_trades_html}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ASSET PERFORMANCE -->
+    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:14px;margin-bottom:14px">
+        <span style="font-size:16px">&#128178;</span>
+        <span data-i18n="live.asset_perf">Rendimiento por Activo</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        {_live_asset_cards}
+      </div>
+    </div>
+
+    <!-- CTA TELEGRAM -->
+    <div style="text-align:center;margin-top:24px">
+      <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#0088cc,#00a3e0);color:#fff;border-radius:30px;font-weight:700;text-decoration:none;box-shadow:0 4px 20px rgba(0,136,204,.3);transition:all .3s" data-i18n="live.cta_telegram">&#128172; Recibe las se&ntilde;ales en Telegram &rarr;</a>
     </div>
   </div>
 </section>
@@ -1482,7 +1676,7 @@ if('serviceWorker' in navigator){{
             <div style="margin-top:8px;font-size:13px">&#128205; <strong>Entrada:</strong> 110.50</div>
             <div style="color:#00e676;margin-top:2px;font-size:13px">&#127919; <strong>TP:</strong> 106.50</div>
             <div style="color:#ff6b35;margin-top:2px;font-size:13px">&#128737; <strong>SL:</strong> 112.50</div>
-            <div style="margin-top:8px;font-size:12px;color:#7a90a8">Rendimiento en vivo &bull; <a href="/dashboard" style="color:#00d4aa;text-decoration:none">Ver Dashboard &rarr;</a></div>
+            <div style="margin-top:8px;font-size:12px;color:#7a90a8">Rendimiento en vivo &bull; <a href="#en-vivo" style="color:#00d4aa;text-decoration:none">Ver Rendimiento &rarr;</a></div>
         </div>
     </div>
     <p style="color:#8a9ab5;font-size:13px;margin-bottom:12px" data-i18n="signal.receive">Recibe alertas como esta directamente en tu Telegram</p>
@@ -1526,8 +1720,7 @@ if('serviceWorker' in navigator){{
 <!-- FOOTER -->
 <footer class="footer">
   <div class="footer-links">
-    <a href="/dashboard">\U0001f4ca <span data-i18n="footer.dashboard">Trading en Vivo</span></a>
-    <a href="/about">\U0001f465 <span data-i18n="footer.about">Qui\u00e9nes Somos</span></a>
+    <a href="#en-vivo">\U0001f4ca <span data-i18n="footer.dashboard">En Vivo</span></a>
     <a href="/terminos">\U0001f4dc <span data-i18n="footer.terms">T\u00e9rminos</span></a>
     <a href="/privacidad">\U0001f512 <span data-i18n="footer.privacy">Privacidad</span></a>
     <a href="https://t.me/BUYSELL_365_24_7" target="_blank">\U0001f4e2 <span data-i18n="footer.telegram">Telegram</span></a>
@@ -1818,1370 +2011,25 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){{
     return _resp
 
 # ============================================================
-#  DASHBOARD
+#  DASHBOARD (legacy) — redirige a la seccion #en-vivo en /
 # ============================================================
 @app.route("/dashboard", methods=["GET"])
 def dashboard_visual():
-    """Dashboard served from synced data — full version matching bot.py."""
-    _track_visitor()
-    with _lock:
-        hist = list(_store.get("historial_operaciones", []))
-        ops = dict(_store.get("operaciones_activas", {}))
+    """Ruta legacy — el dashboard ahora vive como seccion #en-vivo en /.
+    Mantenemos la ruta con redirect 301 para preservar SEO y bookmarks.
+    """
+    return redirect("/#en-vivo", code=301)
 
-    wins = sum(1 for h in hist if h.get('pips', 0) > 0)
-    losses_count = sum(1 for h in hist if h.get('pips', 0) <= 0)
-    total = wins + losses_count
-    winrate = round(wins / total * 100, 1) if total > 0 else 0
-    pips_total = round(sum(h.get('pips', 0) for h in hist), 1)
-    avg_win = round(sum(h.get('pips', 0) for h in hist if h.get('pips', 0) > 0) / max(wins, 1), 1)
-    avg_loss = round(sum(abs(h.get('pips', 0)) for h in hist if h.get('pips', 0) <= 0) / max(losses_count, 1), 1)
-    rr = round(avg_win / avg_loss, 2) if avg_loss > 0 else 0
-    now = _ahora()
-    now_str = now.strftime("%H:%M:%S CET")
-    hoy_str = now.strftime("%d/%m/%Y")
-    senales_hoy = sum(1 for h in hist if h.get('fecha', '') == hoy_str)
-    pips_color = "#00e676" if pips_total >= 0 else "#ff3b30"
-    is_alive = (time.time() - _store.get("ultimo_sync", 0)) < 120
-    wr_color = '#00d4aa' if winrate >= 60 else ('#f0b90b' if winrate >= 45 else '#ff3b30')
-
-    # FIX 2026-03-19: Calcular drawdown máximo y racha de pérdidas
-    _cumul = 0.0
-    _peak = 0.0
-    _max_dd = 0.0
-    _loss_streak = 0
-    _max_loss_streak = 0
-    for h in hist:
-        _cumul += h.get('pips', 0)
-        if _cumul > _peak:
-            _peak = _cumul
-        dd = _peak - _cumul
-        if dd > _max_dd:
-            _max_dd = dd
-        if h.get('pips', 0) <= 0:
-            _loss_streak += 1
-            if _loss_streak > _max_loss_streak:
-                _max_loss_streak = _loss_streak
-        else:
-            _loss_streak = 0
-    max_drawdown = round(_max_dd, 1)
-    dd_color = '#00d4aa' if max_drawdown < 50 else ('#f0b90b' if max_drawdown < 150 else '#ff3b30')
-
-    # P&L en dólares (de profit_mt5 si existe)
-    total_profit = round(sum(float(h.get('profit_mt5', 0) or 0) for h in hist), 2)
-    profit_color = '#00e676' if total_profit >= 0 else '#ff3b30'
-    profit_str = f"+${total_profit:,.2f}" if total_profit >= 0 else f"-${abs(total_profit):,.2f}"
-    # Profit Factor con dólares (más preciso que pips)
-    _gross_profit = sum(float(h.get('profit_mt5', 0) or 0) for h in hist if float(h.get('profit_mt5', 0) or 0) > 0)
-    _gross_loss = abs(sum(float(h.get('profit_mt5', 0) or 0) for h in hist if float(h.get('profit_mt5', 0) or 0) < 0))
-    profit_factor_usd = round(_gross_profit / _gross_loss, 2) if _gross_loss > 0 else round(sum(h.get('pips',0) for h in hist if h.get('pips',0)>0) / max(abs(sum(h.get('pips',0) for h in hist if h.get('pips',0)<=0)), 0.1), 2)
-
-    # --- Asset performance ---
-    asset_perf = {}
-    for h in hist:
-        nombre = h.get('nombre', h.get('ticker', 'N/A'))
-        if nombre not in asset_perf:
-            asset_perf[nombre] = {'wins': 0, 'losses': 0, 'pips': 0.0, 'total': 0}
-        asset_perf[nombre]['total'] += 1
-        if h.get('pips', 0) > 0:
-            asset_perf[nombre]['wins'] += 1
-        else:
-            asset_perf[nombre]['losses'] += 1
-        asset_perf[nombre]['pips'] += h.get('pips', 0)
-
-    _all_assets = [
-        ('ORO', '#f0b90b', ['ORO', 'GOLD', 'XAUUSD', 'XAU']),
-        ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100', 'US100Cash']),
-        ('S&amp;P 500', '#3b82f6', ['S&P', 'SP500', 'US500', 'ES', 'US500Cash']),
-        ('EUR/USD', '#a855f7', ['EUR/USD', 'EURUSD', 'EUR']),
-        ('USD/JPY', '#ef4444', ['USD/JPY', 'USDJPY', 'JPY']),
-        ('AUD/CAD', '#22c55e', ['AUD/CAD', 'AUDCAD']),
-        ('EUR/CHF', '#06b6d4', ['EUR/CHF', 'EURCHF']),
-        ('USD/CAD', '#f97316', ['USD/CAD', 'USDCAD']),
-    ]
-    activos_en_curso = [str(op.get('nombre', op.get('ticker', ''))) for op in ops.values() if isinstance(op, dict)]
-    asset_cards_html = ""
-    for display_name, accent, aliases in _all_assets:
-        st = {'wins': 0, 'losses': 0, 'pips': 0.0, 'total': 0}
-        for key, val in asset_perf.items():
-            if any(a.lower() in key.lower() for a in aliases):
-                st['wins'] += val['wins']
-                st['losses'] += val['losses']
-                st['pips'] += val['pips']
-                st['total'] += val['total']
-        wr = round(st['wins'] / st['total'] * 100) if st['total'] > 0 else 0
-        pips_a = round(st['pips'], 1)
-        pips_c = "#00e676" if pips_a >= 0 else "#ff3b30"
-        is_active = any(any(a.lower() in ac.lower() for a in aliases) for ac in activos_en_curso)
-        active_cls = " asset-live" if is_active else ""
-        active_dot = '<span class="mini-pulse"></span>' if is_active else ''
-        asset_cards_html += f'''<div class="asset-card{active_cls}">
-                <div class="asset-hdr"><span class="asset-dot" style="background:{accent}"></span>{display_name}{active_dot}</div>
-                <div class="asset-wr">{wr}%</div>
-                <div class="wr-bar-bg"><div class="wr-bar-fill" style="width:{wr}%;background:{accent}"></div></div>
-                <div class="asset-meta"><span>{st['total']} ops</span><span style="color:{pips_c}">{pips_a:+.1f}</span></div>
-            </div>'''
-
-    _dash_html = f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-<!-- Cookie Consent + Conditional Analytics -->
-<script>
-(function(){{
-  var c=localStorage.getItem('bs365_consent');
-  function _loadGA(){{
-    if(window._ga_loaded) return; window._ga_loaded=true;
-    var s=document.createElement('script'); s.async=true;
-    s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';
-    document.head.appendChild(s);
-    window.dataLayer=window.dataLayer||[];
-    window.gtag=function(){{dataLayer.push(arguments);}};
-    gtag('js',new Date()); gtag('config','G-L514BL7E83'); gtag('config','AW-18090606337');
-  }}
-  if(c==='accepted') _loadGA();
-  window._acceptCookies=function(){{
-    localStorage.setItem('bs365_consent','accepted');
-    var b=document.getElementById('bs365-cb'); if(b) b.remove(); _loadGA();
-  }};
-  window._declineCookies=function(){{
-    localStorage.setItem('bs365_consent','declined');
-    var b=document.getElementById('bs365-cb'); if(b) b.remove();
-  }};
-  if(!c) document.addEventListener('DOMContentLoaded',function(){{
-    var el=document.getElementById('bs365-cb'); if(el) el.style.display='flex';
-  }});
-}})();
-</script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BuySell365 Pro | Rendimiento en Vivo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<script defer data-domain="buysell365.pro" src="https://plausible.io/js/script.js"></script>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-:root{{--bg:#080b0f;--panel:#111820;--panel2:#192230;--border:#1e2a3a;--primary:#00d4aa;--primary-dim:rgba(0,212,170,.12);--gold:#f0b90b;--buy:#00e676;--sell:#ff3b30;--text:#e2e8f0;--muted:#5a6a7a;--font:'Inter',system-ui,-apple-system,sans-serif}}
-body{{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}}
-#matrix-canvas{{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.12}}
-body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;background:radial-gradient(ellipse at 50% 0%,rgba(0,212,170,.08) 0%,transparent 70%);pointer-events:none;z-index:0}}
-.wrap{{max-width:1280px;margin:0 auto;padding:20px;position:relative;z-index:1}}
-.hdr{{display:flex;justify-content:space-between;align-items:center;padding:18px 0 22px;border-bottom:1px solid var(--border);margin-bottom:28px}}
-.hdr-left{{display:flex;align-items:center;gap:14px}}
-.hdr-logo{{width:72px;height:72px;border-radius:14px;object-fit:cover;border:1px solid rgba(0,212,170,.2);box-shadow:0 4px 16px rgba(0,212,170,.15)}}
-.brand{{font-size:24px;font-weight:800;letter-spacing:-.5px;color:#fff}}
-.brand small{{display:block;font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.5px;margin-top:2px}}
-.live-badge{{display:flex;align-items:center;gap:6px;background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;color:var(--primary)}}
-.pulse{{width:8px;height:8px;border-radius:50%;background:var(--primary);animation:pulse 2s infinite}}
-@keyframes pulse{{0%,100%{{opacity:1;box-shadow:0 0 0 0 rgba(0,212,170,.5)}}50%{{opacity:.7;box-shadow:0 0 0 6px rgba(0,212,170,0)}}}}
-.stats-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}}
-.stat-card{{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}}
-.stat-card::after{{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}}
-.stat-card.accent-green::after{{background:linear-gradient(90deg,var(--primary),transparent)}}
-.stat-card.accent-gold::after{{background:linear-gradient(90deg,var(--gold),transparent)}}
-.stat-card.accent-blue::after{{background:linear-gradient(90deg,#3b82f6,transparent)}}
-.stat-card.accent-purple::after{{background:linear-gradient(90deg,#a855f7,transparent)}}
-.stat-label{{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}}
-.stat-value{{font-size:32px;font-weight:800;letter-spacing:-1px}}
-.stat-sub{{font-size:11px;color:var(--muted);margin-top:4px}}
-.wr-bar-bg{{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden}}
-.wr-bar-fill{{height:100%;border-radius:3px;transition:width .5s ease}}
-.two-col{{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}}
-.card{{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:22px;position:relative}}
-.card-title{{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px;display:flex;align-items:center;gap:8px}}
-.card-title i{{font-style:normal}}
-.chart-area{{display:flex;align-items:flex-end;gap:4px;height:100px;padding:10px 0}}
-.perf-bar{{flex:1;min-width:6px;border-radius:3px 3px 0 0;transition:height .3s ease;opacity:.85}}
-.perf-bar:hover{{opacity:1;filter:brightness(1.2)}}
-.mini-pulse{{width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block;margin-left:6px;animation:pulse 2s infinite;vertical-align:middle}}
-.asset-grid{{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}}
-.asset-card{{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;transition:border-color .2s,transform .2s}}
-.asset-card:hover{{border-color:rgba(0,212,170,.3);transform:translateY(-2px)}}
-.asset-card.asset-live{{border-color:rgba(0,212,170,.4);box-shadow:0 0 12px rgba(0,212,170,.1)}}
-.asset-hdr{{font-size:12px;font-weight:700;color:#fff;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:6px}}
-.asset-dot{{width:8px;height:8px;border-radius:50%;display:inline-block}}
-.asset-wr{{font-size:24px;font-weight:900;color:var(--primary);letter-spacing:-1px;margin:4px 0}}
-.asset-meta{{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:8px}}
-.promo{{background:linear-gradient(135deg,#0d1a2a 0%,#112030 50%,#0a1520 100%);border:1px solid rgba(0,212,170,.15);border-radius:18px;padding:32px;text-align:center;margin-top:24px;position:relative;overflow:hidden}}
-.promo::before{{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(0,212,170,.04) 0%,transparent 60%);pointer-events:none}}
-.promo h2{{font-size:20px;font-weight:800;margin-bottom:6px;position:relative}}
-.promo p{{color:var(--muted);font-size:13px;margin-bottom:20px;position:relative}}
-.promo-features{{display:flex;justify-content:center;gap:24px;margin-bottom:24px;flex-wrap:wrap;position:relative}}
-.promo-feat{{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}}
-.promo-feat i{{font-style:normal;color:var(--primary)}}
-.cta-btn{{display:inline-flex;align-items:center;gap:8px;padding:14px 36px;background:linear-gradient(135deg,var(--primary),#00a080);color:#000;font-weight:800;font-size:15px;border-radius:12px;text-decoration:none;transition:all .2s;box-shadow:0 4px 24px rgba(0,212,170,.3);position:relative}}
-.cta-btn:hover{{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,212,170,.4)}}
-.active-alert{{background:linear-gradient(135deg,rgba(0,212,170,.08),rgba(0,212,170,.02));border:1px solid rgba(0,212,170,.25);border-radius:14px;padding:16px 20px;margin-bottom:24px;animation:alertGlow 3s infinite}}
-@keyframes alertGlow{{0%,100%{{box-shadow:0 0 8px rgba(0,212,170,.1)}}50%{{box-shadow:0 0 20px rgba(0,212,170,.2)}}}}
-.alert-header{{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:14px;font-weight:700;color:var(--primary)}}
-.alert-op{{display:flex;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid rgba(30,42,58,.3);flex-wrap:wrap}}
-.alert-op:last-child{{border-bottom:none}}
-.alert-name{{font-weight:700;min-width:120px}}
-.alert-type{{padding:2px 10px;border-radius:6px;font-size:12px;font-weight:700}}
-.alert-type.buy{{background:rgba(0,230,118,.15);color:#00e676}}
-.alert-type.sell{{background:rgba(255,59,48,.15);color:#ff3b30}}
-.progress-bar-wrap{{flex:1;min-width:200px;display:flex;align-items:center;gap:10px}}
-.progress-track{{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;position:relative}}
-.progress-fill{{height:100%;border-radius:4px;transition:width .5s ease;background:linear-gradient(90deg,var(--primary),#00e676)}}
-.progress-marks{{position:absolute;top:0;height:100%;display:flex;width:100%}}
-.progress-mark{{position:absolute;top:-4px;width:2px;height:16px;background:rgba(255,255,255,.3)}}
-.progress-pct{{font-size:13px;font-weight:700;color:var(--primary);min-width:45px;text-align:right}}
-.tp-badges{{display:flex;gap:4px}}
-.tp-badge{{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700}}
-.tp-badge.hit{{background:rgba(0,230,118,.2);color:#00e676}}
-.tp-badge.pending{{background:var(--panel2);color:var(--muted)}}
-.filter-bar{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center}}
-.filter-btn{{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid var(--border);background:var(--panel2);color:var(--muted)}}
-.filter-btn:hover{{border-color:rgba(0,212,170,.3);color:var(--text)}}
-.filter-btn.active{{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}}
-.pagination{{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:16px;flex-wrap:wrap}}
-.page-btn{{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.85rem;transition:all .2s;font-family:inherit}}
-.page-btn:hover:not(:disabled){{border-color:var(--primary);color:var(--primary)}}
-.page-btn.active{{background:var(--primary);color:#000;border-color:var(--primary);font-weight:700}}
-.page-btn:disabled{{opacity:.4;cursor:not-allowed}}
-.streak-banner{{display:flex;align-items:center;gap:16px;padding:14px 20px;background:linear-gradient(135deg,rgba(0,212,170,.06),transparent);border:1px solid rgba(0,212,170,.15);border-radius:12px;margin-bottom:14px}}
-.streak-number{{font-size:36px;font-weight:900;color:var(--primary);letter-spacing:-2px;line-height:1}}
-.streak-info{{flex:1}}
-.streak-label{{font-size:13px;font-weight:700;color:var(--text)}}
-.streak-sub{{font-size:11px;color:var(--muted)}}
-.streak-fire{{color:#ff6b35;font-size:24px}}
-.cumul-chart-wrap{{position:relative;height:160px;margin:14px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel2)}}
-.cumul-chart-wrap svg{{width:100%;height:100%}}
-.wr-period-row{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}}
-.wr-period-card{{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;position:relative;overflow:hidden}}
-.wr-period-card::after{{content:'';position:absolute;top:0;left:0;right:0;height:2px}}
-.wr-period-label{{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}}
-.wr-period-val{{font-size:28px;font-weight:900;letter-spacing:-1px}}
-.wr-period-detail{{font-size:11px;color:var(--muted);margin-top:4px}}
-.wr-period-bar{{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}}
-.wr-period-fill{{height:100%;border-radius:2px;transition:width .5s}}
-.footer{{text-align:center;padding:24px 0 12px;margin-top:20px;border-top:1px solid var(--border)}}
-.footer p{{font-size:11px;color:var(--muted)}}
-.footer a{{color:var(--primary);text-decoration:none}}
-@media(max-width:1024px){{
-    .asset-grid{{grid-template-columns:repeat(4,1fr)}}
-}}
-@media(max-width:768px){{
-    .wrap{{padding:14px}}
-    .stats-row{{grid-template-columns:repeat(2,1fr)}}
-    .two-col{{grid-template-columns:1fr}}
-    .asset-grid{{grid-template-columns:repeat(3,1fr)}}
-    .hdr{{flex-direction:column;gap:10px;text-align:center;padding:14px 0 16px}}
-    .hdr-left a{{justify-content:center}}
-    .hdr > div:last-child{{flex-wrap:wrap;justify-content:center;gap:8px}}
-    .live-badge{{font-size:11px;padding:5px 10px}}
-    .promo-features{{flex-direction:column;align-items:center;gap:8px}}
-    .stat-value{{font-size:24px}}
-    .wr-period-row{{grid-template-columns:repeat(3,1fr);gap:8px}}
-    .wr-period-val{{font-size:22px}}
-    .streak-banner{{gap:10px;padding:12px 14px}}
-    .streak-number{{font-size:28px}}
-    .filter-bar{{gap:4px}}
-    .filter-btn{{padding:4px 10px;font-size:11px}}
-    .date-filter-btn{{padding:4px 10px;font-size:11px}}
-    .card{{padding:16px}}
-    #winning-trades-container table{{min-width:560px}}
-}}
-@media(max-width:480px){{
-    .wrap{{padding:10px}}
-    .stats-row{{grid-template-columns:1fr 1fr}}
-    .stat-card{{padding:14px}}
-    .stat-value{{font-size:20px}}
-    .asset-grid{{grid-template-columns:repeat(2,1fr)}}
-    .card{{padding:12px}}
-    .hdr-logo{{width:44px;height:44px}}
-    .brand{{font-size:18px}}
-    .wr-period-row{{grid-template-columns:1fr;gap:8px}}
-    .wr-period-val{{font-size:28px}}
-    .cumul-chart-wrap{{height:130px}}
-    .promo{{padding:20px 14px}}
-    .promo h2{{font-size:16px}}
-    .promo p{{font-size:12px}}
-    .streak-number{{font-size:24px}}
-    .bell-btn{{padding:4px 8px;font-size:16px}}
-}}
-.date-filter-bar{{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}}
-.date-filter-btn{{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid var(--border);background:var(--panel2);color:var(--muted)}}
-.date-filter-btn:hover{{border-color:rgba(240,185,11,.3);color:var(--gold)}}
-.date-filter-btn.active{{background:rgba(240,185,11,.12);border-color:var(--gold);color:var(--gold)}}
-.export-csv-btn{{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.08);color:#3b82f6;margin-left:auto}}
-.export-csv-btn:hover{{background:rgba(59,130,246,.18);border-color:#3b82f6}}
-.bell-btn{{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:18px;line-height:1;transition:all .2s;position:relative}}
-.bell-btn:hover{{border-color:rgba(240,185,11,.4);background:rgba(240,185,11,.08)}}
-.bell-btn.notif-on{{border-color:rgba(240,185,11,.6);background:rgba(240,185,11,.12)}}
-.bell-dot{{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ff3b30;border:1px solid var(--bg);display:none}}
-.bell-dot.show{{display:block}}
-</style>
-<!-- Auto-reload removido: el polling JS (setInterval) ya actualiza los datos sin recargar -->
-</head>
-<body>
-<canvas id="matrix-canvas"></canvas>
-<div class="wrap">
-
-    <!-- HEADER -->
-    <div class="hdr">
-        <div class="hdr-left">
-            <a href="/" style="display:flex;align-items:center;text-decoration:none;color:inherit;gap:14px">
-            <img src="/img/bull_bear.png" alt="BuySell365 Pro" class="hdr-logo" loading="lazy">
-            <div class="brand" style="color:#fff">BuySell365 <span style="color:var(--primary)">Pro</span><small data-i18n="dash.tagline">TRADING CON INTELIGENCIA ARTIFICIAL</small></div>
-            </a>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px">
-            <button class="bell-btn" id="bellBtn" onclick="window._requestNotifPermission()" title="Activar notificaciones" data-i18n="dash.notifications_btn">&#128276;<span class="bell-dot" id="bellDot"></span></button>
-            <div class="lang-selector" id="langSelector" style="position:relative">
-                <button class="lang-btn" onclick="toggleLangMenu()" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:18px;line-height:1"><span id="currentFlag">\U0001f1ea\U0001f1f8</span></button>
-                <div class="lang-menu" id="langMenu" style="display:none;position:absolute;top:110%;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;z-index:999;min-width:150px;box-shadow:0 8px 32px rgba(0,0,0,.4)">
-                    <a onclick="setLang('es')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1ea\U0001f1f8 Espa\u00f1ol</a>
-                    <a onclick="setLang('en')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1fa\U0001f1f8 English</a>
-                    <a onclick="setLang('pt')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1e7\U0001f1f7 Portugu\u00eas</a>
-                    <a onclick="setLang('fr')" style="display:block;padding:10px 16px;cursor:pointer;color:var(--text);text-decoration:none;font-size:14px;transition:background .2s">\U0001f1eb\U0001f1f7 Fran\u00e7ais</a>
-                </div>
-            </div>
-            <div class="live-badge"><div class="pulse"></div><span data-i18n="dash.live">{'EN VIVO' if is_alive else 'OFFLINE'}</span> &mdash; {now_str}</div>
-        </div>
-    </div>
-
-    <!-- ACTIVE OPERATIONS -->
-    <div id="active-alerts-container" style="margin-bottom:24px"></div>
-
-    <!-- ALL TRADES HISTORY — FIX 2026-03-19: Transparencia total -->
-    <div class="card" style="margin-bottom:24px">
-        <div class="card-title"><i>&#128200;</i> <span data-i18n="dash.history_title">Historial Completo de Operaciones</span></div>
-        <div id="streak-banner-container"></div>
-        <div class="card-title" style="margin-top:8px"><i>&#128200;</i> <span data-i18n="dash.cumulative_chart">Rendimiento Acumulado</span></div>
-        <div id="cumulative-chart-container" class="cumul-chart-wrap">
-            <p style="color:var(--muted);text-align:center;padding:40px;font-size:12px" data-i18n="dash.loading_chart">Cargando gr&aacute;fico...</p>
-        </div>
-        <div id="date-filter-bar" class="date-filter-bar" style="margin-top:14px">
-            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.5px" data-i18n="dash.period">Periodo:</span>
-            <button class="date-filter-btn" data-period="7d" onclick="window._filterByDate('7d')" data-i18n="dash.7d">7 d&iacute;as</button>
-            <button class="date-filter-btn" data-period="30d" onclick="window._filterByDate('30d')" data-i18n="dash.30d">30 d&iacute;as</button>
-            <button class="date-filter-btn" data-period="90d" onclick="window._filterByDate('90d')" data-i18n="dash.90d">90 d&iacute;as</button>
-            <button class="date-filter-btn active" data-period="all" onclick="window._filterByDate('all')" data-i18n="dash.all">Todo</button>
-        </div>
-        <div id="trade-filter-bar" class="filter-bar" style="margin-top:6px">
-            <span style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.5px" data-i18n="dash.filter_label">Filtrar:</span>
-        </div>
-        <div id="winning-trades-container" style="overflow-x:auto">
-            <p style="color:var(--muted);text-align:center;padding:20px" data-i18n="dash.loading_history">Cargando historial...</p>
-        </div>
-    </div>
-
-    <!-- WIN RATE BY PERIOD -->
-    <div class="wr-period-row" id="wr-period-container">
-        <div class="wr-period-card"><div class="wr-period-label" data-i18n="dash.today_label">Hoy</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
-        <div class="wr-period-card"><div class="wr-period-label" data-i18n="dash.this_week">Esta Semana</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
-        <div class="wr-period-card"><div class="wr-period-label" data-i18n="dash.this_month">Este Mes</div><div class="wr-period-val" style="color:var(--muted)">-</div></div>
-    </div>
-
-    <!-- STAT CARDS -->
-    <div class="stats-row">
-        <div class="stat-card accent-green">
-            <div class="stat-label">&#127942; <span data-i18n="dash.total_signals">Se&ntilde;ales Totales</span></div>
-            <div class="stat-value" style="color:var(--primary)">{total}</div>
-            <div class="stat-sub">{senales_hoy} <span data-i18n="dash.today">hoy</span> &mdash; {wins}W / {losses_count}L</div>
-        </div>
-        <div class="stat-card accent-gold">
-            <div class="stat-label">&#128200; <span data-i18n="dash.winrate">Tasa de Acierto</span></div>
-            <div class="stat-value" style="color:{wr_color}">{winrate}%</div>
-            <div class="wr-bar-bg" style="margin-top:8px"><div class="wr-bar-fill" style="width:{winrate}%;background:{wr_color}"></div></div>
-            <div class="stat-sub" data-i18n="dash.winrate_sub">Porcentaje de acierto global</div>
-        </div>
-        <div class="stat-card accent-blue">
-            <div class="stat-label">&#128176; <span data-i18n="dash.real_profit">Beneficio Real MT5</span></div>
-            <div class="stat-value" style="color:{profit_color}">{profit_str}</div>
-            <div class="stat-sub"><span data-i18n="dash.net_pips_label">Pips netos:</span> {pips_total:+.1f} &bull; <span data-i18n="dash.avg_win_label">Avg ganancia:</span> {avg_win}</div>
-        </div>
-        <div class="stat-card accent-purple">
-            <div class="stat-label">&#9878; <span data-i18n="dash.rr">Risk : Reward</span></div>
-            <div class="stat-value" style="color:var(--primary)">{rr}:1</div>
-            <div class="stat-sub" data-i18n="dash.rr_sub">Relaci&oacute;n ganancia / p&eacute;rdida</div>
-        </div>
-    </div>
-    <!-- FIX 2026-03-19: Drawdown y racha de pérdidas — transparencia -->
-    <div class="stats-row" style="margin-top:0;margin-bottom:24px">
-        <div class="stat-card" style="border-left:3px solid {dd_color}">
-            <div class="stat-label">&#128200; <span data-i18n="dash.max_drawdown">Max Drawdown</span></div>
-            <div class="stat-value" style="color:{dd_color}">{max_drawdown} pips</div>
-            <div class="stat-sub" data-i18n="dash.max_drawdown_sub">Ca&iacute;da m&aacute;xima desde el pico</div>
-        </div>
-        <div class="stat-card" style="border-left:3px solid #ff3b30">
-            <div class="stat-label">&#128308; <span data-i18n="dash.max_loss_streak">Racha P&eacute;rdidas M&aacute;x</span></div>
-            <div class="stat-value" style="color:#ff3b30">{_max_loss_streak}</div>
-            <div class="stat-sub" data-i18n="dash.max_loss_streak_sub">P&eacute;rdidas consecutivas m&aacute;ximas</div>
-        </div>
-        <div class="stat-card" style="border-left:3px solid var(--primary)">
-            <div class="stat-label">&#128178; <span data-i18n="dash.avg_loss_label">Promedio P&eacute;rdida</span></div>
-            <div class="stat-value" style="color:#ff3b30">-{avg_loss}</div>
-            <div class="stat-sub" data-i18n="dash.avg_loss_sub">Pips promedio en p&eacute;rdidas</div>
-        </div>
-        <div class="stat-card" style="border-left:3px solid var(--primary)">
-            <div class="stat-label">&#128176; <span data-i18n="dash.profit_factor">Profit Factor</span></div>
-            <div class="stat-value" style="color:{'#00d4aa' if profit_factor_usd>=1.5 else ('#f0b90b' if profit_factor_usd>=1 else '#ff3b30')}">{profit_factor_usd}</div>
-            <div class="stat-sub" data-i18n="dash.profit_factor_sub">Ganancia bruta / P&eacute;rdida bruta (USD)</div>
-        </div>
-    </div>
-
-    <!-- PROMO -->
-    <div class="promo" style="margin-bottom:24px;background:linear-gradient(135deg,#0d1a2a 0%,#1a0d2e 50%,#0a1520 100%);border:1px solid rgba(168,85,247,.2)">
-        <div style="position:relative">
-            <h2 style="font-size:22px" data-i18n="dash.promo_unified_title">&#128640; &Uacute;nete a BuySell365 Pro</h2>
-            <p style="font-size:14px;max-width:520px;margin:8px auto 20px" data-i18n="dash.promo_unified_sub">Se&ntilde;ales de IA en tiempo real con Entry, TP y SL exactos</p>
-            <div class="promo-features" style="margin-bottom:20px">
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat1">Se&ntilde;ales con TP y SL exactos</span></div>
-                <div class="promo-feat"><i style="color:#a855f7">&#10003;</i> <span data-i18n="dash.promo_feat4">SL y TP autom&aacute;ticos</span></div>
-            </div>
-            <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:16px 20px;max-width:420px;margin:0 auto 20px;text-align:left">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                    <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#00a080);display:flex;align-items:center;justify-content:center;font-size:14px">&#129302;</div>
-                    <span style="font-weight:700;font-size:13px;color:#fff">BuySell365 Pro</span>
-                    <span style="font-size:10px;color:var(--muted);margin-left:auto" data-i18n="dash.signal_now">ahora</span>
-                </div>
-                <div style="font-size:13px;line-height:1.8">
-                    <div style="color:#ff3b30;font-weight:800">&#128308; <span data-i18n="dash.signal_sell">VENTA</span> &mdash; AUD/JPY</div>
-                    <div style="margin-top:4px">&#128205; <strong data-i18n="dash.signal_entry">Entrada:</strong> 110.50</div>
-                    <div style="color:#00e676;margin-top:2px">&#127919; <strong>TP:</strong> 106.50 &nbsp;&#128737; <span style="color:#ff6b35"><strong>SL:</strong> 112.50</span></div>
-                </div>
-            </div>
-            <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap">
-                <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px"><span data-i18n="dash.cta_channel">&#128172; ÚNETE AL CANAL</span></a>
-            </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px" data-i18n="dash.promo_note">Estamos optimizando el sistema para ofrecerte la mejor experiencia</p>
-        </div>
-    </div>
-
-    <!-- ASSET PERFORMANCE -->
-    <div class="card" style="margin-bottom:24px">
-        <div class="card-title"><i>&#128178;</i> <span data-i18n="dash.asset_perf">Rendimiento por Activo</span></div>
-        <div class="asset-grid">{asset_cards_html}</div>
-    </div>
-
-    <!-- FOOTER -->
-    <div class="footer">
-        <p>&#169; 2026 BuySell365 Pro | <span data-i18n="dash.footer_refresh">Auto-refresh cada 30s</span></p>
-        <p style="margin-top:4px"><a href="https://t.me/BUYSELL_365_24_7" data-i18n="dash.footer_telegram">Grupo Telegram</a> &middot; <a href="https://www.instagram.com/buysell365.pro_tradingsignals/" target="_blank" style="display:inline-flex;align-items:center;gap:3px"><svg viewBox="0 0 24 24" width="12" height="12" fill="#e1306c"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>Instagram</a> &middot; <a href="https://t.me/BuySell365Traiding" data-i18n="dash.footer_vip">Contacto VIP</a> &middot; <a href="/terminos" data-i18n="footer.terms">T&eacute;rminos</a> &middot; <a href="/privacidad" data-i18n="footer.privacy">Privacidad</a></p>
-        <p style="margin-top:8px;font-size:0.7rem;color:#888;max-width:700px;margin-left:auto;margin-right:auto">
-            &#9888; <strong data-i18n="dash.footer_legal_title">Aviso legal:</strong> <span data-i18n="dash.footer_legal">BuySell365 Pro es una herramienta de an&aacute;lisis t&eacute;cnico automatizado con fines informativos y educativos. No constituye asesor&iacute;a financiera, recomendaci&oacute;n de inversi&oacute;n ni oferta de servicios regulados. Operar en mercados financieros conlleva riesgo de p&eacute;rdida de capital. Resultados pasados no garantizan resultados futuros. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n.</span>
-        </p>
-        <p style="margin-top:6px;font-size:0.65rem;color:#666" data-i18n="footer.creator">Creador: Emmanuel Diaz</p>
-    </div>
-
-</div>
-
-<script>
-// MATRIX BINARY RAIN
-(function(){{
-  const canvas = document.getElementById('matrix-canvas');
-  if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let w, h, columns, drops;
-  function resize(){{
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-    const fs = 14;
-    columns = Math.floor(w / fs);
-    drops = Array(columns).fill(1);
-  }}
-  resize();
-  window.addEventListener('resize', resize);
-  const chars = '01';
-  function draw(){{
-    ctx.fillStyle = 'rgba(8,11,15,0.05)';
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#00d4aa';
-    ctx.font = '14px monospace';
-    for(let i = 0; i < drops.length; i++){{
-      const txt = chars[Math.floor(Math.random() * chars.length)];
-      ctx.fillStyle = 'rgba(0,212,170,' + (0.15 + Math.random() * 0.25) + ')';
-      ctx.fillText(txt, i * 14, drops[i] * 14);
-      if(drops[i] * 14 > h && Math.random() > 0.975){{
-        drops[i] = 0;
-      }}
-      drops[i]++;
-    }}
-  }}
-  setInterval(draw, 50);
-}})();
-
-// i18n ENGINE
-(function(){{
-  const FLAGS = {{es:'\U0001f1ea\U0001f1f8',en:'\U0001f1fa\U0001f1f8',pt:'\U0001f1e7\U0001f1f7',fr:'\U0001f1eb\U0001f1f7'}};
-  const SUPPORTED = ['es','en','pt','fr'];
-  let currentLang = 'es';
-  function detectLang(){{
-    const saved = localStorage.getItem('buysell365_lang');
-    if(saved && SUPPORTED.includes(saved)) return saved;
-    const nav = (navigator.language || navigator.userLanguage || 'es').toLowerCase();
-    if(nav.startsWith('en')) return 'en';
-    if(nav.startsWith('pt')) return 'pt';
-    if(nav.startsWith('fr')) return 'fr';
-    return 'es';
-  }}
-  function applyTranslations(tr){{
-    document.querySelectorAll('[data-i18n]').forEach(function(el){{
-      const key = el.getAttribute('data-i18n');
-      if(tr[key]){{
-        let text = tr[key];
-        const vars = el.getAttribute('data-i18n-vars');
-        if(vars){{ try{{ const obj=JSON.parse(vars); Object.keys(obj).forEach(function(k){{ text=text.replace('{{'+k+'}}',obj[k]); }}); }}catch(e){{}} }}
-        if(text.includes('<br') || text.includes('<span') || text.includes('<strong')){{ el.innerHTML = text; }}
-        else{{ el.textContent = text; }}
-      }}
-    }});
-    document.documentElement.lang = currentLang;
-    const flagEl = document.getElementById('currentFlag');
-    if(flagEl) flagEl.textContent = FLAGS[currentLang] || '\U0001f1ea\U0001f1f8';
-  }}
-  function loadLang(lang){{
-    if(!SUPPORTED.includes(lang)) lang = 'es';
-    fetch('/i18n/' + lang + '.json')
-      .then(function(r){{ return r.json(); }})
-      .then(function(data){{ currentLang = lang; localStorage.setItem('buysell365_lang', lang); window._tr = data; applyTranslations(data); }})
-      .catch(function(err){{ console.warn('i18n load failed:', err); }});
-  }}
-  window.toggleLangMenu = function(){{
-    const menu = document.getElementById('langMenu');
-    if(menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-  }};
-  window.setLang = function(lang){{ loadLang(lang); const menu = document.getElementById('langMenu'); if(menu) menu.style.display = 'none'; }};
-  document.addEventListener('click', function(e){{
-    const sel = document.getElementById('langSelector');
-    if(sel && !sel.contains(e.target)){{ const menu = document.getElementById('langMenu'); if(menu) menu.style.display = 'none'; }}
-  }});
-  window._t = function(key, fallback) {{ return (window._tr && window._tr[key]) || fallback; }};
-  const lang = detectLang();
-  if(lang !== 'es') loadLang(lang);
-  else{{ currentLang = 'es'; localStorage.setItem('buysell365_lang', 'es'); const flagEl = document.getElementById('currentFlag'); if(flagEl) flagEl.textContent = FLAGS['es']; }}
-}})();
-
-// ACTIVE OPERATIONS ALERT BANNER
-(function(){{
-  function loadActiveOps(){{
-    fetch('/api/active_ops')
-      .then(r => r.json())
-      .then(ops => {{
-        const container = document.getElementById('active-alerts-container');
-        if(!container) return;
-        if(!ops || ops.length === 0){{
-          container.innerHTML = '<div class="active-alert" style="text-align:center;padding:20px;opacity:.7"><div class="alert-header"><span style="font-size:18px">&#128308;</span> ' + window._t('dash.no_active_ops','Sin operaciones activas en este momento') + '</div><div style="font-size:13px;color:var(--muted);margin-top:8px">' + window._t('dash.bot_schedule','El bot opera de lunes a viernes en horario de mercado europeo') + '</div></div>';
-          return;
-        }}
-        let html = '<div class="active-alert">';
-        html += '<div class="alert-header"><span style="font-size:18px">&#9889;</span> ' + ops.length + ' ' + (ops.length > 1 ? window._t('dash.active_ops_plural','Operaciones Activas en Tiempo Real') : window._t('dash.active_ops_singular','Operaci\u00f3n Activa en Tiempo Real')) + '</div>';
-        ops.forEach(function(op){{
-          const isBuy = op.tipo === 'COMPRA';
-          const typeCls = isBuy ? 'buy' : 'sell';
-          const typeLabel = isBuy ? window._t('dash.buy','COMPRA') : window._t('dash.sell','VENTA');
-          const prog = Math.max(0, Math.min(100, op.progreso || 0));
-          const tp1Pos = 33; const tp2Pos = 66;
-          const isMt5 = op.fuente === 'mt5';
-          const plColor = (op.beneficio !== undefined) ? (op.beneficio >= 0 ? '#00c853' : '#ff5252') : '#8b949e';
-          html += '<div class="alert-op">';
-          const _dispName = (function(raw){{ if(!raw) return '?'; const m={{'GC=F':'ORO','NQ=F':'NASDAQ','ES=F':'S&P 500','EURUSD=X':'EUR/USD','USDJPY=X':'USD/JPY','GBPJPY=X':'GBP/JPY','AUDCAD':'AUD/CAD','EURCHF':'EUR/CHF','USDCAD':'USD/CAD'}}; if(m[raw]) return m[raw]; var n=raw; for(var k in m){{ if(raw.indexOf(k)>=0) return m[k]; }}; n=n.replace(/[^A-Za-z0-9\\/&. _-]/g,'').trim(); if(m[n]) return m[n]; return n||raw; }})(op.nombre || op.ticker);
-          html += '<div class="alert-name">' + _dispName;
-          if(isMt5 && op.volumen) html += ' <span style="font-size:11px;color:#8b949e">(' + op.volumen + ' lots)</span>';
-          html += '</div>';
-          html += '<div class="alert-type ' + typeCls + '">' + typeLabel + '</div>';
-          if(op.beneficio !== undefined){{
-            html += '<div style="font-size:13px;color:' + plColor + ';font-weight:600;margin:2px 0">';
-            html += (op.beneficio >= 0 ? '+' : '') + op.beneficio.toFixed(2) + ' USD';
-            html += '</div>';
-          }}
-          html += '<div class="progress-bar-wrap">';
-          html += '<div class="progress-track">';
-          html += '<div class="progress-fill" style="width:' + prog + '%"></div>';
-          html += '<div class="progress-mark" style="left:' + tp1Pos + '%"></div>';
-          html += '<div class="progress-mark" style="left:' + tp2Pos + '%"></div>';
-          html += '</div>';
-          html += '<div class="progress-pct">' + prog.toFixed(0) + '%</div>';
-          html += '</div>';
-          html += '<div class="tp-badges">';
-          html += '<span class="tp-badge ' + (op.tp1_hit ? 'hit' : 'pending') + '">TP1</span>';
-          html += '<span class="tp-badge ' + (op.tp2_hit ? 'hit' : 'pending') + '">TP2</span>';
-          html += '<span class="tp-badge pending">TP3</span>';
-          html += '</div>';
-          html += '</div>';
-        }});
-        html += '</div>';
-        container.innerHTML = html;
-      }})
-      .catch(function(){{ }});
-  }}
-  loadActiveOps();
-  setInterval(loadActiveOps, 15000);
-}})();
-
-// WINNING TRADES + FILTERS + STREAK + CHART + WIN RATE
-(function(){{
-  let allTrades = [];
-  let currentFilter = 'ALL';
-  let currentDateFilter = 'all';
-  let currentPage = 1;
-  const TRADES_PER_PAGE = 20;
-
-  function getUnit(tkr){{
-    tkr = (tkr || '').toUpperCase();
-    if(tkr.indexOf('EUR')>=0 || tkr.indexOf('JPY')>=0 || tkr.indexOf('GBP')>=0) return 'pips';
-    if(tkr === 'BTC-USD' || tkr === 'ETH-USD' || tkr === 'BTCUSD' || tkr === 'ETHUSD') return 'USD';
-    return 'pts';
-  }}
-
-  function getDec(tkr){{
-    tkr = (tkr || '').toUpperCase();
-    if(tkr.indexOf('NQ=F')>=0||tkr.indexOf('ES=F')>=0||tkr.indexOf('GC=F')>=0) return 2;
-    if(tkr.indexOf('BTC')>=0||tkr.indexOf('ETH')>=0) return 2;
-    if(tkr.indexOf('JPY')>=0) return 3;
-    return 5;
-  }}
-
-  // FIX 2026-03-19: Racha real — contar desde la última pérdida
-  function renderStreak(trades){{
-    const container = document.getElementById('streak-banner-container');
-    if(!container) return;
-    if(!trades || trades.length === 0){{ container.innerHTML = ''; return; }}
-    // Calcular racha actual desde el final
-    let streak = 0;
-    for(let i = trades.length - 1; i >= 0; i--){{
-      if((trades[i].pips || 0) > 0) streak++;
-      else break;
-    }}
-    if(streak < 2){{ container.innerHTML = ''; return; }}
-    const totalWins = trades.filter(function(t){{ return (t.pips||0) > 0; }}).length;
-    const totalAll = trades.length;
-    const realWR = totalAll > 0 ? Math.round(totalWins / totalAll * 100) : 0;
-    let fireEmoji = '';
-    if(streak >= 10) fireEmoji = '\U0001f525\U0001f525\U0001f525';
-    else if(streak >= 5) fireEmoji = '\U0001f525\U0001f525';
-    else if(streak >= 3) fireEmoji = '\U0001f525';
-    let html = '<div class="streak-banner">';
-    html += '<div class="streak-number">' + streak + '</div>';
-    html += '<div class="streak-info"><div class="streak-label">' + window._t('dash.consecutive_wins','Racha Ganadora Actual') + '</div>';
-    html += '<div class="streak-sub">' + totalWins + 'W / ' + (totalAll - totalWins) + 'L | WR: ' + realWR + '%</div></div>';
-    if(fireEmoji) html += '<div class="streak-fire">' + fireEmoji + '</div>';
-    html += '</div>';
-    container.innerHTML = html;
-  }}
-
-  function renderCumulativeChart(trades){{
-    const container = document.getElementById('cumulative-chart-container');
-    if(!container || !trades || trades.length === 0){{
-      if(container) container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px;font-size:12px">' + window._t('dash.no_data','Sin datos a\u00fan') + '</p>';
-      return;
-    }}
-    // Ordenar cronológicamente (más antiguo primero) para el gráfico
-    const chron = trades.slice().sort(function(a,b){{
-      var da = (a.fecha||'').split('/').reverse().join('') + (a.hora||'');
-      var db = (b.fecha||'').split('/').reverse().join('') + (b.hora||'');
-      return da.localeCompare(db);
-    }});
-    // Usar profit_mt5 en USD si disponible, sino pips como fallback
-    const useUSD = chron.some(function(t){{ return t.profit_mt5 && t.profit_mt5 !== 0; }});
-    const W = container.clientWidth || 600;
-    const H = 160;
-    const pad = {{t:20,r:24,b:30,l:62}};
-    const pw = W - pad.l - pad.r;
-    const ph = H - pad.t - pad.b;
-    let cumul = [0];
-    chron.forEach(function(t){{
-      const val = useUSD ? (parseFloat(t.profit_mt5) || 0) : (t.pips || 0);
-      cumul.push(cumul[cumul.length-1] + val);
-    }});
-    const maxY = Math.max.apply(null, cumul);
-    const minY = Math.min.apply(null, cumul);
-    const rangeY = maxY - minY || 1;
-    const lineColor = cumul[cumul.length-1] >= 0 ? '#00d4aa' : '#ff3b30';
-    const areaColor = cumul[cumul.length-1] >= 0 ? 'rgba(0,212,170,.28)' : 'rgba(255,59,48,.18)';
-    function x(i){{ return pad.l + (i / (cumul.length - 1)) * pw; }}
-    function y(v){{ return pad.t + ph - ((v - minY) / rangeY) * ph; }}
-    let pathD = 'M' + x(0) + ',' + y(cumul[0]);
-    for(let i = 1; i < cumul.length; i++) pathD += ' L' + x(i) + ',' + y(cumul[i]);
-    let areaD = pathD + ' L' + x(cumul.length-1) + ',' + (pad.t+ph) + ' L' + x(0) + ',' + (pad.t+ph) + ' Z';
-    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:100%">';
-    // Grid lines con etiquetas en USD o pips
-    for(let i = 0; i <= 4; i++){{
-      const yy = pad.t + (ph / 4) * i;
-      const val = maxY - (rangeY / 4) * i;
-      const lbl = useUSD ? (val >= 0 ? '+$' : '-$') + Math.abs(val).toFixed(0) : val.toFixed(0);
-      svg += '<line x1="' + pad.l + '" y1="' + yy + '" x2="' + (W-pad.r) + '" y2="' + yy + '" stroke="rgba(30,42,58,.5)" stroke-width="1"/>';
-      svg += '<text x="' + (pad.l-6) + '" y="' + (yy+4) + '" fill="#5a6a7a" font-size="9" text-anchor="end" font-family="Inter">' + lbl + '</text>';
-    }}
-    svg += '<defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + areaColor + '"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient></defs>';
-    svg += '<path d="' + areaD + '" fill="url(#cg2)"/>';
-    svg += '<path d="' + pathD + '" fill="none" stroke="' + lineColor + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
-    svg += '<circle cx="' + x(cumul.length-1) + '" cy="' + y(cumul[cumul.length-1]) + '" r="4" fill="' + lineColor + '" stroke="#080b0f" stroke-width="2"/>';
-    // Etiquetas de fecha en eje X
-    const step = Math.max(1, Math.floor(chron.length / 6));
-    for(let i = 0; i < chron.length; i += step){{
-      const lbl = (chron[i].fecha||'').substring(0,5);
-      svg += '<text x="' + x(i+1) + '" y="' + (H-6) + '" fill="#5a6a7a" font-size="9" text-anchor="middle" font-family="Inter">' + lbl + '</text>';
-    }}
-    // Valor final
-    const finalVal = cumul[cumul.length-1];
-    const finalLbl = useUSD ? ((finalVal>=0?'+$':'-$') + Math.abs(finalVal).toFixed(2)) : ((finalVal>=0?'+':'')+finalVal.toFixed(1)+' pips');
-    svg += '<text x="' + x(cumul.length-1) + '" y="' + (y(finalVal)-10) + '" fill="' + lineColor + '" font-size="12" font-weight="700" text-anchor="middle" font-family="Inter">' + finalLbl + '</text>';
-    svg += '</svg>';
-    container.innerHTML = svg;
-  }}
-
-  function normName(raw){{
-    if(!raw) return '?';
-    const map = {{
-      'GC=F':'ORO','XAUUSD':'ORO','XAUUSD=X':'ORO','GOLD':'ORO','gold':'ORO',
-      'NQ=F':'NASDAQ 100','US100Cash':'NASDAQ 100','US100':'NASDAQ 100','NASDAQ':'NASDAQ 100',
-      'ES=F':'S&P 500','US500Cash':'S&P 500','US500':'S&P 500',
-      'EURUSD=X':'EUR/USD','EURUSD':'EUR/USD',
-      'USDJPY=X':'USD/JPY','USDJPY':'USD/JPY',
-      'GBPJPY=X':'GBP/JPY','GBPJPY':'GBP/JPY',
-      'GBPUSD=X':'GBP/USD','GBPUSD':'GBP/USD',
-      'AUDCAD=X':'AUD/CAD','AUDCAD':'AUD/CAD',
-      'EURCHF=X':'EUR/CHF','EURCHF':'EUR/CHF',
-      'USDCAD=X':'USD/CAD','USDCAD':'USD/CAD',
-      'BTC-USD':'Bitcoin','BTCUSD':'Bitcoin',
-      'ETH-USD':'Ethereum','ETHUSD':'Ethereum'
-    }};
-    if(map[raw]) return map[raw];
-    let n = raw.replace(/[^A-Za-z0-9\\/&. _-]/g, '').trim();
-    if(map[n]) return map[n];
-    for(let k in map){{ if(raw.toUpperCase().indexOf(k.toUpperCase()) >= 0) return map[k]; }}
-    return n;
-  }}
-
-  function renderFilters(trades){{
-    const bar = document.getElementById('trade-filter-bar');
-    if(!bar) return;
-    const assets = {{}};
-    const hidden = {{'BITCOIN':1,'ETHEREUM':1}};
-    trades.forEach(function(t){{
-      const n = normName(t.nombre || t.ticker || '?');
-      if(hidden[n]) return;
-      assets[n] = (assets[n] || 0) + 1;
-    }});
-    const visibleCount = trades.filter(function(t){{ return !hidden[normName(t.nombre || t.ticker || '?')]; }}).length;
-    let html = '<span style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.5px">' + window._t('dash.filter_label','Filtrar:') + '</span>';
-    html += '<button class="filter-btn' + (currentFilter === 'ALL' ? ' active' : '') + '" data-filter="ALL" onclick="window._filterTrades(this.dataset.filter)">' + window._t('dash.all_filter','Todos') + ' (' + visibleCount + ')</button>';
-    Object.keys(assets).sort().forEach(function(name){{
-      const cls = currentFilter === name ? ' active' : '';
-      html += '<button class="filter-btn' + cls + '" data-filter="' + name + '" onclick="window._filterTrades(this.dataset.filter)">' + name + ' (' + assets[name] + ')</button>';
-    }});
-    html += '<button class="export-csv-btn" onclick="window._exportCSV()">&#8681; ' + window._t('dash.export_csv','Exportar CSV') + '</button>';
-    bar.innerHTML = html;
-  }}
-
-  function applyDateFilter(trades){{
-    if(currentDateFilter === 'all') return trades;
-    const now = new Date();
-    const days = currentDateFilter === '7d' ? 7 : (currentDateFilter === '30d' ? 30 : 90);
-    const cutoff = new Date(now.getTime() - days * 86400000);
-    return trades.filter(function(t){{
-      const f = t.fecha || '';
-      if(!f) return false;
-      const parts = f.split('/');
-      if(parts.length === 3){{
-        const d = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
-        return d >= cutoff;
-      }}
-      const d2 = new Date(f);
-      return !isNaN(d2) && d2 >= cutoff;
-    }});
-  }}
-
-  function renderTable(trades){{
-    const container = document.getElementById('winning-trades-container');
-    if(!container) return;
-    const _hidden = {{'BITCOIN':1,'ETHEREUM':1}};
-    const datFiltered = applyDateFilter(trades);
-    const visibleTrades = datFiltered.filter(function(t){{ return !_hidden[normName(t.nombre || t.ticker || '?')]; }});
-    const filtered = currentFilter === 'ALL' ? visibleTrades : visibleTrades.filter(function(t){{ return normName(t.nombre || t.ticker) === currentFilter; }});
-    if(!filtered || filtered.length === 0){{
-      container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">' + window._t('dash.no_ops_filter','No hay operaciones para este filtro.') + '</p>';
-      return;
-    }}
-    let totalPips = 0;
-    filtered.forEach(function(t){{ totalPips += (t.pips || 0); }});
-    const sorted = filtered.slice().sort(function(a, b){{
-      // Ordenar por fecha+hora descendente (más reciente primero)
-      var da = (a.fecha||'').split('/').reverse().join('') + (a.hora||'');
-      var db = (b.fecha||'').split('/').reverse().join('') + (b.hora||'');
-      return db.localeCompare(da);
-    }});
-    const totalPages = Math.ceil(sorted.length / TRADES_PER_PAGE);
-    if(currentPage > totalPages) currentPage = totalPages;
-    if(currentPage < 1) currentPage = 1;
-    const startIdx = (currentPage - 1) * TRADES_PER_PAGE;
-    const pageData = sorted.slice(startIdx, startIdx + TRADES_PER_PAGE);
-    let html = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    html += '<thead><tr style="border-bottom:2px solid var(--border);color:var(--primary);text-align:left">';
-    html += '<th style="padding:10px 8px" data-i18n="dash.th_date">' + window._t('dash.th_date','Fecha') + '</th><th style="padding:10px 8px" data-i18n="dash.th_asset">' + window._t('dash.th_asset','Activo') + '</th><th style="padding:10px 8px" data-i18n="dash.th_type">' + window._t('dash.th_type','Tipo') + '</th>';
-    html += '<th style="padding:10px 8px" data-i18n="dash.th_entry">' + window._t('dash.th_entry','Entrada') + '</th><th style="padding:10px 6px" data-i18n="dash.th_time">' + window._t('dash.th_time','Hora') + '</th><th style="padding:10px 8px" data-i18n="dash.th_exit">' + window._t('dash.th_exit','Salida') + '</th>';
-    html += '<th style="padding:10px 6px" data-i18n="dash.th_time_exit">' + window._t('dash.th_time','Hora') + '</th><th style="padding:10px 8px">Pips/Pts</th>';
-    html += '</tr></thead><tbody>';
-    pageData.forEach(function(t, i){{
-      // FIX 2026-03-19: Fondo rojo sutil para losses
-      const isLoss = (t.pips || 0) <= 0;
-      const bg = isLoss ? 'rgba(255,59,48,0.06)' : (i % 2 === 0 ? 'rgba(0,212,170,0.04)' : 'transparent');
-      const tipoIcon = t.tipo === 'COMPRA' ? '\U0001f7e2' : '\U0001f534';
-      const pips = (t.pips || 0);
-      const tkr = (t.ticker || '').toUpperCase();
-      const unit = getUnit(tkr);
-      const dec = getDec(tkr);
-      html += '<tr style="background:' + bg + ';border-bottom:1px solid var(--border)">';
-      html += '<td style="padding:8px;color:var(--muted)">' + (t.fecha || '-') + '</td>';
-      html += '<td style="padding:8px;font-weight:600">' + normName(t.nombre || t.ticker || '-') + '</td>';
-      html += '<td style="padding:8px">' + tipoIcon + ' ' + (t.tipo || '-') + '</td>';
-      const _entrada = t.entrada || t.precio_entrada;
-      const _salida = t.salida || t.precio_salida || t.precio_cierre;
-      const _hora_e = t.hora_entrada || t.hora || '';
-      const _hora_s = t.hora_salida || t.hora_cierre || '';
-      html += '<td style="padding:8px;font-family:monospace">' + (_entrada ? Number(_entrada).toFixed(dec) : '-') + '</td>';
-      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (_hora_e || '-') + '</td>';
-      html += '<td style="padding:8px;font-family:monospace">' + (_salida ? Number(_salida).toFixed(dec) : '-') + '</td>';
-      html += '<td style="padding:8px 6px;color:var(--muted);font-size:0.8rem">' + (_hora_s || '-') + '</td>';
-      // FIX 2026-03-19: Mostrar wins en verde y losses en rojo + score real /5
-      const pipsColor = pips >= 0 ? '#00e676' : '#ff3b30';
-      const pipsSign = pips >= 0 ? '+' : '';
-      html += '<td style="padding:8px;color:' + pipsColor + ';font-weight:700">' + pipsSign + pips.toFixed(1) + ' ' + unit + '</td>';
-      html += '</tr>';
-    }});
-    html += '</tbody></table>';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 8px;margin-top:8px;border-top:2px solid var(--primary);font-weight:700">';
-    // FIX 2026-03-19: Resumen con wins/losses reales
-    const totalWins = filtered.filter(function(t){{ return (t.pips||0) > 0; }}).length;
-    const totalLosses = filtered.length - totalWins;
-    const pipsColorTotal = totalPips >= 0 ? '#00e676' : '#ff3b30';
-    const pipsSignTotal = totalPips >= 0 ? '+' : '';
-    html += '<span style="color:var(--text)">\U0001f4ca Total: ' + filtered.length + ' ops (' + totalWins + 'W / ' + totalLosses + 'L)</span>';
-    html += '<span style="color:' + pipsColorTotal + ';font-size:1.1rem">' + pipsSignTotal + totalPips.toFixed(1) + ' ' + window._t('dash.accumulated_pips','pips netos') + '</span>';
-    html += '</div>';
-    if(totalPages > 1){{
-      html += '<div class="pagination">';
-      html += '<button class="page-btn" onclick="window._goToPage(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>&laquo; ' + window._t('dash.prev','Anterior') + '</button>';
-      let startP = Math.max(1, currentPage - 2);
-      let endP = Math.min(totalPages, currentPage + 2);
-      if(startP > 1){{ html += '<button class="page-btn" onclick="window._goToPage(1)">1</button>'; if(startP > 2) html += '<span style="color:var(--muted);padding:0 4px">...</span>'; }}
-      for(let p = startP; p <= endP; p++){{
-        html += '<button class="page-btn' + (p === currentPage ? ' active' : '') + '" onclick="window._goToPage(' + p + ')">' + p + '</button>';
-      }}
-      if(endP < totalPages){{ if(endP < totalPages - 1) html += '<span style="color:var(--muted);padding:0 4px">...</span>'; html += '<button class="page-btn" onclick="window._goToPage(' + totalPages + ')">' + totalPages + '</button>'; }}
-      html += '<button class="page-btn" onclick="window._goToPage(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>' + window._t('dash.next','Siguiente') + ' &raquo;</button>';
-      html += '</div>';
-      html += '<div style="text-align:center;font-size:0.75rem;color:var(--muted);margin-top:8px">' + window._t('dash.page','P\u00e1gina') + ' ' + currentPage + ' ' + window._t('dash.of','de') + ' ' + totalPages + ' \u00b7 ' + window._t('dash.showing','Mostrando') + ' ' + pageData.length + ' ' + window._t('dash.of','de') + ' ' + filtered.length + ' ' + window._t('dash.operations','operaciones') + '</div>';
-    }}
-    container.innerHTML = html;
-  }}
-
-  function renderWinRatePeriods(trades){{
-    const container = document.getElementById('wr-period-container');
-    if(!container || !trades || !trades.length) return;
-    // Usar la última fecha del historial como referencia (no "hoy" del navegador)
-    // para que las tarjetas muestren datos reales aunque el historial no sea de hoy
-    var lastFecha = '';
-    (trades||[]).forEach(function(t){{ if((t.fecha||'') > lastFecha) lastFecha = t.fecha||''; }});
-    var refParts = lastFecha ? lastFecha.split('/') : [];
-    var ref = refParts.length===3 ? new Date(parseInt(refParts[2]),parseInt(refParts[1])-1,parseInt(refParts[0])) : new Date();
-    var todayStr = lastFecha; // última sesión de trading = "hoy"
-    var weekStart = new Date(ref); weekStart.setDate(ref.getDate() - ref.getDay() + 1); weekStart.setHours(0,0,0,0);
-    if(ref.getDay()===0) weekStart.setDate(weekStart.getDate()-7);
-    var refMonth = ref.getMonth()+1; var refYear = ref.getFullYear();
-    var todayLabel = 'Últ. Sesión'; // más honesto que "Hoy"
-    var todayTotal=0,todayWins=0,weekTotal=0,weekWins=0,monthTotal=0,monthWins=0;
-    (trades||[]).forEach(function(t){{
-      var f = t.fecha||''; var parts = f.split('/');
-      if(parts.length!==3) return;
-      var dd=parseInt(parts[0],10),mm=parseInt(parts[1],10),yy=parseInt(parts[2],10);
-      var dt = new Date(yy,mm-1,dd);
-      var isWin = (t.pips||0)>0;
-      if(f===todayStr){{ todayTotal++; if(isWin) todayWins++; }}
-      if(dt>=weekStart){{ weekTotal++; if(isWin) weekWins++; }}
-      if(mm===refMonth && yy===refYear){{ monthTotal++; if(isWin) monthWins++; }}
-    }});
-    var todayWR = todayTotal>0 ? Math.round(todayWins/todayTotal*100) : 0;
-    var weekWR  = weekTotal>0  ? Math.round(weekWins/weekTotal*100)   : 0;
-    var monthWR = monthTotal>0 ? Math.round(monthWins/monthTotal*100) : 0;
-    function getColor(wr,total){{ return wr>=60?'#00d4aa':(wr>=45?'#f0b90b':(total>0?'#ff3b30':'#5a6a7a')); }}
-    function card(label,wr,wins,total,color){{
-      return '<div class="wr-period-card" style="border-top:2px solid '+color+'">' +
-        '<div class="wr-period-label">'+label+'</div>' +
-        '<div class="wr-period-val" style="color:'+color+'">'+wr+'%</div>' +
-        '<div class="wr-period-detail">'+wins+'W / '+(total-wins)+'L de '+total+'</div>' +
-        '<div class="wr-period-bar"><div class="wr-period-fill" style="width:'+wr+'%;background:'+color+'"></div></div></div>';
-    }}
-    container.innerHTML =
-      card(todayLabel, todayWR, todayWins, todayTotal, getColor(todayWR,todayTotal)) +
-      card(window._t('dash.this_week','Esta Semana'), weekWR, weekWins, weekTotal, getColor(weekWR,weekTotal)) +
-      card(window._t('dash.this_month','Este Mes'), monthWR, monthWins, monthTotal, getColor(monthWR,monthTotal));
-  }}
-
-  window._goToPage = function(page){{
-    currentPage = page;
-    renderTable(allTrades);
-    const el = document.getElementById('winning-trades-container');
-    if(el) el.scrollIntoView({{behavior:'smooth', block:'start'}});
-  }};
-
-  window._filterTrades = function(filter){{
-    currentFilter = filter;
-    currentPage = 1;
-    renderFilters(allTrades);
-    renderTable(allTrades);
-  }};
-
-  window._filterByDate = function(period){{
-    currentDateFilter = period;
-    currentPage = 1;
-    document.querySelectorAll('.date-filter-btn').forEach(function(btn){{
-      btn.classList.toggle('active', btn.dataset.period === period);
-    }});
-    renderFilters(allTrades);
-    renderTable(allTrades);
-
-    renderCumulativeChart(applyDateFilter(allTrades));
-  }};
-
-  window._exportCSV = function(){{
-    const _hiddenCSV = {{'BITCOIN':1,'ETHEREUM':1}};
-    const datFilteredCSV = applyDateFilter(allTrades);
-    const visibleCSV = datFilteredCSV.filter(function(t){{ return !_hiddenCSV[normName(t.nombre || t.ticker || '?')]; }});
-    const filteredCSV = currentFilter === 'ALL' ? visibleCSV : visibleCSV.filter(function(t){{ return normName(t.nombre || t.ticker) === currentFilter; }});
-    if(!filteredCSV.length){{ alert(window._t('dash.no_ops_export','No hay operaciones para exportar.')); return; }}
-    const csvHeaders = [window._t('dash.th_date','Fecha'),window._t('dash.th_asset','Activo'),window._t('dash.th_type','Tipo'),window._t('dash.th_entry','Entrada'),window._t('dash.th_time_entry','Hora Entrada'),window._t('dash.th_exit','Salida'),window._t('dash.th_time_exit_csv','Hora Salida'),'Pips/Pts'];
-    const csvRows = filteredCSV.slice().reverse().map(function(t){{
-      const tkrCSV = (t.ticker || '').toUpperCase();
-      const decCSV = getDec(tkrCSV);
-      const rowArr = [
-        t.fecha || '',
-        normName(t.nombre || t.ticker || ''),
-        t.tipo || '',
-        t.entrada ? Number(t.entrada).toFixed(decCSV) : '',
-        t.hora_entrada || t.hora || '',
-        t.salida ? Number(t.salida).toFixed(decCSV) : '',
-        t.hora_salida || '',
-        (t.pips || 0).toFixed(1)
-      ];
-      return rowArr.map(function(v){{ return '"' + String(v).replace(/"/g,'""') + '"'; }}).join(',');
-    }});
-    const csvContent = [csvHeaders.join(',')].concat(csvRows).join('\\n');
-    const csvBlob = new Blob([csvContent], {{type:'text/csv;charset=utf-8;'}});
-    const csvUrl = URL.createObjectURL(csvBlob);
-    const csvLink = document.createElement('a');
-    csvLink.href = csvUrl;
-    csvLink.download = 'buysell365_trades_' + new Date().toISOString().slice(0,10) + '.csv';
-    document.body.appendChild(csvLink);
-    csvLink.click();
-    document.body.removeChild(csvLink);
-    URL.revokeObjectURL(csvUrl);
-  }};
-
-  function loadAll(){{
-    fetch('/api/winning_trades')
-      .then(r => r.json())
-      .then(trades => {{
-        allTrades = trades || [];
-        renderStreak(allTrades);
-        renderCumulativeChart(applyDateFilter(allTrades));
-    
-        renderFilters(allTrades);
-        renderTable(allTrades);
-        renderWinRatePeriods(allTrades);
-      }})
-      .catch(function(e){{
-        const container = document.getElementById('winning-trades-container');
-        if(container) container.innerHTML = '<p style="color:var(--muted);text-align:center">' + window._t('dash.error_loading','Error cargando historial') + '</p>';
-      }});
-  }}
-  loadAll();
-  setInterval(loadAll, 30000);
-}})();
-
-// BROWSER PUSH NOTIFICATIONS
-(function(){{
-  let _prevOpsCount = -1;
-
-  window._requestNotifPermission = function(){{
-    if(!('Notification' in window)){{ alert('Tu navegador no soporta notificaciones.'); return; }}
-    if(Notification.permission === 'granted'){{
-      const bellBtnEl = document.getElementById('bellBtn');
-      if(bellBtnEl) bellBtnEl.classList.toggle('notif-on');
-      return;
-    }}
-    Notification.requestPermission().then(function(perm){{
-      const bellBtnEl = document.getElementById('bellBtn');
-      if(perm === 'granted'){{
-        if(bellBtnEl) bellBtnEl.classList.add('notif-on');
-        new Notification('BuySell365 Pro', {{body:'Notificaciones activadas. Te avisaremos de nuevas operaciones.', icon:'/img/bull_bear.png'}});
-      }}
-    }});
-  }};
-
-  function _sendNotif(title, body){{
-    if(!('Notification' in window) || Notification.permission !== 'granted') return;
-    try{{ new Notification(title, {{body:body, icon:'/img/bull_bear.png'}}); }}catch(notifErr){{}}
-  }}
-
-  (function(){{
-    const bellBtnInit = document.getElementById('bellBtn');
-    if(bellBtnInit && 'Notification' in window && Notification.permission === 'granted') bellBtnInit.classList.add('notif-on');
-  }})();
-
-  function pollActiveOpsNotif(){{
-    fetch('/api/active_ops')
-      .then(r => r.json())
-      .then(function(ops){{
-        const cnt = (ops && ops.length) ? ops.length : 0;
-        const bellDotEl = document.getElementById('bellDot');
-        if(_prevOpsCount >= 0 && cnt > _prevOpsCount){{
-          const diff = cnt - _prevOpsCount;
-          _sendNotif('BuySell365 Pro \u2014 Nueva Operaci\u00f3n', diff + ' nueva' + (diff > 1 ? 's' : '') + ' operaci\u00f3n' + (diff > 1 ? 'es' : '') + ' activa' + (diff > 1 ? 's' : ''));
-          if(bellDotEl){{ bellDotEl.classList.add('show'); setTimeout(function(){{ bellDotEl.classList.remove('show'); }}, 8000); }}
-        }}
-        _prevOpsCount = cnt;
-      }})
-      .catch(function(){{}});
-  }}
-  pollActiveOpsNotif();
-  setInterval(pollActiveOpsNotif, 15000);
-}})();
-</script>
-
-<!-- GDPR Cookie Consent Banner -->
-<div id="bs365-cb" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#0d1117;border-top:2px solid #00e5c5;padding:16px 24px;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 -4px 30px rgba(0,0,0,.8)">
-  <div style="flex:1;min-width:240px">
-    <p style="margin:0 0 4px;font-weight:700;color:#f0f6ff;font-size:.95rem" data-i18n="dash.cookie_title">🍪 Usamos cookies</p>
-    <p style="margin:0;color:#8b9fc4;font-size:.82rem"><span data-i18n="dash.cookie_text">Usamos Google Analytics para mejorar la experiencia. No vendemos datos personales.</span> <a href="/privacidad" style="color:#00e5c5;text-decoration:underline" data-i18n="dash.cookie_policy">Política de privacidad</a></p>
-  </div>
-  <div style="display:flex;gap:10px;flex-shrink:0;margin-top:4px">
-    <button onclick="_declineCookies()" style="padding:10px 18px;border-radius:8px;border:1px solid #2a3045;background:transparent;color:#8b9fc4;cursor:pointer;font-size:.85rem;font-family:inherit" data-i18n="dash.cookie_decline">Solo esenciales</button>
-    <button onclick="_acceptCookies()" style="padding:10px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#00e5c5,#00a89d);color:#000;font-weight:800;cursor:pointer;font-size:.85rem;font-family:inherit" data-i18n="dash.cookie_accept">✓ Aceptar todo</button>
-  </div>
-</div>
-<script>
-(function(){{
-  var c=localStorage.getItem('bs365_consent');
-  function _loadGA(){{
-    if(window._ga_loaded) return; window._ga_loaded=true;
-    var s=document.createElement('script'); s.async=true;
-    s.src='https://www.googletagmanager.com/gtag/js?id=G-L514BL7E83';
-    document.head.appendChild(s);
-    window.dataLayer=window.dataLayer||[];
-    window.gtag=function(){{dataLayer.push(arguments);}};
-    gtag('js',new Date()); gtag('config','G-L514BL7E83'); gtag('config','AW-18090606337');
-  }}
-  if(c==='accepted') _loadGA();
-  window._acceptCookies=function(){{
-    localStorage.setItem('bs365_consent','accepted');
-    var b=document.getElementById('bs365-cb'); if(b) b.remove(); _loadGA();
-  }};
-  window._declineCookies=function(){{
-    localStorage.setItem('bs365_consent','declined');
-    var b=document.getElementById('bs365-cb'); if(b) b.remove();
-  }};
-  if(!c) document.addEventListener('DOMContentLoaded',function(){{
-    var el=document.getElementById('bs365-cb'); if(el) el.style.display='flex';
-  }});
-}})();
-</script>
-</body>
-</html>"""
-    _dash_resp = make_response(_dash_html)
-    _dash_resp.headers['Content-Type'] = 'text/html; charset=utf-8'
-    _dash_resp.headers['Cache-Control'] = 'no-cache'
-    return _dash_resp
 
 # ============================================================
 #  LEGAL PAGES
 # ============================================================
 @app.route("/about")
 def pagina_about():
-    with _lock:
-        hist = list(_historial_real) if _historial_real else []
-    total_ops = len(hist)
-    wins = sum(1 for h in hist if float(h.get('pips', 0)) > 0)
-    wr = round(wins / total_ops * 100, 1) if total_ops > 0 else 0
-    profit = round(sum(float(h.get('profit_mt5', 0) or 0) for h in hist), 2)
-    profit_str = f"+${profit:,.2f}" if profit >= 0 else f"-${abs(profit):,.2f}"
-    return f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Qui\u00e9nes Somos \u2014 BuySell365 Pro</title>
-<meta name="description" content="Conoce la historia de BuySell365 Pro: un equipo de traders que construy\u00f3 un bot de IA para operar forex e \u00edndices en MT5 con resultados reales y verificados.">
-<meta property="og:title" content="Qui\u00e9nes Somos \u2014 BuySell365 Pro">
-<meta property="og:description" content="La historia real de BuySell365: de trader manual a bot aut\u00f3nomo de IA en MT5. {wr}% Win Rate, {total_ops} operaciones reales verificadas.">
-<meta property="og:url" content="https://buysell365.pro/about">
-<meta property="og:image" content="https://buysell365.pro/img/og_image.png">
-<link rel="icon" href="/img/bull_bear.png" type="image/png">
-<link rel="canonical" href="https://buysell365.pro/about">
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;line-height:1.7;overflow-x:hidden}}
-:root{{--green:#00ffcc;--blue:#4d9fff;--gold:#fbbf24;--muted:#8b9fc4;--border:rgba(255,255,255,.1)}}
-a{{color:var(--green);text-decoration:none}}
-/* NAV */
-.nav{{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--border);background:rgba(7,9,31,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}}
-.nav-logo{{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;text-decoration:none;color:#fff}}
-.nav-logo img{{width:36px;height:36px;border-radius:50%}}
-.nav-links{{display:flex;gap:24px;font-size:.9rem}}
-.nav-links a{{color:#b0bdd0;text-decoration:none;transition:color .2s}}
-.nav-links a:hover{{color:var(--green)}}
-/* HERO */
-.about-hero{{padding:80px 24px 60px;text-align:center;background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(0,212,170,.1),transparent)}}
-.about-hero h1{{font-size:clamp(2rem,5vw,3.2rem);font-weight:900;line-height:1.2;margin-bottom:16px}}
-.about-hero h1 span{{background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}}
-.about-hero p{{font-size:1.1rem;color:var(--muted);max-width:640px;margin:0 auto 32px}}
-/* STATS ROW */
-.about-stats{{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin:0 auto 60px;max-width:800px}}
-.astat{{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:16px;padding:24px 32px;text-align:center;min-width:160px}}
-.astat-val{{font-size:2rem;font-weight:900;color:var(--green)}}
-.astat-val.gold{{color:var(--gold)}}
-.astat-val.blue{{color:var(--blue)}}
-.astat-label{{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}}
-/* SECTIONS */
-.about-section{{max-width:820px;margin:0 auto;padding:40px 24px}}
-.about-section h2{{font-size:1.6rem;font-weight:800;margin-bottom:20px;color:#fff}}
-.about-section h2 .emoji{{margin-right:8px}}
-.about-section p{{color:#c0cfe0;margin-bottom:16px;font-size:.98rem}}
-/* TIMELINE */
-.timeline{{position:relative;padding-left:28px;border-left:2px solid rgba(0,255,204,.25);margin-bottom:40px}}
-.tl-item{{position:relative;margin-bottom:28px}}
-.tl-dot{{position:absolute;left:-36px;width:16px;height:16px;border-radius:50%;background:var(--green);border:3px solid #07091f;box-shadow:0 0 12px rgba(0,255,204,.5)}}
-.tl-date{{font-size:.8rem;color:var(--green);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}}
-.tl-title{{font-size:1rem;font-weight:700;color:#fff;margin-bottom:4px}}
-.tl-text{{font-size:.9rem;color:var(--muted)}}
-/* CARDS */
-.value-cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px;margin-bottom:40px}}
-.vcard{{background:linear-gradient(145deg,rgba(22,32,53,.95),rgba(14,22,40,.9));border:1px solid var(--border);border-radius:16px;padding:24px}}
-.vcard-icon{{font-size:2rem;margin-bottom:10px}}
-.vcard h4{{color:#fff;font-size:1rem;margin-bottom:8px}}
-.vcard p{{color:var(--muted);font-size:.85rem;line-height:1.6}}
-/* CTA */
-.about-cta{{background:linear-gradient(135deg,rgba(0,212,170,.08),rgba(77,159,255,.06));border:1px solid rgba(0,212,170,.2);border-radius:20px;padding:48px 32px;text-align:center;max-width:820px;margin:0 auto 60px}}
-.about-cta h2{{font-size:1.8rem;font-weight:900;margin-bottom:12px}}
-.about-cta p{{color:var(--muted);margin-bottom:28px}}
-.btn-row{{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}}
-.btn-p{{padding:14px 28px;background:linear-gradient(135deg,#00ffc8,#00a89d);border-radius:12px;color:#000;font-weight:800;font-size:1rem;text-decoration:none;transition:all .3s}}
-.btn-p:hover{{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,255,204,.3)}}
-.btn-s{{padding:14px 28px;background:rgba(255,255,255,.06);border:1px solid rgba(0,255,204,.3);border-radius:12px;color:#00ffc8;font-weight:700;font-size:1rem;text-decoration:none;transition:all .3s}}
-.btn-s:hover{{background:rgba(0,255,204,.1)}}
-/* FOOTER */
-.foot{{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:.8rem;color:var(--muted);margin-top:20px}}
-.foot a{{color:var(--green);margin:0 8px}}
-/* ABOUT HAMBURGER */
-.about-ham{{display:none;background:none;border:none;cursor:pointer;padding:6px;flex-direction:column;gap:5px}}
-.about-ham span{{display:block;width:22px;height:2px;background:#fff;border-radius:2px;transition:all .3s}}
-.about-mobile-menu{{display:none;position:fixed;inset:0;background:rgba(7,9,31,.97);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:20px;backdrop-filter:blur(16px)}}
-.about-mobile-menu.open{{display:flex}}
-.about-mobile-menu a{{color:#fff;font-size:1.3rem;font-weight:600;padding:10px 28px;border-radius:10px;text-decoration:none;transition:all .2s}}
-.about-mobile-menu a:hover{{background:rgba(0,212,170,.15);color:var(--green)}}
-.about-mobile-close{{position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;padding:8px;line-height:1}}
-/* LANG SELECTOR */
-.lang-selector{{position:relative}}
-.lang-btn{{background:rgba(0,212,170,.15);border:2px solid rgba(0,212,170,.5);border-radius:10px;padding:8px 14px;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;gap:6px;transition:all .2s}}
-.lang-btn:hover{{background:rgba(0,212,170,.25);border-color:rgba(0,212,170,.8);box-shadow:0 0 12px rgba(0,212,170,.3)}}
-.lang-menu{{display:none;position:absolute;top:110%;right:0;background:#0d1229;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-width:150px;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,0.4)}}
-.lang-menu a{{display:block;padding:10px 16px;color:#f0f6ff;text-decoration:none;font-size:0.9rem;cursor:pointer;transition:background 0.2s}}
-.lang-menu a:hover{{background:rgba(0,212,170,0.1);color:var(--green)}}
-@media(max-width:640px){{
-  .nav{{padding:12px 16px}}
-  .nav-links{{display:none}}
-  .about-ham{{display:flex}}
-  .about-hero{{padding:60px 16px 40px}}
-  .about-hero h1{{font-size:1.8rem}}
-  .about-hero p{{font-size:.95rem}}
-  .about-stats{{gap:12px;padding:0 12px}}
-  .astat{{min-width:calc(50% - 8px);padding:16px 14px}}
-  .astat-val{{font-size:1.5rem}}
-  .about-section{{padding:28px 16px}}
-  .about-section h2{{font-size:1.3rem}}
-  .about-cta{{padding:28px 16px;margin:0 12px 40px}}
-  .about-cta h2{{font-size:1.4rem}}
-  .btn-row{{flex-direction:column;align-items:center}}
-  .btn-p,.btn-s{{width:100%;max-width:300px;text-align:center}}
-  .timeline{{padding-left:20px}}
-  .tl-dot{{left:-29px;width:14px;height:14px}}
-  .value-cards{{grid-template-columns:1fr 1fr;gap:12px}}
-  .vcard{{padding:18px}}
-}}
-</style>
-</head>
-<body>
-<nav class="nav">
-  <a href="/" class="nav-logo">
-    <img src="/img/bull_bear.png" alt="BS365">
-    <span>BuySell365 <span style="color:var(--green)">Pro</span></span>
-  </a>
-  <div class="nav-links">
-    <a href="/" data-i18n="about.nav.home">Inicio</a>
-    <a href="/dashboard" data-i18n="about.nav.dashboard">Dashboard</a>
-    <a href="/about" style="color:var(--green)" data-i18n="about.nav.about">Qui\u00e9nes Somos</a>
-    <a href="https://t.me/BUYSELL_365_24_7" target="_blank">Telegram</a>
-    <div class="lang-selector" id="langSelector" style="position:relative">
-      <button class="lang-btn" onclick="toggleLangMenu()"><span id="currentFlag">\U0001f1ea\U0001f1f8</span><span style="font-size:12px;color:#00d4aa;font-weight:700">\u25bc</span></button>
-      <div class="lang-menu" id="langMenu">
-        <a onclick="setLang('es')">\U0001f1ea\U0001f1f8 Espa\u00f1ol</a>
-        <a onclick="setLang('en')">\U0001f1fa\U0001f1f8 English</a>
-        <a onclick="setLang('pt')">\U0001f1e7\U0001f1f7 Portugu\u00eas</a>
-        <a onclick="setLang('fr')">\U0001f1eb\U0001f1f7 Fran\u00e7ais</a>
-      </div>
-    </div>
-  </div>
-  <button class="about-ham" id="aboutHam" onclick="document.getElementById('aboutMobileMenu').classList.toggle('open');this.style.display='none'" aria-label="Men\u00fa">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
-<div class="about-mobile-menu" id="aboutMobileMenu">
-  <button class="about-mobile-close" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''">&times;</button>
-  <a href="/" onclick="document.getElementById('aboutMobileMenu').classList.remove('open');document.getElementById('aboutHam').style.display=''" data-i18n="about.mobile.home">&#127968; Inicio</a>
-  <a href="/dashboard" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')" data-i18n="about.mobile.dashboard">&#128200; Dashboard</a>
-  <a href="/about" style="color:var(--green)" onclick="document.getElementById('aboutMobileMenu').classList.remove('open')" data-i18n="about.mobile.about">&#128101; Qui\u00e9nes Somos</a>
-  <a href="https://t.me/BUYSELL_365_24_7" target="_blank" style="background:linear-gradient(135deg,#00d4aa,#00b894);color:#0a0e17;font-weight:700" data-i18n="about.mobile.telegram">&#128172; Telegram</a>
-</div>
-
-<section class="about-hero">
-  <div style="display:inline-block;background:rgba(0,212,170,.12);border:1px solid rgba(0,212,170,.3);border-radius:20px;padding:6px 16px;font-size:12px;color:#00ffc8;margin-bottom:16px;font-weight:600;letter-spacing:1px" data-i18n="about.hero.badge">&#9989; CUENTA REAL MT5 &mdash; RESULTADOS VERIFICADOS</div>
-  <h1 data-i18n="about.hero.title">Trading automatizado en<br><span>GOLD y NASDAQ con IA</span></h1>
-  <p data-i18n="about.hero.subtitle">Creado por Emmanuel Diaz, trader real operando con cuenta verificada en MT5. BuySell365 Pro combina IA propia + se\u00f1ales de canales VIP internacionales para operar GOLD (XAUUSD) y NASDAQ (NAS100) las 24 horas.</p>
-</section>
-
-<div class="about-stats">
-  <div class="astat"><div class="astat-val">{wr}%</div><div class="astat-label" data-i18n="about.stats.winrate">Win Rate Verificado</div></div>
-  <div class="astat"><div class="astat-val blue">{total_ops}+</div><div class="astat-label" data-i18n="about.stats.operations">Operaciones Cerradas</div></div>
-  <div class="astat"><div class="astat-val" style="color:#a855f7">24/5</div><div class="astat-label" data-i18n="about.stats.bot_active">Bot Activo</div></div>
-  <div class="astat"><div class="astat-val gold">MT5</div><div class="astat-label" data-i18n="about.stats.real_account">Cuenta Real MT5</div></div>
-</div>
-
-<section class="about-section">
-  <h2 data-i18n="about.history.title"><span class="emoji">&#128065;</span>Nuestra Historia Real</h2>
-  <p data-i18n="about.history.p1">Mi nombre es <strong>Emmanuel Diaz</strong>, trader retail desde Andorra. Como muchos, empec\u00e9 cometiendo los errores cl\u00e1sicos: dejar correr las p\u00e9rdidas, cortar las ganancias, y operar por emoci\u00f3n.</p>
-  <p data-i18n="about.history.p2">La soluci\u00f3n fue la <strong>automatizaci\u00f3n</strong>. Dise\u00f1\u00e9 un bot de IA que analiza GOLD y NASDAQ cada 3 minutos \u2014 sin emociones, sin fatiga. Adem\u00e1s, integr\u00e9 un <strong>Signal Copier</strong> que replica se\u00f1ales de canales VIP internacionales verificados.</p>
-  <p data-i18n="about.history.p3">BuySell365 Pro no es un producto de marketing. Es la herramienta que <strong>yo mismo uso</strong> para operar en mi cuenta real verificada en MT5. Todos los resultados son p\u00fablicos en el <a href="/dashboard" style="color:#00d4aa">dashboard</a>.</p>
-
-  <h2 style="margin-top:40px" data-i18n="about.timeline.title"><span class="emoji">&#128336;</span>Cronolog\u00eda del Proyecto</h2>
-  <div class="timeline">
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-date" data-i18n="about.timeline.t1.date">Inicio 2026</div>
-      <div class="tl-title" data-i18n="about.timeline.t1.title">Primeras versiones del bot</div>
-      <div class="tl-text" data-i18n="about.timeline.t1.text">Desarrollo del motor de se\u00f1ales con indicadores t\u00e9cnicos e integraci\u00f3n con MT5 v\u00eda MetaTrader5 Python API.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-date" data-i18n="about.timeline.t2.date">Marzo 2026</div>
-      <div class="tl-title" data-i18n="about.timeline.t2.title">Cuenta real MT5 — Lanzamiento VIP</div>
-      <div class="tl-text" data-i18n="about.timeline.t2.text">Apertura de cuenta real, canal VIP en Telegram, y dashboard p\u00fablico con resultados en tiempo real.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot"></div>
-      <div class="tl-date" data-i18n="about.timeline.t3.date">Abril 2026</div>
-      <div class="tl-title" data-i18n="about.timeline.t3.title">Signal Copier + Foco en GOLD y NASDAQ</div>
-      <div class="tl-text" data-i18n="about.timeline.t3.text" data-i18n-vars='{{"ops":"{total_ops}","wr":"{wr}"}}'>{total_ops}+ operaciones cerradas, {wr}% win rate. Integraci\u00f3n de Signal Copier con canales VIP internacionales. Especializaci\u00f3n en GOLD y NASDAQ.</div>
-    </div>
-    <div class="tl-item">
-      <div class="tl-dot" style="background:var(--gold)"></div>
-      <div class="tl-date" style="color:var(--gold)" data-i18n="about.timeline.t4.date">Pr\u00f3ximo</div>
-      <div class="tl-title" data-i18n="about.timeline.t4.title">Verificaci\u00f3n Myfxbook + Expansi\u00f3n</div>
-      <div class="tl-text" data-i18n="about.timeline.t4.text">Integraci\u00f3n con Myfxbook para verificaci\u00f3n independiente de resultados. Escalado a m\u00e1s activos y m\u00e1s capital.</div>
-    </div>
-  </div>
-</section>
-
-<section class="about-section" style="padding-top:0">
-  <h2 data-i18n="about.values.title"><span class="emoji">&#127775;</span>Nuestros Valores</h2>
-  <div class="value-cards">
-    <div class="vcard">
-      <div class="vcard-icon">&#128202;</div>
-      <h4 data-i18n="about.values.v1.title">Transparencia Total</h4>
-      <p data-i18n="about.values.v1.text">Todos los resultados son p\u00fablicos y en tiempo real. No editamos ni ocultamos operaciones perdedoras.</p>
-    </div>
-    <div class="vcard">
-      <div class="vcard-icon">&#129302;</div>
-      <h4 data-i18n="about.values.v2.title">IA Real, No Marketing</h4>
-      <p data-i18n="about.values.v2.text">El bot analiza datos de mercado cada 3 minutos con algoritmos propios. Sin se\u00f1ales manuales ni opiniones.</p>
-    </div>
-    <div class="vcard">
-      <div class="vcard-icon">&#128176;</div>
-      <h4 data-i18n="about.values.v3.title">Tu Capital es Tuyo</h4>
-      <p data-i18n="about.values.v3.text">Tu dinero est\u00e1 siempre en tu propia cuenta del broker. Nosotros nunca tocamos tu capital.</p>
-    </div>
-    <div class="vcard">
-      <div class="vcard-icon">&#128101;</div>
-      <h4 data-i18n="about.values.v4.title">Comunidad Primero</h4>
-      <p data-i18n="about.values.v4.text">Crecemos con nuestros usuarios. Su \u00e9xito es nuestro \u00e9xito. Sin contratos ni letras peque\u00f1as.</p>
-    </div>
-  </div>
-</section>
-
-<section style="padding:0 24px 60px">
-  <div class="about-cta">
-    <div style="font-size:2.5rem;margin-bottom:12px">&#128640;</div>
-    <h2 data-i18n="about.cta.title">&#218;nete a BuySell365 Pro</h2>
-    <p data-i18n="about.cta.subtitle">Accede a las se\u00f1ales del Canal VIP. Sin contratos, cancela cuando quieras.</p>
-    <div class="btn-row">
-      <a href="https://t.me/Andoperandobot?start=vip" target="_blank" rel="noopener" class="btn-p" data-i18n="about.cta.btn_vip">&#128081; Canal VIP Pro</a>
-      <a href="/dashboard" class="btn-s" data-i18n="about.cta.btn_results">&#128202; Ver Resultados</a>
-    </div>
-  </div>
-</section>
-
-<footer class="foot">
-  <a href="/" data-i18n="about.footer.home">Inicio</a>
-  <a href="/dashboard" data-i18n="about.footer.dashboard">Dashboard</a>
-  <a href="/terminos" data-i18n="about.footer.terms">T\u00e9rminos</a>
-  <a href="/privacidad" data-i18n="about.footer.privacy">Privacidad</a>
-  <a href="mailto:soporte@buysell365.pro">soporte@buysell365.pro</a>
-  <p style="margin-top:12px" data-i18n="about.footer.rights">\u00a9 2026 BuySell365 Pro &mdash; Todos los derechos reservados</p>
-  <p style="margin-top:6px;font-size:0.75rem;color:#8b949e" data-i18n="about.footer.creator">Creador: Emmanuel Diaz</p>
-</footer>
-
-<script>
-(function(){{
-  var FLAGS = {{es:'\U0001f1ea\U0001f1f8',en:'\U0001f1fa\U0001f1f8',pt:'\U0001f1e7\U0001f1f7',fr:'\U0001f1eb\U0001f1f7'}};
-  var SUPPORTED = ['es','en','pt','fr'];
-  var currentLang = 'es';
-  function detectLang(){{
-    var saved = localStorage.getItem('buysell365_lang');
-    if(saved && SUPPORTED.indexOf(saved) !== -1) return saved;
-    var nav = (navigator.language || navigator.userLanguage || 'es').toLowerCase();
-    if(nav.indexOf('en') === 0) return 'en';
-    if(nav.indexOf('pt') === 0) return 'pt';
-    if(nav.indexOf('fr') === 0) return 'fr';
-    return 'es';
-  }}
-  function applyTranslations(tr){{
-    document.querySelectorAll('[data-i18n]').forEach(function(el){{
-      var key = el.getAttribute('data-i18n');
-      if(tr[key]){{
-        var text = tr[key];
-        var vars = el.getAttribute('data-i18n-vars');
-        if(vars){{ try{{ var obj=JSON.parse(vars); Object.keys(obj).forEach(function(k){{ text=text.replace('{{{{'+k+'}}}}',obj[k]); }}); }}catch(e){{}} }}
-        if(text.indexOf('<br') !== -1 || text.indexOf('<span') !== -1 || text.indexOf('<strong') !== -1 || text.indexOf('<a ') !== -1){{ el.innerHTML = text; }}
-        else{{ el.textContent = text; }}
-      }}
-    }});
-    document.documentElement.lang = currentLang;
-    var flagEl = document.getElementById('currentFlag');
-    if(flagEl) flagEl.textContent = FLAGS[currentLang] || '\U0001f1ea\U0001f1f8';
-  }}
-  function loadLang(lang){{
-    if(SUPPORTED.indexOf(lang) === -1) lang = 'es';
-    fetch('/i18n/' + lang + '.json')
-      .then(function(r){{ return r.json(); }})
-      .then(function(data){{ currentLang = lang; localStorage.setItem('buysell365_lang', lang); applyTranslations(data); }})
-      .catch(function(err){{ console.warn('i18n load failed:', err); }});
-  }}
-  window.toggleLangMenu = function(){{
-    var menu = document.getElementById('langMenu');
-    if(menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-  }};
-  window.setLang = function(lang){{ loadLang(lang); var menu = document.getElementById('langMenu'); if(menu) menu.style.display = 'none'; }};
-  document.addEventListener('click', function(e){{
-    var sel = document.getElementById('langSelector');
-    if(sel && !sel.contains(e.target)){{ var menu = document.getElementById('langMenu'); if(menu) menu.style.display = 'none'; }}
-  }});
-  var lang = detectLang();
-  if(lang !== 'es') loadLang(lang);
-  else{{ currentLang = 'es'; localStorage.setItem('buysell365_lang', 'es'); var flagEl = document.getElementById('currentFlag'); if(flagEl) flagEl.textContent = FLAGS['es']; }}
-}})();
-</script>
-</body>
-</html>"""
+    """Ruta legacy — Quienes Somos ahora forma parte de la landing principal.
+    Redirect 301 a / para preservar SEO.
+    """
+    return redirect("/", code=301)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -3319,7 +2167,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 
 <div class="trust">
 <p>BuySell365 Pro &mdash; Resultados reales, verificados en MT5</p>
-<p style="margin-top:8px"><a href="https://buysell365.pro" style="color:#4d9fff;text-decoration:none">buysell365.pro</a> &middot; <a href="https://buysell365.pro/about" style="color:#4d9fff;text-decoration:none">Qui&eacute;nes somos</a> &middot; <a href="https://buysell365.pro/terminos" style="color:#4d9fff;text-decoration:none">T&eacute;rminos</a></p>
+<p style="margin-top:8px"><a href="https://buysell365.pro" style="color:#4d9fff;text-decoration:none">buysell365.pro</a> &middot; <a href="https://buysell365.pro/terminos" style="color:#4d9fff;text-decoration:none">T&eacute;rminos</a></p>
 </div>
 
 </body>
@@ -3343,7 +2191,7 @@ def pagina_terminos():
 <h2>7. Disponibilidad</h2><p>Trabajamos para mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida. Puede haber pausas por mantenimiento o actualizaciones.</p>
 <h2>8. Modificaciones</h2><p>Podemos actualizar estos t&eacute;rminos en cualquier momento. Los cambios se publican en esta p&aacute;gina. El uso continuado del servicio implica la aceptaci&oacute;n de los cambios.</p>
 <h2>9. Contacto</h2><p><a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a> en Telegram.</p>
-<a href="/dashboard" class="back">&larr; Volver</a>
+<a href="/" class="back">&larr; Volver</a>
 <p style="margin-top:30px;font-size:0.75rem;color:#8b949e;text-align:center">&copy; 2026 BuySell365 Pro &mdash; Creador: Emmanuel Diaz</p>
 </div></body></html>"""
 
@@ -3361,7 +2209,7 @@ def pagina_privacidad():
 <h2>4. Almacenamiento y Seguridad</h2><ul><li>Servidor privado con acceso restringido.</li><li>Comunicaci&oacute;n web cifrada con HTTPS.</li><li>Datos en formato JSON en el servidor, sin base de datos externa.</li><li>No compartimos tus datos con terceros.</li></ul>
 <h2>5. Tus Derechos</h2><p>Tienes derecho a acceso, rectificaci&oacute;n, eliminaci&oacute;n y portabilidad de tus datos. Contacta: <a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a></p>
 <h2>6. Cookies y Analytics</h2><p>Esta web usa Google Analytics (gtag.js) para medir el tr&aacute;fico de forma an&oacute;nima. Google Analytics puede usar cookies propias. No usamos tracking de publicidad ni vendemos datos. Puedes desactivar Google Analytics desde la configuraci&oacute;n de tu navegador.</p>
-<a href="/dashboard" class="back">&larr; Volver</a>
+<a href="/" class="back">&larr; Volver</a>
 <p style="margin-top:30px;font-size:0.75rem;color:#8b949e;text-align:center">&copy; 2026 BuySell365 Pro &mdash; Creador: Emmanuel Diaz</p>
 </div></body></html>"""
 
@@ -3377,8 +2225,6 @@ def sitemap():
     base = "https://buysell365.pro"
     urls = [
         {"loc": f"{base}/", "changefreq": "daily", "priority": "1.0"},
-        {"loc": f"{base}/dashboard", "changefreq": "always", "priority": "0.9"},
-        {"loc": f"{base}/about", "changefreq": "weekly", "priority": "0.7"},
         {"loc": f"{base}/terminos", "changefreq": "monthly", "priority": "0.4"},
         {"loc": f"{base}/privacidad", "changefreq": "monthly", "priority": "0.4"},
     ]
@@ -3434,7 +2280,7 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api/') || url.pathname === '/dashboard') return;
+  if (url.pathname.startsWith('/api/')) return;
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       const networkFetch = fetch(event.request).then(function(response) {
