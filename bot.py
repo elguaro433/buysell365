@@ -184,9 +184,6 @@ if not TELEGRAM_TOKEN:
     raise RuntimeError("❌ TELEGRAM_TOKEN no configurado en .env — bot no puede arrancar sin token")
 BOT_USERNAME   = "Andoperandobot"  # Username del bot (sin @) — usado en URLs de t.me
 
-# FIX 2026-04-21: Flag para mostrar/ocultar TODO rastro del Copy Trading.
-# Servicio pausado por el usuario. Para reactivar: COPY_TRADING_ENABLED=true en .env
-COPY_TRADING_ENABLED = os.getenv("COPY_TRADING_ENABLED", "false").lower() in ("true", "1", "yes")
 CHANNEL_ID     = os.getenv("CHANNEL_ID", "-1003729609114").strip()
 # 👥 Grupo de Logs/Alertas (Entrada: https://t.me/BUYSELL_365_24_7)
 GROUP_ID       = os.getenv("GROUP_ID", "@BUYSELL_365_24_7").strip()
@@ -421,6 +418,8 @@ _depositos_procesados_vip: set = set()       # TxIDs ya procesados (evitar dupli
 _vip_trials_usados: set = set()              # User IDs que ya usaron trial gratis (promo única)
 _trial_intentos: dict = {}                   # {user_id: int} — intentos de trial (máx 3)
 _cache_miembros: dict = {}                   # {user_id: (timestamp, bool)} — caché getChatMember TTL 300s
+_cooldown_bienvenida: dict = {}              # {user_id: timestamp} — evitar spam de bienvenida (max 5000 entries)
+_MAX_COOLDOWN_ENTRIES = 5000
 _ultima_auditoria: float = 0.0              # Timestamp última auditoría de membresías
 _codigos_invitacion: dict = {}              # {code: {creado_por, dias, creado, max_usos, usos, usado_por}}
 _ultimo_reporte_diario: str = ""            # "YYYY-MM-DD" — evita enviar doble
@@ -3379,8 +3378,7 @@ def _ejecutar_senal_manual(senal: dict, chat_id: str, nombre_admin: str = "Admin
     ind_mock = {'estrategia': 'manual', 'confianza_total': 100}
     msg_canal = mensaje_nueva_senal(nombre, ticker, tipo, entrada, niveles, ind_mock, 5, [], fuente="Manual", premium=True, nivel_senal="PREMIUM")
     enviar_canal(msg_canal, teclado={"inline_keyboard": [
-        [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-         {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+        [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
     ]})
 
     # Confirmar resultado
@@ -5269,30 +5267,6 @@ def cmd_como():
         "4️⃣ *Gestión Estricta del Capital*\n"
         "   Si la auditoría es EXITOSA, te entregamos una Entrada precisa, un Stop Loss para proteger tu dinero, y un objetivo de ganancia (TP) calculado por Volatilidad (ATR).\n\n"
         "💡 *Consejo:* Escribe el nombre de un activo (Ej: *Oro*) para que te dé el pronóstico inmediato de lo que sucederá."
-    )
-
-def cmd_broker():
-    return (
-        "🏦 *BROKER RECOMENDADO — XM*\n"
-        "━━━━━━━━━━\n\n"
-        "🎁 *BONO EXCLUSIVO: 100% hasta $100 en tu primer depósito*\n\n"
-        "✅ BuySell365 Pro opera sobre *XM Global* — broker regulado internacionalmente.\n\n"
-        "📋 *¿Por qué XM?*\n"
-        "   • Regulado CySEC · ASIC · FCA\n"
-        "   • +5 millones de clientes en 196 países\n"
-        "   • Depósito mínimo: *$5 USD*\n"
-        "   • Spread desde 0 pips (Ultra Low)\n"
-        "   • Ejecución sin re-quotes\n"
-        "   • App iOS y Android ✅\n"
-        "   • Fondos en cuentas segregadas 🔒\n\n"
-        "⚡ *Regístrate con nuestro código de afiliado:*\n"
-        "   🔑 Código: *6CTHK*\n\n"
-        "👇 Pulsa el botón — son 2 minutos:",
-        {"inline_keyboard": [
-            [{"text": "🎁 Abrir Cuenta + Bono 100% hasta $100", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}],
-            [{"text": "📱 Descargar App XM", "url": "https://affs.click/dy3cG"}],
-            [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-        ]}
     )
 
 def cmd_riesgo():
@@ -8758,16 +8732,15 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             f"🎯 TP: {fmt(tp, ticker)}\n"
             f"🛡️ SL: {fmt(sl, ticker)}"
         )
-        _xm_teclado = {"inline_keyboard": [
-            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-             {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+        _teclado_vip = {"inline_keyboard": [
+            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
         ]}
 
         # Ejecutar en MT5 si está activo
         if MT5_AVAILABLE and AUTO_TRADING:
             exito = ejecutar_orden_mt5(ticker, tipo, CAPITAL_USUARIO, RIESGO_POR_TRADE, entrada, sl, tp)
             if exito:
-                enviar_canal(_msg_canal, teclado=_xm_teclado)
+                enviar_canal(_msg_canal, teclado=_teclado_vip)
                 return f"✅ *SEÑAL EJECUTADA y enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre} @ {_entry_d}\nSL: {fmt(sl, ticker)} | TP: {fmt(tp, ticker)}"
             else:
                 admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
@@ -8778,11 +8751,11 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                         admin_id
                     )
                 # Aunque MT5 falle, enviar la señal al canal VIP
-                enviar_canal(_msg_canal, teclado=_xm_teclado)
+                enviar_canal(_msg_canal, teclado=_teclado_vip)
                 return f"⚠️ MT5 falló pero la señal fue enviada al canal VIP."
         else:
             # MT5 desactivado — enviar señal al canal VIP de todas formas
-            enviar_canal(_msg_canal, teclado=_xm_teclado)
+            enviar_canal(_msg_canal, teclado=_teclado_vip)
             return f"✅ *Señal enviada al canal VIP*\n{_emoji} {_dir_es} {_nombre}\n📍 {_entry_d} | 🎯 {fmt(tp)} | 🛡️ {fmt(sl)}"
 
     # ── 1. COMANDOS EXACTOS CON SLASH (máxima prioridad) ─────
@@ -8922,8 +8895,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 "inline_keyboard": [
                     [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
-                    [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                     {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
                 ]
             }
@@ -8953,9 +8925,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             start_botones = {
                 "inline_keyboard": [
                     [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}],
-                    [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],                    [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
                     [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
                 ]
             }
@@ -9028,8 +8998,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                      {"text": "📉 Resumen Semanal",   "callback_data": "/semana"}],
                     [{"text": "⏰ Horarios",           "callback_data": "/horarios"},
                      {"text": "📌 Estado del Bot",    "callback_data": "/estado"}],
-                    [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                     {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                 ]}
             )
@@ -9159,8 +9128,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 [{"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
                 [{"text": "🔍 Análisis de Mercado", "callback_data": "/analisis_eurusd"},
                  {"text": "💎 Ver Planes VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                 {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
                 [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
             ]
         }
@@ -9215,10 +9183,6 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return cmd_precios_tv()
     if t in ("/web", "web", "web en vivo", "/dashboard", "dashboard", "📊 web en vivo"):
         return cmd_url_dashboard()
-    if t in ("/broker", "broker", "xm", "abrir cuenta", "cuenta xm", "cuenta real",
-             "donde operar", "que broker", "que broker usar", "broker recomendado", "que broker usas",
-             "registrarme", "como me registro", "donde me registro"):
-        return cmd_broker()
     if t in ("/mercados", "mercados", "activos", "/activos", "que activos", "que mercados"):
         return cmd_mercados()
     if t in ("/mis alertas", "/alertas", "mis alertas", "alertas"):
@@ -9238,18 +9202,16 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                              "quiero acceso", "me interesa el vip", "suscribirme al")):
         return cmd_vip(user_id=remitente)
 
-    # ── COPY TRADING — DESACTIVADO TEMPORALMENTE 2026-04-21 ──
-    # Servicio pausado por el usuario. Si alguien pregunta por copy trading,
-    # respondemos amablemente que está pausado y ofrecemos el canal VIP.
-    if (COPY_TRADING_ENABLED is False) and (
-        t in ("/copy", "/copytrading", "/copy_trading", "copy", "copytrading", "copy trading",
+    # ── COPY TRADING — SERVICIO ELIMINADO ──
+    # Si alguien pregunta, redirigimos al Canal VIP (único servicio vigente).
+    if (t in ("/copy", "/copytrading", "/copy_trading", "copy", "copytrading", "copy trading",
               "copiar operaciones", "copiar senales", "copiar señales") or
         any(p in t for p in ("copy trading", "copytrading", "copiar operaciones",
                              "copiar trades", "como copio", "quiero copiar",
                              "copiar automatico", "copia automatica"))):
         return (
-            "🛠️ *Servicio temporalmente pausado*\n\n"
-            "Estamos optimizando esta función. Mientras tanto puedes recibir nuestras señales en tiempo real:\n\n"
+            "💎 *Nuestro servicio es el Canal VIP*\n\n"
+            "No ofrecemos Copy Trading. Te damos señales con entrada, TP y SL exactos — tú decides cuándo entrar.\n\n"
             "📡 Canal VIP — entrada, TP y SL exactos\n"
             "🔍 Análisis bajo petición de cualquier activo\n"
             "💎 Suscripción mensual\n\n"
@@ -9257,32 +9219,6 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             {"inline_keyboard": [
                 [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
                 [{"text": "📊 Ver Rendimiento en Vivo", "url": "https://buysell365.pro"}],
-            ]}
-        )
-    if COPY_TRADING_ENABLED and (t in ("/copy", "/copytrading", "/copy_trading", "copy", "copytrading", "copy trading",
-             "copiar operaciones", "copiar senales", "copiar señales") or
-       any(p in t for p in ("copy trading", "copytrading", "copiar operaciones",
-                             "copiar trades", "como copio", "quiero copiar",
-                             "copiar automatico", "copia automatica"))):
-        return (
-            "🤖 *COPY TRADING — BuySell365 Pro*\n"
-            "━━━━━━━━━━\n\n"
-            "⚡ Tu cuenta opera *automáticamente* 24/7\n"
-            "📍 Entrada · 🎯 TP · 🛡️ SL — todo automático\n"
-            "🏦 Sobre *XM* — broker regulado (CySEC, ASIC)\n"
-            "🔒 +5M clientes · fondos segregados\n"
-            "💰 *Sin mensualidad — pagas solo si ganas*\n\n"
-            "3️⃣ pasos para empezar:\n"
-            "1️⃣ Regístrate en XM con código *6CTHK* _(gratis, 2 min)_\n"
-            "2️⃣ Copia la estrategia *BuySell365Pro*\n"
-            "3️⃣ Tu cuenta opera sola 🚀\n\n"
-            "⚠️ _Debes registrarte con el código *6CTHK* para que el copy funcione correctamente._\n\n"
-            "👇 Pulsa el botón para activarlo ahora:",
-            {"inline_keyboard": [
-                [{"text": "🚀 ACTIVAR COPY TRADING AHORA", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}],
-                [{"text": "🏦 Abrir Cuenta XM con Código 6CTHK", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}],
-                [{"text": "📊 Ver Rendimiento en Vivo", "url": "https://buysell365.pro"}],
-                [{"text": "💎 Canal VIP — Señales", "callback_data": "vip_pagar_usdt"}],
             ]}
         )
 
@@ -10219,11 +10155,6 @@ section{{padding:50px 20px}}
       </ul>
       <a href="https://t.me/{BOT_USERNAME}?start=vip" target="_blank" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" data-i18n="pricing.start_trial">Suscribirme al VIP</a>
     </div>
-    <!-- FIX 2026-04-21: Card de Copy Trading oculta — servicio temporalmente pausado -->
-    <div class="price-card" style="position:relative;display:none;">
-      <div class="price-name">Copy Trading</div>
-      <div class="price-amount">Servicio temporalmente pausado</div>
-    </div>
   </div>
 </section>
 
@@ -10249,11 +10180,6 @@ section{{padding:50px 20px}}
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q4">\u00bfQu\u00e9 broker necesito?</div>
       <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para mejor ejecuci\u00f3n.</div>
-    </div>
-    <!-- FIX 2026-04-21: FAQ de Copy Trading oculta — servicio temporalmente pausado -->
-    <div class="faq-item" style="display:none;" onclick="this.classList.toggle('open')">
-      <div class="faq-q">Copy Trading</div>
-      <div class="faq-a">Servicio temporalmente pausado.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q5">\u00bfC\u00f3mo cancelo mi suscripci\u00f3n VIP?</div>
@@ -10693,7 +10619,7 @@ def api_winning_trades():
 
 @app.route("/api/mt5_realtime")
 def api_mt5_realtime():
-    """API: datos en tiempo real desde monitor_real.py (cuenta XM 88849791).
+    """API: datos en tiempo real desde monitor_real.py (cuenta MT5 real).
     Devuelve posiciones abiertas, historial del día y estadísticas live."""
     try:
         import json as _jrt
@@ -10966,8 +10892,6 @@ def pagina_terminos():
     <h2 data-i18n="terms.s7_title">7. Disponibilidad del Servicio</h2>
     <p data-i18n="terms.s7_text">Nos esforzamos por mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida.
     Pueden ocurrir interrupciones por mantenimiento, actualizaciones t&eacute;cnicas o causas de fuerza mayor.</p>
-
-    <!-- FIX 2026-04-21: Sección Copy Trading oculta — servicio temporalmente pausado -->
 
     <h2 data-i18n="terms.s8_title">8. Modificaciones</h2>
     <p data-i18n="terms.s8_text">Nos reservamos el derecho de modificar estos t&eacute;rminos en cualquier momento. Los cambios ser&aacute;n
@@ -11585,7 +11509,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     <!-- CUENTA REAL MT5 -->
     {"" if not _rt else f"""
     <div class="card" style="margin-bottom:24px;border-color:rgba(0,212,170,.3)">
-        <div class="card-title" style="color:var(--primary)">&#128178; Cuenta Real XM &mdash; {_rt.get('last_update','')}</div>
+        <div class="card-title" style="color:var(--primary)">&#128178; Cuenta Real MT5 &mdash; {_rt.get('last_update','')}</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
             <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
                 <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Balance</div>
@@ -13016,8 +12940,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         # Enviar a Telegram (solo en horario)
         enviar_canal(msg, teclado={"inline_keyboard": [
-            [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-             {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
         ]})
 
         # Actualizar la reserva con datos finales (MT5 result, etc.)
@@ -14535,11 +14458,10 @@ def analizar_activo(nombre, ticker):
 
             guardar_estado()
             _skip_razon_display = _skip_mt5_razon if _skip_mt5 else ""
-            _xm_btn_senal = {"inline_keyboard": [
-                [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                 {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+            _btn_senal_vip = {"inline_keyboard": [
+                [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
             ]}
-            _msg_canal_id = enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_xm_btn_senal)
+            _msg_canal_id = enviar_canal(mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razones, fuente=fuente_precio, premium=_es_premium, skip_mt5_razon=_skip_razon_display, nivel_senal=_nivel_senal), teclado=_btn_senal_vip)
             # Guardar message_id INMEDIATAMENTE para que TP/SL haga reply correcto
             if op_id:
                 with _lock_ops:
@@ -15723,9 +15645,6 @@ def loop_escaneo():
         time.sleep(INTERVALO_ESCANEO)
 
 
-_cooldown_bienvenida: dict = {}  # {user_id: timestamp} — evitar spam de bienvenida (max 5000 entries)
-_MAX_COOLDOWN_ENTRIES = 5000
-
 def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     """Redirige al usuario al chat privado con menú completo de ayuda.
     En el grupo solo muestra un aviso breve que se auto-borra."""
@@ -15883,7 +15802,6 @@ def loop_polling():
             {"command": "sentimiento", "description": "Fear & Greed index"},
             {"command": "vip", "description": "Acceso VIP premium"},
             {"command": "web", "description": "Dashboard web en vivo"},
-            {"command": "broker", "description": "🏦 Broker recomendado XM"},
             {"command": "ayuda", "description": "Lista de comandos"},
         ]
         # Comandos públicos (todos los usuarios)
@@ -16317,8 +16235,7 @@ def loop_polling():
                                              {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
                                             [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
                                              {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
-                                            [{"text": "🎁 Abrir cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                                             {"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                                            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
                                             [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                                         ]
                                     }
@@ -16918,7 +16835,7 @@ SERVICES: VIP Channel (signals with Entry+SL+TP), análisis bajo petición de cu
 RULES:
 - MAX 500 characters. Be warm, professional and helpful.
 - If user asks about signals/trading → mention VIP channel and invite to write /vip
-- If user asks about copy trading → say it's temporarily paused, invite them to subscribe to VIP channel meanwhile
+- If user asks about copy trading → say we don't offer that service, we focus on VIP signals (entry/TP/SL) and invite them to /vip
 - If asking about open positions → show MT5 positions with P&L
 - If asking about a pair → give trend + RSI if available
 - If asking "how's it going" → brief daily summary (pips, wins, losses)
@@ -17042,7 +16959,7 @@ def _procesar_ia_telegram(texto, chat_id, user_id, nombre, es_grupo_publico=Fals
         _extra = ("Usuario nuevo en chat privado interesado en el servicio. "
                   "Responde de forma comercial y amigable. "
                   "Si pregunta por señales o VIP, explica brevemente el servicio y dile que pulse /vip para ver los planes. "
-                  "Si pregunta por copy trading, di que está temporalmente pausado y ofrécele el Canal VIP. "
+                  "Si pregunta por copy trading, aclara que no ofrecemos ese servicio — solo señales VIP con entry/TP/SL. Invítale al Canal VIP. "
                   "Sé conciso — máximo 4-5 líneas.")
     else:
         _extra = "Usuario del grupo público — atención al cliente. Si pregunta por señales o VIP, invítalo a escribir /vip en privado."

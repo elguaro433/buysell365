@@ -96,11 +96,6 @@ SYMBOL_MAP = {
 MAGIC_COPIER = 20260325
 TWELVE_KEY = os.getenv("TWELVE_DATA_KEY", "")
 
-# FIX 2026-04-21: Flag para mostrar/ocultar TODO rastro del servicio Copy Trading.
-# El usuario tiene el servicio pausado temporalmente. Cuando vuelva a activarlo,
-# poner True (o exportar COPY_TRADING_ENABLED=true en el entorno).
-COPY_TRADING_ENABLED = os.getenv("COPY_TRADING_ENABLED", "false").lower() in ("true", "1", "yes")
-
 # Mapa de nombres para display — FIX 2026-04-21: ORO unificado (no XAU/GOLD/XAUUSD)
 # Por petición del usuario: a partir de hoy el oro siempre se llama "ORO" en mensajes.
 _DISPLAY_MAP = {
@@ -2109,12 +2104,10 @@ async def _loop_promo_reportes() -> None:
 
     _sent_today: dict = {}  # {"12": "2026-04-08", "17": "2026-04-08"}
 
-    # FIX 2026-04-21: Botón Copy Trading oculto (servicio pausado).
-    # Cuando el usuario reactive el servicio, basta con setear COPY_TRADING_ENABLED=true.
-    _promo_rows = []
-    if COPY_TRADING_ENABLED:
-        _promo_rows.append([{"text": "🤖 Empezar Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"}])
-    _promo_rows.append([{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}])
+    _promo_rows = [
+        [{"text": "💎 VER CANAL VIP", "url": f"https://t.me/{os.getenv('BOT_USERNAME','Andoperandobot')}?start=vip"}],
+        [{"text": "🌐 Dashboard en vivo", "url": "https://buysell365.pro"}],
+    ]
     _promo_buttons = json.dumps({"inline_keyboard": _promo_rows})
 
     while True:
@@ -2618,6 +2611,15 @@ def parse_signal(text, chat_title=""):
     """Parse trading signal from text. Returns dict or None.
     Soporta formatos: SureShotFX, Learn2Trade VIP.
     """
+    try:
+        return _parse_signal_impl(text, chat_title)
+    except Exception as _e_parse:
+        log.exception(f"parse_signal crash en [{chat_title}]: {_e_parse} | text={text[:120].replace(chr(10),' ')!r}")
+        return None
+
+
+def _parse_signal_impl(text, chat_title=""):
+    """Implementación real de parse_signal (envuelta con try/except defensivo)."""
     if not text or len(text) < 10:
         return None
 
@@ -3480,7 +3482,7 @@ def send_to_channel(signal, executed, detail):
             _razon_partial = "Protegemos ganancia cerrando parte."
 
         # FIX 2026-04-17: tp_partial = TP intermedio → la posición sigue corriendo
-        _tp_lvl = update.get("tp_level", 0) if isinstance(update, dict) else 0
+        _tp_lvl = signal.get("tp_level", 0) if isinstance(signal, dict) else 0
         _tp_partial_msg = (
             f"🎯 *TP{_tp_lvl} ALCANZADO* — {_pair_d}\n"
             f"✅ Nivel asegurado. La operación *sigue corriendo* hasta el próximo objetivo."
@@ -3606,7 +3608,7 @@ def send_to_channel(signal, executed, detail):
                 # FIX 2026-04-17: tp_partial (TP intermedio) → avanzar _tp_idx y registrar
                 # en stats sin limpiar la señal. La posición MT5 sigue corriendo.
                 if _action == "tp_partial":
-                    _tp_lvl_adv = update.get("tp_level", 0) if isinstance(update, dict) else 0
+                    _tp_lvl_adv = signal.get("tp_level", 0) if isinstance(signal, dict) else 0
                     with _signals_lock:
                         for _sid_p, _sdata_p in _open_signals.items():
                             _s_p = _sdata_p.get("signal", {})
@@ -3742,15 +3744,10 @@ def send_to_channel(signal, executed, detail):
             {"text": "💬 Pedir análisis de otro activo", "url": f"https://t.me/{_BOT_USERNAME}?start=analisis"},
         ],
     ]
-    # Fila 4: afiliado XM (+ Copy Trading solo si está activo)
-    _xm_row = [{"text": "🎁 Abrir Cuenta XM — Bono 100%", "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"}]
-    if COPY_TRADING_ENABLED:
-        _xm_row.append({"text": "🤖 Copy Trading", "url": "https://social.tp-redirect.com/s/WRE0V7jm"})
-    _btn_rows.append(_xm_row)
     _xm_buttons = {"inline_keyboard": _btn_rows}
 
     # FIX 2026-04-08: Gráfica SOLO en TP/SL HIT, NO en señales nuevas
-    # Las señales nuevas solo llevan texto + botones XM
+    # Las señales nuevas solo llevan texto + botones de análisis
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     _payload = {
@@ -4104,7 +4101,7 @@ async def main():
                     log.info(f"📡 UPDATE MT5: {'✅' if executed else '❌'} {detail}")
 
         except Exception as e:
-            log.error(f"Error processing message: {e}")
+            log.exception(f"Error processing message: {e}")
 
     # ══════════════════════════════════════════════════════════════
     # Handler de mensajes EDITADOS — captura cuando el canal aliado
@@ -4199,7 +4196,7 @@ async def main():
             _published_msg_ids.add(msg_id)
 
         except Exception as e:
-            log.error(f"Error en edit_handler: {e}")
+            log.exception(f"Error en edit_handler: {e}")
 
     log.info("📡 Signal Copier iniciando...")
     log.info(f"📡 API ID: {API_ID}")

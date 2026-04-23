@@ -94,23 +94,12 @@ def build_message(pair, direction, entry, sl, tp, tp2=0, tp3=0, tp4=0, tp5=0):
 
 
 def send_to_telegram(msg):
-    """Envía mensaje al canal VIP con botones XM. Retorna msg_id o None."""
-    xm_buttons = {
-        "inline_keyboard": [
-            [
-                {"text": "\U0001f381 Abrir Cuenta XM \u2014 Bono 100%",
-                 "url": "https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1"},
-                {"text": "\U0001f916 Copy Trading (ya tengo cuenta)",
-                 "url": "https://social.tp-redirect.com/s/WRE0V7jm"},
-            ]
-        ]
-    }
+    """Envía mensaje al canal VIP. Retorna msg_id o None."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": CHANNEL_ID,
         "text": msg,
         "parse_mode": "Markdown",
-        "reply_markup": xm_buttons,
     }
     for intento in range(3):
         try:
