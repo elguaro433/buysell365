@@ -1011,120 +1011,6 @@
             text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
         }
 
-        /* ===== XM BROKER ELEMENTS ===== */
-        .xm-header-btn {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            background: linear-gradient(135deg, #b8960a 0%, #FFD700 50%, #b8960a 100%);
-            color: #000;
-            border: none;
-            border-radius: 8px;
-            padding: 6px 11px;
-            font-size: 11px;
-            font-weight: 700;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
-            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.25);
-        }
-        .xm-header-btn:hover {
-            box-shadow: 0 4px 16px rgba(255, 215, 0, 0.5);
-            transform: translateY(-1px);
-        }
-        .xm-broker-card {
-            background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(28,26,8,0.95) 100%);
-            border: 1px solid rgba(255, 215, 0, 0.3);
-            border-radius: 16px;
-            padding: 24px 20px;
-            margin: 20px 0;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .xm-broker-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #FFD700, transparent);
-        }
-        .xm-broker-logo {
-            font-size: 30px;
-            font-weight: 900;
-            color: #FFD700;
-            letter-spacing: 3px;
-            margin-bottom: 4px;
-        }
-        .xm-broker-subtitle {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 16px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .xm-broker-features {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 18px;
-        }
-        .xm-feature-pill {
-            background: rgba(255, 215, 0, 0.07);
-            border: 1px solid rgba(255, 215, 0, 0.2);
-            border-radius: 20px;
-            padding: 4px 11px;
-            font-size: 11px;
-            color: #FFD700;
-        }
-        .xm-code-badge {
-            background: rgba(255, 215, 0, 0.1);
-            border: 1px solid rgba(255, 215, 0, 0.4);
-            border-radius: 8px;
-            padding: 8px 16px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: #FFD700;
-            display: inline-block;
-        }
-        .xm-code-badge span {
-            font-weight: 900;
-            font-size: 15px;
-            letter-spacing: 2px;
-        }
-        .xm-broker-cta {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: linear-gradient(135deg, #b8960a 0%, #FFD700 50%, #b8960a 100%);
-            color: #000;
-            text-decoration: none;
-            padding: 12px 28px;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 14px;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 16px rgba(255, 215, 0, 0.25);
-        }
-        .xm-broker-cta:hover {
-            box-shadow: 0 6px 24px rgba(255, 215, 0, 0.5);
-            transform: translateY(-2px);
-        }
-        .xm-disclaimer {
-            font-size: 10px;
-            color: rgba(139, 148, 158, 0.5);
-            margin-top: 12px;
-        }
-        @media (max-width: 480px) {
-            .xm-btn-text { display: none; }
-            .xm-broker-features { gap: 6px; }
-            .xm-feature-pill { font-size: 10px; padding: 3px 9px; }
-        }
-
         /* ===== PERFORMANCE PAGE ===== */
         .perf-summary {
             display: grid;
@@ -1626,9 +1512,6 @@
                     <button class="lang-btn" data-lang="pt" onclick="setLang('pt')">🇧🇷</button>
                     <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">🇫🇷</button>
                 </div>
-                <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-header-btn" title="Abre tu cuenta en XM — broker recomendado">
-                    🏦 <span class="xm-btn-text">XM</span>
-                </a>
                 <button class="btn-logout" data-i18n="logout" onclick="logout()">Cerrar Sesión</button>
             </div>
         </div>
@@ -1780,27 +1663,6 @@
                     <a href="https://t.me/+IUmXE4VWJho5ZTI0" target="_blank" class="support-link">
                         📱 Abrir Telegram
                     </a>
-                </div>
-
-                <!-- XM Broker Card -->
-                <div class="xm-broker-card">
-                    <div class="xm-broker-logo">XM</div>
-                    <div style="font-size:14px; color:var(--text-primary); font-weight:600; margin-bottom:4px;">Broker Recomendado</div>
-                    <div class="xm-broker-subtitle">El broker que usa BuySell365 Pro</div>
-                    <div class="xm-broker-features">
-                        <span class="xm-feature-pill">✅ Regulado CySEC · ASIC</span>
-                        <span class="xm-feature-pill">💰 Depósito desde $5</span>
-                        <span class="xm-feature-pill">⚡ Ejecución sin re-quotes</span>
-                        <span class="xm-feature-pill">📱 App iOS & Android</span>
-                    </div>
-                    <div class="xm-code-badge">
-                        Para Copy Trading usa el código: <span>6CTHK</span>
-                    </div>
-                    <br>
-                    <a href="https://clicks.pipaffiliates.com/c?c=1198043&l=es&p=1" target="_blank" rel="noopener" class="xm-broker-cta">
-                        🚀 Abrir Cuenta Real — Gratis
-                    </a>
-                    <div class="xm-disclaimer">Trading implica riesgo. Capital en riesgo.</div>
                 </div>
 
                 <!-- Notifications Toggle -->
