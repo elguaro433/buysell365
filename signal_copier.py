@@ -683,6 +683,27 @@ def _reconcile_open_vs_mt5() -> None:
             pips_num, pips_unit = _get_pips_info(pair, entry, exit_price)
             result = "tp" if profit > 0 else "sl"
 
+            # FIX 2026-04-24: Sanity adicional — el SIGNO del profit debe coincidir
+            # con la dirección × diff de precio. Si NO coincide, el deal MT5 que
+            # encontramos pertenece a otra posición (deal fantasma). Esto cubre el
+            # caso del incidente del 23/04: SELL @49277 con exit=49370 debería ser
+            # PÉRDIDA (~-$93 con lote 0.1), pero MT5 reportó profit=+$1.71. Eso
+            # indica que el deal NO corresponde a esta señal aunque coincida magic.
+            if entry > 0 and exit_price > 0 and direction in ("BUY", "SELL"):
+                _expected_positive = (
+                    (direction == "SELL" and exit_price < entry) or
+                    (direction == "BUY" and exit_price > entry)
+                )
+                _actual_positive = profit > 0
+                if _expected_positive != _actual_positive and abs(exit_price - entry) > 0.01:
+                    log.warning(
+                        f"🚫 Reconcile skip: {pair_d} {direction} entry={entry} exit={exit_price} "
+                        f"profit=${profit:.2f} — signo profit no coincide con dirección × precio, "
+                        f"deal fantasma de otra posición"
+                    )
+                    _save_open_signals()
+                    continue
+
             # FIX 2026-04-23: Sanity — el precio de salida debe haber TOCADO
             # realmente el TP/SL. Si se cerró a mitad de camino (cierre manual
             # o parcial), NO publicar como TP/SL completo. Esto evita falsos
@@ -710,11 +731,13 @@ def _reconcile_open_vs_mt5() -> None:
                 )
                 _save_open_signals()
                 continue
-            if result == "sl" and not _touched_sl and abs(profit) < 5.0:
-                # SL tampoco tocado y la pérdida es mínima → probable deal fantasma
+            # FIX 2026-04-24: Quitar el filtro `abs(profit) < 5.0` para SL — un SL
+            # no tocado es un SL no tocado, da igual la magnitud de la pérdida (un
+            # cierre manual con pérdida grande tampoco es un SL real).
+            if result == "sl" and not _touched_sl:
                 log.warning(
                     f"🚫 Reconcile skip: {pair_d} {direction} exit={exit_price} NO tocó SL={_sig_sl} "
-                    f"(profit=${profit:.2f}) — deal ajeno a esta señal, ignorado"
+                    f"(profit=${profit:.2f}) — cierre parcial/manual, no es SL real"
                 )
                 _save_open_signals()
                 continue
