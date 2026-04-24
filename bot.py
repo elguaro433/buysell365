@@ -445,8 +445,11 @@ BRIEFING_HORA = 7                           # Hora local (Andorra) para briefing
 BRIEFING_MINUTO = 0
 CIERRE_HORA = 22                            # Hora local (Andorra) para reporte de cierre nocturno
 CIERRE_MINUTO = 0
+WEEKLY_HORA = 19                            # Viernes 19:00 — resumen semanal (sab-vie)
+WEEKLY_MINUTO = 0
 _ultimo_briefing_diario: str = ""           # "YYYY-MM-DD" — evita enviar doble
 _ultimo_cierre_diario: str = ""             # "YYYY-MM-DD" — evita enviar doble
+_ultimo_weekly_summary: str = ""            # "YYYY-MM-DD" del viernes — evita enviar doble
 
 # ── CACHÉS DE OPTIMIZACIÓN ────────────────────────────────────
 _cache_ml_modelos = {}  # ML desactivado — cache vacío, mantenido para compatibilidad con limpiar_caches
@@ -14730,7 +14733,7 @@ def loop_vip_check():
     - Limpia pagos pendientes con >24h sin completar
     - Limpia códigos de invitación viejos (>30 días)
     """
-    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario
+    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario, _ultimo_weekly_summary
     time.sleep(120)  # Esperar 2 min tras arranque
     _ultima_auditoria = time.time()
     logger.info("👑 Loop VIP check iniciado")
@@ -14764,6 +14767,20 @@ def loop_vip_check():
                     log_sistema("☀️ Briefing matutino enviado al canal VIP")
                 except Exception as e:
                     logger.error(f"❌ Error enviando briefing matutino: {e}")
+
+            # 0d. 📊 RESUMEN SEMANAL (VIERNES 19:00) — canal VIP + grupo + IG feed + Stories
+            # FIX 2026-04-24: publicador automatico del resumen de 7 dias (sab→vie)
+            es_viernes = (ahora_check.weekday() == 4)
+            if es_viernes and (ahora_check.hour > WEEKLY_HORA or (ahora_check.hour == WEEKLY_HORA and ahora_check.minute >= WEEKLY_MINUTO)) and _ultimo_weekly_summary != hoy_str_check:
+                _ultimo_weekly_summary = hoy_str_check
+                try:
+                    from weekly_summary_publisher import publish_weekly_summary
+                    res = publish_weekly_summary(dry_run=False)
+                    _total_pts = res.get("stats", {}).get("total_pts", 0)
+                    _total_tp = res.get("stats", {}).get("total_tp", 0)
+                    log_sistema(f"📊 Resumen semanal publicado: +{_total_pts:.0f} pts · {_total_tp} TPs")
+                except Exception as e:
+                    logger.error(f"❌ Error publicando resumen semanal: {e}", exc_info=True)
 
             # 0c. 🌙 CIERRE NOCTURNO — DESACTIVADO (el signal_copier envía resumen completo a las 22:00)
             # if not es_finde and (ahora_check.hour > CIERRE_HORA or (ahora_check.hour == CIERRE_HORA and ahora_check.minute >= CIERRE_MINUTO)) and _ultimo_cierre_diario != hoy_str_check:
