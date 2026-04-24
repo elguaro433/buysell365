@@ -1230,7 +1230,7 @@ if('serviceWorker' in navigator){{
 <section class="hero">
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge">{'Bot activo' if is_alive else 'Dashboard Online'}</span></div>
-    <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/5</span></h1>
+    <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/7</span></h1>
     <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px"><span data-i18n="hero.btn_start">\U0001f680 Empezar Ahora</span></a>
@@ -1241,7 +1241,7 @@ if('serviceWorker' in navigator){{
       <div class="stat-item"><div class="stat-value" id="counterWr" data-target="{wr}">0%</div><div class="stat-label" data-i18n="stats.winrate">WIN RATE</div></div>
       <div class="stat-item"><div class="stat-value blue" id="counterTotal" data-target="{total}">0+</div><div class="stat-label" data-i18n="stats.signals">SE\u00d1ALES GENERADAS</div></div>
       <div class="stat-item"><div class="stat-value gold" id="counterPips" data-target="{pips:.0f}">0</div><div class="stat-label" data-i18n="stats.pips">PIPS ACUMULADOS</div></div>
-      <div class="stat-item"><div class="stat-value purple">24/5</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
+      <div class="stat-item"><div class="stat-value purple">24/7</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
     </div>
 
     <!-- FIX 2026-04-24: Eliminado el DASHBOARD MOCKUP PREVIEW (datos fake 30/03).
@@ -1446,7 +1446,7 @@ if('serviceWorker' in navigator){{
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_ai">Modelos de IA</div>
     </div>
     <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(77,159,255,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(77,159,255,0.06)">
-      <div style="font-size:1.8rem;font-weight:900;color:#4d9fff;text-shadow:0 0 20px rgba(77,159,255,0.6)">24/5</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#4d9fff;text-shadow:0 0 20px rgba(77,159,255,0.6)">24/7</div>
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_monitor">Monitoreo</div>
     </div>
     <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(167,139,250,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(167,139,250,0.06)">
@@ -2069,7 +2069,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 <p>Oro, Forex, NASDAQ y m&aacute;s &mdash; con Entrada, TP y SL exactos. Nuestro bot de IA analiza el mercado y te env&iacute;a las mejores oportunidades.</p>
 
 <div class="stats">
-<div class="stat"><div class="num">24/5</div><div class="label">Monitoreo</div></div>
+<div class="stat"><div class="num">24/7</div><div class="label">Monitoreo</div></div>
 <div class="stat"><div class="num">13+</div><div class="label">Pares</div></div>
 <div class="stat"><div class="num">IA</div><div class="label">An&aacute;lisis</div></div>
 <div class="stat"><div class="num">MT5</div><div class="label">Verificado</div></div>
