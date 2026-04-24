@@ -3522,6 +3522,15 @@ def _parse_signal_impl(text, chat_title=""):
     # Formato inline: "GBP/CAD H1 Buy 1.8412" → número después de BUY/SELL seguido de otro token
     if not entry_match:
         entry_match = re.search(r'(?:BUY|SELL|COMPRA|VENTA)\s+[\w/]+\s+(?:H\d+\s+)?(\d+\.?\d*)', upper_clean)
+    # FIX 2026-04-24: AnabelSignals "Buy limit us30\n\n49100\n\nTp 49250..."
+    # Formato: direccion + LIMIT/STOP + pair + (newlines o spaces) + precio.
+    # Ocurrido 24/04 15:28: parser no capturaba 49100, usaba precio actual
+    # 49453 → TPs invertidos → MT5 No response. Ahora captura correctamente.
+    if not entry_match:
+        entry_match = re.search(
+            r'(?:BUY|SELL|COMPRA|VENTA)\s+(?:LIMIT|STOP)\s+[\w/]+\s+(\d+\.?\d*)',
+            upper_clean
+        )
     # SureShotFX inline: "GBPAUD SELL  1.93236" — precio con decimal JUSTO tras BUY/SELL (sin keyword)
     # Requiere decimal para evitar falsos positivos con números enteros del texto
     if not entry_match:
@@ -4069,10 +4078,12 @@ def execute_in_mt5(signal):
     else:
         tp = signal.get("tp", 0) or 0  # fallback
 
-    # R:R check — solo log informativo, NO rechazar (todas las señales se ejecutan)
+    # FIX 2026-04-24: "Invalid SL" (risk<=0) NO bloquea — el usuario puso SL igual
+    # al precio por error o SL=0. Ejecutamos sin SL (usuario lo pone a mano).
     risk = abs(price - sl)
     if risk <= 0:
-        return False, "Invalid SL"
+        log.warning(f"⚠️ {sym} risk<=0 (price={price} sl={sl}) — ejecutando sin SL")
+        sl = 0
     if tp > 0:
         reward = abs(tp - price)
         rr = reward / risk
@@ -4142,8 +4153,17 @@ def execute_in_mt5(signal):
         result2 = mt5.order_send(request)
         if result2 and result2.retcode == mt5.TRADE_RETCODE_DONE:
             return True, f"Executed {signal['direction']} {sym} @ {exec_price} [SL/TP ajustados: {sl_adj}/{tp_adj}]"
-        err = result2.comment if result2 else "No response"
-        return False, f"MT5 skip (invalid stops tras ajuste): {err}"
+        # FIX 2026-04-24: si el ajuste tambien falla → ejecutar SIN SL ni TP (usuario los pone manual).
+        # Caso real 24/04 14:12: SureShot XAUUSD BUY 4715.97 con precio 4707.60 → SL imposible, pero
+        # politica usuario es EJECUTAR TODA senal. Antes era return False, ahora reintento sin stops.
+        log.warning(f"⚠️ Invalid stops {sym} ajustado tampoco funciono — reintentando SIN SL/TP")
+        request["sl"] = 0.0
+        request["tp"] = 0.0
+        result3 = mt5.order_send(request)
+        if result3 and result3.retcode == mt5.TRADE_RETCODE_DONE:
+            return True, f"Executed {signal['direction']} {sym} @ {exec_price} [SIN SL/TP — ajusta manual]"
+        err = result3.comment if result3 else "No response"
+        return False, f"MT5 skip (invalid stops tras 2 reintentos): {err}"
 
     # FIX 2026-04-17: "Invalid price" (precio stale en Limit/Stop) — convertir a Market
     if result and "invalid price" in err.lower() and trade_action == mt5.TRADE_ACTION_PENDING:
