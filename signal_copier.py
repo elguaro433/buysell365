@@ -3423,7 +3423,9 @@ def _parse_signal_impl(text, chat_title=""):
     # Formatos: "SL: 4499.60" | "SL 4499" | "❗️ SL 45370" | "Stop Loss → 1.3801" | "SL4415" (sin espacio)
     # FIX: \d{1,6} en vez de \d{3,6} — forex como EURUSD/GBPAUD tienen precio 1.XXXXX (1 solo dígito entero)
     # FIX 2026-04-16: incluir @ como separador válido — NasdaqMasters usa "SL @47950"
-    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→@]*(\d{1,6}\.?\d+)', upper_clean)
+    # FIX 2026-04-24: ampliar separadores a `_`, `-`, `=`, `|`, `—` — aliados usan
+    # variantes raras ("SL_ 4686" AnabelSignals 24/04 06:50 que crasheaba antes).
+    sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→@_\-=\|—]*(\d{1,6}\.?\d+)', upper_clean)
     # FIX 2026-04-24: detectar "SL OPEN/NONE/N/A/SIN/ABIERTO/-" — el aliado dice
     # explicitamente "sin SL" (AnabelSignals "SL OPEN", otros canales "NO SL").
     # En ese caso sl=0 es INTENCIONAL, no un parser fail. Sirve para no capturar
