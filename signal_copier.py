@@ -3424,6 +3424,18 @@ def _parse_signal_impl(text, chat_title=""):
     # FIX: \d{1,6} en vez de \d{3,6} — forex como EURUSD/GBPAUD tienen precio 1.XXXXX (1 solo dígito entero)
     # FIX 2026-04-16: incluir @ como separador válido — NasdaqMasters usa "SL @47950"
     sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→@]*(\d{1,6}\.?\d+)', upper_clean)
+    # FIX 2026-04-24: detectar "SL OPEN/NONE/N/A/SIN/ABIERTO/-" — el aliado dice
+    # explicitamente "sin SL" (AnabelSignals "SL OPEN", otros canales "NO SL").
+    # En ese caso sl=0 es INTENCIONAL, no un parser fail. Sirve para no capturar
+    # un TP por error al ver "SL" sin numero. Tambien evita que el parser intente
+    # buscar un numero perdido y agarre el primer TP por accidente.
+    _sl_explicit_none = bool(re.search(
+        r'(?:SL|STOP\s*LOSS)\s*[:\s→@]*(?:OPEN|NONE|N/?A|ABIERTO|SIN|NO\s*SL|-+)\b',
+        upper_clean
+    )) or bool(re.search(r'\bNO\s+SL\b|\bSIN\s+SL\b', upper_clean))
+    if _sl_explicit_none and not sl_match:
+        # SL declarado como "abierto/none" — dejamos sl=0 explicitamente
+        sl_match = None  # ya es None, pero dejamos claro que es intencional
 
     # ── EXTRAER TP1, TP2, TP3 ──
     # Formatos: "TP1: 4513" | "TP: 4513" | "Tp 4540" | "🥇 TP 45530" | "Toma de Ganancias 1 : 4513"
@@ -3522,14 +3534,19 @@ def _parse_signal_impl(text, chat_title=""):
     # (El usuario quiere que se publiquen TODAS las señales sin excepción)
 
     try:
-        sl    = float(sl_match.group(1))
+        # FIX 2026-04-24: SL puede ser None si el aliado dijo "SL OPEN" o no hay
+        # SL en el mensaje. Antes esto crasheaba con 'NoneType.group' y la senal
+        # se descartaba completa (ej. AnabelSignals "GOLD SELL 4667 OR 4670 SL OPEN..."
+        # del 24/04 06:44 que se perdio). Ahora sl=0 = "sin SL" → se publica igual,
+        # MT5 no ejecuta sin SL pero el canal recibe la senal.
+        sl    = float(sl_match.group(1)) if sl_match else 0.0
         tp    = float(tp_match.group(1)) if tp_match else 0.0
         tp2   = float(tp2_match.group(1)) if tp2_match else 0.0
         tp3   = float(tp3_match.group(1)) if tp3_match else 0.0
         tp4   = float(tp4_match.group(1)) if tp4_match else 0.0
         tp5   = float(tp5_match.group(1)) if tp5_match else 0.0
         entry = float(entry_match.group(1)) if entry_match else 0.0
-    except (ValueError, IndexError):
+    except (ValueError, IndexError, AttributeError):
         return None
 
     # Protección: TP de dígito único (ej "1") es artefacto del parser — "TP1: 4608" captura "1" si regex falla
