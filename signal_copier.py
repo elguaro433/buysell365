@@ -2647,6 +2647,21 @@ async def _loop_calendario_diario() -> None:
         await asyncio.sleep(60)
 
 
+async def _loop_sync_web_periodico() -> None:
+    """FIX 2026-04-24: Re-sincroniza copier_stats.json → web cada 5 min.
+    Render tiene filesystem efimero — al redeploy pierde _copier_trades (RAM).
+    Este loop garantiza que la web muestre siempre los stats frescos.
+    """
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 min
+            _sync_copier_stats_to_web()
+        except asyncio.CancelledError:
+            break
+        except Exception as _e_sync_loop:
+            log.debug(f"Loop sync web fallo (no critico): {_e_sync_loop}")
+
+
 async def _loop_promo_reportes() -> None:
     """Loop que envía reportes promocionales al grupo público a las 12:00 y 17:00 hora Andorra."""
     import requests
@@ -5260,6 +5275,10 @@ async def main():
     # Iniciar monitor TP/SL en background
     asyncio.ensure_future(_monitor_tp_loop())
     asyncio.ensure_future(_loop_promo_reportes())
+    # FIX 2026-04-24: loop de sync web cada 5 min. Render tiene filesystem
+    # efimero → al redeploy pierde _copier_trades (RAM). Este loop garantiza
+    # que maximo cada 5 min la web vuelva a tener los stats aunque reinicie.
+    asyncio.ensure_future(_loop_sync_web_periodico())
 
     log.info("📡 Signal Copier ACTIVO — escuchando todos los canales VIP...")
     await client.run_until_disconnected()
