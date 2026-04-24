@@ -13382,9 +13382,9 @@ def enviar_briefing_matutino():
             # con CTA al VIP. Politica del usuario: el briefing se publica
             # automaticamente en ambos lados todos los dias.
             try:
-                _grupo_caption = caption + "\n\n🎁 ¿Quieres las señales VIP? → @BuySell365_pro_bot"
+                _grupo_caption = caption + "\n\n🎁 ¿Quieres las señales VIP? → @Andoperandobot"
                 if len(_grupo_caption) > 1020:
-                    _grupo_caption = caption[:950] + "...\n\n🎁 VIP → @BuySell365_pro_bot"
+                    _grupo_caption = caption[:950] + "...\n\n🎁 VIP → @Andoperandobot"
                 _enviar_grupo_foto(_photo_bytes, _grupo_caption)
             except Exception as _e_grupo:
                 logger.warning(f"Briefing al grupo fallo (no critico): {_e_grupo}")
@@ -13400,7 +13400,7 @@ def enviar_briefing_matutino():
             _briefing_guardar_msg_id(_msg_id)
             # Tambien al grupo (texto)
             try:
-                enviar_grupo(_texto_briefing + "\n\n🎁 VIP → @BuySell365_pro_bot",
+                enviar_grupo(_texto_briefing + "\n\n🎁 VIP → @Andoperandobot",
                              incluir_promo=False, auto_delete=0)
             except Exception:
                 pass
@@ -13421,7 +13421,7 @@ def enviar_briefing_matutino():
         _briefing_guardar_msg_id(_msg_id)
         # FIX 2026-04-24: Replicar al grupo publico tambien (texto plano)
         try:
-            enviar_grupo(_texto_briefing + "\n\n🎁 VIP → @BuySell365_pro_bot",
+            enviar_grupo(_texto_briefing + "\n\n🎁 VIP → @Andoperandobot",
                          incluir_promo=False, auto_delete=0)
         except Exception as _e_grupo:
             logger.warning(f"Briefing al grupo fallo (no critico): {_e_grupo}")
