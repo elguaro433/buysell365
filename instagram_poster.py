@@ -48,6 +48,26 @@ COLOR_GRAY = (140, 148, 160)
 COLOR_ACCENT = (59, 130, 246)    # Azul BuySell365
 COLOR_CARD_BG = (22, 27, 34)     # Fondo tarjeta
 
+# FIX 2026-04-24: Display map oficial para Instagram (igual al canal VIP).
+# GOLD/XAUUSD/XAU siempre se muestran como "ORO", sufijos tecnicos eliminados.
+# Ver feedback_canal_vip_normas.md para la politica completa.
+_IG_PAIR_DISPLAY = {
+    "GOLD": "ORO", "XAUUSD": "ORO", "XAU": "ORO", "XAU/USD": "ORO",
+    "US30Cash": "US30", "US30CASH": "US30", "DOW30": "US30", "DJ30": "US30",
+    "US100Cash": "NAS100", "US100CASH": "NAS100", "NASDAQ": "NAS100",
+    "US500Cash": "S&P500", "US500CASH": "S&P500", "SPX500": "S&P500",
+    "GER40Cash": "DAX", "GER40CASH": "DAX",
+    "OILCash": "USOIL", "OILCASH": "USOIL", "WTIUSD": "USOIL",
+    "BRENTCash": "BRENT", "BRENTCASH": "BRENT",
+}
+
+def _fmt_pair_ig(pair: str) -> str:
+    """Devuelve el nombre oficial del par para mostrar en Instagram."""
+    if not pair:
+        return ""
+    p = pair.strip()
+    return _IG_PAIR_DISPLAY.get(p, _IG_PAIR_DISPLAY.get(p.upper(), p.upper()))
+
 # ── Dimensiones Instagram (1080x1080 cuadrado) ───────────────
 IMG_W, IMG_H = 1080, 1080
 
@@ -221,11 +241,11 @@ def _annotate_chart_with_times(chart_path, pair: str, direction: str, pips: str,
             draw.text((left_x, 14 + int(W * 0.035)), "  |  ".join(hora_txt_parts),
                        fill=(210, 215, 225, 255), font=font_body)
 
-        right_text = f"{pair.upper()} {pips}".strip()
+        right_text = f"{_fmt_pair_ig(pair)} {pips}".strip()
         draw.text((W - left_x, 14), right_text, fill=accent,
                    font=font_title, anchor="rt")
         draw.text((W - left_x, 14 + int(W * 0.035)),
-                   ("COMPRA" if is_buy else "VENTA"),
+                   ("BUY" if is_buy else "SELL"),
                    fill=(210, 215, 225), font=font_body, anchor="rt")
 
         merged = Image.alpha_composite(img, overlay).convert("RGB")
@@ -292,10 +312,10 @@ def _generate_tp_image(pair: str, direction: str, entry: float, tp: float,
     # Par grande (protagonista)
     is_buy = direction.upper() in ("BUY", "COMPRA")
     dir_color = COLOR_GREEN if is_buy else COLOR_RED
-    dir_label = "COMPRA" if is_buy else "VENTA"
+    dir_label = "BUY" if is_buy else "SELL"
     dir_icon = "\u25b2" if is_buy else "\u25bc"
 
-    draw.text((IMG_W // 2, 260), pair.upper(), fill=COLOR_WHITE,
+    draw.text((IMG_W // 2, 260), _fmt_pair_ig(pair), fill=COLOR_WHITE,
               font=font_big, anchor="mt")
     draw.text((IMG_W // 2, 365), f"{dir_icon} {dir_label}", fill=dir_color,
               font=font_value, anchor="mt")
@@ -517,7 +537,7 @@ def _generate_new_signal_image(pair: str, direction: str, entry: float,
 
     is_buy = direction.upper() in ("BUY", "COMPRA")
     dir_color = COLOR_GREEN if is_buy else COLOR_RED
-    dir_label = "COMPRA" if is_buy else "VENTA"
+    dir_label = "BUY" if is_buy else "SELL"
 
     # Borde superior
     for y in range(8):
@@ -540,7 +560,7 @@ def _generate_new_signal_image(pair: str, direction: str, entry: float,
               font=font_title, anchor="mm")
 
     # Par
-    draw.text((IMG_W // 2, 220), pair.upper(), fill=COLOR_WHITE,
+    draw.text((IMG_W // 2, 220), _fmt_pair_ig(pair), fill=COLOR_WHITE,
               font=font_big, anchor="mt")
 
     # Direccion
@@ -1369,7 +1389,7 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
 
         is_buy = direction.upper() in ("BUY", "COMPRA")
         dir_color = COLOR_GREEN if is_buy else COLOR_RED
-        dir_label = "COMPRA" if is_buy else "VENTA"
+        dir_label = "BUY" if is_buy else "SELL"
 
         reel_path = IMAGES_DIR / f"reel_{pair.replace('/', '')}_{int(time.time())}.mp4"
         writer = imageio.get_writer(str(reel_path), fps=FPS, codec="libx264",
@@ -1503,7 +1523,7 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([80, 180, REEL_W - 80, 330], radius=25, fill=COLOR_GREEN)
                 draw.text((REEL_W // 2, 255), "TP ALCANZADO", fill=(10, 15, 10),
                           font=_get_font(72, bold=True), anchor="mm")
-                draw.text((REEL_W // 2, 420), pair.upper(), fill=COLOR_WHITE,
+                draw.text((REEL_W // 2, 420), _fmt_pair_ig(pair), fill=COLOR_WHITE,
                           font=_get_font(110, bold=True), anchor="mt")
                 draw.text((REEL_W // 2, 570), dir_label, fill=dir_color,
                           font=_get_font(54, bold=True), anchor="mt")
@@ -1534,7 +1554,7 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([100, 90, REEL_W - 100, 190], radius=20, fill=COLOR_GREEN)
                 draw.text((REEL_W // 2, 140), "TP ALCANZADO", fill=(10, 15, 10),
                           font=_get_font(60, bold=True), anchor="mm")
-                draw.text((REEL_W // 2, 230), pair.upper(), fill=COLOR_WHITE,
+                draw.text((REEL_W // 2, 230), _fmt_pair_ig(pair), fill=COLOR_WHITE,
                           font=_get_font(90, bold=True), anchor="mt")
                 draw.text((REEL_W // 2, 340), dir_label, fill=dir_color,
                           font=_get_font(44, bold=True), anchor="mt")
@@ -1592,7 +1612,7 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([80, 180, REEL_W - 80, 330], radius=25, fill=COLOR_GREEN)
                 draw.text((REEL_W // 2, 255), "TP ALCANZADO", fill=(10, 15, 10),
                           font=_get_font(72, bold=True), anchor="mm")
-                draw.text((REEL_W // 2, 420), pair.upper(), fill=COLOR_WHITE,
+                draw.text((REEL_W // 2, 420), _fmt_pair_ig(pair), fill=COLOR_WHITE,
                           font=_get_font(110, bold=True), anchor="mt")
                 draw.text((REEL_W // 2, 570), dir_label, fill=dir_color,
                           font=_get_font(54, bold=True), anchor="mt")
@@ -1608,7 +1628,7 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                 scene_t = (sec - 6.5) / 1.5
                 draw.text((REEL_W // 2, 80), "BUYSELL365 PRO", fill=(80, 90, 110),
                           font=_get_font(32, bold=True), anchor="mt")
-                draw.text((REEL_W // 2, 250), pair.upper(), fill=COLOR_GRAY,
+                draw.text((REEL_W // 2, 250), _fmt_pair_ig(pair), fill=COLOR_GRAY,
                           font=_get_font(60, bold=True), anchor="mt")
                 draw.text((REEL_W // 2, 350), pips, fill=COLOR_GREEN,
                           font=_get_font(100, bold=True), anchor="mt")
@@ -1679,7 +1699,7 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
 
         is_buy = direction.upper() in ("BUY", "COMPRA")
         dir_color = COLOR_GREEN if is_buy else COLOR_RED
-        dir_label = "COMPRA" if is_buy else "VENTA"
+        dir_label = "BUY" if is_buy else "SELL"
 
         vid_path = IMAGES_DIR / f"tg_{pair.replace('/', '')}_{int(time.time())}.mp4"
         writer = imageio.get_writer(str(vid_path), fps=FPS, codec="libx264",
@@ -1785,7 +1805,7 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([100, 50, TG_W - 100, 120], radius=16, fill=COLOR_GREEN)
                 draw.text((TG_W // 2, 85), header_text, fill=(10, 15, 10),
                           font=_get_font(44, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 150), pair.upper(), fill=COLOR_WHITE,
+                draw.text((TG_W // 2, 150), _fmt_pair_ig(pair), fill=COLOR_WHITE,
                           font=_get_font(64, bold=True), anchor="mt")
                 draw.text((TG_W // 2, 230), dir_label, fill=dir_color,
                           font=_get_font(34, bold=True), anchor="mt")
@@ -1826,7 +1846,7 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([60, 45, TG_W - 60, 110], radius=14, fill=COLOR_GREEN)
                 draw.text((TG_W // 2, 77), header_text, fill=(10, 15, 10),
                           font=_get_font(32, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 125), f"{pair.upper()}  {dir_label}",
+                draw.text((TG_W // 2, 125), f"{_fmt_pair_ig(pair)}  {dir_label}",
                           fill=COLOR_WHITE, font=_get_font(28, bold=True), anchor="mt")
 
                 draw.rounded_rectangle(
@@ -1896,7 +1916,7 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([100, 30, TG_W - 100, 80], radius=12, fill=COLOR_GREEN)
                 draw.text((TG_W // 2, 55), header_text, fill=(10, 15, 10),
                           font=_get_font(32, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 92), f"{pair.upper()}  {dir_label}",
+                draw.text((TG_W // 2, 92), f"{_fmt_pair_ig(pair)}  {dir_label}",
                           fill=COLOR_WHITE, font=_get_font(20, bold=True), anchor="mt")
                 # Pips siempre visible al final
                 for y in range(TG_H - 100, TG_H):
@@ -1922,7 +1942,7 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
                 draw.rounded_rectangle([100, 140, TG_W - 100, 220], radius=16, fill=COLOR_GREEN)
                 draw.text((TG_W // 2, 180), header_text, fill=(10, 15, 10),
                           font=_get_font(48, bold=True), anchor="mm")
-                draw.text((TG_W // 2, 270), pair.upper(), fill=COLOR_WHITE,
+                draw.text((TG_W // 2, 270), _fmt_pair_ig(pair), fill=COLOR_WHITE,
                           font=_get_font(64, bold=True), anchor="mt")
                 draw.text((TG_W // 2, 360), dir_label, fill=dir_color,
                           font=_get_font(36, bold=True), anchor="mt")
@@ -2055,7 +2075,7 @@ def _generate_reel_thumbnail(pair: str, pips: str, direction: str) -> Path:
 
     draw.text((REEL_W // 2, 400), "TP ALCANZADO", fill=COLOR_GREEN,
               font=_get_font(72, bold=True), anchor="mt")
-    draw.text((REEL_W // 2, 550), pair.upper(), fill=COLOR_WHITE,
+    draw.text((REEL_W // 2, 550), _fmt_pair_ig(pair), fill=COLOR_WHITE,
               font=_get_font(90, bold=True), anchor="mt")
     draw.text((REEL_W // 2, 750), pips, fill=dir_color,
               font=_get_font(120, bold=True), anchor="mt")
@@ -2167,7 +2187,7 @@ def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIU
                 draw = ImageDraw.Draw(img)
 
                 dir_emoji = "🟢" if direction.upper() in ("COMPRA", "BUY") else "🔴"
-                dir_text = "COMPRA / BUY" if direction.upper() in ("COMPRA", "BUY") else "VENTA / SELL"
+                dir_text = "BUY" if direction.upper() in ("COMPRA", "BUY") else "SELL"
 
                 # Título
                 f_title = _get_font(110, bold=True)
@@ -2180,7 +2200,7 @@ def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIU
                 draw.text((540, 420), "⚡ NEW VIP SIGNAL", font=f_small, fill=COLOR_GRAY, anchor="mm")
 
                 # Par grande
-                draw.text((540, 680), pair.upper(), font=f_pair, fill=COLOR_WHITE, anchor="mm")
+                draw.text((540, 680), _fmt_pair_ig(pair), font=f_pair, fill=COLOR_WHITE, anchor="mm")
 
                 # Dirección
                 color_dir = COLOR_GREEN if direction.upper() in ("COMPRA", "BUY") else COLOR_RED
