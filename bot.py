@@ -447,9 +447,12 @@ CIERRE_HORA = 22                            # Hora local (Andorra) para reporte 
 CIERRE_MINUTO = 0
 WEEKLY_HORA = 19                            # Viernes 19:00 — resumen semanal (sab-vie)
 WEEKLY_MINUTO = 0
+DAILY_PROMO_HORA = 12                       # 12:00 — publicidad diaria (grupo + IG feed)
+DAILY_PROMO_MINUTO = 0
 _ultimo_briefing_diario: str = ""           # "YYYY-MM-DD" — evita enviar doble
 _ultimo_cierre_diario: str = ""             # "YYYY-MM-DD" — evita enviar doble
 _ultimo_weekly_summary: str = ""            # "YYYY-MM-DD" del viernes — evita enviar doble
+_ultimo_daily_promo: str = ""               # "YYYY-MM-DD" — evita enviar doble promo diaria
 
 # ── CACHÉS DE OPTIMIZACIÓN ────────────────────────────────────
 _cache_ml_modelos = {}  # ML desactivado — cache vacío, mantenido para compatibilidad con limpiar_caches
@@ -895,7 +898,7 @@ FERIADOS_2026 = _calcular_feriados(datetime.now().year)
 
 def guardar_estado():
     """Guarda el estado del bot de forma segura para hilos."""
-    global operaciones_activas, historial_operaciones, estadisticas_diarias, alertas_precio, MODO_RIESGO, activos_desactivados, directorio_usuarios, suscripciones_vip, pagos_pendientes_vip, _vip_monto_counter, _vip_trials_usados, _depositos_procesados_vip, _trial_intentos, _codigos_invitacion, _ultimo_reporte_diario, _ultimo_weekly_summary
+    global operaciones_activas, historial_operaciones, estadisticas_diarias, alertas_precio, MODO_RIESGO, activos_desactivados, directorio_usuarios, suscripciones_vip, pagos_pendientes_vip, _vip_monto_counter, _vip_trials_usados, _depositos_procesados_vip, _trial_intentos, _codigos_invitacion, _ultimo_reporte_diario, _ultimo_weekly_summary, _ultimo_daily_promo
     try:
         with _lock_ops:
             if not isinstance(operaciones_activas, dict):
@@ -922,6 +925,7 @@ def guardar_estado():
                 "_codigos_invitacion": _codigos_invitacion,
                 "_ultimo_reporte_diario": _ultimo_reporte_diario,
                 "_ultimo_weekly_summary": _ultimo_weekly_summary,  # FIX 2026-04-24: evita duplicar al reiniciar
+                "_ultimo_daily_promo": _ultimo_daily_promo,  # FIX 2026-04-24: promo diaria 12:00
                 "mt5_pausado": mt5_pausado,
                 "mt5_solo_premium": mt5_solo_premium,
                 "escaneo_pausado": escaneo_pausado,
@@ -1108,10 +1112,13 @@ def cargar_estado():
 
                     # FIX 2026-04-24: Cargar flag de resumen semanal persistido
                     # (evita duplicar al reiniciar el bot despues de publicar).
-                    global _ultimo_weekly_summary
+                    global _ultimo_weekly_summary, _ultimo_daily_promo
                     _uws = data.get("_ultimo_weekly_summary")
                     if isinstance(_uws, str):
                         _ultimo_weekly_summary = _uws
+                    _udp = data.get("_ultimo_daily_promo")
+                    if isinstance(_udp, str):
+                        _ultimo_daily_promo = _udp
 
                     # Cargar mt5_pausado, mt5_solo_premium, escaneo_pausado
                     global mt5_pausado, mt5_solo_premium, escaneo_pausado
@@ -14775,6 +14782,23 @@ def loop_vip_check():
                     log_sistema("☀️ Briefing matutino enviado al canal VIP")
                 except Exception as e:
                     logger.error(f"❌ Error enviando briefing matutino: {e}")
+
+            # 0c2. 📢 PROMO DIARIA (TODOS LOS DIAS 12:00) — grupo + IG feed
+            # FIX 2026-04-24: publicidad diaria de la web + IG al grupo y web al IG
+            if (ahora_check.hour > DAILY_PROMO_HORA or (ahora_check.hour == DAILY_PROMO_HORA and ahora_check.minute >= DAILY_PROMO_MINUTO)) and _ultimo_daily_promo != hoy_str_check:
+                _ultimo_daily_promo = hoy_str_check
+                try:
+                    guardar_estado()  # persistir flag antes
+                except Exception:
+                    pass
+                try:
+                    from daily_promo_publisher import publish_daily_promo
+                    res = publish_daily_promo(dry_run=False)
+                    _gmid = res.get("grupo_msg_id")
+                    _igok = res.get("ig_feed", "?")
+                    log_sistema(f"📢 Promo diaria publicada: grupo msg_id={_gmid}, IG={_igok}")
+                except Exception as e:
+                    logger.error(f"❌ Error promo diaria: {e}", exc_info=True)
 
             # 0d. 📊 RESUMEN SEMANAL (VIERNES 19:00) — canal VIP + grupo + IG feed + Stories
             # FIX 2026-04-24: publicador automatico del resumen de 7 dias (sab→vie)
