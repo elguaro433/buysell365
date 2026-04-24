@@ -1247,45 +1247,8 @@ if('serviceWorker' in navigator){{
       <div class="stat-item"><div class="stat-value purple">24/5</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
     </div>
 
-    <!-- DASHBOARD MOCKUP PREVIEW -->
-    <div style="margin:40px auto 0;max-width:780px;background:rgba(10,15,30,.9);border:1px solid rgba(0,212,170,.25);border-radius:18px;padding:16px 20px;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 60px rgba(0,212,170,.06);backdrop-filter:blur(12px);text-align:left">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)">
-        <div style="width:10px;height:10px;border-radius:50%;background:#ff5f57"></div>
-        <div style="width:10px;height:10px;border-radius:50%;background:#febc2e"></div>
-        <div style="width:10px;height:10px;border-radius:50%;background:#28c840"></div>
-        <span style="margin-left:8px;font-size:11px;color:#8b9fc4;font-family:monospace">buysell365.pro</span>
-        <span style="margin-left:auto;font-size:11px;color:#00ffc8">&#9679; BOT ACTIVO</span>
-      </div>
-      <div class="hero-mockup-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-        <div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:800;color:#00ffc8">{wr}%</div>
-          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">WIN RATE</div>
-        </div>
-        <div style="background:rgba(77,159,255,.08);border:1px solid rgba(77,159,255,.2);border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:800;color:#4d9fff">{total}</div>
-          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">SE&#209;ALES</div>
-        </div>
-        <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:800;color:#fbbf24">{profit_str}</div>
-          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">BENEFICIO</div>
-        </div>
-        <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:10px;text-align:center">
-          <div style="font-size:1.4rem;font-weight:800;color:#a78bfa">24/5</div>
-          <div style="font-size:10px;color:#8b9fc4;margin-top:2px">ACTIVO</div>
-        </div>
-      </div>
-      <table class="hero-mockup-table" style="width:100%;font-size:11px;border-collapse:collapse">
-        <tr style="color:#8b9fc4;border-bottom:1px solid rgba(255,255,255,.05)">
-          <td style="padding:5px 8px">Fecha</td><td style="padding:5px 8px">Activo</td>
-          <td style="padding:5px 8px">Tipo</td><td style="padding:5px 8px">Entrada</td>
-          <td style="padding:5px 8px;text-align:right">P&amp;L</td>
-        </tr>
-        {_hero_rows}
-      </table>
-      <div style="text-align:center;margin-top:12px">
-        <a href="#en-vivo" style="font-size:11px;color:#00ffc8;text-decoration:none">&#128202; Ver rendimiento completo en vivo &rarr;</a>
-      </div>
-    </div>
+    <!-- FIX 2026-04-24: Eliminado el DASHBOARD MOCKUP PREVIEW (datos fake 30/03).
+         El usuario prefiere que la gente baje al section #en-vivo con data real. -->
   </div>
 </section>
 
