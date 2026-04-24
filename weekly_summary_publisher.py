@@ -496,24 +496,52 @@ def publish_weekly_summary(dry_run: bool = False) -> dict:
         log.info(f"✅ Grupo: msg_id={mid}")
 
     # 6. Instagram Feed + Stories
+    # FIX 2026-04-24: Circuit breaker anti-spam-lock de IG
+    _ig_lock_file = BASE_DIR / ".ig_feed_locked_until.txt"
+    _ig_feed_locked = False
+    if _ig_lock_file.exists():
+        try:
+            _locked_ts = float(_ig_lock_file.read_text().strip())
+            if time.time() < _locked_ts:
+                _ig_feed_locked = True
+                _hours_left = (_locked_ts - time.time()) / 3600
+                log.warning(f"⛔ IG Feed en cooldown {_hours_left:.1f}h (anti-spam-lock) — skip feed, stories OK")
+        except Exception:
+            pass
+
     if IG_ENABLED:
         try:
             import instagram_poster as ig
             cl = ig._get_client()
             if cl:
-                try:
-                    cl.photo_upload(str(img_publico), cap_ig)
-                    result["ig_feed"] = "ok"
-                    log.info("✅ Instagram Feed publicado")
-                except Exception as e_feed:
-                    log.warning(f"IG Feed fallo: {e_feed}")
-                    result["ig_feed_error"] = str(e_feed)
-                # Stories (cada slide separado, no interrumpir si una falla)
+                # ─ FEED POST ─ (solo si NO está en cooldown)
+                if not _ig_feed_locked:
+                    try:
+                        cl.photo_upload(str(img_publico), cap_ig)
+                        result["ig_feed"] = "ok"
+                        log.info("✅ Instagram Feed publicado")
+                    except Exception as e_feed:
+                        _err_str = str(e_feed).lower()
+                        log.warning(f"IG Feed fallo: {e_feed}")
+                        result["ig_feed_error"] = str(e_feed)
+                        # Si IG detecto spam → ACTIVAR cooldown 48h (IG suele liberar en 24-48h)
+                        if any(k in _err_str for k in ("feedback_required", "is_spam", "try again later", "rate", "policy")):
+                            _unlock_at = time.time() + (48 * 3600)
+                            try:
+                                _ig_lock_file.write_text(str(_unlock_at))
+                                log.warning(f"⛔ IG Feed LOCKED 48h por spam detection — se reanuda {datetime.fromtimestamp(_unlock_at).strftime('%Y-%m-%d %H:%M')}")
+                            except Exception:
+                                pass
+                else:
+                    result["ig_feed"] = "skipped_cooldown"
+
+                # ─ STORIES ─ (siempre, IG es más permisivo con stories)
                 stories_ok = 0
                 for s in story_slides:
                     try:
                         cl.photo_upload_to_story(str(s))
                         stories_ok += 1
+                        time.sleep(3)  # delay humanizado entre stories
                     except Exception as e_s:
                         log.warning(f"IG Story {s.name} fallo: {e_s}")
                 result["ig_stories"] = stories_ok
