@@ -895,7 +895,7 @@ FERIADOS_2026 = _calcular_feriados(datetime.now().year)
 
 def guardar_estado():
     """Guarda el estado del bot de forma segura para hilos."""
-    global operaciones_activas, historial_operaciones, estadisticas_diarias, alertas_precio, MODO_RIESGO, activos_desactivados, directorio_usuarios, suscripciones_vip, pagos_pendientes_vip, _vip_monto_counter, _vip_trials_usados, _depositos_procesados_vip, _trial_intentos, _codigos_invitacion, _ultimo_reporte_diario
+    global operaciones_activas, historial_operaciones, estadisticas_diarias, alertas_precio, MODO_RIESGO, activos_desactivados, directorio_usuarios, suscripciones_vip, pagos_pendientes_vip, _vip_monto_counter, _vip_trials_usados, _depositos_procesados_vip, _trial_intentos, _codigos_invitacion, _ultimo_reporte_diario, _ultimo_weekly_summary
     try:
         with _lock_ops:
             if not isinstance(operaciones_activas, dict):
@@ -921,6 +921,7 @@ def guardar_estado():
                 "_trial_intentos": _trial_intentos,
                 "_codigos_invitacion": _codigos_invitacion,
                 "_ultimo_reporte_diario": _ultimo_reporte_diario,
+                "_ultimo_weekly_summary": _ultimo_weekly_summary,  # FIX 2026-04-24: evita duplicar al reiniciar
                 "mt5_pausado": mt5_pausado,
                 "mt5_solo_premium": mt5_solo_premium,
                 "escaneo_pausado": escaneo_pausado,
@@ -1104,6 +1105,13 @@ def cargar_estado():
                     urd = data.get("_ultimo_reporte_diario")
                     if isinstance(urd, str):
                         _ultimo_reporte_diario = urd
+
+                    # FIX 2026-04-24: Cargar flag de resumen semanal persistido
+                    # (evita duplicar al reiniciar el bot despues de publicar).
+                    global _ultimo_weekly_summary
+                    _uws = data.get("_ultimo_weekly_summary")
+                    if isinstance(_uws, str):
+                        _ultimo_weekly_summary = _uws
 
                     # Cargar mt5_pausado, mt5_solo_premium, escaneo_pausado
                     global mt5_pausado, mt5_solo_premium, escaneo_pausado
@@ -14770,9 +14778,16 @@ def loop_vip_check():
 
             # 0d. 📊 RESUMEN SEMANAL (VIERNES 19:00) — canal VIP + grupo + IG feed + Stories
             # FIX 2026-04-24: publicador automatico del resumen de 7 dias (sab→vie)
+            # FIX 2026-04-24 (later): persistir _ultimo_weekly_summary en estado.json
+            # para que sobreviva reinicios. Antes solo en RAM → al reiniciar
+            # duplicaba la publicacion (IG feed bloqueado por spam por este bug).
             es_viernes = (ahora_check.weekday() == 4)
             if es_viernes and (ahora_check.hour > WEEKLY_HORA or (ahora_check.hour == WEEKLY_HORA and ahora_check.minute >= WEEKLY_MINUTO)) and _ultimo_weekly_summary != hoy_str_check:
                 _ultimo_weekly_summary = hoy_str_check
+                try:
+                    guardar_estado()  # persistir flag ANTES de publicar (evita duplicado si crash)
+                except Exception:
+                    pass
                 try:
                     from weekly_summary_publisher import publish_weekly_summary
                     res = publish_weekly_summary(dry_run=False)
