@@ -1232,7 +1232,7 @@ if('serviceWorker' in navigator){{
 <!-- HERO -->
 <section class="hero">
   <div class="hero-content">
-    <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge" data-i18n-vars='{{"ops":"{n_ops}"}}'>{'Bot activo' if is_alive else 'Dashboard Online'} \u2014 {n_ops} operaciones en vivo</span></div>
+    <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge">{'Bot activo' if is_alive else 'Dashboard Online'}</span></div>
     <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/5</span></h1>
     <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
     <div class="hero-buttons">
@@ -1393,8 +1393,8 @@ if('serviceWorker' in navigator){{
       <div class="price-badge" style="background:linear-gradient(135deg,#ff6d00,#fbbf24);box-shadow:0 0 30px rgba(251,191,36,.8);animation:pulse 2s infinite;font-size:15px;padding:10px 32px">\U0001f525 <span data-i18n="pricing.badge">50% OFF \u2014 LANZAMIENTO</span></div>
       <div class="price-name" style="color:#fbbf24;font-size:1.5rem;text-shadow:0 0 20px rgba(251,191,36,0.3)" data-i18n="pricing.vip">VIP Pro</div>
       <div class="price-amount" style="font-size:3.8rem;text-shadow:0 0 30px rgba(255,255,255,0.1)">
-        <span class="old" data-i18n="pricing.old_price">$299/mes</span>
-        $149<span data-i18n="pricing.month">/mes USDT</span>
+        <span class="old" data-i18n="pricing.old_price">€299/mes</span>
+        €149<span data-i18n="pricing.month">/mes</span>
       </div>
       <div style="margin:12px 0 4px;font-size:12px;color:rgba(255,215,0,.7);letter-spacing:1px" data-i18n="pricing.founders">&#9733; PRECIO ESPECIAL FUNDADORES &#9733;</div>
       <ul class="price-list" style="margin-top:20px">
@@ -2188,7 +2188,7 @@ def pagina_terminos():
 <h2>1. Qu&eacute; es BuySell365</h2><p>BuySell365 es una herramienta automatizada de an&aacute;lisis t&eacute;cnico que genera alertas informativas sobre activos financieros. Las se&ntilde;ales se basan en indicadores t&eacute;cnicos, modelos de Machine Learning y an&aacute;lisis de sentimiento. Son de car&aacute;cter informativo y educativo &mdash; no son recomendaciones de inversi&oacute;n.</p>
 <h2>2. No es Asesor&iacute;a Financiera</h2><p>BuySell365 NO proporciona asesor&iacute;a financiera ni recomendaciones personalizadas. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n. Consulta a un profesional financiero antes de operar con dinero real.</p>
 <h2>3. Riesgo de Inversi&oacute;n</h2><p>Operar en mercados financieros conlleva un alto riesgo de p&eacute;rdida de capital. Los resultados pasados no garantizan resultados futuros. Nunca inviertas dinero que no puedas permitirte perder.</p>
-<h2>4. Suscripci&oacute;n VIP</h2><ul><li>Precio: $149 USDT/mes, pagado manualmente en USDT TRC20.</li><li>Sin cobros autom&aacute;ticos ni recurrentes. T&uacute; decides cu&aacute;ndo renovar.</li><li>Cancela cuando quieras: simplemente no renuevas y el acceso expira al final del periodo pagado.</li><li>No se ofrecen reembolsos una vez procesado el pago, ya que el acceso al canal VIP se activa de forma inmediata.</li></ul>
+<h2>4. Suscripci&oacute;n VIP</h2><ul><li>Precio: €149/mes (equivalente en USDT TRC20), pagado manualmente.</li><li>Sin cobros autom&aacute;ticos ni recurrentes. T&uacute; decides cu&aacute;ndo renovar.</li><li>Cancela cuando quieras: simplemente no renuevas y el acceso expira al final del periodo pagado.</li><li>No se ofrecen reembolsos una vez procesado el pago, ya que el acceso al canal VIP se activa de forma inmediata.</li></ul>
 <h2>5. Uso Aceptable</h2><ul><li>No redistribuir ni revender las se&ntilde;ales del canal VIP.</li><li>No usar bots ni scrapers para extraer contenido del canal.</li><li>No enviar spam en el grupo de Telegram.</li><li>Respetar a los dem&aacute;s miembros de la comunidad.</li></ul>
 <h2>6. Limitaci&oacute;n de Responsabilidad</h2><p>BuySell365 y su equipo no ser&aacute;n responsables de p&eacute;rdidas financieras derivadas del uso del servicio. Al usar el servicio aceptas que operas bajo tu propia responsabilidad.</p>
 <h2>7. Disponibilidad</h2><p>Trabajamos para mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida. Puede haber pausas por mantenimiento o actualizaciones.</p>
