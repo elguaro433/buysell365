@@ -13378,6 +13378,16 @@ def enviar_briefing_matutino():
                 _photo_bytes = _fimg.read()
             _msg_id = enviar_canal_foto(_photo_bytes, caption)
             _briefing_guardar_msg_id(_msg_id)
+            # FIX 2026-04-24: Replicar briefing diario al GRUPO publico tambien
+            # con CTA al VIP. Politica del usuario: el briefing se publica
+            # automaticamente en ambos lados todos los dias.
+            try:
+                _grupo_caption = caption + "\n\n🎁 ¿Quieres las señales VIP? → @BuySell365_pro_bot"
+                if len(_grupo_caption) > 1020:
+                    _grupo_caption = caption[:950] + "...\n\n🎁 VIP → @BuySell365_pro_bot"
+                _enviar_grupo_foto(_photo_bytes, _grupo_caption)
+            except Exception as _e_grupo:
+                logger.warning(f"Briefing al grupo fallo (no critico): {_e_grupo}")
         except Exception as _e_send:
             logger.warning(f"Error enviando briefing como foto: {_e_send} — fallback texto")
             # Fallback: texto plano con las noticias
@@ -13385,8 +13395,15 @@ def enviar_briefing_matutino():
                 lineas.insert(-1, "\n📰 *Alto impacto hoy:*")
                 for _l in noticias_hoy[:5]:
                     lineas.insert(-1, _l)
-            _msg_id = enviar_canal("\n".join(lineas))
+            _texto_briefing = "\n".join(lineas)
+            _msg_id = enviar_canal(_texto_briefing)
             _briefing_guardar_msg_id(_msg_id)
+            # Tambien al grupo (texto)
+            try:
+                enviar_grupo(_texto_briefing + "\n\n🎁 VIP → @BuySell365_pro_bot",
+                             incluir_promo=False, auto_delete=0)
+            except Exception:
+                pass
     else:
         # Sin imagen → flujo original texto
         if noticias_hoy:
@@ -13399,8 +13416,15 @@ def enviar_briefing_matutino():
         if n_activas > 0:
             lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
         lineas.append("━━━━━━━━━━━━━━━━━━━━")
-        _msg_id = enviar_canal("\n".join(lineas))
+        _texto_briefing = "\n".join(lineas)
+        _msg_id = enviar_canal(_texto_briefing)
         _briefing_guardar_msg_id(_msg_id)
+        # FIX 2026-04-24: Replicar al grupo publico tambien (texto plano)
+        try:
+            enviar_grupo(_texto_briefing + "\n\n🎁 VIP → @BuySell365_pro_bot",
+                         incluir_promo=False, auto_delete=0)
+        except Exception as _e_grupo:
+            logger.warning(f"Briefing al grupo fallo (no critico): {_e_grupo}")
 
 
 def enviar_cierre_nocturno():
