@@ -51,9 +51,11 @@ NOMBRE_MAP = {
     "USDCHF": "USD/CHF", "CADJPY": "CAD/JPY",
 }
 DISPLAY_MAP = {
-    "GOLD": "GOLD (XAUUSD)", "XAUUSD": "GOLD (XAUUSD)",
-    "NAS100": "NASDAQ (NAS100)", "NASDAQ": "NASDAQ (NAS100)",
-    "US100Cash": "NASDAQ (US100)", "US30Cash": "DOW30 (US30)",
+    # FIX 2026-04-24: alinear con formato oficial canal VIP — ORO no GOLD/XAUUSD,
+    # nombres limpios sin sufijos tecnicos (US30 no DOW30, NASDAQ no NAS100)
+    "GOLD": "ORO", "XAUUSD": "ORO", "XAU": "ORO",
+    "NAS100": "NASDAQ", "NASDAQ": "NASDAQ", "US100Cash": "NASDAQ",
+    "US500Cash": "S&P 500", "US30Cash": "US30",
     "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD", "USDJPY": "USD/JPY",
     "GBPJPY": "GBP/JPY", "AUDCAD": "AUD/CAD", "USDCAD": "USD/CAD",
 }
@@ -73,7 +75,9 @@ def build_message(pair, direction, entry, sl, tp, tp2=0, tp3=0, tp4=0, tp5=0):
     has_multi_tp = any(t > 0 for t in [tp2, tp3, tp4, tp5])
     tp_label = "TP1" if has_multi_tp else "TP"
 
-    dir_label = "COMPRA" if direction.upper() == "BUY" else "VENTA"
+    # FIX 2026-04-24: formato oficial canal VIP usa BUY/SELL en INGLES, no
+    # COMPRA/VENTA. Ver feedback_canal_vip_normas.md.
+    dir_label = direction.upper()  # BUY o SELL
     lines = [
         f"{dir_emoji} *{dir_label} \u2014 {pair_display}*",
         "",
