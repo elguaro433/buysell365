@@ -14761,6 +14761,13 @@ def loop_vip_check():
         _ultimo_briefing_diario = _init_hoy
     if _init_hora.hour >= CIERRE_HORA:         # >= 22:00 → cierre de hoy ya pasó (evita reenvío al reiniciar)
         _ultimo_cierre_diario   = _init_hoy
+    # FIX 2026-04-24: mismo patron para daily_promo (12:00) y weekly (viernes 19:00)
+    # para evitar reenvio si ya paso la hora al arrancar.
+    if _init_hora.hour >= DAILY_PROMO_HORA and _ultimo_daily_promo != _init_hoy:
+        _ultimo_daily_promo = _init_hoy
+    _init_es_viernes = (_init_hora.weekday() == 4)
+    if _init_es_viernes and _init_hora.hour >= WEEKLY_HORA and _ultimo_weekly_summary != _init_hoy:
+        _ultimo_weekly_summary = _init_hoy
 
     while True:
         try:

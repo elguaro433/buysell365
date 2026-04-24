@@ -1230,8 +1230,8 @@ if('serviceWorker' in navigator){{
 <section class="hero">
   <div class="hero-content">
     <div class="hero-badge"><span class="dot"></span> <span data-i18n="hero.badge">{'Bot activo' if is_alive else 'Dashboard Online'}</span></div>
-    <h1 data-i18n="hero.title">Tu cuenta opera sola<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Nuestro bot trabaja por ti, 24/7</span></h1>
-    <p data-i18n="hero.subtitle">El bot ejecuta operaciones en <strong style="color:#f0f6ff">EUR/USD, NASDAQ, S&amp;P 500 y ORO</strong> \u2014 con Entry, Stop Loss y Take Profit exactos \u2014 sin que hagas nada. Sin experiencia requerida.</p>
+    <h1 data-i18n="hero.title">Señales VIP en tiempo real<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Opera con precisión, 24/7</span></h1>
+    <p data-i18n="hero.subtitle">Recibe señales con <strong style="color:#f0f6ff">Entry, Stop Loss y Take Profit exactos</strong> en ORO, NASDAQ, US30, EUR/USD, Forex y BTC. Análisis con IA y alertas al instante \u2014 solo ejecuta y gana.</p>
     <div class="hero-buttons">
       <a href="#pricing" class="btn btn-primary" style="font-size:1.05rem;padding:16px 36px"><span data-i18n="hero.btn_start">\U0001f680 Empezar Ahora</span></a>
       <a href="#en-vivo" class="btn btn-secondary">\U0001f4ca <span data-i18n="hero.btn_dashboard">Rendimiento en Vivo</span></a>

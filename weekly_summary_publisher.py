@@ -16,6 +16,7 @@ Test manual:
   python -X utf8 weekly_summary_publisher.py
 """
 import os
+import time
 import json
 import logging
 import random
