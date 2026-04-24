@@ -14748,7 +14748,7 @@ def loop_vip_check():
     - Limpia pagos pendientes con >24h sin completar
     - Limpia códigos de invitación viejos (>30 días)
     """
-    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario, _ultimo_weekly_summary
+    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario, _ultimo_weekly_summary, _ultimo_daily_promo
     time.sleep(120)  # Esperar 2 min tras arranque
     _ultima_auditoria = time.time()
     logger.info("👑 Loop VIP check iniciado")
