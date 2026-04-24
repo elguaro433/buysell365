@@ -3418,6 +3418,12 @@ def _parse_signal_impl(text, chat_title=""):
     # ── EXTRAER PRECIOS ──
     # Eliminar símbolos de moneda para parsear números
     upper_clean = re.sub(r'[$€£]', '', upper)
+    # FIX 2026-04-24: eliminar comas de miles ("4,680" → "4680"). Learn 2 Trade
+    # VIP usa formato "Entry: $4,680 – $4,705" que dejaba tp=4 como artefacto.
+    # Caso real 24/04 18:03: XAU/USD BUY + WTI CRUDE BUY perdidas por este bug.
+    # Regex especifico: solo comas ENTRE digitos con 3 digitos despues (miles).
+    # NO toca comas con < 3 digitos despues (ej "1,5" decimal europeo).
+    upper_clean = re.sub(r'(\d),(\d{3})(?!\d)', r'\1\2', upper_clean)
 
     # ── EXTRAER SL ──
     # Formatos: "SL: 4499.60" | "SL 4499" | "❗️ SL 45370" | "Stop Loss → 1.3801" | "SL4415" (sin espacio)
