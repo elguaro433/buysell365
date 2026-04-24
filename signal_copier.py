@@ -4008,25 +4008,19 @@ def execute_in_mt5(signal):
     if not tick:
         return False, f"No tick for {sym}"
 
-    # FIX 2026-04-21 (C1): Check de spread ANTES de ejecutar — protección crítica real.
-    # Si spread anómalo (apertura domingo, noticias), abortar para evitar SL instantáneo.
-    # NOTA: spread_pts = (ask-bid)/point  →  para índices con point=0.01:
-    #   US30 spread normal 5-8 → 500-800 pts; GER40 spread normal 2-4 → 200-400 pts.
-    _spread_pts = (tick.ask - tick.bid) / info.point if info.point > 0 else 0
-    _max_spread = {
-        "GOLD": 150,          # Oro: punto=0.01, spread normal ~0.5-1 USD → 50-100 pts; máx 150
-        "XAUUSD": 150,
-        "US100Cash": 600,     # NAS100: spread normal 1-3 → 100-300 pts; máx 600
-        "US30Cash": 2000,     # DOW: spread normal 5-12 → 500-1200 pts; máx 2000
-        "US500Cash": 500,     # S&P500: spread normal 1-3 → 100-300 pts; máx 500
-        "GER40Cash": 1000,    # DAX: spread normal 2-5 → 200-500 pts; máx 1000
-        "OILCash": 50,        # WTI: punto=0.01, spread normal 0.03-0.05 → 3-5 pts
-        "BRENTCash": 50,
-        "BTCUSD": 500,        # Crypto
-    }.get(sym, 30)            # Forex default 30 points (3 pips)
-    if _spread_pts > _max_spread:
-        log.warning(f"🛡️ Spread alto en {sym}: {_spread_pts:.0f}pts > máx {_max_spread}pts — ABORTANDO orden")
-        return False, f"Spread alto: {_spread_pts:.0f}pts (máx {_max_spread})"
+    # FIX 2026-04-24: Spread guard OPCIONAL (default OFF) — politica del usuario es
+    # ejecutar TODA senal sin bloqueos, el gestiona riesgo manual. Para reactivar:
+    # `COPIER_SPREAD_GUARD=true` en .env.
+    if os.getenv("COPIER_SPREAD_GUARD", "false").lower() in ("true", "1", "yes"):
+        _spread_pts = (tick.ask - tick.bid) / info.point if info.point > 0 else 0
+        _max_spread = {
+            "GOLD": 150, "XAUUSD": 150,
+            "US100Cash": 600, "US30Cash": 2000, "US500Cash": 500,
+            "GER40Cash": 1000, "OILCash": 50, "BRENTCash": 50, "BTCUSD": 500,
+        }.get(sym, 30)
+        if _spread_pts > _max_spread:
+            log.warning(f"🛡️ Spread alto en {sym}: {_spread_pts:.0f}pts > máx {_max_spread}pts — ABORTANDO (guard ON)")
+            return False, f"Spread alto: {_spread_pts:.0f}pts (max {_max_spread})"
 
     # FIX 2026-04-21 (C2): Límite de posiciones simultáneas del copier.
     # Con cuenta real y margen limitado, evitar abrir >N posiciones a la vez.
@@ -4930,20 +4924,26 @@ async def main():
                         log.warning(f"⚠️ Sin entry y sin precio disponible — NO publicando (esperamos edición del canal)")
                         return
 
-                # PASO 2: Validar SL vs entry (antes de ejecutar)
+                # PASO 2: SL vs entry — NUNCA descartar, solo limpiar valor invalido
+                # FIX 2026-04-24: Politica del usuario: TODA senal al canal VIP TAMBIEN
+                # se ejecuta en MT5. El usuario ajusta SL/TP manualmente despues.
+                # Si SL contradice direccion → setear SL=0 (MT5 ejecuta sin SL)
+                # NO auto-flip (respetamos la direccion declarada por el aliado).
                 _e = signal.get("entry", 0)
                 _s = signal.get("sl", 0)
                 _d = signal.get("direction", "")
                 if _e > 0 and _s > 0:
-                    # SELL: SL debe estar ARRIBA del entry | BUY: SL debe estar ABAJO
                     if _d == "SELL" and _s < _e:
-                        log.warning(f"⚠️ SELL con SL({_s}) < entry({_e}) — señal inválida, descartando")
-                        return
-                    if _d == "BUY" and _s > _e:
-                        log.warning(f"⚠️ BUY con SL({_s}) > entry({_e}) — señal inválida, descartando")
-                        return
+                        log.warning(f"⚠️ SELL con SL({_s}) < entry({_e}) — limpiando SL=0 (usuario ajusta manual)")
+                        signal["sl"] = 0
+                    elif _d == "BUY" and _s > _e:
+                        log.warning(f"⚠️ BUY con SL({_s}) > entry({_e}) — limpiando SL=0 (usuario ajusta manual)")
+                        signal["sl"] = 0
 
-                # PASO 3: Validar TPs (antes de ejecutar)
+                # PASO 3: Validar TPs — NUNCA descartar, solo limpiar valores invalidos.
+                # FIX 2026-04-24: Politica usuario: TODA senal se ejecuta en MT5.
+                # Si todos los TPs son invalidos, ejecutamos sin TP (tp=0). MT5 acepta
+                # ordenes sin TP. Usuario ajusta manualmente despues.
                 if _e > 0:
                     for _tp_key in ("tp", "tp2", "tp3", "tp4", "tp5"):
                         _tv = signal.get(_tp_key, 0) or 0
@@ -4962,10 +4962,8 @@ async def main():
                             _reason = f"dirección invertida ({_d} pero TP {'<' if _tv < _e else '>'} entry)" if _tp_wrong_dir else f"fuera de rango ({_pct:.0%})"
                             log.warning(f"⚠️ {_tp_key}={_tv} inválido vs entry={_e} — {_reason} — limpiando")
                             signal[_tp_key] = 0
-                    # Si TP principal fue limpiado, la señal no tiene sentido — descartar
-                    if (signal.get("tp", 0) or 0) <= 0 and all((signal.get(f"tp{i}", 0) or 0) <= 0 for i in range(2, 6)):
-                        log.warning(f"⚠️ Todos los TPs inválidos para {_d} {signal.get('pair','')} entry={_e} — descartando señal")
-                        return
+                    # FIX 2026-04-24: NO descartar aunque todos los TPs sean invalidos.
+                    # Se ejecuta a mercado sin TP (usuario lo pone a mano).
 
                 # PASO 4: Validar entry vs precio actual
                 # FIX 2026-04-23: Si entry stale, ejecutar a MERCADO (entry=0) en vez de saltar MT5.
