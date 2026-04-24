@@ -1157,9 +1157,6 @@ section{{padding:60px 20px}}
   .back-to-top{{bottom:76px;right:20px;width:38px;height:38px}}
   section{{padding:40px 12px}}
   .pricing{{padding:50px 12px!important}}
-  /* Hero mockup: ocultar tabla en móvil, mostrar solo stats grid */
-  .hero-mockup-table{{display:none!important}}
-  .hero-mockup-grid{{grid-template-columns:repeat(2,1fr)!important}}
 }}
 @media(max-width:480px){{
   .hero h1{{font-size:1.6rem}}
