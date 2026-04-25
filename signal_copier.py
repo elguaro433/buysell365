@@ -219,6 +219,8 @@ MANUAL_SIGNALS_FILE = Path(__file__).parent / "manual_signals.json"
 OPEN_SIGNALS_FILE = Path(__file__).parent / "copier_open_signals.json"
 # FIX 2026-04-15: Archivo de estadísticas persistentes — sobrevive reinicios
 COPIER_STATS_FILE = Path(__file__).parent / "copier_stats.json"
+# FIX 2026-04-25: Persistencia de estado diario (reportes, IG promo) — sobrevive reinicios
+COPIER_SENT_STATE_FILE = Path(__file__).parent / "copier_sent_state.json"
 # Flag para enviar resumen diario solo una vez
 _daily_summary_sent: str = ""  # fecha "DD/MM/YYYY" del último resumen enviado
 _daily_publisher_sent: str = ""  # fecha "DD/MM/YYYY" del último publisher (19:00 Andorra → Canal VIP + Grupo + IG Story + Highlight)
@@ -2669,7 +2671,27 @@ async def _loop_promo_reportes() -> None:
     import pytz
     tz = pytz.timezone("Europe/Andorra")
 
-    _sent_today: dict = {}  # {"12": "2026-04-08", "17": "2026-04-08"}
+    # FIX 2026-04-25: Persistir _sent_today en disco (sobrevive reinicios del copier)
+    def _load_sent_today() -> dict:
+        try:
+            if COPIER_SENT_STATE_FILE.exists():
+                return json.loads(COPIER_SENT_STATE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        return {}
+
+    def _save_sent_today(data: dict):
+        try:
+            _tmp = str(COPIER_SENT_STATE_FILE) + ".tmp"
+            with open(_tmp, "w", encoding="utf-8") as f:
+                f.write(json.dumps(data, ensure_ascii=False))
+            import os as _os_st
+            _os_st.replace(_tmp, str(COPIER_SENT_STATE_FILE))
+        except Exception:
+            pass
+
+    _sent_today: dict = _load_sent_today()
+    log.info(f"📢 Reportes: estado cargado de disco — {list(_sent_today.keys())}")
 
     _promo_rows = [
         [{"text": "💎 VER CANAL VIP", "url": f"https://t.me/{os.getenv('BOT_USERNAME','Andoperandobot')}?start=vip"}],
@@ -2691,10 +2713,12 @@ async def _loop_promo_reportes() -> None:
                         log.info(f"🔄 Reset daily tracker: {len(_daily_results)} resultados del día anterior")
                         _daily_results.clear()
                 _sent_today.clear()
+                _save_sent_today(_sent_today)
 
             # 12:00 — Reporte de mañana
             if hora == 12 and minuto < 5 and _sent_today.get("12") != hoy_str:
                 _sent_today["12"] = hoy_str
+                _save_sent_today(_sent_today)
                 msg = _build_promo_report("DE MAÑANA")
                 if msg and GROUP_ID:
                     try:
@@ -2713,6 +2737,7 @@ async def _loop_promo_reportes() -> None:
             # 17:00 — Reporte de tarde
             if hora == 17 and minuto < 5 and _sent_today.get("17") != hoy_str:
                 _sent_today["17"] = hoy_str
+                _save_sent_today(_sent_today)
                 msg = _build_promo_report("DE TARDE")
                 if msg and GROUP_ID:
                     try:
@@ -2731,6 +2756,7 @@ async def _loop_promo_reportes() -> None:
             # 22:00 — Reporte privado al admin (resumen del día)
             if hora == 22 and minuto < 5 and _sent_today.get("22") != hoy_str:
                 _sent_today["22"] = hoy_str
+                _save_sent_today(_sent_today)
                 if ADMIN_ID:
                     with _daily_results_lock:
                         today_start = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
@@ -2778,7 +2804,11 @@ async def _monitor_tp_loop() -> None:
     """Async background loop — checks every 30s if any tracked signal hit TP or SL."""
     log.info("🎯 Monitor TP/SL loop iniciado (intervalo: 30s)")
     global _daily_summary_sent, _daily_publisher_sent
-    _sent_today = {}  # FIX 2026-04-16: Variable local para promo/follow diarios (antes NameError)
+    # FIX 2026-04-25: Cargar estado de disco (mismas funciones definidas en _loop_promo_reportes)
+    try:
+        _sent_today = json.loads(COPIER_SENT_STATE_FILE.read_text(encoding="utf-8")) if COPIER_SENT_STATE_FILE.exists() else {}
+    except Exception:
+        _sent_today = {}
     _reconcile_tick = 0  # FIX 2026-04-17: contador para reconciliación MT5 cada 3 min
     while True:
         await asyncio.sleep(30)  # 30s para no perder TP/SL en mercados volátiles
@@ -2899,6 +2929,13 @@ async def _monitor_tp_loop() -> None:
         try:
             if _now_sum.hour == 14 and _now_sum.minute < 5 and _sent_today.get("ig_promo") != _hoy_str:
                 _sent_today["ig_promo"] = _hoy_str
+                try:
+                    _tmp_st = str(COPIER_SENT_STATE_FILE) + ".tmp"
+                    with open(_tmp_st, "w", encoding="utf-8") as _f_st:
+                        _f_st.write(json.dumps(_sent_today, ensure_ascii=False))
+                    os.replace(_tmp_st, str(COPIER_SENT_STATE_FILE))
+                except Exception:
+                    pass
                 import random
                 import requests as _req_ig
                 _ig_captions = [

@@ -13948,7 +13948,18 @@ def revisar_niveles_operaciones():
 # ============================================================
 #  RESUMEN SEMANAL AUTOMÁTICO (#5)
 # ============================================================
-_ultimo_resumen_semanal = time.time()  # Esperar desde arranque
+# FIX 2026-04-25: Persistir timestamp del resumen semanal en pub_state.json
+def _load_ultimo_resumen_semanal():
+    try:
+        _ps_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pub_state.json")
+        if os.path.exists(_ps_path):
+            with open(_ps_path, encoding="utf-8") as f:
+                return json.loads(f.read()).get("ultimo_resumen_semanal_ts", time.time())
+    except Exception:
+        pass
+    return time.time()
+
+_ultimo_resumen_semanal = _load_ultimo_resumen_semanal()
 
 def enviar_resumen_semanal():
     """Envía resumen semanal al GRUPO público cada domingo a las 20:00 UTC."""
@@ -13956,6 +13967,20 @@ def enviar_resumen_semanal():
     if time.time() - _ultimo_resumen_semanal < 86400:  # Max 1 por día
         return
     _ultimo_resumen_semanal = time.time()
+    # Persistir a disco
+    try:
+        _ps_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pub_state.json")
+        _existing = {}
+        if os.path.exists(_ps_path):
+            with open(_ps_path, encoding="utf-8") as f:
+                _existing = json.loads(f.read())
+        _existing["ultimo_resumen_semanal_ts"] = _ultimo_resumen_semanal
+        _tmp = _ps_path + ".tmp"
+        with open(_tmp, "w", encoding="utf-8") as f:
+            f.write(json.dumps(_existing, ensure_ascii=False))
+        os.replace(_tmp, _ps_path)
+    except Exception:
+        pass
 
     hist = historial_operaciones if historial_operaciones else []
     # Filtrar señales de los últimos 7 días
@@ -14413,7 +14438,18 @@ def loop_publicidad_grupo():
         _guardar_estado({**_cargar_estado(), "grupo_msg_id": None})
         logger.info("🗑️ Anuncio anterior del grupo borrado al arrancar")
 
-    _ultima_publicacion_g = None  # datetime del último envío para control de intervalo
+    # FIX 2026-04-25: Cargar hora de última publicación desde disco (sobrevive reinicios)
+    # Sin esto, cada reinicio publicaba un anuncio inmediato (bypass del intervalo)
+    _ultima_publicacion_g = None
+    _ts_ultima_pub = _estado.get("grupo_ultima_pub_ts")
+    if _ts_ultima_pub:
+        try:
+            from datetime import datetime
+            import pytz as _pytz_pub
+            _ultima_publicacion_g = datetime.fromtimestamp(_ts_ultima_pub, tz=_pytz_pub.timezone("Europe/Andorra"))
+            logger.info(f"📢 Publicidad grupo: última publicación fue {_ultima_publicacion_g.strftime('%H:%M')} — respetando intervalo")
+        except Exception:
+            pass
     _dia_borrado_grupo   = ""     # Para el borrado nocturno del grupo
 
     # ── Anuncios rotativos del GRUPO (cada 30 min) ──
@@ -14573,7 +14609,7 @@ def loop_publicidad_grupo():
             if nuevo_id:
                 _ultimo_anuncio_id = nuevo_id
                 _ultima_publicacion_g = _ahora_g
-                _guardar_estado({**_cargar_estado(), "grupo_msg_id": nuevo_id})
+                _guardar_estado({**_cargar_estado(), "grupo_msg_id": nuevo_id, "grupo_ultima_pub_ts": _ahora_g.timestamp()})
                 logger.info(f"📢 Publicidad grupo — modelo {_indice+1}/{len(ANUNCIOS)} (hora {_hora_g}:00, cada {PUBLICIDAD_INTERVALO_HORAS}h)")
 
         except Exception as e:
