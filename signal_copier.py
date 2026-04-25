@@ -3329,6 +3329,19 @@ def _parse_signal_impl(text, chat_title=""):
         # NasdaqMasters / NASDaqxNinja — mensajes de celebración (NO son señales)
         "IT FLEW", "PIPS HIT", "TP CORRECTED", "1000 PIPS", "2000 PIPS", "3000 PIPS",
         "BANKED", "NAILED IT", "MASSIVE WIN", "LET IT RUN",
+        # FIX 2026-04-25: TopTradingSignals manda CARDS de resultados pasados como
+        # "GOLD SIGNALS RESULTS" — son ranking historico, NO señales nuevas.
+        "SIGNALS RESULTS", "GOLD SIGNALS RESULT", "PIPS WON", "PIPS LOST",
+        "NET GAIN", "TOTAL PIPS WON", "TOTAL PIPS LOST", "NET PIPS GAINED",
+        "VIP CHANNEL", "GOLD VIP", "FREE COPY TRADING",
+        "LIKE & SUBSCRIBE", "BROADCAST",
+        # FIX 2026-04-25: ProSignalsFx manda posts narrativos promocionales como
+        # "Absolutely fascinating short on #GBPUSD" + #update + #bestforexsignals.
+        # NO son señales — son posts de marketing del propio canal.
+        "FASCINATING SHORT", "FASCINATING LONG", "ABSOLUTELY FASCINATING",
+        "FASCINATING", "AMAZING SETUP", "BEAUTIFUL SETUP", "PERFECT SETUP",
+        "#UPDATE", "#BESTFOREXSIGNALS", "#FREECHANNEL", "#FREESIGNAL",
+        "BEST FOREX SIGNALS", "FREE CHANNEL THIS MONTH", "FREE SIGNAL",
     ]
     if any(w in upper for w in _ignore_keywords):
         return None
@@ -3579,6 +3592,20 @@ def _parse_signal_impl(text, chat_title=""):
         tp5   = float(tp5_match.group(1)) if tp5_match else 0.0
         entry = float(entry_match.group(1)) if entry_match else 0.0
     except (ValueError, IndexError, AttributeError):
+        return None
+
+    # FIX 2026-04-25: REGLA CRITICA — una senal REAL tiene al menos UNO de
+    # estos: SL valido, TP valido, o entry valido. Si NINGUNO de los tres se
+    # capturo, es un post promocional/publicidad (NO publicar al canal VIP).
+    # Casos reales que se colaron antes de este filtro:
+    # - "Absolutely fascinating short on #GBPUSD" (ProSignalsFx promo)
+    # - "GOLD SIGNALS RESULTS" (TopTradingSignals card de stats)
+    # Ambos tenian dir + pair pero CERO precios → falsos positivos.
+    if entry <= 0 and sl <= 0 and tp <= 0 and tp2 <= 0 and tp3 <= 0 and tp4 <= 0 and tp5 <= 0:
+        log.warning(
+            f"🚫 Senal descartada (sin precios) en [{chat_title}]: "
+            f"{text[:100].replace(chr(10),' ')!r} — probable promo/publicidad"
+        )
         return None
 
     # Protección: TP de dígito único (ej "1") es artefacto del parser — "TP1: 4608" captura "1" si regex falla
