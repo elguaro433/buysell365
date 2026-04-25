@@ -15354,26 +15354,12 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
     )
 
     # Intentar enviar DM al usuario — sin botones, texto limpio.
+    # FIX 2026-04-25: NO publicar aviso en el grupo publico.
+    # Antes el bot publicaba "Carlos, te acabo de saludar por privado" o
+    # "Carlos, para atenderte pulsa el boton" segun si el DM llegaba o no.
+    # El usuario pidio quitarlo: agobia el grupo y no aporta valor.
+    # El admin sigue recibiendo notificacion privada (ver bloque siguiente).
     dm_ok = enviar_telegram(menu_privado, user_id)
-
-    if grupo_chat_id:
-        if dm_ok:
-            # ✅ DM enviado — aviso breve en el grupo
-            aviso = (
-                f"💬 *{nombre}*, te acabo de escribir por privado con toda la información 📩\n"
-                f"👉 Revisa tus mensajes directos con el bot."
-            )
-        else:
-            # ❌ DM falló — el usuario no ha hecho /start → indicar cómo hacerlo
-            aviso = (
-                f"👋 *{nombre}*, para atenderte en privado pulsa el botón 👇"
-            )
-        _markup_aviso = {"inline_keyboard": [[
-            {"text": "💬 Hablar con el bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
-        ]]} if not dm_ok else None
-        aviso_id = enviar_telegram(aviso, grupo_chat_id, teclado=_markup_aviso)
-        if aviso_id:
-            programar_borrado(grupo_chat_id, aviso_id, 600)  # 10 min visible
 
     # Notificar al admin
     admin_id = USERS_AUTORIZADOS[0] if USERS_AUTORIZADOS else None
