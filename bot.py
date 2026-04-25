@@ -1988,13 +1988,14 @@ def enviar_grupo(mensaje: str, incluir_promo: bool = True, auto_delete: int = 30
     target = GROUP_ID if GROUP_ID else CHANNEL_ID
 
     # 📢 Marca de agua publicitaria para el grupo
+    # FIX 2026-04-25: eliminadas 2 promos de COPY TRADING — el servicio fue
+    # pausado el 21-abr (ver feedback_copy_trading_pausado). Las promos
+    # quedaron en este array y se mostraban con 40% probabilidad cada vez.
     if incluir_promo and ADMIN_USER:
         promos = [
             f"\n\n💎 *¿QUIERES ESTAS SEÑALES EN VIVO?*\nRecibe entradas con alta precision.\n👉 *Escribe /vip para más información* 🔥",
             f"\n\n🚀 *SEÑALES DE TRADING EN TIEMPO REAL*\nAnalisis tecnico automatizado con IA.\n👉 *Escribe /vip — Canal VIP exclusivo* 🚀",
             f"\n\n🔥 *UNETE AL CANAL VIP*\nSenales diarias de Forex e Indices.\n👉 *Escribe /vip para unirte* 💎",
-            f"\n\n📈 *COPY TRADING DISPONIBLE*\nCopia nuestras operaciones automaticamente.\n👉 *Escribe /vip para mas informacion* 🤖",
-            f"\n\n🤖 *COPY TRADING AUTOMATICO 24/7*\nNuestro bot opera por ti sin que hagas nada.\n👉 *Escribe /vip para activarlo* 📊",
         ]
         mensaje += random.choice(promos)
         
