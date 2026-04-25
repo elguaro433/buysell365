@@ -449,10 +449,17 @@ WEEKLY_HORA = 19                            # Viernes 19:00 — resumen semanal 
 WEEKLY_MINUTO = 0
 DAILY_PROMO_HORA = 12                       # 12:00 — publicidad diaria (grupo + IG feed)
 DAILY_PROMO_MINUTO = 0
+# FIX 2026-04-25: promo "2 senales gratis cada dia" 2 veces/dia (9am + 7pm Andorra)
+SIGNALS_PROMO_AM_HORA = 9                   # 9:00 — promo manana
+SIGNALS_PROMO_AM_MINUTO = 0
+SIGNALS_PROMO_PM_HORA = 19                  # 19:00 — promo tarde
+SIGNALS_PROMO_PM_MINUTO = 0
 _ultimo_briefing_diario: str = ""           # "YYYY-MM-DD" — evita enviar doble
 _ultimo_cierre_diario: str = ""             # "YYYY-MM-DD" — evita enviar doble
 _ultimo_weekly_summary: str = ""            # "YYYY-MM-DD" del viernes — evita enviar doble
 _ultimo_daily_promo: str = ""               # "YYYY-MM-DD" — evita enviar doble promo diaria
+_ultimo_signals_promo_am: str = ""          # "YYYY-MM-DD" — evita doble promo 9am
+_ultimo_signals_promo_pm: str = ""          # "YYYY-MM-DD" — evita doble promo 7pm
 
 # ── CACHÉS DE OPTIMIZACIÓN ────────────────────────────────────
 _cache_ml_modelos = {}  # ML desactivado — cache vacío, mantenido para compatibilidad con limpiar_caches
@@ -926,6 +933,8 @@ def guardar_estado():
                 "_ultimo_reporte_diario": _ultimo_reporte_diario,
                 "_ultimo_weekly_summary": _ultimo_weekly_summary,  # FIX 2026-04-24: evita duplicar al reiniciar
                 "_ultimo_daily_promo": _ultimo_daily_promo,  # FIX 2026-04-24: promo diaria 12:00
+                "_ultimo_signals_promo_am": _ultimo_signals_promo_am,  # FIX 2026-04-25: promo 2 senales 9am
+                "_ultimo_signals_promo_pm": _ultimo_signals_promo_pm,  # FIX 2026-04-25: promo 2 senales 7pm
                 "mt5_pausado": mt5_pausado,
                 "mt5_solo_premium": mt5_solo_premium,
                 "escaneo_pausado": escaneo_pausado,
@@ -1112,13 +1121,20 @@ def cargar_estado():
 
                     # FIX 2026-04-24: Cargar flag de resumen semanal persistido
                     # (evita duplicar al reiniciar el bot despues de publicar).
-                    global _ultimo_weekly_summary, _ultimo_daily_promo
+                    global _ultimo_weekly_summary, _ultimo_daily_promo, _ultimo_signals_promo_am, _ultimo_signals_promo_pm
                     _uws = data.get("_ultimo_weekly_summary")
                     if isinstance(_uws, str):
                         _ultimo_weekly_summary = _uws
                     _udp = data.get("_ultimo_daily_promo")
                     if isinstance(_udp, str):
                         _ultimo_daily_promo = _udp
+                    # FIX 2026-04-25: Cargar flags de promo "2 senales gratis" 9am+7pm
+                    _uspa = data.get("_ultimo_signals_promo_am")
+                    if isinstance(_uspa, str):
+                        _ultimo_signals_promo_am = _uspa
+                    _uspp = data.get("_ultimo_signals_promo_pm")
+                    if isinstance(_uspp, str):
+                        _ultimo_signals_promo_pm = _uspp
 
                     # Cargar mt5_pausado, mt5_solo_premium, escaneo_pausado
                     global mt5_pausado, mt5_solo_premium, escaneo_pausado
@@ -14827,7 +14843,7 @@ def loop_vip_check():
     - Limpia pagos pendientes con >24h sin completar
     - Limpia códigos de invitación viejos (>30 días)
     """
-    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario, _ultimo_weekly_summary, _ultimo_daily_promo
+    global pagos_pendientes_vip, _ultima_auditoria, _codigos_invitacion, _ultimo_briefing_diario, _ultimo_cierre_diario, _ultimo_weekly_summary, _ultimo_daily_promo, _ultimo_signals_promo_am, _ultimo_signals_promo_pm
     time.sleep(120)  # Esperar 2 min tras arranque
     _ultima_auditoria = time.time()
     logger.info("👑 Loop VIP check iniciado")
@@ -14847,6 +14863,11 @@ def loop_vip_check():
     _init_es_viernes = (_init_hora.weekday() == 4)
     if _init_es_viernes and _init_hora.hour >= WEEKLY_HORA and _ultimo_weekly_summary != _init_hoy:
         _ultimo_weekly_summary = _init_hoy
+    # FIX 2026-04-25: mismo patron para promo "2 senales gratis" 9am + 7pm
+    if _init_hora.hour >= SIGNALS_PROMO_AM_HORA and _ultimo_signals_promo_am != _init_hoy:
+        _ultimo_signals_promo_am = _init_hoy
+    if _init_hora.hour >= SIGNALS_PROMO_PM_HORA and _ultimo_signals_promo_pm != _init_hoy:
+        _ultimo_signals_promo_pm = _init_hoy
 
     while True:
         try:
@@ -14885,6 +14906,34 @@ def loop_vip_check():
                     log_sistema(f"📢 Promo diaria publicada: grupo msg_id={_gmid}, IG={_igok}")
                 except Exception as e:
                     logger.error(f"❌ Error promo diaria: {e}", exc_info=True)
+
+            # 0c3. 🎁 PROMO "2 SEÑALES GRATIS" (TODOS LOS DIAS 9:00 + 19:00) — grupo
+            # FIX 2026-04-25: 2x al dia, mensaje con boton inline al bot privado.
+            if (ahora_check.hour > SIGNALS_PROMO_AM_HORA or (ahora_check.hour == SIGNALS_PROMO_AM_HORA and ahora_check.minute >= SIGNALS_PROMO_AM_MINUTO)) and ahora_check.hour < SIGNALS_PROMO_PM_HORA and _ultimo_signals_promo_am != hoy_str_check:
+                _ultimo_signals_promo_am = hoy_str_check
+                try:
+                    guardar_estado()
+                except Exception:
+                    pass
+                try:
+                    from signals_promo_publisher import publish_signals_promo
+                    _res_am = publish_signals_promo(dry_run=False)
+                    log_sistema(f"🎁 Promo 9am '2 senales gratis' → {_res_am}")
+                except Exception as e:
+                    logger.error(f"❌ Error promo 9am: {e}", exc_info=True)
+
+            if (ahora_check.hour > SIGNALS_PROMO_PM_HORA or (ahora_check.hour == SIGNALS_PROMO_PM_HORA and ahora_check.minute >= SIGNALS_PROMO_PM_MINUTO)) and _ultimo_signals_promo_pm != hoy_str_check:
+                _ultimo_signals_promo_pm = hoy_str_check
+                try:
+                    guardar_estado()
+                except Exception:
+                    pass
+                try:
+                    from signals_promo_publisher import publish_signals_promo
+                    _res_pm = publish_signals_promo(dry_run=False)
+                    log_sistema(f"🎁 Promo 7pm '2 senales gratis' → {_res_pm}")
+                except Exception as e:
+                    logger.error(f"❌ Error promo 7pm: {e}", exc_info=True)
 
             # 0d. 📊 RESUMEN SEMANAL (VIERNES 19:00) — canal VIP + grupo + IG feed + Stories
             # FIX 2026-04-24: publicador automatico del resumen de 7 dias (sab→vie)
