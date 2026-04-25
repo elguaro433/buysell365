@@ -817,6 +817,10 @@ class ManagementConsole:
 
         # Build root window
         self.root = tk.Tk()
+        # FIX 2026-04-25: ocultar root durante construccion para que Windows no
+        # exponga ventanas auxiliares de Tk (EmbeddedMenuWindow, root sin titulo)
+        # en Alt+Tab tras reinicios del laptop. Se restaura en run() con deiconify().
+        self.root.withdraw()
         self.root.title("BuySell365 Pro - Consola de Control | Propiedad de Emmanuel Diaz")
         self.root.geometry("1400x850")
         self.root.minsize(1100, 700)
@@ -4011,6 +4015,9 @@ class ManagementConsole:
     #  RUN
     # ============================================================
     def run(self):
+        # FIX 2026-04-25: mostrar la root ahora que esta totalmente construida
+        # (titulo, geometria, tabs, widgets). Complementa el withdraw() del __init__.
+        self.root.deiconify()
         self.root.mainloop()
 
 
