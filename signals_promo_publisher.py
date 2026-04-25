@@ -27,6 +27,7 @@ log = logging.getLogger("signals_promo")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 GROUP_ID = os.getenv("GROUP_ID", "@BUYSELL_365_24_7").strip()
 BOT_USERNAME = os.getenv("BOT_USERNAME", "Andoperandobot").strip()
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "BuySell365traiding").strip()
 
 
 PROMO_MSG = (
@@ -39,15 +40,16 @@ PROMO_MSG = (
     "Sin pagos. Sin cursos. Sin trampas.\n"
     "Solo tienes que estar atento al grupo 👀\n\n"
     "💎 ¿Quieres acceso a *todas* las señales + análisis IA?\n"
-    "👇 Habla con nuestro bot"
+    "👇 Elige cómo prefieres hablar:"
 )
 
 
 def _build_keyboard() -> dict:
     return {
-        "inline_keyboard": [[
-            {"text": "🤖 Hablar con el bot", "url": f"https://t.me/{BOT_USERNAME}"}
-        ]]
+        "inline_keyboard": [
+            [{"text": "🤖 Hablar con el bot", "url": f"https://t.me/{BOT_USERNAME}"}],
+            [{"text": "👤 Hablar con Emmanuel (admin)", "url": f"https://t.me/{ADMIN_USERNAME}"}],
+        ]
     }
 
 
