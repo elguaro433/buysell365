@@ -2800,10 +2800,36 @@ async def _loop_promo_reportes() -> None:
         await asyncio.sleep(60)  # Revisar cada minuto
 
 
+def _is_forex_market_closed() -> bool:
+    """True si forex/indices/metales/petroleo estan cerrados (fin de semana).
+    Forex cierra Viernes 22:00 UTC y reabre Domingo 22:00 UTC.
+    Crypto no aplica — siempre abierto.
+    """
+    from datetime import datetime, timezone
+    _now_utc = datetime.now(timezone.utc)
+    _wd = _now_utc.weekday()  # Mon=0..Sun=6
+    if _wd == 5:  # Sabado completo
+        return True
+    if _wd == 4 and _now_utc.hour >= 22:  # Viernes desde 22:00 UTC
+        return True
+    if _wd == 6 and _now_utc.hour < 22:  # Domingo antes de 22:00 UTC
+        return True
+    return False
+
+
+def _is_24_7_asset(pair: str) -> bool:
+    """True si el activo cotiza 24/7 (cryptos)."""
+    _p = pair.upper().replace("/", "")
+    return any(_c in _p for _c in ("BTC", "ETH", "BNB", "XRP", "DOGE", "SOL", "LTC", "BCH", "ADA", "DOT", "AVAX", "MATIC"))
+
+
+_market_closed_logged_until = 0.0  # ts hasta el que ya logueamos el skip de mercado cerrado
+
+
 async def _monitor_tp_loop() -> None:
     """Async background loop — checks every 30s if any tracked signal hit TP or SL."""
     log.info("🎯 Monitor TP/SL loop iniciado (intervalo: 30s)")
-    global _daily_summary_sent, _daily_publisher_sent
+    global _daily_summary_sent, _daily_publisher_sent, _market_closed_logged_until
     # FIX 2026-04-25: Cargar estado de disco (mismas funciones definidas en _loop_promo_reportes)
     try:
         _sent_today = json.loads(COPIER_SENT_STATE_FILE.read_text(encoding="utf-8")) if COPIER_SENT_STATE_FILE.exists() else {}
@@ -3032,6 +3058,17 @@ async def _monitor_tp_loop() -> None:
         with _signals_lock:
             signals_copy = dict(_open_signals)
 
+        # FIX 2026-04-25: Saltar polling de precio MT5 para forex/indices/metales
+        # cuando el mercado esta cerrado (fin de semana). Crypto sigue 24/7.
+        # Antes: cada 30s polleabamos USDJPY 2x + GBPUSD 1x los sabados sin que se
+        # mueva ni un pip → ruido en log + uso inutil de MT5.
+        _market_closed = _is_forex_market_closed()
+        if _market_closed and signals_copy and time.time() > _market_closed_logged_until:
+            _non_crypto = sum(1 for _s in signals_copy.values() if not _is_24_7_asset(_s["signal"].get("pair", "")))
+            if _non_crypto > 0:
+                log.info(f"💤 Mercado forex/indices CERRADO (fin de semana) — pausando polling de {_non_crypto} señales no-crypto")
+                _market_closed_logged_until = time.time() + 1800  # log cada 30 min mientras dure
+
         to_resolve = []
         _already_in_cycle = set()  # Anti-duplicado: un TP/SL por par+dir por ciclo
         for sig_id, sdata in signals_copy.items():
@@ -3040,6 +3077,12 @@ async def _monitor_tp_loop() -> None:
             sl = signal["sl"]
             pair = signal["pair"]
             age_hours = (time.time() - sdata["sent_at"]) / 3600
+
+            # FIX 2026-04-25: Skip silencioso si el mercado esta cerrado y el activo
+            # no es 24/7. La señal sigue en seguimiento — solo no consultamos precio
+            # hasta que reabra. TP/SL no se pueden tocar con mercado cerrado.
+            if _market_closed and not _is_24_7_asset(pair):
+                continue
 
             # FIX 2026-04-10: Filtrar TPs basura ANTES de seleccionar _tp_final
             _entry_ref = signal.get("entry", 0) or 0
