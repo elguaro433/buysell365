@@ -4541,27 +4541,22 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
 # ============================================================
 
 def cmd_ayuda():
+    # FIX 2026-04-25: lista publica reducida — antes exponia /senales,
+    # /resumen, /winrate, /analisis, /precios, /sentimiento, /tendencia,
+    # /pivots, /estado, /web a cualquier usuario. Esos son comandos
+    # internos/VIP, no deben anunciarse en el menu publico.
     return (
-        "🤖 *COMANDOS BuySell365.pro*\n\n"
-        "📈 *Senales*\n"
-        "   `/senales` — Operaciones abiertas\n"
-        "   `/resumen` — Resumen del dia\n"
-        "   `/winrate` — Estadisticas\n\n"
-        "🔍 *Analisis*\n"
-        "   `/analisis [activo]` — Analisis tecnico\n"
-        "   `/precio [activo]` — Precio en vivo\n"
-        "   `/precios` — Todos los precios\n\n"
-        "🌍 *Mercados*\n"
-        "   `/mercados` — Activos monitoreados\n"
-        "   `/horarios` — Sesiones de mercado\n"
-        "   `/noticias` — Calendario economico\n"
-        "   `/sentimiento` · `/tendencia` · `/pivots`\n\n"
-        "📊 *Herramientas*\n"
-        "   `/web` — Trading en Vivo\n"
-        "   `/estado` — Estado del sistema\n\n"
-        "👑 *VIP*\n"
-        f"   `/vip` — Canal VIP Premium\n\n"
-        "💡 _Preguntame: \"Analiza el oro\" o \"Precio del nasdaq\"_"
+        "🤖 *BuySell365.pro — Bot de Trading*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        "Soy tu asistente. Puedo ayudarte con:\n\n"
+        "👑 *Canal VIP*\n"
+        "   `/vip` — Suscríbete al Canal VIP Premium\n\n"
+        "👤 *Contacto humano*\n"
+        "   `/contacto` — Hablar con Emmanuel (admin)\n\n"
+        "📋 *Otros*\n"
+        "   `/start` — Volver al menú principal\n"
+        "   `/ayuda` — Esta ayuda\n\n"
+        "💡 _O escríbeme directamente: \"Quiero ver el VIP\" o \"Hablar con un humano\"._"
     )
 
 def cmd_senales():
@@ -8979,7 +8974,30 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
 
     if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "❓ ayuda"):
         res_ayuda = f"👋 ¡Hola *{nombre_user}*! " + cmd_ayuda()
-        return res_ayuda, crear_teclado_principal()
+        # FIX 2026-04-25: incluir teclado inline con boton para hablar con admin.
+        _ayuda_botones = {
+            "inline_keyboard": [
+                [{"text": "💎 Suscribirme al Canal VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "👤 Hablar con Emmanuel (admin)", "url": "https://t.me/BuySell365traiding"}],
+            ]
+        }
+        return res_ayuda, _ayuda_botones
+
+    # FIX 2026-04-25: comando /contacto — boton directo a chat con admin
+    if t in ("/contacto", "/contact", "contacto", "contact", "/admin_contact",
+             "hablar con admin", "hablar con emmanuel", "contactar admin"):
+        return (
+            "👤 *Contacto con el administrador*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Pulsa el botón de abajo para hablar directamente con Emmanuel "
+            "(fundador de BuySell365.pro).\n\n"
+            "Te responde personalmente en cuanto pueda. ✅"
+        ), {
+            "inline_keyboard": [
+                [{"text": "👤 Hablar con Emmanuel", "url": "https://t.me/BuySell365traiding"}],
+                [{"text": "💎 Ver Canal VIP", "callback_data": "vip_pagar_usdt"}],
+            ]
+        }
     if t in ("/señales", "/senales", "/operaciones", "/abiertas", "/activas", "activas",
              "señales", "senales", "señales activas", "📊 señales activas"):
         return cmd_senales(), crear_teclado_principal()
