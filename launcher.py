@@ -2775,25 +2775,120 @@ class ManagementConsole:
             if not uid:
                 messagebox.showwarning("Error", "Introduce el User ID.")
                 return
+
+            # FIX 2026-04-25: crear invite link Telegram + enviar DM al cliente.
+            # Antes solo guardaba la suscripcion en estado.json con invite_link
+            # vacio, y el admin tenia que pegar el link a mano (caso Gian).
+            now = datetime.now()
+            expira_dt = now + timedelta(days=days)
+
+            env = load_env()
+            tg_token = env.get("TELEGRAM_TOKEN", "").strip()
+            ch_id = env.get("CHANNEL_ID", "").strip()
+            invite_link = ""
+            tg_error = ""
+
+            if tg_token and ch_id:
+                # 1. Crear invite link unico (1 uso, expira en days+1)
+                try:
+                    expire_unix = int((expira_dt + timedelta(days=1)).timestamp())
+                    payload = json.dumps({
+                        "chat_id": int(ch_id),
+                        "expire_date": expire_unix,
+                        "member_limit": 1,
+                        "name": f"VIP-{uid[-6:]}-{now.strftime('%m%d')}",
+                    }).encode("utf-8")
+                    req = urllib.request.Request(
+                        f"https://api.telegram.org/bot{tg_token}/createChatInviteLink",
+                        data=payload,
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        body = json.loads(resp.read().decode("utf-8"))
+                    if body.get("ok"):
+                        invite_link = body.get("result", {}).get("invite_link", "")
+                    else:
+                        tg_error = f"createChatInviteLink: {body}"
+                except Exception as e:
+                    tg_error = f"createChatInviteLink: {e}"
+
+                # 2. Enviar DM de bienvenida con el link al cliente
+                if invite_link:
+                    try:
+                        dm_text = (
+                            f"🏆 *¡Bienvenido al VIP, {name}!*\n"
+                            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                            f"Tu acceso al canal *BuySell365.Pro · Señales VIP* "
+                            f"esta activo hasta el *{expira_dt.strftime('%d-%m-%Y')}* "
+                            f"({days} dias).\n\n"
+                            f"👇 Toca el boton para entrar al canal:"
+                        )
+                        dm_payload = json.dumps({
+                            "chat_id": int(uid),
+                            "text": dm_text,
+                            "parse_mode": "Markdown",
+                            "reply_markup": {
+                                "inline_keyboard": [[
+                                    {"text": "👑 ENTRAR AL CANAL VIP", "url": invite_link}
+                                ]]
+                            },
+                        }).encode("utf-8")
+                        req2 = urllib.request.Request(
+                            f"https://api.telegram.org/bot{tg_token}/sendMessage",
+                            data=dm_payload,
+                            headers={"Content-Type": "application/json"},
+                            method="POST",
+                        )
+                        with urllib.request.urlopen(req2, timeout=15) as resp2:
+                            dm_body = json.loads(resp2.read().decode("utf-8"))
+                        if not dm_body.get("ok"):
+                            tg_error = (tg_error + " | " if tg_error else "") + f"sendMessage: {dm_body.get('description','?')}"
+                    except Exception as e:
+                        tg_error = (tg_error + " | " if tg_error else "") + f"sendMessage: {e}"
+
             estado = load_estado()
             subs = estado.get("suscripciones_vip", {})
-            now = datetime.now()
             subs[uid] = {
                 "nombre": name,
                 "username": "",
                 "inicio": now.isoformat(),
-                "expira": (now + timedelta(days=days)).isoformat(),
+                "expira": expira_dt.isoformat(),
                 "aviso_enviado": False,
                 "monto_pagado": 0,
                 "tx_id": "manual_launcher",
-                "invite_link": "",
+                "invite_link": invite_link,
                 "es_trial": False,
                 "entrada_confirmada": True,
             }
             estado["suscripciones_vip"] = subs
             save_estado(estado)
             self._estado_mtime = 0  # Force reload
-            messagebox.showinfo("VIP", f"VIP otorgado a {name} ({uid}) por {days} dias.")
+
+            # Mensaje final al admin con resultado
+            if invite_link and not tg_error:
+                msg_final = (
+                    f"VIP otorgado a {name} ({uid}) por {days} dias.\n\n"
+                    f"Link enviado por DM al cliente:\n{invite_link}"
+                )
+            elif invite_link and tg_error:
+                msg_final = (
+                    f"VIP otorgado a {name} ({uid}) por {days} dias.\n"
+                    f"Link creado pero hubo problema con el DM:\n{tg_error}\n\n"
+                    f"Pasale el link a mano:\n{invite_link}"
+                )
+            elif tg_error:
+                msg_final = (
+                    f"VIP otorgado en estado.json a {name} ({uid}) por {days} dias.\n"
+                    f"PERO no se pudo crear el invite link:\n{tg_error}\n\n"
+                    f"Tendras que generar y pasar el link manualmente."
+                )
+            else:
+                msg_final = (
+                    f"VIP otorgado a {name} ({uid}) por {days} dias.\n"
+                    f"AVISO: TELEGRAM_TOKEN o CHANNEL_ID no configurados — sin link automatico."
+                )
+            messagebox.showinfo("VIP", msg_final)
             dialog.destroy()
             self._refresh_vip()
 
