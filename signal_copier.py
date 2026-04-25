@@ -3418,13 +3418,25 @@ def _parse_signal_impl(text, chat_title=""):
         # FIX 2026-04-25: ProSignalsFx manda posts narrativos promocionales como
         # "Absolutely fascinating short on #GBPUSD" + #update + #bestforexsignals.
         # NO son señales — son posts de marketing del propio canal.
+        # Mantenemos aquí solo los términos PURO promo (nunca aparecen en señales reales).
         "FASCINATING SHORT", "FASCINATING LONG", "ABSOLUTELY FASCINATING",
         "FASCINATING", "AMAZING SETUP", "BEAUTIFUL SETUP", "PERFECT SETUP",
-        "#UPDATE", "#BESTFOREXSIGNALS", "#FREECHANNEL", "#FREESIGNAL",
-        "BEST FOREX SIGNALS", "FREE CHANNEL THIS MONTH", "FREE SIGNAL",
     ]
     if any(w in upper for w in _ignore_keywords):
         return None
+
+    # FIX 2026-04-25 (regresión NZDJPY ProSignalsFx): los términos genéricos
+    # como "FREE SIGNAL", "#FREESIGNAL", "BEST FOREX SIGNALS" aparecen también
+    # en señales legítimas como header/marca (ej. "FREE SIGNAL|SHORT🔥" seguido
+    # de Entry/SL/TP). Filtrar como promo SOLO si NO hay precios en el mensaje.
+    _promo_only_keywords = [
+        "#UPDATE", "#BESTFOREXSIGNALS", "#FREECHANNEL", "#FREESIGNAL",
+        "BEST FOREX SIGNALS", "FREE CHANNEL THIS MONTH", "FREE SIGNAL",
+    ]
+    if any(w in upper for w in _promo_only_keywords):
+        # Si NO encontramos Entry/SL/TP con número adyacente → es promo pura.
+        if not re.search(r'(ENTRY|SL|STOP\s*LOSS|TP|TAKE\s*PROFIT)\s*[:\s]*\d', upper):
+            return None
 
     # ── MENSAJES DE ACTUALIZACIÓN ──
     # FIX 2026-04-22: Ampliado para capturar:
