@@ -14475,16 +14475,23 @@ def loop_publicidad_grupo():
 
     # FIX 2026-04-25: Cargar hora de última publicación desde disco (sobrevive reinicios)
     # Sin esto, cada reinicio publicaba un anuncio inmediato (bypass del intervalo)
+    # FIX 2026-04-25 (b): si pub_state.json existe pero no trae el ts (caso migracion
+    # del fix anterior, o estado corrupto), asumir pub reciente para esperar el full 2h.
     _ultima_publicacion_g = None
     _ts_ultima_pub = _estado.get("grupo_ultima_pub_ts")
-    if _ts_ultima_pub:
-        try:
-            from datetime import datetime
-            import pytz as _pytz_pub
-            _ultima_publicacion_g = datetime.fromtimestamp(_ts_ultima_pub, tz=_pytz_pub.timezone("Europe/Andorra"))
+    try:
+        from datetime import datetime
+        import pytz as _pytz_pub
+        _tz_pub = _pytz_pub.timezone("Europe/Andorra")
+        if _ts_ultima_pub:
+            _ultima_publicacion_g = datetime.fromtimestamp(_ts_ultima_pub, tz=_tz_pub)
             logger.info(f"📢 Publicidad grupo: última publicación fue {_ultima_publicacion_g.strftime('%H:%M')} — respetando intervalo")
-        except Exception:
-            pass
+        elif _estado:
+            # pub_state.json existe pero falta el ts → curarse en salud
+            _ultima_publicacion_g = datetime.now(_tz_pub)
+            logger.info("📢 Publicidad grupo: ts ausente en pub_state.json — asumo pub reciente (espera 2h)")
+    except Exception:
+        pass
     _dia_borrado_grupo   = ""     # Para el borrado nocturno del grupo
 
     # ── Anuncios rotativos del GRUPO (cada 30 min) ──
@@ -18471,23 +18478,45 @@ def _arrancar_interno():
         log_sistema("🌐 Web sync iniciado → datos se envían a Render cada 30s")
 
     # Solo notificar al admin (NO al canal/grupo — los usuarios no necesitan saber)
-    msg_inicio = (
-        "BuySell365.pro ONLINE\n"
-        "━━━━━━━━━━━━━━\n"
-        f"✅ Sistema: Operativo 100%\n"
-        f"🕒 Inicio: {ahora().strftime('%H:%M')}"
-    )
-    admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
-    if admin_id:
-        try:
-            if os.path.exists("logo_bot.png"):
-                enviar_foto_telegram(msg_inicio, os.path.abspath("logo_bot.png"), destino=admin_id)
-            else:
-                enviar_telegram(msg_inicio, destino=admin_id)
-        except Exception as e_msg:
-            log_sistema(f"⚠️ No se pudo enviar mensaje de inicio al admin {admin_id}: {e_msg}", "warning")
-    else:
-        log_sistema("⚠️ No hay ADMIN_IDS válidos configurados. Configura USER_ID_1 en .env con tu ID de Telegram personal.", "warning")
+    # FIX 2026-04-25: cooldown 30 min entre mensajes ONLINE — evita spam por reinicios
+    # rapidos (cascada de watchdogs, prueba de errores, etc).
+    _online_cooldown_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".last_online_msg.ts")
+    _send_online = True
+    try:
+        if os.path.exists(_online_cooldown_file):
+            with open(_online_cooldown_file, encoding="utf-8") as _f:
+                _last_ts = float(_f.read().strip())
+            if (time.time() - _last_ts) < 1800:  # 30 min
+                _send_online = False
+                _mins_ago = int((time.time() - _last_ts) / 60)
+                log_sistema(f"⏭️ Mensaje ONLINE suprimido (ultimo hace {_mins_ago} min, cooldown 30 min)")
+    except Exception:
+        pass
+
+    if _send_online:
+        msg_inicio = (
+            "BuySell365.pro ONLINE\n"
+            "━━━━━━━━━━━━━━\n"
+            f"✅ Sistema: Operativo 100%\n"
+            f"🕒 Inicio: {ahora().strftime('%H:%M')}"
+        )
+        admin_id = ADMIN_IDS[0] if ADMIN_IDS else None
+        if admin_id:
+            try:
+                if os.path.exists("logo_bot.png"):
+                    enviar_foto_telegram(msg_inicio, os.path.abspath("logo_bot.png"), destino=admin_id)
+                else:
+                    enviar_telegram(msg_inicio, destino=admin_id)
+                # Persistir ts solo si el envio no lanzo excepcion
+                try:
+                    with open(_online_cooldown_file, "w", encoding="utf-8") as _f:
+                        _f.write(str(time.time()))
+                except Exception:
+                    pass
+            except Exception as e_msg:
+                log_sistema(f"⚠️ No se pudo enviar mensaje de inicio al admin {admin_id}: {e_msg}", "warning")
+        else:
+            log_sistema("⚠️ No hay ADMIN_IDS válidos configurados. Configura USER_ID_1 en .env con tu ID de Telegram personal.", "warning")
 
 # ============================================================
 # Para ejecutar directamente

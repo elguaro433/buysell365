@@ -4018,41 +4018,70 @@ class ManagementConsole:
 #  MAIN ENTRY POINT
 # ============================================================
 def _single_instance_check():
-    """Previene múltiples instancias. Si la instancia anterior murió, libera el mutex y continúa."""
+    """Previene múltiples instancias del launcher.
+    FIX 2026-04-25: el check antiguo via FindWindow buscaba "BuySell365 Pro" exacto,
+    pero el titulo real lleva sufijo " - Consola de Control | ..." → siempre fallaba
+    y permitia spawnear N launchers. Cada launcher tiene su propio watchdog → guerra
+    entre watchdogs reiniciando bot.py cada 5-10s.
+    Nuevo enfoque: enumerar procesos via psutil. Si hay otro python con launcher.py
+    en el cmdline (que no sea yo), traer al frente su ventana y salir.
+    """
     import ctypes
-    MUTEX_NAME = "BuySell365_Launcher_Mutex"
-    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    _my_pid = os.getpid()
+    _other_pid = None
+    try:
+        import psutil
+        for _p in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if _p.info['pid'] == _my_pid:
+                    continue
+                _name = (_p.info.get('name') or '').lower()
+                if 'python' not in _name:
+                    continue
+                _cmd = ' '.join(_p.info.get('cmdline') or []).lower()
+                if 'launcher.py' in _cmd:
+                    _other_pid = _p.info['pid']
+                    break
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except ImportError:
+        # Sin psutil: confiar en mutex puro (best effort)
+        pass
 
-    # Intentar abrir mutex existente para ver si hay alguien vivo
-    SYNCHRONIZE = 0x00100000
-    existing = kernel32.OpenMutexW(SYNCHRONIZE, False, MUTEX_NAME)
-    if existing:
-        # Hay un mutex activo — comprobar si el proceso propietario sigue vivo
-        # buscando la ventana de la consola (si existe, está vivo)
-        import ctypes.wintypes
-        FindWindow = ctypes.windll.user32.FindWindowW
-        hwnd = FindWindow(None, "BuySell365 Pro")
-        kernel32.CloseHandle(existing)
-        if hwnd:
-            # Ventana encontrada → traerla al frente y salir
-            SW_RESTORE = 9
-            ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
-            return False
-        # No hay ventana → el proceso anterior murió sin liberar mutex
-        # Forzar creación de nuevo mutex ignorando el existente
-        _log("Mutex huérfano detectado — forzando nueva instancia")
+    if _other_pid:
+        _log(f"⚠️ Launcher ya corriendo (PID={_other_pid}) — saliendo")
+        # Intentar traer su ventana al frente (best effort, no critico)
+        try:
+            EnumWindows = ctypes.windll.user32.EnumWindows
+            GetWindowThreadProcessId = ctypes.windll.user32.GetWindowThreadProcessId
+            ShowWindow = ctypes.windll.user32.ShowWindow
+            SetForegroundWindow = ctypes.windll.user32.SetForegroundWindow
+            EnumWindowsProc = ctypes.WINFUNCTYPE(
+                ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p
+            )
+            _found = []
 
-    # Crear mutex como propietario
-    _launcher_mutex = kernel32.CreateMutexW(None, True, MUTEX_NAME)
-    last_err = ctypes.get_last_error()
-    if last_err == 183:  # ERROR_ALREADY_EXISTS pero no encontramos ventana
-        kernel32.CloseHandle(_launcher_mutex)
-        # Último recurso: continuar de todas formas
-        _log("WARN: mutex existente sin ventana — arrancando de todas formas")
-        _launcher_mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+            def _cb(hwnd, _):
+                _wpid = ctypes.c_ulong()
+                GetWindowThreadProcessId(hwnd, ctypes.byref(_wpid))
+                if _wpid.value == _other_pid:
+                    _found.append(hwnd)
+                return True
+            EnumWindows(EnumWindowsProc(_cb), 0)
+            for _h in _found:
+                ShowWindow(_h, 9)  # SW_RESTORE
+                SetForegroundWindow(_h)
+        except Exception:
+            pass
+        return False
 
-    _single_instance_check._mutex_handle = _launcher_mutex
+    # No hay otro launcher → crear mutex por compat (no critico)
+    try:
+        kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        _launcher_mutex = kernel32.CreateMutexW(None, False, "BuySell365_Launcher_Mutex")
+        _single_instance_check._mutex_handle = _launcher_mutex
+    except Exception:
+        pass
     return True
 
 
