@@ -15337,57 +15337,23 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         for _k, _ in _sorted[:len(_cooldown_bienvenida) - _MAX_COOLDOWN_ENTRIES + 500]:
             _cooldown_bienvenida.pop(_k, None)
 
-    # FIX 2026-04-24: Cargar stats de los ultimos 7 dias para mostrar resumen
-    # al dar la bienvenida. Usuario pide: "a toda persona que se une o escribe
-    # debemos saludar y dar pequena publicidad con resumen de ultima semana".
-    _stats_line = ""
-    try:
-        from weekly_summary_publisher import _load_week_stats
-        from datetime import datetime as _dt, timedelta as _td
-        # Calcular el ultimo viernes (si hoy es viernes, usar hoy; si no, viernes pasado)
-        _now = _dt.now()
-        _dias_desde_viernes = (_now.weekday() - 4) % 7
-        _ultimo_viernes = _now - _td(days=_dias_desde_viernes)
-        _wstats = _load_week_stats(_ultimo_viernes)
-        if _wstats.get("total_pts", 0) > 0:
-            _stats_line = (
-                f"\n━━ *Últimos 7 días en el VIP* ━━\n"
-                f"💎 *+{_wstats['total_pts']:,.0f} puntos* ganados\n"
-                f"🎯 {_wstats['total_tp']} TPs · {_wstats['wr']:.1f}% Win Rate\n"
-            )
-    except Exception:
-        pass
-
-    # ── Menú completo para el chat PRIVADO (grupo público) ──
+    # FIX 2026-04-25: bienvenida simplificada — calida y sin publicidad.
+    # Usuario pide: "invitalo a conocer todo el grupo gratis y dile que cada
+    # dia regalamos 2 senales". Sin botones, sin stats, sin lista de servicios.
     menu_privado = (
-        f"👋 *¡Hola {nombre}!* Bienvenido a *BuySell365 Pro* 🚀\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Soy tu asistente de trading con IA, disponible 24/7.\n"
-        f"En el grupo solo se publican señales y análisis — "
-        f"aquí en privado te atiendo a ti directamente.\n"
-        + _stats_line +
-        f"\n━━ *¿Qué ofrecemos?* ━━\n\n"
-        f"💎 *Canal VIP* — Señales con Entry, SL y TP exactos\n"
-        f"   ORO · NASDAQ · EUR/USD · Forex · Índices · BTC\n"
-        f"   Análisis con IA · Alertas en tiempo real\n"
-        f"   🔍 Análisis bajo petición de cualquier activo\n\n"
-        f"📊 *Dashboard en vivo* — buysell365.pro\n"
-        f"   Stats, posiciones abiertas, historial de señales\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💬 *Escríbeme aquí cualquier pregunta — te respondo ahora* ✅"
+        f"👋 *¡Hola {nombre}!*\n\n"
+        f"Bienvenido a *BuySell365 Pro* 🚀\n\n"
+        f"Estás en el lugar correcto si te gusta el trading. "
+        f"El grupo es *100% gratis* — explora con confianza, mira las señales "
+        f"que publicamos, los análisis y las cifras reales de cada semana.\n\n"
+        f"🎁 *Cada día regalamos 2 señales gratis* dentro del grupo — "
+        f"con Entry, SL y TP exactos. Solo tienes que estar atento.\n\n"
+        f"Para cualquier duda escribe al administrador 👉 "
+        f"[@BuySell365traiding](https://t.me/BuySell365traiding)"
     )
-    markup_privado = {
-        "inline_keyboard": [
-            [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
-            [{"text": "⏰ Horarios de Mercado", "callback_data": "/horarios"}, {"text": "📈 Resumen Hoy", "callback_data": "/resumen"}],
-            [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
-        ]
-    }
 
-    # Intentar enviar menú al DM del usuario
-    dm_ok = enviar_telegram(menu_privado, user_id, teclado=markup_privado)
+    # Intentar enviar DM al usuario — sin botones, texto limpio.
+    dm_ok = enviar_telegram(menu_privado, user_id)
 
     if grupo_chat_id:
         if dm_ok:
@@ -15422,7 +15388,9 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         )
         enviar_telegram(aviso_admin, admin_id)
 
-    return True  # Bienvenida enviada correctamente
+    # FIX 2026-04-25: retornar el resultado real del DM al usuario para que
+    # el caller pueda loggear si llego o fallo (anteriormente siempre True).
+    return bool(dm_ok)
 
 # 🛡️ RATE LIMITER POR USUARIO — máx 4 comandos cada 30 segundos
 _rate_limit_usuarios: dict = {}
@@ -16000,8 +15968,9 @@ def loop_polling():
                                     if _nm_id not in directorio_usuarios:
                                         directorio_usuarios[_nm_id] = {"nombre": _nm_nombre, "username": _nm.get("username", "")}
                                     if _nm_id not in USERS_AUTORIZADOS:
-                                        manejar_usuario_nuevo(msg, _nm_info, "(nuevo miembro)", grupo_chat_id=_grp_chat_id)
-                                        log_usuario(f"👤 NUEVO MIEMBRO GRUPO: {_nm_nombre} ({_nm_id})")
+                                        _dm_ok_grp = manejar_usuario_nuevo(msg, _nm_info, "(nuevo miembro)", grupo_chat_id=_grp_chat_id)
+                                        _dm_status = "enviado" if _dm_ok_grp else "fallido (sin /start previo)"
+                                        log_usuario(f"👤 NUEVO MIEMBRO GRUPO: {_nm_nombre} ({_nm_id}) — DM {_dm_status}")
                             elif _grp_tipo == "channel" or _es_canal_vip:
                                 # Nuevo miembro en el canal VIP — bienvenida por DM
                                 # (caso poco frecuente — los canales NO suelen emitir
