@@ -10540,65 +10540,100 @@ def api_stats_public():
         return app.response_class(response='{"error":"unauthorized"}', status=401, mimetype="application/json")
     try:
         import json as _json
+        # FIX 2026-04-25: Usar copier_stats.json como fuente principal (señales reales del canal VIP)
+        # Antes: usaba historial_operaciones (solo bot AI scanner, a menudo vacío)
+        _copier = []
+        try:
+            _cs_api = os.path.join(os.path.dirname(os.path.abspath(__file__)), "copier_stats.json")
+            if os.path.exists(_cs_api):
+                with open(_cs_api, "r", encoding="utf-8") as _fcs:
+                    _copier = _json.load(_fcs).get("trades", [])
+        except Exception:
+            pass
+
+        # Combinar: copier_stats + historial_operaciones (sin duplicar)
         _hist = historial_operaciones if historial_operaciones else []
-        _wins = sum(1 for h in _hist if h.get('pips', 0) > 0)
-        _total = len(_hist)
-        _wr = round(_wins / _total * 100, 1) if _total > 0 else 0
-        _pips = round(sum(h.get('pips', 0) for h in _hist), 1)
+        _all_trades = _copier if _copier else _hist  # copier es la fuente principal
+
+        _now = ahora()
+        _weekday = _now.weekday()  # 0=Mon ... 6=Sun
+
+        # Semana de trading: Lun-Vie actual, o Lun-Vie anterior si es fin de semana
+        if _weekday <= 4:
+            _week_start_dt = _now - timedelta(days=_weekday)
+        else:
+            _week_start_dt = _now - timedelta(days=_weekday)
+        _week_start_ts = _week_start_dt.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        _month_start_dt = _now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        _month_start_ts = _month_start_dt.timestamp()
+        _hoy_start_ts = _now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+        # Filtrar por período
+        _week_trades = [t for t in _all_trades if t.get("closed_at", 0) >= _week_start_ts]
+        _month_trades = [t for t in _all_trades if t.get("closed_at", 0) >= _month_start_ts]
+        _today_trades = [t for t in _all_trades if t.get("closed_at", 0) >= _hoy_start_ts]
+
+        def _calc_stats(trades):
+            tps = [t for t in trades if t.get("result") == "tp"]
+            sls = [t for t in trades if t.get("result") == "sl"]
+            total = len(tps) + len(sls)
+            wr = round(len(tps) / max(1, total) * 100, 1) if total > 0 else 0
+            pips = 0
+            for t in trades:
+                p = t.get("pips", t.get("pips_numeric", 0))
+                if isinstance(p, (int, float)):
+                    pips += p
+            return len(tps), len(sls), total, wr, round(pips, 1)
+
+        _w_tps, _w_sls, _week_total, _week_wr, _week_pips = _calc_stats(_week_trades)
+        _m_tps, _m_sls, _month_total, _month_wr, _month_pips = _calc_stats(_month_trades)
+        _t_tps, _t_sls, _today_total, _today_wr, _today_pips = _calc_stats(_today_trades)
+        _a_tps, _a_sls, _all_total, _all_wr, _all_pips = _calc_stats(_all_trades)
+
         _n_ops = sum(1 for op in operaciones_activas.values() if isinstance(op, dict) and op.get('mt5_ejecutado', False))
-        _avg_win = round(sum(h.get('pips', 0) for h in _hist if h.get('pips', 0) > 0) / max(_wins, 1), 1)
-        _losses = _total - _wins
-        _avg_loss = round(sum(abs(h.get('pips', 0)) for h in _hist if h.get('pips', 0) <= 0) / max(_losses, 1), 1)
-        _rr = round(_avg_win / _avg_loss, 2) if _avg_loss > 0 else 0
-        _hoy = ahora().strftime("%d/%m/%Y")  # M-FIX: Usar hora Andorra
-        _hoy_total = sum(1 for h in _hist if h.get('fecha', '') == _hoy)
-        _hoy_wins = sum(1 for h in _hist if h.get('fecha', '') == _hoy and h.get('pips', 0) > 0)
-        # Weekly + Monthly stats
-        _now = ahora()  # M-FIX: Usar hora Andorra
-        _week_start = (_now - timedelta(days=_now.weekday())).strftime("%d/%m/%Y")
-        _month_prefix = _now.strftime("/%m/%Y")
-        _week_total = 0; _week_wins = 0
-        _month_total = 0; _month_wins = 0
-        for h in _hist:
-            f = h.get('fecha', '')
-            p = h.get('pips', 0)
-            if f.endswith(_month_prefix) or f.endswith(_now.strftime("%m/%Y")):
-                try:
-                    parts = f.split('/')
-                    if len(parts) == 3:
-                        d = int(parts[0]); m = int(parts[1]); y = int(parts[2])
-                        dt = datetime(y, m, d)
-                        if dt.month == _now.month and dt.year == _now.year:
-                            _month_total += 1
-                            if p > 0: _month_wins += 1
-                        if dt >= datetime(_now.year, _now.month, _now.day) - timedelta(days=_now.weekday()):
-                            _week_total += 1
-                            if p > 0: _week_wins += 1
-                except Exception:
-                    pass
-        _week_wr = round(_week_wins / _week_total * 100, 1) if _week_total > 0 else 0
-        _month_wr = round(_month_wins / _month_total * 100, 1) if _month_total > 0 else 0
-        # Last 6 signals for landing page (public, no sensitive data)
-        _last = []
-        for h in reversed(_hist[-20:]):
-            _last.append({
-                "nombre": h.get("nombre", ""),
-                "ticker": h.get("ticker", ""),
-                "tipo": h.get("tipo", ""),
-                "pips": round(h.get("pips", 0), 1),
-                "resultado": "WIN" if h.get("pips", 0) > 0 else "LOSS",
-                "fecha": h.get("fecha", "")
-            })
-            if len(_last) >= 6:
+
+        # Racha ganadora actual
+        _streak = 0
+        for t in reversed(_all_trades):
+            if t.get("result") == "tp":
+                _streak += 1
+            else:
                 break
+
+        # Últimas 10 señales para la tabla
+        _last = []
+        for t in reversed(_all_trades[-30:]):
+            _pair_d = t.get("pair_display", t.get("pair", ""))
+            _dir = t.get("direction", "")
+            _pips_v = t.get("pips", t.get("pips_numeric", 0))
+            _last.append({
+                "nombre": _pair_d,
+                "ticker": t.get("pair", ""),
+                "tipo": _dir,
+                "pips": round(_pips_v, 1) if isinstance(_pips_v, (int, float)) else 0,
+                "resultado": "WIN" if t.get("result") == "tp" else "LOSS",
+                "fecha": t.get("fecha", "")
+            })
+            if len(_last) >= 10:
+                break
+
         data = {
-            "winrate": _wr, "total_signals": _total, "pips": _pips,
-            "active_ops": _n_ops, "rr_ratio": _rr, "wins": _wins, "losses": _losses,
-            "today_signals": _hoy_total, "today_wins": _hoy_wins,
-            "week_signals": _week_total, "week_wins": _week_wins, "week_wr": _week_wr,
-            "month_signals": _month_total, "month_wins": _month_wins, "month_wr": _month_wr,
+            # Datos principales (semana = hero del dashboard)
+            "winrate": _week_wr, "total_signals": _week_total, "pips": _week_pips,
+            "wins": _w_tps, "losses": _w_sls, "streak": _streak,
+            "active_ops": _n_ops, "rr_ratio": 0,
+            # Hoy
+            "today_signals": _today_total, "today_wins": _t_tps,
+            # Semana
+            "week_signals": _week_total, "week_wins": _w_tps, "week_wr": _week_wr,
+            # Mes
+            "month_signals": _month_total, "month_wins": _m_tps, "month_wr": _month_wr,
+            # Global (todo copier_stats)
+            "all_signals": _all_total, "all_wr": _all_wr, "all_pips": _all_pips,
+            # Meta
             "assets_count": len(ACTIVOS), "bot_active": True, "auto_trading": AUTO_TRADING,
-            "last_signals": _last
+            "last_signals": _last,
+            "week_label": f"{_week_start_dt.strftime('%d/%m')} — {(_week_start_dt + timedelta(days=4)).strftime('%d/%m/%Y')}",
         }
         return app.response_class(response=_json.dumps(data), status=200, mimetype="application/json")
     except Exception as e:
@@ -18291,14 +18326,39 @@ def _arrancar_interno():
             except Exception:
                 pass
 
-            # 4) Estadísticas del copier (solo HOY)
+            # 4) Estadísticas del copier — SEMANA COMPLETA (lunes a viernes)
+            # FIX 2026-04-25: Siempre mostrar la semana entera. Fines de semana = semana que acaba de cerrar.
             from datetime import datetime, timezone, timedelta
             _tz_and = timezone(timedelta(hours=2))
-            _hoy_start = datetime.now(_tz_and).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+            _now_web = datetime.now(_tz_and)
+            _hoy_start = _now_web.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+            # Calcular inicio de la semana de trading (lunes 00:00)
+            _weekday = _now_web.weekday()  # 0=Mon ... 6=Sun
+            if _weekday <= 4:  # Lunes a viernes → semana actual
+                _week_start_dt = _now_web - timedelta(days=_weekday)
+            else:  # Sábado(5) o domingo(6) → mostrar semana completa que terminó el viernes
+                _days_since_monday = _weekday
+                _week_start_dt = _now_web - timedelta(days=_days_since_monday)
+            _week_start_ts = _week_start_dt.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+            # Stats HOY
             _hoy = [t for t in _copier_closed if t.get("closed_at", 0) >= _hoy_start]
             _tps_hoy = [t for t in _hoy if t.get("result") == "tp"]
             _sls_hoy = [t for t in _hoy if t.get("result") == "sl"]
             _wr_hoy = round(len(_tps_hoy) / max(1, len(_tps_hoy) + len(_sls_hoy)) * 100, 0)
+
+            # Stats SEMANA (lo que muestra el dashboard principal)
+            _semana = [t for t in _copier_closed if t.get("closed_at", 0) >= _week_start_ts]
+            _tps_sem = [t for t in _semana if t.get("result") == "tp"]
+            _sls_sem = [t for t in _semana if t.get("result") == "sl"]
+            _wr_sem = round(len(_tps_sem) / max(1, len(_tps_sem) + len(_sls_sem)) * 100, 0)
+            # Pips de la semana
+            _pips_sem = 0
+            for _t_sem in _semana:
+                _p_val = _t_sem.get("pips", _t_sem.get("pips_numeric", 0))
+                if isinstance(_p_val, (int, float)):
+                    _pips_sem += _p_val
 
             # 5) Operaciones del bot (operaciones_activas del monitor) — para trades en curso
             with _lock_ops:
@@ -18317,6 +18377,14 @@ def _arrancar_interno():
                     "sls": len(_sls_hoy),
                     "total_closed": len(_hoy),
                     "win_rate": _wr_hoy,
+                },
+                "copier_stats_week": {
+                    "tps": len(_tps_sem),
+                    "sls": len(_sls_sem),
+                    "total_closed": len(_semana),
+                    "win_rate": _wr_sem,
+                    "pips_netos": round(_pips_sem, 1),
+                    "week_start": _week_start_dt.strftime("%d/%m/%Y"),
                 },
                 # === MT5 EN VIVO (transparencia — cuenta real 335215928) ===
                 "mt5_live": _mt5_live,                         # posiciones abiertas + stats hoy + historial día
