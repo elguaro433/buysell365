@@ -15445,6 +15445,66 @@ def _check_rate_limit(user_id: str) -> bool:
     _rate_limit_usuarios[user_id].append(ahora)
     return False
 
+def _enviar_bienvenida_vip(user_dict: dict, chat_id_str: str = "") -> bool:
+    """Envia DM de bienvenida al canal VIP a un nuevo miembro.
+
+    Reusable desde:
+      - Handler de `new_chat_members` (cuando llega como `message` — solo grupos).
+      - Handler de `chat_member` (cuando llega como evento aparte — canales).
+
+    Retorna True si el DM se envio, False si fallo (usuario nunca inicio el bot).
+    """
+    if user_dict.get("is_bot"):
+        return False
+    _nm_id = str(user_dict.get("id", ""))
+    if not _nm_id:
+        return False
+    _nm_nombre = escapar_markdown(user_dict.get("first_name", "Trader"))
+    if _nm_id not in directorio_usuarios:
+        directorio_usuarios[_nm_id] = {
+            "nombre": _nm_nombre,
+            "username": user_dict.get("username", ""),
+        }
+    _bienvenida_vip = (
+        f"🏆 *¡Bienvenido al VIP, {_nm_nombre}!*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Soy tu asistente personal de trading con IA. "
+        f"El canal es solo lectura — aquí en privado te atiendo a ti.\n\n"
+        f"━━ *Tu acceso VIP incluye* ━━\n\n"
+        f"📡 Señales con Entry · SL · TP exactos\n"
+        f"🔍 Análisis IA en tiempo real: ORO, NASDAQ, S&P500, Forex y más\n"
+        f"📊 Dashboard en vivo con stats y posiciones\n"
+        f"💬 Análisis bajo petición de cualquier activo\n"
+        f"🛠️ Asistente personal 24/7 — yo, aquí\n\n"
+        f"━━ *Usa los botones para empezar* ━━\n"
+        f"O escríbeme directamente cualquier pregunta ✅"
+    )
+    _botones_vip = {
+        "inline_keyboard": [
+            [{"text": "🥇 Análisis GOLD", "callback_data": "/analisis_xauusd"},
+             {"text": "📈 Análisis NASDAQ", "callback_data": "/analisis_nasdaq"}],
+            [{"text": "💱 Análisis EUR/USD", "callback_data": "/analisis_eurusd"},
+             {"text": "💱 Análisis GBP/USD", "callback_data": "/analisis_gbpusd"}],
+            [{"text": "📊 Análisis S&P 500", "callback_data": "/analisis_sp500"},
+             {"text": "💱 Análisis EUR/JPY", "callback_data": "/analisis_eurjpy"}],
+            [{"text": "📡 Señales Activas", "callback_data": "/activas"},
+             {"text": "📈 Resumen del Día", "callback_data": "/resumen"}],
+            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
+             {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
+            [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
+             {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
+            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
+        ]
+    }
+    _dm_ok = enviar_telegram(_bienvenida_vip, _nm_id, teclado=_botones_vip)
+    if _dm_ok:
+        log_usuario(f"💎 NUEVO VIP: {_nm_nombre} ({_nm_id}) — bienvenida enviada por DM")
+    else:
+        log_usuario(f"💎 NUEVO VIP: {_nm_nombre} ({_nm_id}) — no pudo recibir DM (no ha iniciado el bot)")
+    return bool(_dm_ok)
+
+
 def loop_polling():
     """
     Polling de mensajes Telegram con backoff exponencial.
@@ -15536,13 +15596,61 @@ def loop_polling():
     while True:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
-            r = requests.get(url, params={"offset": offset, "timeout": 30}, timeout=35)
+            # FIX 2026-04-25: incluir chat_member/my_chat_member para detectar
+            # joins/leaves del canal VIP. Telegram NO los envia por defecto;
+            # sin esto el handler de bienvenida del canal nunca se dispara.
+            r = requests.get(url, params={
+                "offset": offset,
+                "timeout": 30,
+                "allowed_updates": json.dumps([
+                    "message", "edited_message",
+                    "channel_post", "edited_channel_post",
+                    "callback_query",
+                    "chat_member", "my_chat_member",
+                ]),
+            }, timeout=35)
 
             if r.status_code == 200:
                 _backoff = 5  # Resetear backoff en caso de éxito
                 data = r.json()
                 for update in data.get("result", []):
                     offset = update["update_id"] + 1
+
+                    # ── MANEJO DE CHAT_MEMBER (joins/leaves de canal VIP) ──
+                    # FIX 2026-04-25: los canales NO emiten new_chat_members; usan
+                    # chat_member updates. Detectamos transicion left/kicked → member
+                    # para disparar la bienvenida VIP por DM.
+                    cm_update = update.get("chat_member")
+                    if cm_update:
+                        try:
+                            _cm_chat = cm_update.get("chat", {})
+                            _cm_chat_id = str(_cm_chat.get("id", ""))
+                            _cm_old = cm_update.get("old_chat_member", {})
+                            _cm_new = cm_update.get("new_chat_member", {})
+                            _old_status = _cm_old.get("status", "")
+                            _new_status = _cm_new.get("status", "")
+                            _cm_user = _cm_new.get("user", {})
+                            _es_canal_vip_cm = (_cm_chat_id == str(CHANNEL_ID).replace("@", ""))
+                            # Transicion: NO miembro → miembro
+                            _entro = (_old_status in ("left", "kicked", "restricted")
+                                      and _new_status == "member")
+                            if _entro and _es_canal_vip_cm and not _cm_user.get("is_bot"):
+                                _enviar_bienvenida_vip(_cm_user, _cm_chat_id)
+                            # Loggear leaves para tener traza (no enviamos nada)
+                            elif _new_status in ("left", "kicked") and _old_status == "member":
+                                _u_nom = _cm_user.get("first_name", "?")
+                                _u_id = _cm_user.get("id", "?")
+                                if _es_canal_vip_cm:
+                                    log_usuario(f"👋 SALIDA CANAL VIP: {_u_nom} ({_u_id})")
+                        except Exception as _e_cm:
+                            log_usuario(f"⚠️ Error procesando chat_member: {_e_cm}")
+                        continue
+
+                    # my_chat_member: cambios de estado del propio bot (admin/banned/etc.)
+                    # No requiere accion — Telegram lo manda cuando alguien promueve/degrada al bot.
+                    if update.get("my_chat_member"):
+                        continue
+
                     # ── MANEJO DE CALLBACK QUERIES (Botones Inline) ──
                     cb = update.get("callback_query")
                     if cb:
@@ -15896,50 +16004,10 @@ def loop_polling():
                                         log_usuario(f"👤 NUEVO MIEMBRO GRUPO: {_nm_nombre} ({_nm_id})")
                             elif _grp_tipo == "channel" or _es_canal_vip:
                                 # Nuevo miembro en el canal VIP — bienvenida por DM
+                                # (caso poco frecuente — los canales NO suelen emitir
+                                # new_chat_members; el flujo principal es via chat_member)
                                 for _nm in _new_members:
-                                    if _nm.get("is_bot"):
-                                        continue
-                                    _nm_id = str(_nm.get("id", ""))
-                                    _nm_nombre = escapar_markdown(_nm.get("first_name", "Trader"))
-                                    if _nm_id not in directorio_usuarios:
-                                        directorio_usuarios[_nm_id] = {"nombre": _nm_nombre, "username": _nm.get("username", "")}
-                                    _bienvenida_vip = (
-                                        f"🏆 *¡Bienvenido al VIP, {_nm_nombre}!*\n"
-                                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-                                        f"Soy tu asistente personal de trading con IA. "
-                                        f"El canal es solo lectura — aquí en privado te atiendo a ti.\n\n"
-                                        f"━━ *Tu acceso VIP incluye* ━━\n\n"
-                                        f"📡 Señales con Entry · SL · TP exactos\n"
-                                        f"🔍 Análisis IA en tiempo real: ORO, NASDAQ, S&P500, Forex y más\n"
-                                        f"📊 Dashboard en vivo con stats y posiciones\n"
-                                        f"💬 Análisis bajo petición de cualquier activo\n"
-                                        f"🛠️ Asistente personal 24/7 — yo, aquí\n\n"
-                                        f"━━ *Usa los botones para empezar* ━━\n"
-                                        f"O escríbeme directamente cualquier pregunta ✅"
-                                    )
-                                    _botones_vip = {
-                                        "inline_keyboard": [
-                                            [{"text": "🥇 Análisis GOLD", "callback_data": "/analisis_xauusd"},
-                                             {"text": "📈 Análisis NASDAQ", "callback_data": "/analisis_nasdaq"}],
-                                            [{"text": "💱 Análisis EUR/USD", "callback_data": "/analisis_eurusd"},
-                                             {"text": "💱 Análisis GBP/USD", "callback_data": "/analisis_gbpusd"}],
-                                            [{"text": "📊 Análisis S&P 500", "callback_data": "/analisis_sp500"},
-                                             {"text": "💱 Análisis EUR/JPY", "callback_data": "/analisis_eurjpy"}],
-                                            [{"text": "📡 Señales Activas", "callback_data": "/activas"},
-                                             {"text": "📈 Resumen del Día", "callback_data": "/resumen"}],
-                                            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
-                                             {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
-                                            [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
-                                             {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
-                                            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                                            [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
-                                        ]
-                                    }
-                                    _dm_ok = enviar_telegram(_bienvenida_vip, _nm_id, teclado=_botones_vip)
-                                    if _dm_ok:
-                                        log_usuario(f"💎 NUEVO VIP: {_nm_nombre} ({_nm_id}) — bienvenida enviada por DM")
-                                    else:
-                                        log_usuario(f"💎 NUEVO VIP: {_nm_nombre} ({_nm_id}) — no pudo recibir DM (no ha iniciado el bot)")
+                                    _enviar_bienvenida_vip(_nm, _grp_chat_id)
                             continue  # No procesar el update como mensaje normal
 
                         # 📺 channel_posts: AHORA se procesan normalmente.
