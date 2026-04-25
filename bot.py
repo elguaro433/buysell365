@@ -15549,37 +15549,45 @@ def loop_polling():
         print(f"⚠️ Error actualizando descripción: {e}")
 
     # Registrar comandos en BotFather
+    # FIX 2026-04-25: bug critico — antes el menu default exponia /senales,
+    # /estado, /resumen, /noticias, /tendencia, /precios, /analisis,
+    # /sentimiento, /web a CUALQUIER usuario del grupo publico. Un usuario
+    # reporto via captura que tenia acceso a esos comandos sensibles desde
+    # el menu del bot. Ahora el menu default solo expone lo basico.
     try:
-        _cmds = [
+        # ── MENU DEFAULT (publico — visible para todos) ──
+        # Solo lo esencial. Sin info sensible, sin comandos de trading.
+        _cmds_default = [
             {"command": "start", "description": "Iniciar el bot"},
-            {"command": "senales", "description": "Ver señales activas"},
-            {"command": "estado", "description": "Estado del bot y mercado"},
-            {"command": "resumen", "description": "Resumen del día"},
-            {"command": "noticias", "description": "Calendario económico"},
-            {"command": "tendencia", "description": "Tendencias del mercado"},
-            {"command": "precios", "description": "Precios en tiempo real"},
-            {"command": "analisis", "description": "Análisis técnico de un activo"},
-            {"command": "sentimiento", "description": "Fear & Greed index"},
-            {"command": "vip", "description": "Acceso VIP premium"},
-            {"command": "web", "description": "Dashboard web en vivo"},
-            {"command": "ayuda", "description": "Lista de comandos"},
+            {"command": "vip",   "description": "Suscribirme al Canal VIP"},
+            {"command": "ayuda", "description": "Ayuda"},
         ]
-        # Comandos públicos (todos los usuarios)
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
-            json={"commands": _cmds},
+            json={"commands": _cmds_default},
             timeout=10
         )
-        # Comandos admin (solo propietario — visible en su menú de comandos)
-        _cmds_admin = _cmds + [
-            {"command": "admin",      "description": "🛡️ Panel de administrador"},
-            {"command": "pausar",     "description": "⏸️ Pausar scanner + MT5"},
-            {"command": "reanudar",   "description": "▶️ Reanudar scanner + MT5"},
-            {"command": "pausarmt5",  "description": "⏸️ Pausar solo MT5"},
-            {"command": "reiniciar",  "description": "🔄 Reiniciar proceso del bot"},
-            {"command": "apagar",     "description": "🔴 Apagar el bot"},
-            {"command": "cuenta",     "description": "💰 Cuenta MT5 en tiempo real"},
-            {"command": "vips",       "description": "👑 Ver suscriptores VIP activos"},
+
+        # ── MENU ADMIN (solo propietario — visible solo en su chat) ──
+        # Conserva todo lo que existia antes + extras de admin.
+        _cmds_admin = _cmds_default + [
+            {"command": "senales",     "description": "Ver señales activas"},
+            {"command": "estado",      "description": "Estado del bot y mercado"},
+            {"command": "resumen",     "description": "Resumen del día"},
+            {"command": "noticias",    "description": "Calendario económico"},
+            {"command": "tendencia",   "description": "Tendencias del mercado"},
+            {"command": "precios",     "description": "Precios en tiempo real"},
+            {"command": "analisis",    "description": "Análisis técnico de un activo"},
+            {"command": "sentimiento", "description": "Fear & Greed index"},
+            {"command": "web",         "description": "Dashboard web en vivo"},
+            {"command": "admin",       "description": "🛡️ Panel de administrador"},
+            {"command": "pausar",      "description": "⏸️ Pausar scanner + MT5"},
+            {"command": "reanudar",    "description": "▶️ Reanudar scanner + MT5"},
+            {"command": "pausarmt5",   "description": "⏸️ Pausar solo MT5"},
+            {"command": "reiniciar",   "description": "🔄 Reiniciar proceso del bot"},
+            {"command": "apagar",      "description": "🔴 Apagar el bot"},
+            {"command": "cuenta",      "description": "💰 Cuenta MT5 en tiempo real"},
+            {"command": "vips",        "description": "👑 Ver suscriptores VIP activos"},
         ]
         for _aid in ADMIN_IDS:
             try:
@@ -15593,7 +15601,21 @@ def loop_polling():
                 )
             except Exception:
                 pass
-        print("✅ Comandos registrados en BotFather (público + admin).")
+
+        # FIX 2026-04-25: limpiar tambien el scope all_group_chats por si
+        # quedo cacheada la lista vieja de comandos en grupos donde el bot
+        # esta presente.
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setMyCommands",
+                json={"commands": _cmds_default,
+                      "scope": {"type": "all_group_chats"}},
+                timeout=10,
+            )
+        except Exception:
+            pass
+
+        print("✅ Comandos registrados en BotFather (default minimo + admin completo).")
     except Exception as e:
         print(f"⚠️ Error registrando comandos: {e}")
 
