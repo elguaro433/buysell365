@@ -9273,15 +9273,15 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                              "copiar trades", "como copio", "quiero copiar",
                              "copiar automatico", "copia automatica"))):
         return (
-            "💎 *Nuestro servicio es el Canal VIP*\n\n"
-            "No ofrecemos Copy Trading. Te damos señales con entrada, TP y SL exactos — tú decides cuándo entrar.\n\n"
-            "📡 Canal VIP — entrada, TP y SL exactos\n"
-            "🔍 Análisis bajo petición de cualquier activo\n"
-            "💎 Suscripción mensual\n\n"
-            "👇 Pulsa para suscribirte:",
+            "💎 *Our service is the VIP Channel*\n\n"
+            "We don't offer that service. We give you signals with exact Entry, SL and TP — you decide when to enter.\n\n"
+            "📡 VIP Channel — exact Entry, TP and SL\n"
+            "🔍 On-demand analysis of any asset\n"
+            "💎 Monthly subscription\n\n"
+            "👇 Tap to subscribe:",
             {"inline_keyboard": [
-                [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "📊 Ver Rendimiento en Vivo", "url": "https://buysell365.pro"}],
+                [{"text": "💎 SUBSCRIBE TO VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "📊 Live Performance", "url": "https://buysell365.pro"}],
             ]}
         )
 
