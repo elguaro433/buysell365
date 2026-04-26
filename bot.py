@@ -18284,29 +18284,59 @@ def _arrancar_interno():
         # FIX 2026-04-06b: Matar TODOS los procesos signal_copier viejos antes de lanzar
         # Evita que procesos zombies (durmiendo en FloodWait) bloqueen el log file
         # FIX 2026-04-22: Si terminate() no basta, forzar kill(). Además esperar
-        # 1s extra tras el kill para que Windows libere el proceso antes de relanzar
-        # (evita race condition "Otra instancia corriendo" → sys.exit(0) del copier nuevo).
+        # 1s extra tras el kill para que Windows libere el proceso antes de relanzar.
+        # FIX 2026-04-26: Poll activo (no sleep ciego) — espera hasta 10s a que
+        # NO quede ningun copier vivo en psutil antes de lanzar el nuevo. Cierra
+        # la race condition donde el nuevo copier detectaba "otra instancia
+        # corriendo" porque el viejo aun no habia desaparecido del process table.
         try:
             import psutil
             _my_pid = os.getpid()
-            _killed_any = False
-            for _proc in psutil.process_iter(['pid', 'cmdline', 'status']):
+
+            def _list_other_copiers():
+                _alive = []
+                for _proc in psutil.process_iter(['pid', 'cmdline', 'status']):
+                    try:
+                        if _proc.pid == _my_pid:
+                            continue
+                        _cmd = ' '.join(_proc.info.get('cmdline') or [])
+                        _st = _proc.info.get('status', '')
+                        if 'signal_copier' in _cmd and _st not in ('zombie', 'dead', 'stopped'):
+                            _alive.append(_proc)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                return _alive
+
+            for _proc in _list_other_copiers():
                 try:
-                    _cmd = ' '.join(_proc.info.get('cmdline') or [])
-                    if 'signal_copier' in _cmd and _proc.pid != _my_pid:
-                        logger.info(f"📡 Matando copier viejo PID={_proc.pid} ({_proc.info.get('status','')})")
-                        _proc.terminate()
-                        try:
-                            _proc.wait(timeout=5)
-                        except psutil.TimeoutExpired:
-                            logger.warning(f"📡 PID={_proc.pid} ignoró terminate() — forzando kill()")
-                            _proc.kill()
-                            _proc.wait(timeout=3)
-                        _killed_any = True
+                    logger.info(f"📡 Matando copier viejo PID={_proc.pid} ({_proc.info.get('status','')})")
+                    _proc.terminate()
+                    try:
+                        _proc.wait(timeout=5)
+                    except psutil.TimeoutExpired:
+                        logger.warning(f"📡 PID={_proc.pid} ignoró terminate() — forzando kill()")
+                        _proc.kill()
+                        _proc.wait(timeout=3)
                 except (psutil.NoSuchProcess, psutil.TimeoutExpired, psutil.AccessDenied):
                     pass
-            if _killed_any:
-                time.sleep(1)  # margen para que Windows libere el PID antes del Popen
+
+            # Poll hasta 10s: confirmar que NO queda ningun copier vivo
+            _deadline = time.time() + 10.0
+            _cleared = False
+            while time.time() < _deadline:
+                if not _list_other_copiers():
+                    _cleared = True
+                    break
+                time.sleep(0.3)
+            if not _cleared:
+                _stragglers = _list_other_copiers()
+                logger.warning(f"📡 {len(_stragglers)} copier(s) siguen vivos tras 10s — forzando kill()")
+                for _p in _stragglers:
+                    try:
+                        _p.kill()
+                    except Exception:
+                        pass
+                time.sleep(1)
         except Exception as _e_kill:
             logger.warning(f"📡 No se pudo limpiar copiers viejos: {_e_kill}")
         # FIX 2026-04-06b: Redirigir stderr a archivo para diagnóstico (en vez de DEVNULL)

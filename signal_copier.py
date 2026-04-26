@@ -5435,23 +5435,46 @@ if __name__ == "__main__":
     _lock_file = Path(__file__).parent / ".copier.lock"
     _my_pid = os.getpid()
 
-    if _lock_file.exists():
-        try:
-            _old_pid = int(_lock_file.read_text().strip())
-            if _old_pid != _my_pid:
-                try:
-                    import psutil as _psutil_lock
-                    _old_proc = _psutil_lock.Process(_old_pid)
-                    _old_cmd = ' '.join(_old_proc.cmdline())
-                    _old_status = _old_proc.status()
-                    if ('signal_copier' in _old_cmd
-                            and _old_status not in ('zombie', 'dead', 'stopped')):
-                        log.warning(f"📡 Otra instancia del copier corriendo (PID={_old_pid}). Saliendo.")
-                        sys.exit(0)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+    # FIX 2026-04-26: detectar TODAS las instancias vivas via psutil (no solo
+    # la apuntada por el lockfile). El lockfile puede quedar stale o apuntar
+    # al PID equivocado tras reinicios solapados — psutil es la fuente de
+    # verdad. Salimos si encontramos OTRO signal_copier vivo distinto del mio.
+    try:
+        import psutil as _psutil_lock
+        _others_alive = []
+        for _proc in _psutil_lock.process_iter(['pid', 'cmdline', 'status']):
+            try:
+                if _proc.info['pid'] == _my_pid:
+                    continue
+                _cmd = ' '.join(_proc.info.get('cmdline') or [])
+                _st = _proc.info.get('status', '')
+                if 'signal_copier' in _cmd and _st not in ('zombie', 'dead', 'stopped'):
+                    _others_alive.append(_proc.info['pid'])
+            except Exception:
+                continue
+        if _others_alive:
+            log.warning(f"📡 Otra(s) instancia(s) del copier corriendo (PIDs={_others_alive}). Saliendo.")
+            sys.exit(0)
+    except Exception as _e_singleton:
+        log.warning(f"📡 No se pudo verificar singleton via psutil: {_e_singleton} — confiando en lockfile")
+        # Fallback al chequeo antiguo basado en lockfile
+        if _lock_file.exists():
+            try:
+                _old_pid = int(_lock_file.read_text().strip())
+                if _old_pid != _my_pid:
+                    try:
+                        import psutil as _psutil_lock2
+                        _old_proc = _psutil_lock2.Process(_old_pid)
+                        _old_cmd = ' '.join(_old_proc.cmdline())
+                        _old_status = _old_proc.status()
+                        if ('signal_copier' in _old_cmd
+                                and _old_status not in ('zombie', 'dead', 'stopped')):
+                            log.warning(f"📡 Otra instancia del copier corriendo (PID={_old_pid}). Saliendo.")
+                            sys.exit(0)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
     _lock_file.write_text(str(_my_pid))
     _max_retries = 10
     _retry_count = 0
