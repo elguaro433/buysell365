@@ -660,7 +660,11 @@ def _reconcile_open_vs_mt5() -> None:
             continue
 
         # Caso D: sin match y >2h desde envío → nunca se ejecutó, limpiar
+        # FIX 2026-04-26: NO limpiar señales esperando apertura de mercado.
+        # Se reintentaran via _retry_pending_market_open_signals cuando abra.
         if age_min > 120:
+            if sdata.get("_pending_market_open", False):
+                continue  # mantener para reintento al abrir
             to_remove.append((sig_id, sdata, None, "never_executed"))
 
     if not to_remove:
@@ -2841,6 +2845,99 @@ def _is_24_7_asset(pair: str) -> bool:
 
 
 _market_closed_logged_until = 0.0  # ts hasta el que ya logueamos el skip de mercado cerrado
+_market_was_closed = None  # estado previo para detectar transicion close->open
+
+
+def _retry_pending_market_open_signals() -> int:
+    """FIX 2026-04-26: reintenta ejecutar en MT5 las senhales que fueron
+    marcadas con _pending_market_open=True cuando el mercado estaba cerrado.
+
+    Se llama cuando se detecta que el mercado acaba de abrir (transicion
+    closed -> open). Notifica al canal VIP en respuesta al mensaje original
+    de cada senhal cuando se ejecuta exitosamente.
+
+    Retorna numero de senhales reintentadas (no necesariamente exitosas).
+    """
+    import requests
+    retried = 0
+    success = 0
+    with _signals_lock:
+        # Snapshot — vamos a mutar _open_signals durante la iteracion
+        pending = [(sid, dict(sdata)) for sid, sdata in _open_signals.items()
+                   if sdata.get("_pending_market_open", False)]
+
+    if not pending:
+        return 0
+
+    log.info(f"🔓 Mercado abierto — reintentando {len(pending)} señales pendientes en MT5")
+
+    for sig_id, sdata in pending:
+        sig = sdata.get("signal", {})
+        pair = sig.get("pair", "?")
+        pair_d = _get_display_pair(pair)
+        direction = sig.get("direction", "?")
+        msg_id = sdata.get("telegram_msg_id")
+
+        # Skip si es crypto (no deberia estar aqui, pero por seguridad)
+        if _is_24_7_asset(pair):
+            with _signals_lock:
+                if sig_id in _open_signals:
+                    _open_signals[sig_id].pop("_pending_market_open", None)
+            continue
+
+        try:
+            executed, detail = execute_in_mt5(sig)
+            retried += 1
+            log.info(f"📡 MT5 retry: {'✅' if executed else '❌'} {pair_d} {direction} — {detail}")
+
+            if executed:
+                success += 1
+                # Quitar el flag pending — ya esta ejecutada
+                with _signals_lock:
+                    if sig_id in _open_signals:
+                        _open_signals[sig_id].pop("_pending_market_open", None)
+
+                # Notificar al canal VIP en respuesta al mensaje original
+                if BOT_TOKEN and CHANNEL_ID and msg_id:
+                    try:
+                        _msg_act = (
+                            f"✅ *Signal ACTIVATED*\n\n"
+                            f"Market is now open — order executed in MT5.\n"
+                            f"_{pair_d} {direction}_"
+                        )
+                        _payload_act = {
+                            "chat_id": CHANNEL_ID,
+                            "text": _msg_act,
+                            "parse_mode": "Markdown",
+                            "reply_to_message_id": msg_id,
+                        }
+                        _r_act = requests.post(
+                            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                            json=_payload_act, timeout=10
+                        )
+                        if _r_act.status_code == 400 and "message to be replied" in _r_act.text:
+                            _payload_act.pop("reply_to_message_id", None)
+                            requests.post(
+                                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                                json=_payload_act, timeout=10
+                            )
+                    except Exception as _e_notif:
+                        log.debug(f"Notif activation error: {_e_notif}")
+            else:
+                # Si sigue fallando con MARKET_CLOSED (mercado aun cerrado por
+                # algun motivo), conservamos el flag y reintentaremos en el
+                # siguiente ciclo. Si falla por otra razon, dejamos como esta.
+                if not (detail and detail.startswith("MARKET_CLOSED:")):
+                    log.warning(
+                        f"⚠️ Reintento {pair_d} {direction} fallo NO por mercado cerrado: {detail}"
+                    )
+        except Exception as _e_retry:
+            log.warning(f"⚠️ Error reintentando senhal {sig_id}: {_e_retry}")
+
+    if retried > 0:
+        _save_open_signals()
+        log.info(f"🔓 Reintento mercado abierto: {success}/{retried} senhales activadas exitosamente")
+    return retried
 
 
 async def _monitor_tp_loop() -> None:
@@ -3082,6 +3179,18 @@ async def _monitor_tp_loop() -> None:
         # Antes: cada 30s polleabamos USDJPY 2x + GBPUSD 1x los sabados sin que se
         # mueva ni un pip → ruido en log + uso inutil de MT5.
         _market_closed = _is_forex_market_closed()
+
+        # FIX 2026-04-26: detectar transicion CLOSED -> OPEN para reintentar
+        # senhales que MT5 rechazo durante el fin de semana.
+        global _market_was_closed
+        if _market_was_closed is True and _market_closed is False:
+            log.info("🔓 Mercado FOREX abre — verificando senhales pendientes…")
+            try:
+                _retry_pending_market_open_signals()
+            except Exception as _e_retry_loop:
+                log.warning(f"Error en reintento al abrir mercado: {_e_retry_loop}")
+        _market_was_closed = _market_closed
+
         if _market_closed and signals_copy and time.time() > _market_closed_logged_until:
             _non_crypto = sum(1 for _s in signals_copy.values() if not _is_24_7_asset(_s["signal"].get("pair", "")))
             if _non_crypto > 0:
@@ -4336,6 +4445,10 @@ def execute_in_mt5(signal):
         err = result3.comment if result3 else "No response"
         return False, f"MT5 skip (invalid price tras fallback Market): {err}"
 
+    # FIX 2026-04-26: detectar mercado cerrado para reintentar al abrir.
+    # El caller marcara la senhal como _pending_market_open en _open_signals.
+    if "market closed" in err.lower() or "market is closed" in err.lower():
+        return False, f"MARKET_CLOSED:{err}"
     return False, f"MT5 error: {err}"
 
 
@@ -4873,6 +4986,13 @@ def send_to_channel(signal, executed, detail):
                         "sent_at": time.time(),
                         "telegram_msg_id": _canal_msg_id,
                     }
+                    # FIX 2026-04-26: si MT5 rechazo por mercado cerrado, marcar
+                    # como pendiente. _retry_pending_market_open_signals la
+                    # reintentara cuando abra el mercado, y el reconcile NO la
+                    # limpiara pasados los 120min.
+                    if not executed and detail and detail.startswith("MARKET_CLOSED:"):
+                        _open_signals[sig_id]["_pending_market_open"] = True
+                        log.info(f"⏳ Señal {sig_id} PENDING — esperando apertura de mercado")
                 log.info(f"🎯 Señal registrada para seguimiento: {sig_id} (msg_id={_canal_msg_id})")
                 _save_open_signals()  # Persistir a disco
 
