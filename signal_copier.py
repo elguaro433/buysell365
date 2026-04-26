@@ -2964,25 +2964,27 @@ async def _monitor_tp_loop() -> None:
                     pass
                 import random
                 import requests as _req_ig
+                # FIX 2026-04-26: traducido a INGLES + quitado "los buenos
+                # y los malos" (decision usuario: solo enfocarse en wins).
                 _ig_captions = [
-                    "📸 *¡Síguenos en Instagram!*\n\n"
-                    "Publicamos resultados diarios, TPs alcanzados y contenido exclusivo.\n\n"
+                    "📸 *Follow us on Instagram!*\n\n"
+                    "We post daily results, TPs hit and exclusive content.\n\n"
                     "🔗 @buysell365.pro\\_tradingsignals\n"
                     "👉 instagram.com/buysell365.pro\\_tradingsignals\n\n"
-                    "_Transparencia total — resultados reales cada día_",
+                    "_Real results, every day_",
 
-                    "🚀 *BuySell365 ya está en Instagram*\n\n"
-                    "📊 Resultados diarios verificados\n"
-                    "🎯 Celebraciones de cada TP\n"
-                    "📈 Estadísticas semanales\n\n"
-                    "Síguenos: @buysell365.pro\\_tradingsignals\n"
+                    "🚀 *BuySell365 is on Instagram*\n\n"
+                    "📊 Verified daily results\n"
+                    "🎯 Every TP celebrated\n"
+                    "📈 Weekly stats\n\n"
+                    "Follow us: @buysell365.pro\\_tradingsignals\n"
                     "👉 instagram.com/buysell365.pro\\_tradingsignals",
 
-                    "📱 *¿Ya nos sigues en Instagram?*\n\n"
-                    "Cada día publicamos nuestros resultados reales — los buenos y los malos.\n"
-                    "Sin filtros, sin trucos.\n\n"
+                    "📱 *Already following us on Instagram?*\n\n"
+                    "Real winning trades published daily.\n"
+                    "Live verified results.\n\n"
                     "🔗 @buysell365.pro\\_tradingsignals\n"
-                    "_BuySell365 Pro — Transparencia total_",
+                    "_BuySell365 Pro_",
                 ]
                 _ig_caption = random.choice(_ig_captions)
                 # Generar imagen promo con logo de Instagram

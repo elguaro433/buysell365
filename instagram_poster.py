@@ -723,18 +723,19 @@ def _generate_carousel_slides(brand_image_path: str = None) -> list:
     draw2.text((IMG_W // 2, 110), "\u00bfQu\u00e9 hacemos?", fill=COLOR_WHITE,
                font=font_title, anchor="mt")
 
+    # FIX 2026-04-26: traducido a INGLES + quitado "buenos y malos"
     features = [
-        ("Se\u00f1ales en tiempo real",
-         "Publicamos se\u00f1ales de Forex, Oro,\n\u00cdndices y m\u00e1s con entrada, TP y SL exactos.",
+        ("Real-time signals",
+         "We post Forex, Gold, Indices\nand more \u2014 with exact Entry, TP & SL.",
          COLOR_GREEN),
-        ("Resultados transparentes",
-         "Mostramos TODOS los resultados:\nlos buenos Y los malos. Sin filtros.",
+        ("Verified results",
+         "Live results published daily.\nFull transparency.",
          COLOR_GOLD),
-        ("An\u00e1lisis con IA",
-         "Cada se\u00f1al pasa por filtros de IA\npara maximizar la probabilidad.",
+        ("AI analysis",
+         "Every signal passes AI filters\nto maximize win probability.",
          COLOR_ACCENT),
-        ("Estad\u00edsticas diarias",
-         "Resumen completo cada d\u00eda:\nWin Rate, pips, mejor/peor se\u00f1al.",
+        ("Daily stats",
+         "Daily recap: Win Rate, pips,\ntop assets and trades.",
          (180, 130, 255)),
     ]
 
@@ -2669,22 +2670,23 @@ def post_carousel(brand_image_path: str = None, caption: str = None) -> bool:
                     return
 
                 if not caption:
+                    # FIX 2026-04-26: traducido a INGLES + quitado "buenos y malos"
                     _caption = (
-                        "Bienvenidos a BuySell365 Pro\n\n"
-                        "Se\u00f1ales de trading en vivo:\n"
-                        "Forex \u2022 Oro \u2022 \u00cdndices \u2022 Crypto\n\n"
-                        "Lo que nos diferencia:\n"
-                        "- Publicamos TODOS los resultados\n"
-                        "- Los d\u00edas buenos Y los malos\n"
-                        "- Sin filtros, sin trucos\n"
-                        "- Transparencia total\n\n"
-                        "Desliza para ver c\u00f3mo funcionan nuestras se\u00f1ales\n\n"
-                        "Link en bio para unirte al canal VIP\n\n"
+                        "Welcome to BuySell365 Pro\n\n"
+                        "Live trading signals:\n"
+                        "Forex \u2022 Gold \u2022 Indices \u2022 Crypto\n\n"
+                        "What sets us apart:\n"
+                        "- Real verified results\n"
+                        "- Exact Entry, TP and SL on every signal\n"
+                        "- AI-powered analysis 24/7\n"
+                        "- Full transparency\n\n"
+                        "Swipe to see how our signals work\n\n"
+                        "Link in bio to join the VIP channel\n\n"
                         "#trading #forex #signals #buysell365 #forexsignals "
                         "#tradingsignals #gold #xauusd #indices #nasdaq "
                         "#daytrading #swingtrading #pips #tradinglifestyle "
                         "#tradingview #forextrader #tradingcommunity "
-                        "#copytrade #tradingresults #accountability"
+                        "#aitrading #tradingresults #realresults"
                     )
                 else:
                     _caption = caption
