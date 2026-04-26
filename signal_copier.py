@@ -1885,8 +1885,9 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
             _ts_open = signal.get("timestamp", 0) or signal.get("opened_at", 0) or 0
             _he_tp = _dt_ig.fromtimestamp(_ts_open).strftime("%H:%M") if _ts_open else ""
             _now_tp = _dt_ig.now()
+            # FIX 2026-04-26: NUNCA pasar fuente del copy a IG (regla canal VIP)
             _ig_post_tp(pair_d, direction, entry, tp, pips_str if pips_str else "+0",
-                        source=signal.get("source", ""), chart_path=_chart_file,
+                        source="", chart_path=_chart_file,
                         reel_entry=entry, reel_tp=tp, is_gift=_was_gifted,
                         fecha=_now_tp.strftime("%d/%m/%Y"),
                         hora_entrada=_he_tp,
@@ -2055,8 +2056,9 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
             from instagram_poster import post_tp_celebration as _ig_post_tp
             from datetime import datetime as _dt_ig_cl
             _now_cl = _dt_ig_cl.now()
+            # FIX 2026-04-26: NUNCA pasar fuente del copy a IG (regla canal VIP)
             _ig_post_tp(pair_d, direction, entry if entry > 0 else 0,
-                        tp_approx, pips_str, source=source,
+                        tp_approx, pips_str, source="",
                         reel_entry=entry if entry > 0 else 0,
                         reel_tp=tp_approx,
                         fecha=_now_cl.strftime("%d/%m/%Y"),

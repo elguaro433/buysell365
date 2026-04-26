@@ -596,12 +596,9 @@ def _generate_new_signal_image(pair: str, direction: str, entry: float,
             draw.text((IMG_W // 2, 762), f"R:R  {rrr:.1f}:1", fill=COLOR_GOLD,
                       font=font_value, anchor="mm")
 
-    # Source y fecha
+    # FIX 2026-04-26: NUNCA mostrar fuente del copy en imagen publica
+    # (regla feedback_canal_vip_normas.md). Solo fecha.
     y_info = 825
-    if source:
-        draw.text((IMG_W // 2, y_info), f"Fuente: {source}", fill=COLOR_GRAY,
-                  font=font_small, anchor="mt")
-        y_info += 32
     draw.text((IMG_W // 2, y_info), datetime.now().strftime("%d/%m/%Y  %H:%M"),
               fill=(70, 75, 85), font=font_small, anchor="mt")
 
