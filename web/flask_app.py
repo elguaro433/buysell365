@@ -27,7 +27,16 @@ app = Flask(__name__)
 # ============================================================
 #  CONFIGURATION
 # ============================================================
-SYNC_SECRET = os.getenv("SYNC_SECRET", "buysell365_sync_2026").strip()
+# FIX 2026-04-26: secrets requeridos — sin fallback hardcoded.
+# Antes: SYNC_SECRET tenia fallback "buysell365_sync_2026" → si la env var
+# fallaba en Render, el secret quedaba expuesto en GitHub publico y el
+# endpoint /api/sync aceptaba cualquier request con ese secret conocido.
+SYNC_SECRET = os.getenv("SYNC_SECRET", "").strip()
+if not SYNC_SECRET:
+    raise RuntimeError(
+        "SYNC_SECRET env var es OBLIGATORIO. Configurarlo en Render Dashboard "
+        "antes de arrancar la web."
+    )
 TV_SECRET = os.getenv("TV_SECRET", "").strip()
 API_SECRET_KEY = os.getenv("API_SECRET_KEY", "").strip()
 LOGS_PASSWORD = os.getenv("LOGS_PASSWORD", "").strip()
@@ -205,8 +214,22 @@ def _track_visitor():
             _visitors["page_views"][page] = _visitors["page_views"].get(page, 0) + 1
 
             # Unique IPs
+            # FIX 2026-04-26: LRU cap a 10000 IPs — antes el dict crecia sin
+            # limite (memory leak: tras meses MB de bloat, _save_store lento).
             _visitors.setdefault("unique_ips", {})
+            _MAX_UNIQUE_IPS = 10000
             if ip not in _visitors["unique_ips"]:
+                # Si supera el cap, evictar la IP con last_visit mas antigua
+                if len(_visitors["unique_ips"]) >= _MAX_UNIQUE_IPS:
+                    try:
+                        _oldest_ip = min(
+                            _visitors["unique_ips"].items(),
+                            key=lambda kv: kv[1].get("last_visit", kv[1].get("first_visit", ""))
+                        )[0]
+                        del _visitors["unique_ips"][_oldest_ip]
+                    except Exception:
+                        # Fallback: borrar la primera entrada por orden de insercion
+                        _visitors["unique_ips"].pop(next(iter(_visitors["unique_ips"])), None)
                 _visitors["unique_ips"][ip] = {
                     "first_visit": now_str, "visits": 0, "lang": lang, "ua": ua,
                     "is_bot": is_bot,
@@ -304,9 +327,12 @@ def _check_api_auth():
     (navegador del mismo dominio). Para APIs externas siempre se exige API key.
     El Referer es fácil de falsificar, pero aquí solo protege endpoints de lectura
     del dashboard que ya son públicos visualmente.
+
+    FIX 2026-04-26: si API_SECRET_KEY no esta configurada, RECHAZAR todo
+    (antes retornaba True permitiendo acceso anonimo a endpoints sensibles).
     """
     if not API_SECRET_KEY:
-        return True
+        return False
     # Primero intentar API key (método seguro)
     key = request.args.get("key", "") or request.headers.get("X-API-Key", "")
     if key and hmac.compare_digest(str(key), str(API_SECRET_KEY)):
@@ -471,8 +497,13 @@ def route_tv_signal():
             data = {}
 
         # Authenticate
+        # FIX 2026-04-26: TV_SECRET es OBLIGATORIO. Antes: si TV_SECRET=""
+        # cualquiera podia inyectar señales (`if TV_SECRET and not ...`).
+        if not TV_SECRET:
+            logger.error(f"TV webhook rechazado: TV_SECRET no configurado en env")
+            return jsonify({"error": "server misconfigured"}), 503
         tv_secret_received = str(data.get("secret", data.get("passphrase", "")))
-        if TV_SECRET and not hmac.compare_digest(tv_secret_received, TV_SECRET):
+        if not hmac.compare_digest(tv_secret_received, TV_SECRET):
             logger.warning(f"Webhook unauthorized from {request.remote_addr}")
             return jsonify({"error": "unauthorized"}), 401
 

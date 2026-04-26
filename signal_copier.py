@@ -4950,11 +4950,8 @@ async def main():
         "unitedkings1",               # United Kings Signals — XAUUSD/Gold commentary (agregado 2026-04-19)
         "prosignalsfxx",              # ProSignalsFx — Gold + Forex diario (agregado 2026-04-19)
     ]
-    # Lista global de pares permitidos (aplica a TODOS los canales)
-    # FIX 2026-04-16: Añadido US30/DOW para soporte canal NasdaqMasters
-    ALLOWED_PAIRS = {"GOLD", "XAUUSD", "XAUUSD=X", "ORO",
-                     "NAS100", "NASDAQ", "NASDAQ100", "US100", "US100Cash", "NQ",
-                     "US30", "DOW", "DJ30", "US30Cash"}
+    # FIX 2026-04-26: ALLOWED_PAIRS eliminado — era dead code (nunca referenciado).
+    # Confirmado en sesion 25-abr y reporte de auditoria 2026-04-26.
 
     # Resolver usernames → se hace DESPUÉS de client.start() (ver más abajo)
     _username_to_id = {}

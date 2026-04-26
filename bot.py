@@ -175,6 +175,40 @@ def log_pago(msg: str, nivel: str = "info"):
     """Log de PAGOS (verificación Binance, montos, confirmaciones)."""
     getattr(logger, nivel)(msg, extra={"category": "PAGO"})
 
+
+def _terminate_copier_subprocesses():
+    """FIX 2026-04-26: matar TODOS los procesos signal_copier vivos antes de
+    que el bot use os._exit(0). os._exit NO ejecuta atexit handlers ni
+    cierra subprocesses hijos automaticamente — sin esto el copier queda
+    huerfano y al relanzarse el bot se crea race condition con la instancia
+    nueva. Equivalente al cleanup de _cleanup_on_exit pero invocable globalmente.
+    """
+    try:
+        import psutil as _ps
+        _my_pid = os.getpid()
+        for _proc in _ps.process_iter(['pid', 'cmdline']):
+            try:
+                if _proc.info['pid'] == _my_pid:
+                    continue
+                _cmd = ' '.join(_proc.info.get('cmdline') or [])
+                if 'signal_copier' in _cmd:
+                    try:
+                        _proc.terminate()
+                        try:
+                            _proc.wait(timeout=3)
+                        except _ps.TimeoutExpired:
+                            _proc.kill()
+                            _proc.wait(timeout=2)
+                    except Exception:
+                        pass
+            except (_ps.NoSuchProcess, _ps.AccessDenied):
+                continue
+    except Exception as _e:
+        try:
+            logger.warning(f"📡 No se pudo terminar copier subprocess: {_e}")
+        except Exception:
+            pass
+
 # ============================================================
 #  CONFIGURACIÓN - BOT PROFESIONAL OPTIMIZADO (TELEGRAM)
 # ============================================================
@@ -1818,12 +1852,21 @@ def es_usuario_vip(user_id: str) -> bool:
 
 
 def borrar_mensaje_telegram(chat_id, message_id):
-    """Elimina un mensaje de Telegram (requiere permisos de admin en grupos)."""
+    """Elimina un mensaje de Telegram (requiere permisos de admin en grupos).
+    FIX 2026-04-26: r.json() puede fallar con JSONDecodeError si Telegram
+    responde 502/HTML (degradacion). Antes esto crasheaba el thread del
+    scheduler de borrado dejando mensajes sin borrar durante minutos.
+    """
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
     try:
         r = requests.post(url, json={"chat_id": chat_id, "message_id": message_id}, timeout=10)
-        if not r.json().get("ok"):
-            desc = r.json().get("description", "")
+        try:
+            data = r.json()
+        except Exception:
+            # Respuesta no-JSON (502 con HTML, etc.) — no podemos parsear, salir limpio
+            return
+        if not data.get("ok"):
+            desc = data.get("description", "")
             if "message to delete not found" not in desc:
                 logger.warning(f"⚠️ No pude borrar msg {message_id} en {chat_id}: {desc}")
     except Exception as e_del:
@@ -1861,14 +1904,21 @@ def _hilo_borrado_scheduler():
                 continue
 
             # Ejecutar todos los borrados que ya vencieron
+            # FIX 2026-04-26: NO hacer HTTP requests dentro del lock — antes
+            # un Telegram lento (10s timeout) bloqueaba programar_borrado
+            # durante todo el round, causando saturacion en cola en picos.
+            _pendientes = []
             with _lock_borrado:
                 while _cola_borrado and _cola_borrado[0][0] <= time.time():
                     _, _chat, _msg = heapq.heappop(_cola_borrado)
-                    try:
-                        borrar_mensaje_telegram(_chat, _msg)
-                    except Exception:
-                        pass
-                    time.sleep(0.05)  # Rate limit borrados: ~20/sec
+                    _pendientes.append((_chat, _msg))
+            # HTTP fuera del lock — otros threads pueden seguir encolando
+            for _chat, _msg in _pendientes:
+                try:
+                    borrar_mensaje_telegram(_chat, _msg)
+                except Exception:
+                    pass
+                time.sleep(0.05)  # Rate limit borrados: ~20/sec
         except Exception as e_bor:
             logger.error(f"⚠️ Error en scheduler borrado: {e_bor}")
             time.sleep(5)
@@ -9227,6 +9277,10 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                     os.remove(_pid_f)
             except Exception:
                 pass
+            # FIX 2026-04-26: matar copier subprocess(es) ANTES de salir.
+            # os._exit no ejecuta atexit handlers — sin esto el copier queda
+            # huerfano y al relanzarse el bot crea solapamiento de instancias.
+            _terminate_copier_subprocesses()
             import subprocess
             subprocess.Popen([_exe, _script], creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0))
             time.sleep(1)
@@ -9240,6 +9294,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         if not es_admin: return "⛔ Solo administradores pueden apagar el bot."
         enviar_telegram("🛑 *Apagando bot de trading. Hasta pronto.*", remitente)
         time.sleep(2)
+        # FIX 2026-04-26: matar copier subprocess antes de salir
+        _terminate_copier_subprocesses()
         os._exit(0)
         return "🛑 Apagando..."
 
