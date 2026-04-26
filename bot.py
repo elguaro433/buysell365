@@ -4365,10 +4365,11 @@ def mensaje_nueva_senal(nombre, ticker, tipo, precio, niveles, ind, score, razon
     }
     _estr_txt = _estr_map.get(_estrategia, '')
 
+    # FIX 2026-04-26: Entry/TP/SL en INGLES
     return (
         f"{cabecera}\n"
         f"\n"
-        f"📍 Entrada: {f_(precio)}\n"
+        f"📍 Entry: {f_(precio)}\n"
         f"🎯 TP: {f_(niveles['tp1'])}\n"
         f"🛡️ SL: {f_(niveles['sl'])}"
     )
@@ -4387,26 +4388,26 @@ def mensaje_tp_alcanzado(nombre, tipo, entrada, salida, pips, ticker, nivel_tp="
     _unidad = unidad_medida(ticker)
     _pips_str = f"+{pips:.1f} {_unidad}"
 
-    # Duración legible
+    # FIX 2026-04-26: TP HIT message en INGLES
     _dur_str = ""
     if duracion_seg and duracion_seg > 0:
         _h = int(duracion_seg // 3600)
         _m = int((duracion_seg % 3600) // 60)
         if _h > 0:
-            _dur_str = f"\n⏱ Duración: {_h}h {_m}m"
+            _dur_str = f"\n⏱ Duration: {_h}h {_m}m"
         else:
-            _dur_str = f"\n⏱ Duración: {_m}m"
+            _dur_str = f"\n⏱ Duration: {_m}m"
 
     return (
-        f"🎯🎯🎯 *TP ALCANZADO* 🎯🎯🎯\n"
+        f"🎯🎯🎯 *TP HIT* 🎯🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
         f"{tipo_emoji}  {nombre}\n\n"
-        f"📍 Entrada: {f_(entrada)}\n"
-        f"✅ Salida: {f_(salida)}\n"
-        f"💰 *Ganancia: {_pips_str}*"
+        f"📍 Entry: {f_(entrada)}\n"
+        f"✅ Exit: {f_(salida)}\n"
+        f"💰 *Profit: {_pips_str}*"
         f"{_dur_str}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"🚀 _BuySell365 Pro — señal exitosa_"
+        f"🚀 _BuySell365 Pro — winning trade_"
     )
 
 def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, mt5_real=False):
@@ -4439,19 +4440,20 @@ def mensaje_sl_tocado(nombre, tipo, entrada, salida, pips, ticker, fuente=None, 
             _net_line = f"   ✅ Net del día: *{_sign}{_pips_net:.0f} pts/pips*\n"
     except Exception:
         pass
+    # FIX 2026-04-26: SL message en INGLES
     _stats_block = ""
     if _wr_line or _net_line:
-        _stats_block = f"\n📊 *El sistema sigue ganando:*\n{_wr_line}{_net_line}"
+        _stats_block = f"\n📊 *The system keeps winning:*\n{_wr_line}{_net_line}"
 
     return (
         f"🛡️ *STOP LOSS — {nombre}*\n\n"
-        f"📉 Operación cerrada con riesgo controlado (-{p_txt}).\n"
+        f"📉 Trade closed with controlled risk (-{p_txt}).\n"
         f"{_stats_block}\n"
-        f"💎 *Perder poco cuando toca es lo que separa\n"
-        f"a un trader profesional de un aficionado.*\n\n"
-        f"🔜 Próxima señal en camino 🚀\n"
+        f"💎 *Losing small when it's time is what separates\n"
+        f"a professional trader from an amateur.*\n\n"
+        f"🔜 Next signal coming 🚀\n"
         f"━━━━━━━━━━━━━━\n"
-        f"_BuySell365 Pro — Disciplina que paga_"
+        f"_BuySell365 Pro — Discipline that pays_"
     )
 
 def mensaje_cambio_tendencia_total(nombre, tipo, entrada, salida, pips, ticker, razon="cambio de tendencia"):
@@ -4466,21 +4468,22 @@ def mensaje_cambio_tendencia_total(nombre, tipo, entrada, salida, pips, ticker, 
         p_txt = f"{pips_abs:.1f} pips"
     else:
         p_txt = f"{pips_abs:.1f} pts"
+    # FIX 2026-04-26: trend change close en INGLES
     f_ = lambda v: fmt(v, ticker)
     _tipo_es = "BUY" if tipo == "COMPRA" else "SELL"
     emoji = "🟢" if pips > 0 else "⚠️"
     signo = "+" if pips > 0 else "-"
-    _dir_contraria = "bajista" if tipo == "COMPRA" else "alcista"
+    _dir_contraria = "bearish" if tipo == "COMPRA" else "bullish"
     return (
-        f"🔄 *CAMBIO DE TENDENCIA* — {nombre}\n"
+        f"🔄 *TREND REVERSAL* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"Detectamos reversión *{_dir_contraria}* mientras estábamos en *{_tipo_es}*.\n"
-        f"Cerramos la posición para proteger capital.\n\n"
-        f"📍 Entrada: {f_(entrada)}\n"
-        f"📊 Cierre: {f_(salida)}\n"
-        f"{emoji} *Neto: {signo}{p_txt}*\n"
+        f"We detected a *{_dir_contraria}* reversal while in *{_tipo_es}*.\n"
+        f"Closing position to protect capital.\n\n"
+        f"📍 Entry: {f_(entrada)}\n"
+        f"📊 Close: {f_(salida)}\n"
+        f"{emoji} *Net: {signo}{p_txt}*\n"
         f"━━━━━━━━━━━━━━\n"
-        f"📊 _BuySell365 Pro — gestión dinámica_"
+        f"📊 _BuySell365 Pro — dynamic management_"
     )
 
 
@@ -4494,9 +4497,10 @@ def mensaje_cierre_parcial_tendencia(nombre, tipo, pips_asegurados, ticker, porc
         p_txt = f"{pips_asegurados * 10000:.0f} pips" if abs(pips_asegurados) < 1 else f"{pips_asegurados:.1f} pips"
     else:
         p_txt = f"{pips_asegurados:.1f} pts"
+    # FIX 2026-04-26: partial close en INGLES
     return (
-        f"⚡ *CIERRE PARCIAL {porc}%* — {nombre}\n"
-        f"💰 +{p_txt} asegurados. Debilitamiento de tendencia, protegemos ganancia cerrando parte."
+        f"⚡ *PARTIAL CLOSE {porc}%* — {nombre}\n"
+        f"💰 +{p_txt} secured. Trend weakening — protecting profit by closing part of position."
     )
 
 
@@ -4509,14 +4513,15 @@ def mensaje_cierre_24h(nombre, tipo, entrada, salida, pips, ticker):
     f_ = lambda v: fmt(v, ticker)
     signo = "+" if pips > 0 else ""
     emoji = "🟢" if pips > 0 else "🔴"
+    # FIX 2026-04-26: 24h auto-close en INGLES
     _tipo_es = "BUY" if tipo == "COMPRA" else "SELL"
     return (
-        f"⏰ *CIERRE AUTO 24H* — {nombre}\n"
+        f"⏰ *24H AUTO-CLOSE* — {nombre}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{emoji} {_tipo_es} *{signo}{p_txt}*\n"
-        f"📍 Entrada: {f_(entrada)} → Salida: {f_(salida)}\n"
+        f"📍 Entry: {f_(entrada)} → Exit: {f_(salida)}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"🕐 _Cerramos automáticamente tras 24h para proteger tu capital._"
+        f"🕐 _Auto-closed after 24h to protect your capital._"
     )
 
 def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
@@ -4529,11 +4534,12 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
     m = int((horas % 1) * 60)
     dur = f"{h}h {m}m" if h > 0 else f"{m}m"
     tipo_txt = "🟢 BUY" if tipo == "COMPRA" else "🔴 SELL"
+    # FIX 2026-04-26: profit lock close en INGLES
     return (
-        f"🔒 *GANANCIA ASEGURADA* — {nombre}\n"
+        f"🔒 *PROFIT SECURED* — {nombre}\n"
         f"{tipo_txt} +{p_txt}\n"
-        f"Entrada {f_(entrada)} → Cierre {f_(salida)} | {dur}\n"
-        f"✅ _Cerramos con beneficio para proteger la ganancia acumulada._"
+        f"Entry {f_(entrada)} → Close {f_(salida)} | {dur}\n"
+        f"✅ _Closed in profit to protect accumulated gains._"
     )
 
 # ============================================================
@@ -7376,16 +7382,17 @@ def cmd_rastrear(texto_completo: str) -> str:
             _json.dump(existentes, _f, ensure_ascii=False, indent=2)
         os.replace(_tmp_file, manual_file)
         dir_es = "BUY" if direccion == "BUY" else "SELL"
+        # FIX 2026-04-26: respuesta del admin en INGLES
         return (
-            f"📌 *Señal registrada para seguimiento*\n\n"
+            f"📌 *Signal registered for tracking*\n\n"
             f"{'🟢' if direccion == 'BUY' else '🔴'} *{dir_es} — {par}*\n"
-            f"📍 Entrada: {entry if entry > 0 else 'Mercado'}\n"
+            f"📍 Entry: {entry if entry > 0 else 'Market'}\n"
             f"🎯 TP: {tp}\n"
             f"🛡️ SL: {sl}\n\n"
-            f"✅ El bot avisará cuando toque TP o SL"
+            f"✅ Bot will alert when TP or SL is hit"
         )
     except Exception as _e:
-        return f"❌ Error guardando señal: {_e}"
+        return f"❌ Error saving signal: {_e}"
 
 
 def cmd_pausar():
@@ -8760,19 +8767,20 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
 
         # Formato unificado de señal (igual al signal copier)
         # FIX 2026-04-21: BUY/SELL en cabecera (no COMPRA/VENTA)
+        # FIX 2026-04-26: senal del scanner propio en INGLES
         _dir_es  = "BUY" if tipo == "COMPRA" else "SELL"
         _emoji   = "🟢" if tipo == "COMPRA" else "🔴"
         _nombre  = senal['nombre']
-        _entry_d = f"{entrada:,.2f}" if entrada and entrada > 0 else "Mercado"
+        _entry_d = f"{entrada:,.2f}" if entrada and entrada > 0 else "Market"
         _msg_canal = (
             f"{_emoji} *{_dir_es} — {_nombre}*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📍 Entrada: {_entry_d}\n"
+            f"📍 Entry: {_entry_d}\n"
             f"🎯 TP: {fmt(tp, ticker)}\n"
             f"🛡️ SL: {fmt(sl, ticker)}"
         )
         _teclado_vip = {"inline_keyboard": [
-            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
         ]}
 
         # Ejecutar en MT5 si está activo
