@@ -1713,7 +1713,7 @@ if('serviceWorker' in navigator){{
   </div>
   <p data-i18n="footer.rights">\u00a9 2026 BuySell365 Pro. Todos los derechos reservados.</p>
   <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)" data-i18n="footer.tagline">BuySell365 Pro &mdash; Trading con Inteligencia Artificial</p>
-  <p style="margin-top:4px;font-size:0.7rem;color:#4a5568" data-i18n="footer.creator">Creador: Emmanuel Diaz</p>
+  <p style="margin-top:10px;font-size:1rem;color:#fbbf24;font-weight:700;letter-spacing:0.3px" data-i18n="footer.creator">Creador: Emmanuel Diaz</p>
   <p style="margin-top:8px;font-size:0.7rem;color:#4a5568">
     \u26a0\ufe0f <span data-i18n="footer.disclaimer">Trading con riesgo. Rendimientos pasados no garantizan resultados futuros. Opera bajo tu propia responsabilidad.</span>
   </p>
