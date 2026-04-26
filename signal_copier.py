@@ -1044,19 +1044,20 @@ def _format_gift_message(signal: dict) -> str:
                       if s.get("sent_at", 0) >= hoy_ts)
     ops_hoy = max(ops_hoy, 2)  # Mínimo 2 para que el texto tenga sentido
 
+    # FIX 2026-04-26: traducido a INGLES — todo el sistema en EN
     msg = (
-        f"🎁🎁🎁  *SEÑAL GRATIS*  🎁🎁🎁\n"
+        f"🎁🎁🎁  *FREE SIGNAL*  🎁🎁🎁\n"
         f"━━━━━━━━━━━━━━━━\n"
         f"{dir_emoji} *{dir_label} — {pair_d}*\n\n"
-        f"📍 Entrada: {entry_display}"
+        f"📍 Entry: {entry_display}"
         f"{tp_lines}\n"
         f"🛡️ SL: {fmt(sl)}\n"
         f"━━━━━━━━━━━━━━━━\n"
-        f"🆓 Señal *REGALO* de nuestro Canal VIP\n"
-        f"📊 Gestión de riesgo incluida\n\n"
-        f"💎 *¿Quieres recibir TODAS las señales?*\n"
-        f"Hoy ya van +{ops_hoy} operaciones en el VIP\n"
-        f"👉 Escribe /vip y empieza a operar con nosotros"
+        f"🆓 *Free signal* from our VIP Channel\n"
+        f"📊 Risk management included\n\n"
+        f"💎 *Want to get ALL signals?*\n"
+        f"+{ops_hoy} trades in the VIP today already\n"
+        f"👉 Type /vip and start trading with us"
     )
     return msg
 
@@ -1699,15 +1700,16 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
         tp_lines = f"\n✅ TP: {fmt(tp)}"
 
     _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
+    # FIX 2026-04-26: traducido a INGLES (mensaje al canal VIP cuando se alcanza TP)
     msg = (
-        f"🎯🎯 *TP ALCANZADO* 🎯🎯\n"
+        f"🎯🎯 *TP HIT* 🎯🎯\n"
         f"━━━━━━━━━━━━━━\n"
         f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-        f"📍 Entrada: {fmt(entry)}"
+        f"📍 Entry: {fmt(entry)}"
         f"{tp_lines}"
         f"{pips_line}\n"
         f"━━━━━━━━━━━━━━\n"
-        f"🚀 _BuySell365 Pro — señal exitosa_"
+        f"🚀 _BuySell365 Pro — winning trade_"
     )
 
     # FIX 2026-04-22: pasar sent_at para que el chart cubra el movimiento real de la señal
@@ -1775,19 +1777,20 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
             tp_lines_publico = ""
 
         if _was_gifted:
-            # ── CELEBRACIÓN ESPECIAL para señales REGALO ──
+            # ── CELEBRATION for FREE signals (gifted to public group) ──
+            # FIX 2026-04-26: traducido a INGLES
             _msg_grupo = (
-                f"🎁🎯 *SEÑAL GRATIS GANADORA* 🎯🎁\n"
+                f"🎁🎯 *FREE SIGNAL — WINNER* 🎯🎁\n"
                 f"━━━━━━━━━━━━━━\n"
                 f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-                f"📍 Entrada: {fmt(entry)}"
+                f"📍 Entry: {fmt(entry)}"
                 f"{tp_lines_publico}"
                 f"{pips_line}\n"
                 f"━━━━━━━━━━━━━━\n"
-                f"🎁 *¡La señal REGALO tocó TP!*\n"
-                f"🏆 Esto pasa todos los días en el VIP\n\n"
-                f"🔥 *¿Quieres TODAS las señales?*\n"
-                f"👉 Escribe */vip* para unirte"
+                f"🎁 *The free signal hit TP!*\n"
+                f"🏆 This happens every day in the VIP\n\n"
+                f"🔥 *Want ALL signals?*\n"
+                f"👉 Type */vip* to join"
             )
             log.info(f"🎁🎯 GIFT TP CELEBRATION: {pair_d} {pips_str}")
             # FIX 2026-04-23: registrar resultado "tp" en gift_tracker para resumen diario
@@ -1802,21 +1805,22 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
             except Exception as _egt:
                 log.debug(f"gift_tracker tp update error: {_egt}")
         else:
+            # FIX 2026-04-26: promos del grupo publico en INGLES
             _promos = [
-                "\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
-                "\n\n📡 *Suscríbete al canal VIP*\nRecibe estas señales en tiempo real con entry, TP y SL exactos.\n👉 Escribe */vip* para activarlo",
-                "\n\n🔥 *Otra victoria más del equipo*\nNo te quedes fuera, únete al VIP.\n👉 Escribe */vip* y empieza hoy",
-                "\n\n📈 *Resultados reales, sin trucos*\nSeñales en vivo con entrada, TP y SL exactos.\n👉 Escribe */vip* para unirte",
+                "\n\n💎 *Want to get these signals?*\nJoin the VIP channel and trade with us.\n👉 Type */vip* for more info",
+                "\n\n📡 *Subscribe to the VIP channel*\nGet these signals in real time with exact Entry, TP and SL.\n👉 Type */vip* to activate",
+                "\n\n🔥 *Another win for the team*\nDon't stay out — join the VIP.\n👉 Type */vip* and start today",
+                "\n\n📈 *Real results, no tricks*\nLive signals with exact Entry, TP and SL.\n👉 Type */vip* to join",
             ]
             _msg_grupo = (
-                f"🎯🎯 *TP ALCANZADO* 🎯🎯\n"
+                f"🎯🎯 *TP HIT* 🎯🎯\n"
                 f"━━━━━━━━━━━━━━\n"
                 f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-                f"📍 Entrada: {fmt(entry)}"
+                f"📍 Entry: {fmt(entry)}"
                 f"{tp_lines_publico}"
                 f"{pips_line}\n"
                 f"━━━━━━━━━━━━━━\n"
-                f"🚀 _BuySell365 Pro — señal exitosa_"
+                f"🚀 _BuySell365 Pro — winning trade_"
                 f"{random.choice(_promos)}"
             )
         # FIX 2026-04-16: Video COMPACTO 720x720 para el grupo (no el reel vertical)
@@ -1918,38 +1922,39 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
 
     # Labels según tipo de cierre
     if action == "close_half":
+        # FIX 2026-04-26: traducido a INGLES — todo el sistema EN
         title_emoji = "⚡⚡"
-        title_text = "GANANCIAS ASEGURADAS"
-        action_line = "⚡ Cierre parcial 50%"
-        subtitle = "protegiendo ganancias"
+        title_text = "PROFITS LOCKED IN"
+        action_line = "⚡ Partial close 50%"
+        subtitle = "protecting profits"
     elif action == "close_partial":
         title_emoji = "⚡⚡"
-        title_text = "GANANCIAS ASEGURADAS"
-        action_line = "⚡ Cierre parcial"
-        subtitle = "protegiendo ganancias"
+        title_text = "PROFITS LOCKED IN"
+        action_line = "⚡ Partial close"
+        subtitle = "protecting profits"
     else:  # full_close
         title_emoji = "🔒🔒"
-        title_text = "CIERRE CON GANANCIA"
-        action_line = "✅ Cierre total"
-        subtitle = "operación exitosa"
+        title_text = "CLOSED IN PROFIT"
+        action_line = "✅ Full close"
+        subtitle = "winning trade"
 
-    entry_line = f"\n📍 Entrada: {fmt_price(entry)}" if entry > 0 else ""
+    entry_line = f"\n📍 Entry: {fmt_price(entry)}" if entry > 0 else ""
 
     _was_gifted = _is_gifted_signal(pair)
     if _was_gifted:
-        # ── CELEBRACIÓN ESPECIAL para señal REGALO ──
+        # ── CELEBRATION for FREE signals (gifted to public group) — EN ──
         _msg_grupo = (
-            f"🎁🎯 *SEÑAL GRATIS GANADORA* 🎯🎁\n"
+            f"🎁🎯 *FREE SIGNAL — WINNER* 🎯🎁\n"
             f"━━━━━━━━━━━━━━\n"
             f"{dir_emoji} *{_dir_label_es} — {pair_d}*"
             f"{entry_line}\n"
             f"{action_line}\n"
-            f"💰 Ganancia: *{pips_str}*\n"
+            f"💰 Profit: *{pips_str}*\n"
             f"━━━━━━━━━━━━━━\n"
-            f"🎁 *¡La señal REGALO fue ganadora!*\n"
-            f"🏆 Esto pasa todos los días en el VIP\n\n"
-            f"🔥 *¿Quieres TODAS las señales?*\n"
-            f"👉 Escribe */vip* para unirte"
+            f"🎁 *The free signal was a winner!*\n"
+            f"🏆 This happens every day in the VIP\n\n"
+            f"🔥 *Want ALL signals?*\n"
+            f"👉 Type */vip* to join"
         )
         log.info(f"🎁🎯 GIFT CLOSE CELEBRATION: {pair_d} {pips_str}")
         # FIX 2026-04-23: registrar resultado "tp" en gift_tracker para resumen diario
@@ -1964,11 +1969,12 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
         except Exception as _egc:
             log.debug(f"gift_tracker close tp update error: {_egc}")
     else:
+        # FIX 2026-04-26: promos en INGLES
         _promos = [
-            "\n\n💎 *¿Quieres recibir estas señales?*\nÚnete al canal VIP y opera con nosotros.\n👉 Escribe */vip* para más info",
-            "\n\n📡 *Suscríbete al canal VIP*\nRecibe estas señales en tiempo real con entry, TP y SL exactos.\n👉 Escribe */vip* para activarlo",
-            "\n\n🔥 *Otra victoria más del equipo*\nNo te quedes fuera, únete al VIP.\n👉 Escribe */vip* y empieza hoy",
-            "\n\n📈 *Resultados reales, sin trucos*\nSeñales en vivo con entrada, TP y SL exactos.\n👉 Escribe */vip* para unirte",
+            "\n\n💎 *Want to get these signals?*\nJoin the VIP channel and trade with us.\n👉 Type */vip* for more info",
+            "\n\n📡 *Subscribe to the VIP channel*\nGet these signals in real time with exact Entry, TP and SL.\n👉 Type */vip* to activate",
+            "\n\n🔥 *Another win for the team*\nDon't stay out — join the VIP.\n👉 Type */vip* and start today",
+            "\n\n📈 *Real results, no tricks*\nLive signals with exact Entry, TP and SL.\n👉 Type */vip* to join",
         ]
         _msg_grupo = (
             f"{title_emoji} *{title_text}* {title_emoji}\n"
@@ -1976,7 +1982,7 @@ def _send_close_celebration(pair: str, direction: str, action: str, pips: float,
             f"{dir_emoji} *{_dir_label_es} — {pair_d}*"
             f"{entry_line}\n"
             f"{action_line}\n"
-            f"💰 Ganancia: *{pips_str}*\n"
+            f"💰 Profit: *{pips_str}*\n"
             f"━━━━━━━━━━━━━━\n"
             f"🚀 _BuySell365 Pro — {subtitle}_"
             f"{random.choice(_promos)}"
@@ -2092,35 +2098,36 @@ def _build_sl_motivational_msg(pair_d: str, pips_lost_str: str = "", tps_previos
     except Exception:
         pass
 
+    # FIX 2026-04-26: traducido a INGLES — todos los mensajes de SL/cierre
     _stats_block = ""
     if _wr_line or _net_line:
-        _stats_block = f"\n📊 *El sistema sigue ganando:*\n{_wr_line}{_net_line}"
+        _stats_block = f"\n📊 *The system keeps winning:*\n{_wr_line}{_net_line}"
 
     if tps_previos:
-        # Variante con TPs alcanzados antes — CIERRE TOTAL motivacional
+        # Variant with TPs hit before — TOTAL CLOSE (motivational)
         n_tps = len(tps_previos)
-        _tps_lines = "\n".join(f"✅ TP{t['nivel']}: +{abs(t.get('pips', 0)):.0f} pts asegurados" for t in tps_previos)
+        _tps_lines = "\n".join(f"✅ TP{t['nivel']}: +{abs(t.get('pips', 0)):.0f} pts secured" for t in tps_previos)
         return (
-            f"🏁 *CIERRE TOTAL — {pair_d}*\n\n"
+            f"🏁 *TOTAL CLOSE — {pair_d}*\n\n"
             f"{_tps_lines}\n"
-            f"📉 Resto cerrado al SL{pips_lost_str}\n"
+            f"📉 Rest closed at SL{pips_lost_str}\n"
             f"{_stats_block}\n"
-            f"💎 *Esta es la magia del multi-TP:*\n"
-            f"aseguramos ganancias antes que el mercado revierta.\n\n"
-            f"🔜 Próxima señal en camino 🚀\n"
+            f"💎 *This is the magic of multi-TP:*\n"
+            f"we lock in profits before the market reverses.\n\n"
+            f"🔜 Next signal coming 🚀\n"
             f"━━━━━━━━━━━━━━\n"
-            f"_BuySell365 Pro — Disciplina que paga_"
+            f"_BuySell365 Pro — Discipline that pays_"
         )
 
     return (
         f"🛡️ *STOP LOSS — {pair_d}*\n\n"
-        f"📉 Operación cerrada con riesgo controlado{pips_lost_str}.\n"
+        f"📉 Trade closed with controlled risk{pips_lost_str}.\n"
         f"{_stats_block}\n"
-        f"💎 *Perder poco cuando toca es lo que separa\n"
-        f"a un trader profesional de un aficionado.*\n\n"
-        f"🔜 Próxima señal en camino 🚀\n"
+        f"💎 *Losing small when it's time is what separates\n"
+        f"a professional trader from an amateur.*\n\n"
+        f"🔜 Next signal coming 🚀\n"
         f"━━━━━━━━━━━━━━\n"
-        f"_BuySell365 Pro — Disciplina que paga_"
+        f"_BuySell365 Pro — Discipline that pays_"
     )
 
 
@@ -2255,11 +2262,12 @@ def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_m
     signo_neto = "+" if pips_netos >= 0 else "-"
     emoji_neto = "✅" if pips_netos >= 0 else "⚠️"
 
+    # FIX 2026-04-26: titulos y mensajes en INGLES
     _titulo = {
-        "expired": "⏱ CIERRE POR TIEMPO",
-        "orphan":  "⏱ CIERRE — sin precio del broker",
-        "eod":     "🌙 CIERRE FIN DEL DÍA",
-    }.get(reason, "⏱ CIERRE POR TIEMPO")
+        "expired": "⏱ CLOSED BY TIME",
+        "orphan":  "⏱ CLOSE — no broker price",
+        "eod":     "🌙 END OF DAY CLOSE",
+    }.get(reason, "⏱ CLOSED BY TIME")
 
     if tps_previos:
         tps_lines = "\n".join(
@@ -2269,23 +2277,23 @@ def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_m
             f"{_titulo}\n"
             f"━━━━━━━━━━━━━━\n"
             f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-            f"📍 Entrada: {fmt_price(entry)}\n"
+            f"📍 Entry: {fmt_price(entry)}\n"
             f"{tps_lines}\n"
-            f"📊 Cierre actual: {fmt_price(_live) if _live > 0 else '—'}\n\n"
-            f"{emoji_neto} *Neto: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
+            f"📊 Current close: {fmt_price(_live) if _live > 0 else '—'}\n\n"
+            f"{emoji_neto} *Net: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
             f"━━━━━━━━━━━━━━\n"
-            f"📊 _BuySell365 Pro — {len(tps_previos)} TP(s) asegurado(s) antes del cierre_"
+            f"📊 _BuySell365 Pro — {len(tps_previos)} TP(s) secured before close_"
         )
     else:
         msg = (
             f"{_titulo}\n"
             f"━━━━━━━━━━━━━━\n"
             f"{dir_emoji} *{_dir_label_es} — {pair_d}*\n\n"
-            f"📍 Entrada: {fmt_price(entry)}\n"
-            f"📊 Cierre actual: {fmt_price(_live) if _live > 0 else '—'}\n\n"
-            f"{emoji_neto} *Neto: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
+            f"📍 Entry: {fmt_price(entry)}\n"
+            f"📊 Current close: {fmt_price(_live) if _live > 0 else '—'}\n\n"
+            f"{emoji_neto} *Net: {_fmt_pips(abs(pips_netos), signo_neto)}*\n"
             f"━━━━━━━━━━━━━━\n"
-            f"📊 _BuySell365 Pro — operación finalizada_"
+            f"📊 _BuySell365 Pro — trade finalized_"
         )
 
     try:
