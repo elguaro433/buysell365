@@ -1368,19 +1368,21 @@ if('serviceWorker' in navigator){{
       </ul>
       <a href="https://t.me/Andoperandobot?start=vip" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:18px 24px;background:linear-gradient(135deg,#ff6d00,#ffd740,#ffab00);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(255,215,64,0.5);transition:all .3s"><span data-i18n="pricing.subscribe_vip">&#128081; Suscribirme al VIP</span></a>
     </div>
-    <!-- FIX 2026-04-26: 3er card 'VIP Trial Gratis' — usuario pide acceso
-         gratis al canal VIP contactando al admin. Sin tiempo especifico. -->
-    <div class="price-card" style="border:1px solid rgba(251,191,36,0.4);box-shadow:0 0 30px rgba(251,191,36,0.15)">
-      <div class="price-name" style="color:#fbbf24;font-size:1.4rem" data-i18n="pricing.trial">Acceso Gratis VIP</div>
-      <div class="price-amount" style="color:#fbbf24;text-shadow:0 0 30px rgba(251,191,36,0.5);font-size:2rem" data-i18n="pricing.free_trial">GRATIS</div>
-      <p style="color:#b0bec5;margin-bottom:16px" data-i18n="pricing.trial_desc">Acceso gratis al canal VIP. Cont&aacute;ctame para activarlo.</p>
-      <ul class="price-list">
-        <li style="color:#fde68a" data-i18n="pricing.tr1">&#9989; Prueba todas las se&ntilde;ales VIP</li>
-        <li style="color:#fde68a" data-i18n="pricing.tr2">&#9989; Comprueba los resultados t&uacute; mismo</li>
-        <li style="color:#fde68a" data-i18n="pricing.tr3">&#9989; Sin tarjeta de cr&eacute;dito</li>
-        <li style="color:#fde68a" data-i18n="pricing.tr4">&#9989; Acceso total como VIP de pago</li>
+    <!-- FIX 2026-04-26: 3er card 'Acceso Gratis VIP' — usuario pide acceso
+         gratis al canal VIP contactando al admin. Diseno verde llamativo
+         para diferenciar del VIP Pro dorado y de la Comunidad azul. -->
+    <div class="price-card" style="border:2px solid #00e676;box-shadow:0 0 40px rgba(0,230,118,0.25);position:relative">
+      <div class="price-badge" style="background:linear-gradient(135deg,#00c853,#00e676);box-shadow:0 0 25px rgba(0,230,118,.6);font-size:14px;padding:8px 24px;animation:pulse 2s infinite">&#127873; <span data-i18n="pricing.trial_badge">PRUEBA GRATIS</span></div>
+      <div style="font-size:3rem;text-align:center;margin:14px 0 6px">&#127873;</div>
+      <div class="price-name" style="color:#00e676;font-size:1.5rem;text-shadow:0 0 20px rgba(0,230,118,0.3)" data-i18n="pricing.trial">Acceso al VIP</div>
+      <div class="price-amount" style="color:#00e676;text-shadow:0 0 30px rgba(0,230,118,0.5);font-size:3rem;margin:8px 0" data-i18n="pricing.free_trial">GRATIS</div>
+      <p style="color:#b0bec5;margin:10px 0 16px;font-size:0.95rem;line-height:1.5" data-i18n="pricing.trial_desc">Prueba el canal VIP sin pagar nada. Solo cont&aacute;ctame y te activo el acceso.</p>
+      <ul class="price-list" style="margin-top:14px">
+        <li style="color:#a7f3d0" data-i18n="pricing.tr1">&#9989; Mismas se&ntilde;ales que el VIP de pago</li>
+        <li style="color:#a7f3d0" data-i18n="pricing.tr2">&#9989; Sin tarjeta de cr&eacute;dito</li>
+        <li style="color:#a7f3d0" data-i18n="pricing.tr3">&#9989; Sin compromiso</li>
       </ul>
-      <a href="https://t.me/BuySell365traiding" target="_blank" style="display:block;width:100%;text-align:center;margin-top:16px;padding:16px 24px;background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:14px;color:#000;font-weight:800;font-size:1.1rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 25px rgba(251,191,36,0.5);transition:all .3s"><span data-i18n="pricing.contact_admin">&#128172; Contactar al Admin</span></a>
+      <a href="https://t.me/BuySell365traiding" target="_blank" style="display:block;width:100%;text-align:center;margin-top:18px;padding:18px 24px;background:linear-gradient(135deg,#00c853,#00e676,#69f0ae);border-radius:14px;color:#000;font-weight:900;font-size:1.15rem;text-decoration:none;cursor:pointer;box-shadow:0 4px 30px rgba(0,230,118,0.5);transition:all .3s"><span data-i18n="pricing.contact_admin">&#128172; Cont&aacute;ctame ahora</span></a>
     </div>
   </div>
 </section>
