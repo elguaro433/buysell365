@@ -243,22 +243,23 @@ def _caption_grupo(stats: dict) -> str:
 
 
 def _caption_ig(stats: dict) -> str:
+    # FIX 2026-04-26: caption en INGLES — audiencia internacional
     return (
-        "🌐 TODO EN UN SOLO LUGAR\n\n"
-        "Visita nuestra web oficial:\n"
+        "🌐 EVERYTHING IN ONE PLACE\n\n"
+        "Visit our official website:\n"
         "🔗 buysell365.pro\n\n"
-        "✨ Qué encontrarás:\n"
-        "📊 Estadísticas en vivo del canal VIP\n"
-        "🎯 Historial completo de señales\n"
-        "📈 Rendimiento por activo\n"
-        "🎁 Oferta lanzamiento — 50% OFF\n"
-        "🤖 Acceso directo al bot\n\n"
-        f"💎 Esta semana: +{stats['total_pts']:,.0f} pts · "
+        "✨ What you'll find:\n"
+        "📊 Live VIP channel stats\n"
+        "🎯 Full signal history\n"
+        "📈 Performance by asset\n"
+        "🎁 Launch offer — 50% OFF\n"
+        "🤖 Direct bot access\n\n"
+        f"💎 This week: +{stats['total_pts']:,.0f} pts · "
         f"{stats['total_tp']} TPs · {stats['wr']:.0f}% WR\n\n"
-        "👉 Link en bio — buysell365.pro\n\n"
-        "#trading #forex #xauusd #oro #nas100\n"
-        "#bitcoin #traders #daytrading #spain\n"
-        "#andorra #buysell365 #señales"
+        "👉 Link in bio — buysell365.pro\n\n"
+        "#trading #forex #xauusd #gold #nas100\n"
+        "#bitcoin #traders #daytrading #aitrading\n"
+        "#tradingsignals #buysell365 #signals"
     )
 
 

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuySell365 Pro — AI Trading Signals</title>
+<meta name="description" content="AI-powered trading signals for GOLD, NASDAQ, Forex and S&P 500. Free daily signals, VIP channel with exact Entry, SL and TP. Real verified results.">
+<!-- FIX 2026-04-26: traducido a INGLES, eliminado Copy Trading,
+     anadido panel '1-Day VIP Trial', quitado nombre del fundador. -->
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07091f;--bg2:#0e1628;--bg3:#162035;
+  --green:#00ffcc;--green2:#00f5c4;--blue:#4d9fff;
+  --purple:#a78bfa;--gold:#fbbf24;--red:#f87171;
+  --text:#f0f6ff;--text2:#b0bdd0;
+}
+body{font-family:'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;background:rgba(7,9,31,0.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,255,204,0.08)}
+.nav-logo{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#00ffcc,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:20px;align-items:center}
+.nav-links a{color:var(--text2);font-size:0.9rem;transition:color 0.3s}
+.nav-links a:hover{color:var(--green)}
+.btn-nav{padding:8px 20px;background:linear-gradient(135deg,#00ffcc,#00b894);color:#000;font-weight:700;border-radius:20px;font-size:0.85rem;transition:all 0.3s}
+.btn-nav:hover{box-shadow:0 0 30px rgba(0,255,204,0.5);transform:translateY(-2px)}
+
+/* HERO */
+.hero{min-height:90vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 60px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,204,0.12),transparent 70%);top:-100px;left:50%;transform:translateX(-50%);animation:heroGlow 8s ease-in-out infinite;pointer-events:none}
+@keyframes heroGlow{0%,100%{opacity:0.6;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.15)}}
+
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,255,204,0.08);border:1px solid rgba(0,255,204,0.25);border-radius:30px;padding:8px 20px;font-size:0.8rem;color:var(--green);font-weight:600;letter-spacing:1px;margin-bottom:24px}
+.hero-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,255,204,0.4)}50%{opacity:0.8;box-shadow:0 0 0 8px rgba(0,255,204,0)}}
+
+.hero h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:900;line-height:1.15;margin-bottom:20px;background:linear-gradient(135deg,#fff 20%,#00ffcc 55%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 40px rgba(0,255,204,0.3))}
+.hero p{font-size:clamp(1rem,2vw,1.2rem);color:var(--text2);max-width:600px;margin:0 auto 32px;line-height:1.6}
+.hero-buttons{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+
+/* BOTONES */
+.btn-primary{padding:14px 32px;background:linear-gradient(135deg,#00ffcc,#00b894);color:#000;font-weight:800;border-radius:12px;font-size:1rem;transition:all 0.3s;position:relative;overflow:hidden;cursor:pointer;border:none}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 8px 50px rgba(0,255,204,0.6)}
+/* GLOW PULSE en CTA principal */
+.btn-primary::after{content:'';position:absolute;inset:-3px;border-radius:14px;background:linear-gradient(135deg,rgba(0,255,204,0.6),rgba(251,191,36,0.4));z-index:-1;animation:ctaGlow 3s ease-in-out infinite;opacity:0}
+@keyframes ctaGlow{0%,100%{opacity:0;transform:scale(1)}50%{opacity:0.8;transform:scale(1.05)}}
+.btn-primary:hover::after{opacity:0}
+
+.btn-secondary{padding:14px 32px;background:transparent;border:2px solid rgba(0,255,204,0.3);color:var(--green);font-weight:700;border-radius:12px;font-size:1rem;transition:all 0.3s;cursor:pointer}
+.btn-secondary:hover{border-color:var(--green);background:rgba(0,255,204,0.06);transform:translateY(-3px)}
+
+/* STATS BAR */
+.stats-bar{display:flex;justify-content:center;gap:40px;padding:30px 24px;max-width:800px;margin:-30px auto 0;position:relative;z-index:10;background:rgba(14,22,40,0.6);backdrop-filter:blur(12px);border-radius:16px;border:1px solid rgba(0,255,204,0.1);flex-wrap:wrap}
+.stat-item{text-align:center}
+.stat-val{font-size:2rem;font-weight:900;color:var(--green);text-shadow:0 0 20px rgba(0,255,204,0.4)}
+.stat-val.gold{color:var(--gold);text-shadow:0 0 20px rgba(251,191,36,0.4)}
+.stat-val.blue{color:var(--blue);text-shadow:0 0 20px rgba(77,159,255,0.4)}
+.stat-val.purple{color:var(--purple);text-shadow:0 0 20px rgba(167,139,250,0.4)}
+.stat-label{font-size:0.75rem;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+
+/* FEATURES 3D */
+.section-title{text-align:center;font-size:clamp(1.5rem,3vw,2.2rem);font-weight:800;margin:80px 0 16px;background:linear-gradient(135deg,#fff 20%,#00ffcc 55%,#4d9fff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 24px rgba(0,255,204,0.2))}
+.section-sub{text-align:center;color:var(--text2);font-size:1rem;margin-bottom:48px;max-width:600px;margin-left:auto;margin-right:auto}
+
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1000px;margin:0 auto;padding:0 24px;perspective:1000px}
+.feature-card{background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.9));border:1px solid rgba(0,255,204,0.08);border-radius:16px;padding:32px 24px;text-align:center;transition:all 0.4s ease;transform-style:preserve-3d;cursor:default}
+.feature-card:hover{transform:rotateY(-5deg) rotateX(5deg) translateY(-8px);border-color:rgba(0,255,204,0.3);box-shadow:0 20px 60px rgba(0,255,204,0.15),0 0 40px rgba(0,255,204,0.05)}
+.feature-icon{font-size:3rem;margin-bottom:16px;display:block;filter:drop-shadow(0 0 12px rgba(0,255,204,0.3))}
+.feature-card h4{font-size:1.1rem;font-weight:700;margin-bottom:10px;color:var(--text)}
+.feature-card p{font-size:0.88rem;color:var(--text2);line-height:1.5}
+
+/* HERO TABLE — últimos trades */
+.hero-table-wrap{max-width:700px;margin:40px auto 0;background:rgba(14,22,40,0.7);border:1px solid rgba(0,255,204,0.1);border-radius:16px;overflow:hidden;backdrop-filter:blur(8px)}
+.hero-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+.hero-table th{background:rgba(0,255,204,0.06);color:var(--green);font-weight:600;padding:10px 12px;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:1px}
+.hero-table td{padding:10px 12px;border-top:1px solid rgba(255,255,255,0.04);color:var(--text)}
+.hero-table tr:hover{background:rgba(0,255,204,0.03)}
+.win-row{border-left:3px solid #00e676}
+.win-badge{color:#00e676;font-weight:700;text-shadow:0 0 8px rgba(0,230,118,0.4)}
+.pips-green{color:#00e676;font-weight:600}
+
+/* PRICING */
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1000px;margin:0 auto;padding:0 24px;perspective:1200px}
+.price-card{background:linear-gradient(160deg,rgba(22,32,53,0.97),rgba(14,22,40,0.97));border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:36px 28px;text-align:center;transition:all 0.4s ease;transform-style:preserve-3d;position:relative;overflow:hidden}
+.price-card:hover{transform:rotateY(-3deg) rotateX(3deg) translateY(-6px)}
+.price-card.featured{border:2px solid rgba(251,191,36,0.5);box-shadow:0 0 40px rgba(251,191,36,0.1)}
+.price-card.featured::before{content:'🔥 MÁS POPULAR';position:absolute;top:0;left:0;right:0;background:linear-gradient(90deg,#fbbf24,#f59e0b);color:#000;font-size:0.7rem;font-weight:800;padding:6px;letter-spacing:1px}
+.price-name{font-size:1.3rem;font-weight:800;margin-bottom:8px;margin-top:16px}
+.price-amount{font-size:2.5rem;font-weight:900;color:var(--gold);margin:12px 0;text-shadow:0 0 20px rgba(251,191,36,0.3)}
+.price-amount span{font-size:0.9rem;color:var(--text2);font-weight:400}
+.price-features{list-style:none;text-align:left;margin:20px 0;font-size:0.88rem;color:var(--text2)}
+.price-features li{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.price-features li::before{content:'✅ ';margin-right:4px}
+.btn-price{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-weight:800;font-size:1rem;cursor:pointer;transition:all 0.3s}
+.btn-gold{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
+.btn-gold:hover{box-shadow:0 8px 40px rgba(251,191,36,0.5);transform:translateY(-2px)}
+.btn-green{background:linear-gradient(135deg,#00ffcc,#00b894);color:#000}
+.btn-green:hover{box-shadow:0 8px 40px rgba(0,255,204,0.5);transform:translateY(-2px)}
+
+/* CTA SECTION */
+.cta-section{text-align:center;padding:80px 24px;position:relative}
+.cta-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 50%,rgba(0,255,204,0.06),transparent);pointer-events:none}
+.cta-section h2{font-size:2rem;font-weight:900;margin-bottom:16px;color:var(--text)}
+.cta-section p{color:var(--text2);margin-bottom:32px;font-size:1.1rem}
+
+/* FLOATING PARTICLES */
+.particles-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+
+/* FOOTER */
+.footer{background:var(--bg2);border-top:1px solid rgba(0,255,204,0.08);padding:40px 24px;text-align:center}
+.footer-links{display:flex;justify-content:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}
+.footer-links a{color:var(--text2);font-size:0.9rem;transition:color 0.3s}
+.footer-links a:hover{color:var(--green)}
+.footer p{color:var(--text2);font-size:0.8rem}
+
+/* SCROLL FADE-IN */
+.fade-in{opacity:0;transform:translateY(40px);transition:all 0.8s ease}
+.fade-in.visible{opacity:1;transform:translateY(0)}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .features-grid,.pricing-grid{grid-template-columns:1fr}
+  .stats-bar{gap:20px}
+  .nav-links{display:none}
+  .hero{min-height:70vh;padding-top:100px}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">💎 BuySell365 Pro</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="https://t.me/BUYSELL_365_24_7" target="_blank">Free Group</a>
+    <a class="btn-nav" href="https://t.me/Andoperandobot" target="_blank">🤖 Talk to Bot</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <canvas class="particles-canvas" id="particles"></canvas>
+  <div style="position:relative;z-index:2">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      ✅ LIVE VERIFIED RESULTS — UPDATED WEEKLY
+    </div>
+    <h1>💎 AI Trading Signals<br>that actually deliver 🚀</h1>
+    <p>🎯 Automated signals for GOLD, NASDAQ, Forex and S&P 500 powered by AI. <strong>Exact Entry, SL and TP on every signal.</strong> Real results, full transparency. 🛡️</p>
+    <div class="hero-buttons">
+      <button class="btn-primary" onclick="window.open('https://t.me/Andoperandobot','_blank')">🤖 Start with the Bot</button>
+      <button class="btn-secondary" onclick="window.location.href='#pricing'">💎 View VIP Plans</button>
+    </div>
+
+    <!-- HERO TABLE -->
+    <div class="hero-table-wrap" style="margin-top:40px">
+      <table class="hero-table">
+        <tr><th>📅 Date</th><th>Pair</th><th>Type</th><th>💰 Result</th><th>Status</th></tr>
+        <tr class="win-row"><td>23/04</td><td>🥇 GOLD</td><td style="color:#00e676">BUY</td><td class="pips-green">+684 pts</td><td class="win-badge">✅ WIN</td></tr>
+        <tr class="win-row"><td>22/04</td><td>📈 NAS100</td><td style="color:#ff3b30">SELL</td><td class="pips-green">+367 pts</td><td class="win-badge">✅ WIN</td></tr>
+        <tr class="win-row"><td>21/04</td><td>🥇 GOLD</td><td style="color:#00e676">BUY</td><td class="pips-green">+613 pts</td><td class="win-badge">✅ WIN</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar fade-in">
+  <div class="stat-item">
+    <div class="stat-val" id="counter-wr">71</div>
+    <div class="stat-label">🎯 Win Rate %</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val blue" id="counter-ops">82</div>
+    <div class="stat-label">📊 TPs Last Week</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val gold" id="counter-profit">+2,111</div>
+    <div class="stat-label">💎 Pts Last Week</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val purple">24/7</div>
+    <div class="stat-label">🤖 AI Bot Active</div>
+  </div>
+</div>
+
+<!-- FEATURES 3D -->
+<h2 class="section-title fade-in" id="features">🧠 Why BuySell365 Pro?</h2>
+<p class="section-sub fade-in">AI technology operating real markets 💎</p>
+
+<div class="features-grid">
+  <div class="feature-card fade-in">
+    <span class="feature-icon">🤖</span>
+    <h4>Advanced AI</h4>
+    <p>Machine Learning bot analyzes the market every 3 minutes. No emotions, no human errors.</p>
+  </div>
+  <div class="feature-card fade-in">
+    <span class="feature-icon">🎁</span>
+    <h4>2 Free Daily Signals</h4>
+    <p>Every day we give away 2 signals in our public Telegram group. Free, with exact Entry, SL and TP.</p>
+  </div>
+  <div class="feature-card fade-in">
+    <span class="feature-icon">🎯</span>
+    <h4>Exact Signals</h4>
+    <p>Precise Entry, TP and SL. GOLD, NASDAQ, Forex, S&P 500 and more. Instant Telegram alerts.</p>
+  </div>
+  <div class="feature-card fade-in">
+    <span class="feature-icon">📊</span>
+    <h4>Full Transparency</h4>
+    <p>Public dashboard with every trade. We don't hide losses. Real results updated weekly.</p>
+  </div>
+  <div class="feature-card fade-in">
+    <span class="feature-icon">🛡️</span>
+    <h4>Your Capital Stays Yours</h4>
+    <p>Your money stays in YOUR broker account. We never touch your capital. Withdraw whenever you want.</p>
+  </div>
+  <div class="feature-card fade-in">
+    <span class="feature-icon">⚡</span>
+    <h4>24/7 AI Assistant</h4>
+    <p>Personal AI bot at @Andoperandobot. Ask for analysis on any asset, anytime. Always ready.</p>
+  </div>
+</div>
+
+<!-- PRICING -->
+<h2 class="section-title fade-in" id="pricing" style="margin-top:80px">💎 Choose Your Plan</h2>
+<p class="section-sub fade-in">Start free, upgrade when you're ready 🚀</p>
+
+<div class="pricing-grid">
+  <div class="price-card fade-in">
+    <div class="price-name">📢 Free Community</div>
+    <div class="price-amount">FREE</div>
+    <ul class="price-features">
+      <li>Public Telegram group</li>
+      <li>2 free signals every day</li>
+      <li>Market news & updates</li>
+      <li>Live public dashboard</li>
+    </ul>
+    <button class="btn-price btn-green" onclick="window.open('https://t.me/BUYSELL_365_24_7','_blank')">Join Free Group</button>
+  </div>
+  <div class="price-card featured fade-in">
+    <div class="price-name">💎 VIP Premium</div>
+    <div class="price-amount">€50<span>/month</span></div>
+    <ul class="price-features">
+      <li>All signals with exact Entry/TP/SL</li>
+      <li>Real-time AI analysis</li>
+      <li>Morning briefing + market close</li>
+      <li>Direct admin support</li>
+      <li>Personal AI assistant 24/7</li>
+      <li>Cancel anytime</li>
+    </ul>
+    <button class="btn-price btn-gold" onclick="window.open('https://t.me/Andoperandobot?start=vip','_blank')">💎 Subscribe to VIP</button>
+  </div>
+  <div class="price-card fade-in" style="border:2px solid var(--gold);position:relative">
+    <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gold);color:#0a0e1f;padding:4px 14px;border-radius:12px;font-size:0.75rem;font-weight:bold;letter-spacing:1px">🎁 BEST DEAL</div>
+    <div class="price-name">🎁 1-Day VIP Trial</div>
+    <div class="price-amount" style="color:var(--gold)">FREE</div>
+    <ul class="price-features">
+      <li>Test our VIP signals for 24h</li>
+      <li>See real results yourself</li>
+      <li>No credit card required</li>
+      <li>Full access — same as paid VIP</li>
+      <li>No tricks, no auto-renewal</li>
+    </ul>
+    <p style="font-size:0.85rem;color:var(--text2);text-align:center;margin:8px 0 14px">Talk to the admin to activate</p>
+    <button class="btn-price btn-gold" onclick="window.open('https://t.me/BuySell365traiding','_blank')">💬 Talk to Admin</button>
+  </div>
+</div>
+
+<!-- CTA -->
+<section class="cta-section fade-in">
+  <h2>🚀 Start trading smarter today</h2>
+  <p>💎 Real results, verified weekly. Full transparency. Join the free group or talk to the admin.</p>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+    <button class="btn-primary" onclick="window.open('https://t.me/BUYSELL_365_24_7','_blank')">📢 Join Free Group</button>
+    <button class="btn-secondary" onclick="window.open('https://t.me/BuySell365traiding','_blank')">💬 Talk to Admin</button>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-links">
+    <a href="https://buysell365.pro" target="_blank">📊 Dashboard</a>
+    <a href="https://t.me/BUYSELL_365_24_7" target="_blank">📢 Free Group</a>
+    <a href="https://t.me/Andoperandobot" target="_blank">🤖 Bot</a>
+    <a href="https://instagram.com/buysell365.pro_tradingsignals" target="_blank">📸 Instagram</a>
+    <a href="#">📜 Terms</a>
+    <a href="#">🔐 Privacy</a>
+  </div>
+  <p>© 2026 BuySell365 Pro. All rights reserved.</p>
+  <p style="margin-top:4px;font-size:0.75rem;color:var(--text2)">BuySell365 Pro — AI Trading Signals 🤖💎</p>
+  <p style="margin-top:8px;font-size:0.7rem;color:#4a5568">⚠️ Trading con riesgo. Rendimientos pasados no garantizan resultados futuros.</p>
+</footer>
+
+<script>
+// ═══════════════════════════════════════
+// FLOATING PARTICLES 💰💎🤖📈🎯
+// ═══════════════════════════════════════
+(function(){
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  const emojis = ['💰','💎','🤖','📈','🎯','💵','🧠','⚡','🏆','💲'];
+  let particles = [];
+
+  function resize(){
+    canvas.width = canvas.parentElement.offsetWidth;
+    canvas.height = canvas.parentElement.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for(let i=0;i<30;i++){
+    particles.push({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      size: 14 + Math.random()*18,
+      speed: 0.2 + Math.random()*0.5,
+      emoji: emojis[Math.floor(Math.random()*emojis.length)],
+      opacity: 0.15 + Math.random()*0.25,
+      drift: (Math.random()-0.5)*0.3
+    });
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p=>{
+      ctx.globalAlpha = p.opacity;
+      ctx.font = p.size+'px serif';
+      ctx.fillText(p.emoji, p.x, p.y);
+      p.y -= p.speed;
+      p.x += p.drift;
+      if(p.y < -30){
+        p.y = canvas.height + 30;
+        p.x = Math.random()*canvas.width;
+      }
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ═══════════════════════════════════════
+// ANIMATED COUNTERS
+// ═══════════════════════════════════════
+function animateCounter(el, target, prefix, suffix, duration){
+  let start = 0;
+  const step = target / (duration / 16);
+  function update(){
+    start += step;
+    if(start >= target){start = target;}
+    if(target >= 100 && !suffix){
+      el.textContent = prefix + Math.floor(start).toLocaleString() + (suffix||'');
+    } else if(suffix === '%'){
+      el.textContent = prefix + start.toFixed(1) + suffix;
+    } else {
+      el.textContent = prefix + Math.floor(start).toLocaleString() + (suffix||'');
+    }
+    if(start < target) requestAnimationFrame(update);
+  }
+  update();
+}
+
+// ═══════════════════════════════════════
+// SCROLL FADE-IN + COUNTER TRIGGER
+// ═══════════════════════════════════════
+const observer = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      // Trigger counters when stats bar appears
+      if(e.target.classList.contains('stats-bar')){
+        animateCounter(document.getElementById('counter-wr'), 69.6, '', '%', 1500);
+        animateCounter(document.getElementById('counter-ops'), 102, '', '+', 1200);
+        animateCounter(document.getElementById('counter-profit'), 4708, '$', '', 1800);
+      }
+    }
+  });
+},{threshold:0.2});
+document.querySelectorAll('.fade-in').forEach(el=>observer.observe(el));
+</script>
+</body>
+</html>

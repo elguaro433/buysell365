@@ -2153,18 +2153,23 @@ def _translate_to_en_pt(text_es: str) -> tuple:
 
 
 def _build_multilang_caption(caption_es: str, hashtags: str = "") -> str:
-    """Combina ES + EN + PT en una sola caption IG. Si falla traducción, solo ES."""
-    en, pt = _translate_to_en_pt(caption_es.replace(hashtags, "").strip() if hashtags else caption_es)
-    blocks = [caption_es.replace(hashtags, "").strip() if hashtags else caption_es]
-    if en:
-        blocks.append(f"━━━━━━━━━━\n🇬🇧 {en}")
-    if pt:
-        blocks.append(f"━━━━━━━━━━\n🇧🇷 {pt}")
-    out = "\n\n".join(blocks)
-    if hashtags and hashtags not in out:
-        out += f"\n\n{hashtags}"
+    """Devuelve caption en INGLES (FIX 2026-04-26: audiencia internacional).
+
+    Antes concatenaba ES + EN + PT con separadores. Ahora solo EN: la cuenta
+    de Instagram tiene mayoria de seguidores anglo-asiaticos. Si la
+    traduccion Groq falla, fallback a la caption original (ES) — mejor que
+    nada.
+
+    Mantiene firma `caption_es` por compatibilidad con todos los callers
+    historicos. Internamente traduce a EN antes de retornar.
+    """
+    base_es = caption_es.replace(hashtags, "").strip() if hashtags else caption_es
+    en, _pt = _translate_to_en_pt(base_es)
+    base = en if en else base_es  # Fallback si traduccion falla
+    if hashtags:
+        base += f"\n\n{hashtags}"
     # Instagram caption max 2200 chars
-    return out[:2180]
+    return base[:2180]
 
 
 def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIUM") -> bool:
@@ -2196,8 +2201,9 @@ def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIU
                 f_cta = _get_font(72, bold=True)
                 f_small = _get_font(44)
 
-                draw.text((540, 280), "⚡ NUEVA SEÑAL VIP", font=f_title, fill=COLOR_GOLD, anchor="mm")
-                draw.text((540, 420), "⚡ NEW VIP SIGNAL", font=f_small, fill=COLOR_GRAY, anchor="mm")
+                # FIX 2026-04-26: titulo principal en INGLES, subtitulo ES
+                draw.text((540, 280), "⚡ NEW VIP SIGNAL", font=f_title, fill=COLOR_GOLD, anchor="mm")
+                draw.text((540, 420), "⚡ NUEVA SEÑAL VIP", font=f_small, fill=COLOR_GRAY, anchor="mm")
 
                 # Par grande
                 draw.text((540, 680), _fmt_pair_ig(pair), font=f_pair, fill=COLOR_WHITE, anchor="mm")
@@ -2209,13 +2215,13 @@ def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIU
                 # Nivel
                 draw.text((540, 980), f"⭐ {nivel}", font=f_small, fill=COLOR_ACCENT, anchor="mm")
 
-                # CTA bloque
+                # CTA bloque (FIX 2026-04-26: ingles primero)
                 _draw_rounded_rect(draw, (140, 1280, 940, 1540), 40, fill=COLOR_ACCENT)
-                draw.text((540, 1380), "🔓 DESBLOQUEA LA SEÑAL", font=f_cta, fill=COLOR_WHITE, anchor="mm")
-                draw.text((540, 1460), "Link en bio · Link in bio", font=f_small, fill=COLOR_WHITE, anchor="mm")
+                draw.text((540, 1380), "🔓 UNLOCK THE SIGNAL", font=f_cta, fill=COLOR_WHITE, anchor="mm")
+                draw.text((540, 1460), "Link in bio", font=f_small, fill=COLOR_WHITE, anchor="mm")
 
                 draw.text((540, 1720), "@BuySell365.pro", font=f_small, fill=COLOR_GRAY, anchor="mm")
-                draw.text((540, 1790), "Señales · Signals · Sinais", font=f_small, fill=COLOR_GRAY, anchor="mm")
+                draw.text((540, 1790), "AI Trading Signals", font=f_small, fill=COLOR_GRAY, anchor="mm")
 
                 story_path = IMAGES_DIR / f"teaser_{pair}_{int(time.time())}.jpg"
                 img.save(str(story_path), "JPEG", quality=92)
@@ -2267,27 +2273,30 @@ def post_tp_celebration(pair: str, direction: str, entry: float, tp: float,
                     return
 
                 hashtags = _get_hashtags("tp", pair)
+                # FIX 2026-04-26: captions directamente en INGLES (sin pasar
+                # por _build_multilang que dependia de Groq).
                 if is_gift:
-                    caption_es = (
-                        f"🎁 SENAL GRATIS GANADORA 🎁 {pair.upper()} {pips}\n\n"
-                        f"Esta senal la regalamos HOY en nuestro grupo publico\n"
-                        f"y fue GANADORA\n\n"
-                        f"Todos los dias regalamos senales en el grupo\n"
-                        f"Imaginate lo que pasa en el Canal VIP\n\n"
-                        f"Unite — Link en bio\n"
-                        f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram"
+                    caption_en = (
+                        f"🎁 FREE WINNING SIGNAL 🎁 {pair.upper()} {pips}\n\n"
+                        f"This signal was a gift TODAY in our free group\n"
+                        f"and it WON\n\n"
+                        f"We give away signals every day in the group\n"
+                        f"Imagine what happens in the VIP Channel\n\n"
+                        f"Join — Link in bio\n"
+                        f"FREE Telegram group: @BUYSELL_365_24_7"
                     )
                 else:
-                    caption_es = (
-                        f"TP ALCANZADO {pair.upper()} {pips}\n\n"
-                        f"Otra senal exitosa de nuestro Canal VIP\n\n"
-                        f"Nuestros miembros recibieron esta senal "
-                        f"antes de que el mercado se moviera.\n\n"
-                        f"Quieres recibir las proximas?\n"
-                        f"Link en bio para unirte\n\n"
-                        f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram"
+                    caption_en = (
+                        f"TP HIT {pair.upper()} {pips}\n\n"
+                        f"Another winning signal from our VIP Channel\n\n"
+                        f"Our members received this signal "
+                        f"before the market moved.\n\n"
+                        f"Want to receive the next ones?\n"
+                        f"Link in bio to join\n\n"
+                        f"FREE Telegram group: @BUYSELL_365_24_7"
                     )
-                caption = _build_multilang_caption(caption_es, hashtags)
+                caption = caption_en + (f"\n\n{hashtags}" if hashtags else "")
+                caption = caption[:2180]  # IG limit
 
                 # 1) Generar video con fecha/horas incrustadas
                 _r_entry = reel_entry if reel_entry > 0 else entry
@@ -2401,13 +2410,14 @@ def post_daily_summary(stats: dict) -> bool:
                 fecha = stats.get("fecha", datetime.now().strftime("%d/%m/%Y"))
                 hashtags = _get_hashtags("daily")
 
+                # FIX 2026-04-26: caption en INGLES \u2014 audiencia internacional
                 caption = (
-                    f"RESUMEN DEL DIA \u2014 {fecha}\n\n"
+                    f"DAILY RECAP \u2014 {fecha}\n\n"
                     f"Win Rate: {wr:.0f}%\n"
                     f"TPs: {tps} | SLs: {sls}\n"
-                    f"Pips Netos: {pips:+.0f}\n\n"
-                    f"Transparencia total \u2014 Publicamos TODOS los resultados\n\n"
-                    f"\u00bfQuieres recibir nuestras se\u00f1ales? Link en bio\n\n"
+                    f"Net Pips: {pips:+.0f}\n\n"
+                    f"Full transparency \u2014 we publish ALL results\n\n"
+                    f"Want to get our signals? Link in bio\n\n"
                     f"{hashtags}"
                 )
 
@@ -2449,6 +2459,7 @@ def post_scheduled_content(content_type: str = "auto") -> bool:
                 else:
                     _type = content_type
 
+                # FIX 2026-04-26: captions en INGLES \u2014 audiencia internacional
                 if _type == "motivational":
                     quote, author = random.choice(_MOTIVATIONAL_QUOTES)
                     image_path = _generate_motivational_image(quote, author)
@@ -2456,9 +2467,9 @@ def post_scheduled_content(content_type: str = "auto") -> bool:
                     caption = (
                         f"\u201c{quote.replace(chr(10), ' ')}\u201d\n"
                         f"\u2014 {author}\n\n"
-                        f"\u00bfQuieres se\u00f1ales de trading?\n"
-                        f"Link en bio para unirte al Canal VIP\n\n"
-                        f"Grupo GRATIS: @BUYSELL_365_24_7 en Telegram\n\n"
+                        f"Want trading signals?\n"
+                        f"Link in bio to join the VIP Channel\n\n"
+                        f"FREE Telegram group: @BUYSELL_365_24_7\n\n"
                         f"{hashtags}"
                     )
                 elif _type == "tip":
@@ -2468,21 +2479,21 @@ def post_scheduled_content(content_type: str = "auto") -> bool:
                     caption = (
                         f"{title}\n\n"
                         f"{body.replace(chr(10), ' ')}\n\n"
-                        f"M\u00e1s tips y se\u00f1ales en nuestro Canal VIP\n"
-                        f"Link en bio para unirte\n\n"
+                        f"More tips and signals in our VIP Channel\n"
+                        f"Link in bio to join\n\n"
                         f"{hashtags}"
                     )
                 else:  # market_hours
                     image_path = _generate_market_hours_image()
                     hashtags = _get_hashtags("motivational")
                     caption = (
-                        f"HORARIOS DEL MERCADO (Hora Espa\u00f1a)\n\n"
+                        f"MARKET HOURS (Madrid / Andorra time)\n\n"
                         f"\U0001f30f Sydney: 22:00 - 07:00\n"
-                        f"\U0001f1ef\U0001f1f5 Tokio: 00:00 - 09:00\n"
-                        f"\U0001f1ec\U0001f1e7 Londres: 08:00 - 17:00\n"
-                        f"\U0001f1fa\U0001f1f8 Nueva York: 13:00 - 22:00\n\n"
-                        f"\u26a1 Mejor hora: 14:30-17:00 (Overlap)\n\n"
-                        f"Link en bio para se\u00f1ales en vivo\n\n"
+                        f"\U0001f1ef\U0001f1f5 Tokyo: 00:00 - 09:00\n"
+                        f"\U0001f1ec\U0001f1e7 London: 08:00 - 17:00\n"
+                        f"\U0001f1fa\U0001f1f8 New York: 13:00 - 22:00\n\n"
+                        f"\u26a1 Best time: 14:30-17:00 (Overlap)\n\n"
+                        f"Link in bio for live signals\n\n"
                         f"{hashtags}"
                     )
 

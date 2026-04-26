@@ -4550,7 +4550,7 @@ def cmd_ayuda():
         "👑 *VIP Channel*\n"
         "   `/vip` — Subscribe to the Premium VIP Channel\n\n"
         "👤 *Human contact*\n"
-        "   `/contacto` — Talk to Emmanuel (admin)\n\n"
+        "   `/contacto` — Talk to the Admin\n\n"
         "📋 *Other*\n"
         "   `/start` — Back to main menu\n"
         "   `/ayuda` — This help\n\n"
@@ -8865,7 +8865,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             start_txt = (
                 f"👑 *PANEL DE CONTROL — PROPIETARIO*\n"
                 f"━━━━━━━━━━━━━━━━\n\n"
-                f"👤 *Emmanuel Diaz* — Fundador & CEO de BuySell365.pro\n\n"
+                f"👤 *Administrador* — BuySell365.pro\n\n"
                 f"📊 *ESTADO DEL SISTEMA:*\n"
                 f"   🔍 Scanner: {_scan_icon}\n"
                 f"   💹 MT5: {_mt5_icon}\n"
@@ -8976,7 +8976,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         _ayuda_botones = {
             "inline_keyboard": [
                 [{"text": "💎 Subscribe to VIP Channel", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "👤 Talk to Emmanuel (admin)", "url": "https://t.me/BuySell365traiding"}],
+                [{"text": "👤 Talk to the Admin", "url": "https://t.me/BuySell365traiding"}],
             ]
         }
         return res_ayuda, _ayuda_botones
@@ -8988,12 +8988,12 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return (
             "👤 *Contact the administrator*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Tap the button below to talk directly with Emmanuel "
-            "(founder of BuySell365.pro).\n\n"
-            "He'll reply personally as soon as he can. ✅"
+            "Tap the button below to talk directly with the Admin "
+            "of BuySell365.pro.\n\n"
+            "We reply personally as soon as we can. ✅"
         ), {
             "inline_keyboard": [
-                [{"text": "👤 Talk to Emmanuel", "url": "https://t.me/BuySell365traiding"}],
+                [{"text": "👤 Talk to the Admin", "url": "https://t.me/BuySell365traiding"}],
                 [{"text": "💎 View VIP Channel", "callback_data": "vip_pagar_usdt"}],
             ]
         }
@@ -11640,7 +11640,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
 
     <!-- FOOTER -->
     <div class="footer">
-        <p>&#169; 2026 BuySell365 Pro &mdash; <span data-i18n="dash.footer_created">Creado por</span> <strong>Emmanuel D&iacute;az</strong> | <span data-i18n="dash.footer_refresh">Auto-refresh cada 30s</span></p>
+        <p>&#169; 2026 BuySell365 Pro &mdash; <span data-i18n="dash.footer_refresh">Auto-refresh every 30s</span></p>
         <p style="margin-top:4px"><a href="https://t.me/BUYSELL_365_24_7" data-i18n="dash.footer_telegram">Grupo Telegram</a> &middot; <a href="https://t.me/BuySell365Traiding" data-i18n="dash.footer_vip">Contacto VIP</a> &middot; <a href="/terminos" data-i18n="footer.terms">T&eacute;rminos</a> &middot; <a href="/privacidad" data-i18n="footer.privacy">Privacidad</a></p>
         <p style="margin-top:8px;font-size:0.7rem;color:#888;max-width:700px;margin-left:auto;margin-right:auto">
             &#9888; <strong data-i18n="dash.footer_legal_title">Aviso legal:</strong> <span data-i18n="dash.footer_legal">BuySell365 Pro es una herramienta de an&aacute;lisis t&eacute;cnico automatizado con fines informativos y educativos. No constituye asesor&iacute;a financiera, recomendaci&oacute;n de inversi&oacute;n ni oferta de servicios regulados. Operar en mercados financieros conlleva riesgo de p&eacute;rdida de capital. Resultados pasados no garantizan resultados futuros. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n.</span>
@@ -12336,7 +12336,7 @@ def dashboard():
             </div>
 
             <div class="footer">
-                &copy; 2026 BuySell365 Pro | By Emmanuel Diaz
+                &copy; 2026 BuySell365 Pro
                 <p style="margin-top:6px;font-size:0.65rem;color:#888">
                     &#9888; Herramienta informativa/educativa. No es asesor&iacute;a financiera. Opera bajo tu propio riesgo.
                 </p>
