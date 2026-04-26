@@ -30,23 +30,23 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "Andoperandobot").strip()
 
 
 PROMO_MSG = (
-    "🎁 *2 SEÑALES GRATIS — TODOS LOS DÍAS* 🎁\n"
+    "🎁 *2 FREE SIGNALS — EVERY DAY* 🎁\n"
     "━━━━━━━━━━━━━━━━━━━━\n\n"
-    "¿Sabías que aquí en el grupo regalamos *2 señales gratis al día*?\n\n"
-    "📡 Con Entry · SL · TP exactos\n"
-    "🎯 ORO · Forex · NASDAQ\n"
-    "⏰ Listas para copiar a tu broker\n\n"
-    "Sin pagos. Sin cursos. Sin trampas.\n"
-    "Solo tienes que estar atento al grupo 👀\n\n"
-    "💎 ¿Quieres acceso a *todas* las señales + análisis IA?\n"
-    "👇 Habla con nuestro bot"
+    "Did you know we give away *2 free signals every day* in this group?\n\n"
+    "📡 With exact Entry · SL · TP\n"
+    "🎯 GOLD · Forex · NASDAQ\n"
+    "⏰ Ready to copy to your broker\n\n"
+    "No payments. No courses. No tricks.\n"
+    "Just stay tuned to the group 👀\n\n"
+    "💎 Want access to *all* signals + AI analysis?\n"
+    "👇 Talk to our bot"
 )
 
 
 def _build_keyboard() -> dict:
     return {
         "inline_keyboard": [[
-            {"text": "🤖 Hablar con el bot", "url": f"https://t.me/{BOT_USERNAME}"}
+            {"text": "🤖 Talk to the bot", "url": f"https://t.me/{BOT_USERNAME}"}
         ]]
     }
 

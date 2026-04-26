@@ -4541,22 +4541,20 @@ def mensaje_profit_lock(nombre, tipo, entrada, salida, pips, ticker, horas):
 # ============================================================
 
 def cmd_ayuda():
-    # FIX 2026-04-25: lista publica reducida — antes exponia /senales,
-    # /resumen, /winrate, /analisis, /precios, /sentimiento, /tendencia,
-    # /pivots, /estado, /web a cualquier usuario. Esos son comandos
-    # internos/VIP, no deben anunciarse en el menu publico.
+    # FIX 2026-04-26: traducido a INGLES — el grupo recibe muchos
+    # miembros de paises extranjeros.
     return (
-        "🤖 *BuySell365.pro — Bot de Trading*\n"
+        "🤖 *BuySell365.pro — Trading Bot*\n"
         "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Soy tu asistente. Puedo ayudarte con:\n\n"
-        "👑 *Canal VIP*\n"
-        "   `/vip` — Suscríbete al Canal VIP Premium\n\n"
-        "👤 *Contacto humano*\n"
-        "   `/contacto` — Hablar con Emmanuel (admin)\n\n"
-        "📋 *Otros*\n"
-        "   `/start` — Volver al menú principal\n"
-        "   `/ayuda` — Esta ayuda\n\n"
-        "💡 _O escríbeme directamente: \"Quiero ver el VIP\" o \"Hablar con un humano\"._"
+        "I'm your assistant. I can help you with:\n\n"
+        "👑 *VIP Channel*\n"
+        "   `/vip` — Subscribe to the Premium VIP Channel\n\n"
+        "👤 *Human contact*\n"
+        "   `/contacto` — Talk to Emmanuel (admin)\n\n"
+        "📋 *Other*\n"
+        "   `/start` — Back to main menu\n"
+        "   `/ayuda` — This help\n\n"
+        "💡 _Or message me directly: \"I want to see VIP\" or \"Talk to a human\"._"
     )
 
 def cmd_senales():
@@ -8973,29 +8971,30 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         return start_txt, start_botones
 
     if t in ("/ayuda", "/help", "ayuda", "help", "comandos", "menu", "❓ ayuda"):
-        res_ayuda = f"👋 ¡Hola *{nombre_user}*! " + cmd_ayuda()
-        # FIX 2026-04-25: incluir teclado inline con boton para hablar con admin.
+        res_ayuda = f"👋 Hi *{nombre_user}*! " + cmd_ayuda()
+        # FIX 2026-04-26: botones en INGLES.
         _ayuda_botones = {
             "inline_keyboard": [
-                [{"text": "💎 Suscribirme al Canal VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "👤 Hablar con Emmanuel (admin)", "url": "https://t.me/BuySell365traiding"}],
+                [{"text": "💎 Subscribe to VIP Channel", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "👤 Talk to Emmanuel (admin)", "url": "https://t.me/BuySell365traiding"}],
             ]
         }
         return res_ayuda, _ayuda_botones
 
-    # FIX 2026-04-25: comando /contacto — boton directo a chat con admin
+    # FIX 2026-04-26: comando /contacto — traducido a INGLES.
     if t in ("/contacto", "/contact", "contacto", "contact", "/admin_contact",
-             "hablar con admin", "hablar con emmanuel", "contactar admin"):
+             "hablar con admin", "hablar con emmanuel", "contactar admin",
+             "talk to admin", "contact admin"):
         return (
-            "👤 *Contacto con el administrador*\n"
+            "👤 *Contact the administrator*\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Pulsa el botón de abajo para hablar directamente con Emmanuel "
-            "(fundador de BuySell365.pro).\n\n"
-            "Te responde personalmente en cuanto pueda. ✅"
+            "Tap the button below to talk directly with Emmanuel "
+            "(founder of BuySell365.pro).\n\n"
+            "He'll reply personally as soon as he can. ✅"
         ), {
             "inline_keyboard": [
-                [{"text": "👤 Hablar con Emmanuel", "url": "https://t.me/BuySell365traiding"}],
-                [{"text": "💎 Ver Canal VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "👤 Talk to Emmanuel", "url": "https://t.me/BuySell365traiding"}],
+                [{"text": "💎 View VIP Channel", "callback_data": "vip_pagar_usdt"}],
             ]
         }
     if t in ("/señales", "/senales", "/operaciones", "/abiertas", "/activas", "activas",
@@ -14532,100 +14531,94 @@ def loop_publicidad_grupo():
     # ── Anuncios rotativos del GRUPO (cada 30 min) ──
     # FIX 2026-04-21: Copy Trading ELIMINADO. Anuncios reescritos para promo del Canal VIP.
     ANUNCIOS = [
-        # 1 — Canal VIP: señales en tiempo real
+        # FIX 2026-04-26: 5 mensajes promo del grupo traducidos a INGLES.
+        # Ademas: 1 solo boton VIP por mensaje (antes habia 2 — UNIRME AL VIP +
+        # CANAL VIP — confuso para el usuario).
+        # 1 — VIP Channel: real-time signals
         (
-            "🚀 *SEÑALES PROFESIONALES EN TIEMPO REAL*\n"
+            "🚀 *PROFESSIONAL TRADING SIGNALS — REAL-TIME*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💎 *CANAL VIP — BuySell365 Pro*\n\n"
-            "⚡ Recibe señales con *Entry · TP · SL exactos*\n"
-            "📡 Alertas al instante en tu Telegram\n"
-            "🌍 ORO · NASDAQ · S&P 500 · Forex · Petróleo\n"
-            "🛡️ Gestión profesional de riesgo en cada operación\n\n"
-            "🔥 *Sin esperas. Sin filtrar ruido. Solo señales que valen.*",
-            {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}
-            ], [
-                {"text": "💎 Ver Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
-                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
-            ]]}
+            "💎 *VIP CHANNEL — BuySell365 Pro*\n\n"
+            "⚡ Get signals with *exact Entry · TP · SL*\n"
+            "📡 Instant alerts on Telegram\n"
+            "🌍 GOLD · NASDAQ · S&P 500 · Forex · Oil\n"
+            "🛡️ Professional risk management on every trade\n\n"
+            "🔥 *No waiting. No noise. Only signals that matter.*",
+            {"inline_keyboard": [
+                [{"text": "💎 SUBSCRIBE TO VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💬 Talk to the Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
+            ]}
         ),
-        # 2 — Señales VIP con ejemplo (marcado como ejemplo)
+        # 2 — VIP signals with example
         (
-            "💎 *SEÑALES VIP — IA EN TIEMPO REAL*\n"
+            "💎 *VIP SIGNALS — REAL-TIME AI*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Así se ven nuestras señales VIP:\n\n"
-            "🟢 *BUY — ORO*\n\n"
-            "📍 Entrada: 4750.00\n"
+            "This is what our VIP signals look like:\n\n"
+            "🟢 *BUY — GOLD*\n\n"
+            "📍 Entry: 4750.00\n"
             "🎯 TP1: 4760.00\n"
             "🎯 TP2: 4770.00\n"
             "🎯 TP3: 4780.00\n"
             "🛡️ SL: 4740.00\n"
-            "_(Ejemplo ilustrativo, no es una señal activa)_\n\n"
-            "✅ Entrada, TP y SL exactos en cada señal\n"
-            "✅ ORO · EUR/USD · GBP/USD · USD/JPY · USD/CAD · AUD/USD · GBP/JPY · EUR/JPY · GBP/NZD · EUR/CHF · NASDAQ · US30 · S&P 500\n"
-            "✅ Alertas instantáneas al canal VIP\n"
-            "🔍 Análisis bajo petición de cualquier activo\n\n"
-            "👇 *Escribe /vip para unirte*",
-            {"inline_keyboard": [[
-                {"text": "💎 UNIRME AL VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"}
-            ], [
-                {"text": "💎 CANAL VIP", "callback_data": "vip_pagar_usdt"},
-                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
-            ]]}
+            "_(Sample for illustration only, not a live signal)_\n\n"
+            "✅ Exact Entry, TP and SL on every signal\n"
+            "✅ GOLD · EUR/USD · GBP/USD · USD/JPY · USD/CAD · AUD/USD · GBP/JPY · EUR/JPY · GBP/NZD · EUR/CHF · NASDAQ · US30 · S&P 500\n"
+            "✅ Instant alerts to the VIP channel\n"
+            "🔍 On-demand analysis of any asset\n\n"
+            "👇 *Type /vip to join*",
+            {"inline_keyboard": [
+                [{"text": "💎 JOIN THE VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💬 Talk to the Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
+            ]}
         ),
-        # 3 — Canal VIP: 3 pasos
+        # 3 — VIP 3 steps
         (
-            "💎 *CANAL VIP — 3 PASOS Y RECIBE SEÑALES*\n"
+            "💎 *VIP CHANNEL — 3 STEPS TO GET SIGNALS*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📡 Señales en vivo con Entry, TP y SL exactos\n"
-            "🛡️ Gestión profesional · 100% transparente\n\n"
-            "1️⃣  *Suscríbete* al Canal VIP _(en 1 min)_\n"
-            "2️⃣  *Recibe alertas* al instante en Telegram\n"
-            "3️⃣  *Operas tú* o pides análisis cuando quieras 🚀\n\n"
-            "✅ Resultados verificados en MT5\n"
-            "💰 *Suscripción mensual sin sorpresas*",
-            {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}
-            ], [
-                {"text": "💎 Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
-                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
-            ]]}
+            "📡 Live signals with exact Entry, TP and SL\n"
+            "🛡️ Professional risk management · 100% transparent\n\n"
+            "1️⃣  *Subscribe* to the VIP Channel _(in 1 min)_\n"
+            "2️⃣  *Get instant alerts* on Telegram\n"
+            "3️⃣  *You trade* or request analysis whenever you want 🚀\n\n"
+            "✅ Results verified on MT5\n"
+            "💰 *Monthly subscription, no surprises*",
+            {"inline_keyboard": [
+                [{"text": "💎 SUBSCRIBE TO VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💬 Talk to the Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
+            ]}
         ),
-        # 4 — Por qué el Canal VIP
+        # 4 — Why the VIP channel
         (
-            "🔥 *POR QUÉ EL CANAL VIP*\n"
+            "🔥 *WHY THE VIP CHANNEL*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💎 *Canal VIP — Señales con IA*\n"
-            "   ├ 📍 Entrada · 🎯 TP · 🛡️ SL exactos\n"
-            "   ├ 📊 Análisis diario de mercados\n"
-            "   ├ ⚡ Alertas en tiempo real\n"
-            "   ├ 🔍 Análisis bajo petición de cualquier activo\n"
-            "   └ 🤖 Bot asistente personal 24/7\n\n"
-            "👇 *Suscríbete y empieza ahora*",
-            {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}
-            ], [
-                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"},
-                {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
-            ]]}
+            "💎 *VIP Channel — AI-powered Signals*\n"
+            "   ├ 📍 Entry · 🎯 TP · 🛡️ SL exact\n"
+            "   ├ 📊 Daily market analysis\n"
+            "   ├ ⚡ Real-time alerts\n"
+            "   ├ 🔍 On-demand analysis of any asset\n"
+            "   └ 🤖 Personal AI assistant 24/7\n\n"
+            "👇 *Subscribe and start now*",
+            {"inline_keyboard": [
+                [{"text": "💎 SUBSCRIBE TO VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💬 Talk to the Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"},
+                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
+            ]}
         ),
-        # 5 — Transparencia total
+        # 5 — Full transparency
         (
-            "👁️ *TRANSPARENCIA TOTAL — SIN LETRA PEQUEÑA*\n"
+            "👁️ *FULL TRANSPARENCY — NO HIDDEN FEES*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Con el *Canal VIP* tú tienes el control:\n\n"
-            "📊 Ves cada señal publicada al instante\n"
-            "📈 Ves el rendimiento real verificado en MT5\n"
-            "🔓 Cancelas tu suscripción *cuando quieras*\n"
-            "💰 Suscripción mensual *transparente*\n\n"
-            "🎯 *Sin sorpresas. Sin trucos. Resultados reales.*\n\n"
-            "👇 *Suscríbete ahora*",
-            {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}
-            ], [
-                {"text": "💎 Canal VIP", "url": f"https://t.me/{BOT_USERNAME}?start=vip"},
-                {"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}
-            ]]}
+            "With the *VIP Channel* you stay in control:\n\n"
+            "📊 See every signal published instantly\n"
+            "📈 See real performance verified on MT5\n"
+            "🔓 Cancel your subscription *whenever you want*\n"
+            "💰 *Transparent* monthly subscription\n\n"
+            "🎯 *No surprises. No tricks. Real results.*\n\n"
+            "👇 *Subscribe now*",
+            {"inline_keyboard": [
+                [{"text": "💎 SUBSCRIBE TO VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💬 Talk to the Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
+            ]}
         ),
     ]
 
@@ -15405,18 +15398,17 @@ def manejar_usuario_nuevo(msg, user_info, texto, grupo_chat_id=None):
         for _k, _ in _sorted[:len(_cooldown_bienvenida) - _MAX_COOLDOWN_ENTRIES + 500]:
             _cooldown_bienvenida.pop(_k, None)
 
-    # FIX 2026-04-25: bienvenida simplificada — calida y sin publicidad.
-    # Usuario pide: "invitalo a conocer todo el grupo gratis y dile que cada
-    # dia regalamos 2 senales". Sin botones, sin stats, sin lista de servicios.
+    # FIX 2026-04-26: bienvenida traducida a INGLES — entran muchos miembros
+    # de paises extranjeros (arabes, asiaticos, etc).
     menu_privado = (
-        f"👋 *¡Hola {nombre}!*\n\n"
-        f"Bienvenido a *BuySell365 Pro* 🚀\n\n"
-        f"Estás en el lugar correcto si te gusta el trading. "
-        f"El grupo es *100% gratis* — explora con confianza, mira las señales "
-        f"que publicamos, los análisis y las cifras reales de cada semana.\n\n"
-        f"🎁 *Cada día regalamos 2 señales gratis* dentro del grupo — "
-        f"con Entry, SL y TP exactos. Solo tienes que estar atento.\n\n"
-        f"Para cualquier duda escribe al administrador 👉 "
+        f"👋 *Hi {nombre}!*\n\n"
+        f"Welcome to *BuySell365 Pro* 🚀\n\n"
+        f"You're in the right place if you love trading. "
+        f"The group is *100% free* — feel free to explore, watch the signals "
+        f"we post, the analysis, and the real numbers we share each week.\n\n"
+        f"🎁 *Every day we give away 2 free signals* in the group — "
+        f"with exact Entry, SL and TP. Just stay tuned.\n\n"
+        f"Got any questions? Message the admin 👉 "
         f"[@BuySell365traiding](https://t.me/BuySell365traiding)"
     )
 
