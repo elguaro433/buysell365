@@ -116,22 +116,23 @@ def _generate_grupo_image(stats: dict) -> Path:
     d.rectangle([(0, 0), (W, 180)], fill=(3, 6, 12))
     em((85, 80), "🚀", 80)
     em((W - 85, 80), "💎", 80)
+    # FIX 2026-04-26: imagen del grupo en INGLES
     d.text((W // 2, 70), "BUYSELL365 PRO", fill=GOLD, font=_font(52, True), anchor="mm")
-    d.text((W // 2, 125), "TRADING CON INTELIGENCIA ARTIFICIAL", fill=GRAY, font=_font(20, True), anchor="mm")
+    d.text((W // 2, 125), "AI TRADING SIGNALS", fill=GRAY, font=_font(20, True), anchor="mm")
     for x in range(60, W - 60):
         t = (x - 60) / (W - 120)
         g_val = int(199 + (220 - 199) * (t if t < 0.5 else 1 - t) * 2)
         d.line([(x, 177), (x, 180)], fill=(255, g_val, 44))
 
-    d.text((W // 2, 240), "DESCUBRE", fill=WHITE, font=_font(62, True), anchor="mm")
-    d.text((W // 2, 310), "NUESTRAS PLATAFORMAS", fill=GOLD, font=_font(48, True), anchor="mm")
-    d.text((W // 2, 370), "Síguenos, conoce resultados y únete", fill=GRAY, font=_font(26), anchor="mm")
+    d.text((W // 2, 240), "DISCOVER", fill=WHITE, font=_font(62, True), anchor="mm")
+    d.text((W // 2, 310), "OUR PLATFORMS", fill=GOLD, font=_font(48, True), anchor="mm")
+    d.text((W // 2, 370), "Follow us, see real results, and join", fill=GRAY, font=_font(26), anchor="mm")
 
     d.rounded_rectangle([(80, 440), (W - 80, 620)], radius=20, fill=(22, 28, 42), outline=BLUE_WEB, width=3)
     em((160, 530), "🌐", 78)
-    d.text((260, 485), "WEB OFICIAL", fill=BLUE_WEB, font=_font(30, True), anchor="lm")
+    d.text((260, 485), "OFFICIAL WEBSITE", fill=BLUE_WEB, font=_font(30, True), anchor="lm")
     d.text((260, 525), "buysell365.pro", fill=WHITE, font=_font(44, True), anchor="lm")
-    d.text((260, 575), "Stats en vivo · Historial · Oferta VIP", fill=GRAY, font=_font(22), anchor="lm")
+    d.text((260, 575), "Live stats · History · VIP Offer", fill=GRAY, font=_font(22), anchor="lm")
 
     d.rounded_rectangle([(80, 650), (W - 80, 830)], radius=20, fill=(22, 28, 42), outline=BLUE_IG, width=3)
     em((160, 740), "📸", 78)
@@ -141,16 +142,16 @@ def _generate_grupo_image(stats: dict) -> Path:
 
     d.rounded_rectangle([(80, 860), (W - 80, 1040)], radius=20, fill=(22, 28, 42), outline=GOLD, width=3)
     em((160, 950), "🤖", 78)
-    d.text((260, 905), "BOT CANAL VIP", fill=GOLD, font=_font(30, True), anchor="lm")
+    d.text((260, 905), "VIP CHANNEL BOT", fill=GOLD, font=_font(30, True), anchor="lm")
     d.text((260, 945), "@Andoperandobot", fill=WHITE, font=_font(38, True), anchor="lm")
-    d.text((260, 985), "Recibe señales en tiempo real", fill=GRAY, font=_font(22), anchor="lm")
+    d.text((260, 985), "Real-time trading signals", fill=GRAY, font=_font(22), anchor="lm")
 
     d.rounded_rectangle([(80, 1090), (W - 80, 1180)], radius=18, fill=GOLD)
-    d.text((W // 2, 1135), "VISÍTANOS EN TODAS NUESTRAS REDES", fill=(5, 8, 15), font=_font(26, True), anchor="mm")
+    d.text((W // 2, 1135), "FOLLOW US ON ALL OUR CHANNELS", fill=(5, 8, 15), font=_font(26, True), anchor="mm")
 
-    stats_line = f"+{stats['total_pts']:,.0f} pts esta semana  ·  {stats['total_tp']} TPs  ·  {stats['wr']:.0f}% WR"
+    stats_line = f"+{stats['total_pts']:,.0f} pts this week  ·  {stats['total_tp']} TPs  ·  {stats['wr']:.0f}% WR"
     d.text((W // 2, 1225), stats_line, fill=GREEN, font=_font(24, True), anchor="mm")
-    d.text((W // 2, 1285), "BuySell365 Pro — Trading con IA 24/7", fill=GRAY, font=_font(20), anchor="mm")
+    d.text((W // 2, 1285), "BuySell365 Pro — AI Trading 24/7", fill=GRAY, font=_font(20), anchor="mm")
 
     out = IMAGES_DIR / "promo_grupo_redes.jpg"
     img.save(str(out), "JPEG", quality=95)
@@ -186,26 +187,26 @@ def _generate_ig_image(stats: dict) -> Path:
     em((85, 80), "🌐", 80)
     em((W - 85, 80), "💎", 80)
     d.text((W // 2, 70), "BUYSELL365 PRO", fill=GOLD, font=_font(52, True), anchor="mm")
-    d.text((W // 2, 125), "VISITA NUESTRA WEB OFICIAL", fill=GRAY, font=_font(20, True), anchor="mm")
+    d.text((W // 2, 125), "VISIT OUR OFFICIAL WEBSITE", fill=GRAY, font=_font(20, True), anchor="mm")
     for x in range(60, W - 60):
         t = (x - 60) / (W - 120)
         g_val = int(199 + (220 - 199) * (t if t < 0.5 else 1 - t) * 2)
         d.line([(x, 177), (x, 180)], fill=(255, g_val, 44))
 
-    d.text((W // 2, 260), "TODO EN UN SOLO LUGAR", fill=WHITE, font=_font(44, True), anchor="mm")
+    d.text((W // 2, 260), "EVERYTHING IN ONE PLACE", fill=WHITE, font=_font(44, True), anchor="mm")
 
     d.rounded_rectangle([(60, 340), (W - 60, 510)], radius=24, fill=(22, 28, 42), outline=GOLD, width=3)
     em((160, 425), "🔗", 70)
     d.text((W // 2 + 40, 395), "buysell365.pro", fill=GOLD, font=_font(58, True), anchor="mm")
-    d.text((W // 2 + 40, 465), "Web oficial", fill=GRAY, font=_font(24), anchor="mm")
+    d.text((W // 2 + 40, 465), "Official website", fill=GRAY, font=_font(24), anchor="mm")
 
-    d.text((W // 2, 580), "✨ LO QUE ENCONTRARÁS ✨", fill=GOLD_L, font=_font(28, True), anchor="mm")
+    d.text((W // 2, 580), "✨ WHAT YOU'LL FIND ✨", fill=GOLD_L, font=_font(28, True), anchor="mm")
     items = [
-        ("📊", "Estadísticas en vivo del canal VIP"),
-        ("🎯", "Historial completo de señales"),
-        ("📈", "Rendimiento por activo (ORO, NAS100, US30, FX, BTC)"),
-        ("🎁", "Oferta lanzamiento — 50% OFF"),
-        ("🤖", "Acceso directo al bot de trading"),
+        ("📊", "Live VIP channel stats"),
+        ("🎯", "Full signal history"),
+        ("📈", "Performance per asset (GOLD, NAS100, US30, FX, BTC)"),
+        ("🎁", "Launch offer — 50% OFF"),
+        ("🤖", "Direct access to the trading bot"),
     ]
     y0 = 660
     for i, (ic, tx) in enumerate(items):
@@ -214,12 +215,12 @@ def _generate_ig_image(stats: dict) -> Path:
         d.text((190, y), tx, fill=WHITE, font=_font(26), anchor="lm")
 
     d.rounded_rectangle([(80, 1060), (W - 80, 1180)], radius=18, fill=(18, 48, 30), outline=GREEN, width=2)
-    d.text((W // 2, 1095), "ESTA SEMANA EN EL CANAL VIP", fill=WHITE, font=_font(22, True), anchor="mm")
+    d.text((W // 2, 1095), "THIS WEEK IN THE VIP CHANNEL", fill=WHITE, font=_font(22, True), anchor="mm")
     stats_line = f"+{stats['total_pts']:,.0f} PTS  ·  {stats['total_tp']} TPs  ·  {stats['wr']:.0f}% WR"
     d.text((W // 2, 1150), stats_line, fill=GREEN, font=_font(34, True), anchor="mm")
 
     em((W // 2 - 250, 1245), "👉", 50)
-    d.text((W // 2 + 20, 1245), "LINK EN BIO", fill=GOLD, font=_font(40, True), anchor="mm")
+    d.text((W // 2 + 20, 1245), "LINK IN BIO", fill=GOLD, font=_font(40, True), anchor="mm")
     d.text((W // 2, 1310), "@buysell365.pro_tradingsignals", fill=GRAY, font=_font(20), anchor="mm")
 
     out = IMAGES_DIR / "promo_ig_web.jpg"
@@ -228,17 +229,18 @@ def _generate_ig_image(stats: dict) -> Path:
 
 
 def _caption_grupo(stats: dict) -> str:
+    # FIX 2026-04-26: caption del grupo (12:00) en INGLES
     return (
-        "🚀 <b>¡Conoce todas nuestras plataformas!</b>\n\n"
-        "🌐 <b>WEB OFICIAL</b> — buysell365.pro\n"
-        "   Stats en vivo, historial y oferta VIP\n\n"
+        "🚀 <b>Discover all our platforms!</b>\n\n"
+        "🌐 <b>OFFICIAL WEBSITE</b> — buysell365.pro\n"
+        "   Live stats, history and VIP offer\n\n"
         "📸 <b>INSTAGRAM</b> — @buysell365.pro_tradingsignals\n"
-        "   Resultados diarios, reels y stories\n\n"
-        "🤖 <b>BOT CANAL VIP</b> — @Andoperandobot\n"
-        "   Acceso directo al canal premium\n\n"
-        f"💎 Esta semana: +{stats['total_pts']:,.0f} pts · "
+        "   Daily results, reels and stories\n\n"
+        "🤖 <b>VIP CHANNEL BOT</b> — @Andoperandobot\n"
+        "   Direct access to the premium channel\n\n"
+        f"💎 This week: +{stats['total_pts']:,.0f} pts · "
         f"{stats['total_tp']} TPs · {stats['wr']:.0f}% WR\n\n"
-        "¡Síguenos en TODAS para no perderte nada! 🔥"
+        "Follow us EVERYWHERE so you don't miss a thing! 🔥"
     )
 
 

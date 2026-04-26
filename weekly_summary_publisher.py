@@ -105,14 +105,15 @@ def _load_week_stats(fecha_viernes: datetime) -> dict:
         data = json.load(f)
     trades = data.get("trades", [])
 
+    # FIX 2026-04-26: dias en INGLES
     dias_config = [
-        ("SÁBADO",    "🌴", fecha_viernes - timedelta(days=6)),
-        ("DOMINGO",   "☀️", fecha_viernes - timedelta(days=5)),
-        ("LUNES",     "💵", fecha_viernes - timedelta(days=4)),
-        ("MARTES",    "🚀", fecha_viernes - timedelta(days=3)),
-        ("MIÉRCOLES", "⚡", fecha_viernes - timedelta(days=2)),
-        ("JUEVES",    "🔥", fecha_viernes - timedelta(days=1)),
-        ("VIERNES",   "⭐", fecha_viernes),
+        ("SATURDAY",  "🌴", fecha_viernes - timedelta(days=6)),
+        ("SUNDAY",    "☀️", fecha_viernes - timedelta(days=5)),
+        ("MONDAY",    "💵", fecha_viernes - timedelta(days=4)),
+        ("TUESDAY",   "🚀", fecha_viernes - timedelta(days=3)),
+        ("WEDNESDAY", "⚡", fecha_viernes - timedelta(days=2)),
+        ("THURSDAY",  "🔥", fecha_viernes - timedelta(days=1)),
+        ("FRIDAY",    "⭐", fecha_viernes),
     ]
 
     days = []
@@ -169,7 +170,7 @@ def _render_day_rows(draw, W: int, y0: int, days: list, row_h: int = 76):
     """Pinta las filas del desglose diario."""
     for i, d in enumerate(days):
         y = y0 + i * row_h
-        is_today = d["name"] == "VIERNES" and d["pts"] < 50  # viernes pobre
+        is_today = d["name"] == "FRIDAY" and d["pts"] < 50  # poor Friday
         card_col = CARD_H if is_today else CARD
         pts_col = GRAY if is_today else GREEN
         accent = GRAY_D if is_today else GREEN
@@ -205,23 +206,23 @@ def generate_summary_image(stats: dict, variant: str = "publico") -> Path:
     _draw_emoji(draw, (W - 85, 82), "💰", 78)
     draw.text((W // 2, 70), "BUYSELL365", fill=GOLD, font=_font(56, True), anchor="mm")
     draw.text((W // 2, 115), "PRO", fill=WHITE, font=_font(32, True), anchor="mm")
-    draw.text((W // 2, 158), "R E S U M E N   S E M A N A L", fill=GRAY, font=_font(18, True), anchor="mm")
+    draw.text((W // 2, 158), "W E E K L Y   R E C A P", fill=GRAY, font=_font(18, True), anchor="mm")
 
-    # FECHA
-    fecha_label = f"SEMANA {stats['fecha_inicio']} — {stats['fecha_fin']}"
+    # DATE — FIX 2026-04-26: en INGLES
+    fecha_label = f"WEEK {stats['fecha_inicio']} — {stats['fecha_fin']}"
     draw.text((W // 2, 220), fecha_label, fill=GOLD_L, font=_font(24, True), anchor="mm")
 
-    # MENSAJE CONTEXTO
+    # CONTEXT MESSAGE
     box_y = 260
     draw.rounded_rectangle([(50, box_y), (W - 50, box_y + 120)], radius=18, fill=CARD, outline=GOLD, width=2)
     _draw_emoji(draw, (100, box_y + 62), "💎", 48)
     _draw_emoji(draw, (W - 100, box_y + 62), "🏆", 48)
     if variant == "vip":
-        draw.text((W // 2, box_y + 38), "GRACIAS FAMILIA VIP", fill=GOLD, font=_font(28, True), anchor="mm")
-        draw.text((W // 2, box_y + 78), "Esta semana JUNTOS conseguimos:", fill=WHITE, font=_font(22), anchor="mm")
+        draw.text((W // 2, box_y + 38), "THANK YOU VIP FAMILY", fill=GOLD, font=_font(28, True), anchor="mm")
+        draw.text((W // 2, box_y + 78), "This week TOGETHER we got:", fill=WHITE, font=_font(22), anchor="mm")
     else:
-        draw.text((W // 2, box_y + 38), "Mira lo que entregamos", fill=GOLD, font=_font(28, True), anchor="mm")
-        draw.text((W // 2, box_y + 78), "esta semana al canal VIP:", fill=WHITE, font=_font(22), anchor="mm")
+        draw.text((W // 2, box_y + 38), "Look what we delivered", fill=GOLD, font=_font(28, True), anchor="mm")
+        draw.text((W // 2, box_y + 78), "this week to the VIP channel:", fill=WHITE, font=_font(22), anchor="mm")
 
     # DESGLOSE 7 DÍAS
     _render_day_rows(draw, W, 410, stats["days"], row_h=72)
@@ -235,42 +236,41 @@ def generate_summary_image(stats: dict, variant: str = "publico") -> Path:
     draw.rounded_rectangle([(50, total_y), (W - 50, total_y + 160)], radius=20, outline=GREEN, width=4)
     _draw_emoji(draw, (140, total_y + 85), "💰", 72)
     _draw_emoji(draw, (W - 140, total_y + 85), "💰", 72)
-    draw.text((W // 2, total_y + 28), "TOTAL DE LA SEMANA", fill=WHITE, font=_font(20, True), anchor="mm")
+    # FIX 2026-04-26: total y CTA en INGLES
+    draw.text((W // 2, total_y + 28), "WEEK TOTAL", fill=WHITE, font=_font(20, True), anchor="mm")
     draw.text((W // 2, total_y + 82), f"+{stats['total_pts']:,.0f}", fill=GREEN, font=_font(76, True), anchor="mm")
-    draw.text((W // 2, total_y + 122), "PUNTOS GANADOS", fill=GREEN, font=_font(20, True), anchor="mm")
+    draw.text((W // 2, total_y + 122), "POINTS GAINED", fill=GREEN, font=_font(20, True), anchor="mm")
     draw.text((W // 2, total_y + 148),
-              f"{stats['total_tp']} TPs alcanzados  ·  {stats['wr']:.1f}% Win Rate",
+              f"{stats['total_tp']} TPs hit  ·  {stats['wr']:.1f}% Win Rate",
               fill=GRAY, font=_font(17), anchor="mm")
 
-    # PROMO O AGRADECIMIENTO
+    # PROMO OR THANKS
     promo_y = total_y + 180
     if variant == "vip":
-        # Mensaje lealtad/gratitud
+        # Loyalty message
         draw.rounded_rectangle([(40, promo_y), (W - 40, promo_y + 120)], radius=20,
                                 fill=(14, 40, 22), outline=GREEN, width=2)
         _draw_emoji(draw, (90, promo_y + 60), "🙏", 48)
         _draw_emoji(draw, (W - 90, promo_y + 60), "💎", 48)
-        draw.text((W // 2, promo_y + 38), "No es suerte, es sistema",
+        draw.text((W // 2, promo_y + 38), "Not luck — system",
                   fill=GREEN, font=_font(26, True), anchor="mm")
-        draw.text((W // 2, promo_y + 78), "Disfruten el finde · El lunes volvemos 🌴",
+        draw.text((W // 2, promo_y + 78), "Enjoy the weekend · See you Monday 🌴",
                   fill=WHITE, font=_font(20), anchor="mm")
     else:
-        # CTA al VIP
+        # CTA to VIP
         draw.rounded_rectangle([(30, promo_y), (W - 30, promo_y + 130)], radius=22,
                                 fill=(50, 36, 14), outline=GOLD, width=3)
         _draw_emoji(draw, (85, promo_y + 55), "🔥", 52)
         _draw_emoji(draw, (W - 85, promo_y + 55), "🔥", 52)
-        draw.text((W // 2, promo_y + 40), "¿CUÁNTO GANASTE TÚ?", fill=GOLD, font=_font(30, True), anchor="mm")
-        draw.text((W // 2, promo_y + 82), f"Los VIPs ganaron +{stats['total_pts']:,.0f} pts",
+        draw.text((W // 2, promo_y + 40), "HOW MUCH DID YOU MAKE?", fill=GOLD, font=_font(30, True), anchor="mm")
+        draw.text((W // 2, promo_y + 82), f"VIPs made +{stats['total_pts']:,.0f} pts",
                   fill=GOLD_L, font=_font(22, True), anchor="mm")
-        # Botón
         btn_y0 = promo_y + 105
-        # botón después de caja, separado
-    # CTA botón solo para público
+    # CTA button only for public group
     if variant != "vip":
         bt_y = H - 110
         draw.rounded_rectangle([(80, bt_y), (W - 80, bt_y + 55)], radius=14, fill=GOLD)
-        draw.text((W // 2, bt_y + 28), "ÚNETE AL VIP → @Andoperandobot",
+        draw.text((W // 2, bt_y + 28), "JOIN THE VIP → @Andoperandobot",
                   fill=(5, 8, 15), font=_font(22, True), anchor="mm")
 
     # FOOTER
@@ -292,18 +292,17 @@ def generate_story_slides(stats: dict) -> List[Path]:
     _gradient_bg(img)
     _starry_dots(img, count=120, seed=10)
     d = ImageDraw.Draw(img)
+    # FIX 2026-04-26: Story slide 1 en INGLES
     _draw_emoji(d, (W // 2, 340), "🔥", 150)
-    d.text((W // 2, 540), "ESTA SEMANA", fill=WHITE, font=_font(70, True), anchor="mm")
-    d.text((W // 2, 620), "EN EL CANAL VIP", fill=GRAY, font=_font(40), anchor="mm")
-    # Número mega
+    d.text((W // 2, 540), "THIS WEEK", fill=WHITE, font=_font(70, True), anchor="mm")
+    d.text((W // 2, 620), "IN THE VIP CHANNEL", fill=GRAY, font=_font(40), anchor="mm")
     d.text((W // 2, 920), f"+{stats['total_pts']:,.0f}", fill=GREEN, font=_font(240, True), anchor="mm")
-    d.text((W // 2, 1080), "PUNTOS GANADOS", fill=GREEN, font=_font(50, True), anchor="mm")
-    # Stats línea
+    d.text((W // 2, 1080), "POINTS GAINED", fill=GREEN, font=_font(50, True), anchor="mm")
     d.text((W // 2, 1240), f"{stats['total_tp']} TPs  ·  {stats['wr']:.0f}% Win Rate",
            fill=GOLD_L, font=_font(38), anchor="mm")
     _draw_emoji(d, (W // 2 - 230, 1480), "💰", 120)
     _draw_emoji(d, (W // 2 + 230, 1480), "💰", 120)
-    d.text((W // 2, 1680), "Desliza para ver el detalle", fill=GRAY, font=_font(32), anchor="mm")
+    d.text((W // 2, 1680), "Swipe to see the details", fill=GRAY, font=_font(32), anchor="mm")
     _draw_emoji(d, (W // 2, 1770), "👉", 70)
     s1 = IMAGES_DIR / f"story1_hook_{datetime.now().strftime('%Y%m%d')}.jpg"
     img.save(str(s1), "JPEG", quality=95)
