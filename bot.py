@@ -4566,7 +4566,7 @@ def cmd_ayuda():
 def cmd_senales():
     with _lock_ops:
         if not operaciones_activas:
-            return "📭 *Sin operaciones abiertas.* Te aviso cuando haya señal. 📡"
+            return "📭 *No open trades.* I'll notify you when a signal hits. 📡"
         # Copia segura para no bloquear el diccionario principal durante el formateo
         ops_local = {k: v.copy() for k, v in operaciones_activas.items() if isinstance(v, dict)}
 
@@ -4575,7 +4575,7 @@ def cmd_senales():
     compras = sum(1 for _, o in ops_ordenadas if o.get('tipo') == "COMPRA")
     ventas  = sum(1 for _, o in ops_ordenadas if o.get('tipo') == "VENTA")
 
-    lineas = [f"📊 *ABIERTAS* {hora} · {len(ops_local)} op · 🟢{compras} 🔴{ventas}"]
+    lineas = [f"📊 *OPEN* {hora} · {len(ops_local)} op · 🟢{compras} 🔴{ventas}"]
 
     for op_id, op in ops_ordenadas:
         tkr = op.get('ticker', op_id)
@@ -4589,7 +4589,7 @@ def cmd_senales():
             f"\n{emoji} *{op.get('nombre', tkr)}* {op.get('tipo', '')} · {op.get('hora','')}\n"
             f"💵 {fmt(op.get('entrada', 0), tkr)} · 🛑 {fmt(op.get('sl', 0), tkr)}\n"
             f"{tp1_ok}TP1 {fmt(op.get('tp1', 0), tkr)} · {tp2_ok}TP2 {fmt(op.get('tp2', 0), tkr)} · ⬜TP3 {fmt(op.get('tp3', 0), tkr)}\n"
-            f"⏱️ {horas_restantes}h restantes"
+            f"⏱️ {horas_restantes}h remaining"
         )
 
     # firma removida
@@ -4599,7 +4599,7 @@ def cmd_estado():
     total = estadisticas_diarias["ganadas"] + estadisticas_diarias["perdidas"]
     efectividad = (estadisticas_diarias["ganadas"] / total * 100) if total > 0 else 0
     pips_netos  = estadisticas_diarias["pips_ganados"] - estadisticas_diarias["pips_perdidos"]
-    emoji_res   = "🟢 POSITIVO" if pips_netos >= 0 else "🔴 NEGATIVO"
+    emoji_res   = "🟢 POSITIVE" if pips_netos >= 0 else "🔴 NEGATIVE"
 
     # Profit Factor
     pf = (estadisticas_diarias["pips_ganados"] / max(estadisticas_diarias["pips_perdidos"], 0.1))
@@ -4608,7 +4608,7 @@ def cmd_estado():
     # Racha actual
     racha = _calcular_racha_perdidas_actual()
     if racha > 0:
-        racha_txt = f"🔴 {racha} pérdidas consecutivas"
+        racha_txt = f"🔴 {racha} losses in a row"
     else:
         # Calcular racha ganadora
         r_win = 0
@@ -4617,7 +4617,7 @@ def cmd_estado():
                 r_win += 1
             else:
                 break
-        racha_txt = f"🟢 {r_win} ganadas consecutivas" if r_win > 0 else "⚪ Sin racha"
+        racha_txt = f"🟢 {r_win} wins in a row" if r_win > 0 else "⚪ No streak"
 
     # Modo de riesgo visual
     modo_emoji = {"conservador": "🔵", "normal": "🟢", "agresivo": "🔴"}
@@ -4626,7 +4626,7 @@ def cmd_estado():
     _g = int(estadisticas_diarias['ganadas'])
     _p = int(estadisticas_diarias['perdidas'])
     res = (
-        f"📊 *ESTADO* {ahora().strftime('%d/%m %H:%M')}\n"
+        f"📊 *STATUS* {ahora().strftime('%d/%m %H:%M')}\n"
         f"✅ *{_g}*  ❌ *{_p}*  │  🎯 *{efectividad:.0f}%*  │  PF *{pf_txt}*\n"
         f"💰 *{pips_netos:+.1f}* {emoji_res}  │  🔥 {racha_txt}\n"
         f"⚙️ {modo_txt} │ 💼 ${CAPITAL_USUARIO:,.0f} │ 🔄 {len(operaciones_activas)} │ 📡{'🟢' if not escaneo_pausado else '⏸️'} │ MT5:{'🟢' if not mt5_pausado else '⏸️'}\n"
@@ -4663,23 +4663,23 @@ def cmd_resumen():
 
     # Últimas 3 ganadas/perdidas (compacto)
     if ganadas:
-        lineas.append(f"✅ *GANADAS ({len(ganadas)})*")
+        lineas.append(f"✅ *WINS ({len(ganadas)})*")
         for op in reversed(ganadas[-3:]):
             lineas.append(f"  {op['nombre']} {op['tipo'][0]} {op.get('hora','')[:5]} +{fmt_pips(op['pips'], op.get('ticker',''))}")
 
     if perdidas:
-        lineas.append(f"❌ *PERDIDAS ({len(perdidas)})*")
+        lineas.append(f"❌ *LOSSES ({len(perdidas)})*")
         for op in reversed(perdidas[-3:]):
             lineas.append(f"  {op['nombre']} {op['tipo'][0]} {op.get('hora','')[:5]} -{fmt_pips(op['pips'], op.get('ticker',''))}")
 
     if not historial_operaciones:
-        lineas.append("📭 Sin operaciones hoy")
+        lineas.append("📭 No trades today")
 
     # Abiertas con TPs (compacto)
     ops_tp = [(oid, op) for oid, op in operaciones_activas.items()
               if op.get('tp1_hit') or op.get('tp2_hit')]
     if ops_tp:
-        lineas.append(f"🔄 *ABIERTAS +TP ({len(ops_tp)})*")
+        lineas.append(f"🔄 *OPEN +TP ({len(ops_tp)})*")
         for op_id, op in sorted(ops_tp, key=lambda x: x[1].get('timestamp', 0), reverse=True)[:3]:
             tkr = op.get('ticker', '')
             tp_n = "TP2" if op.get('tp2_hit') else "TP1"
@@ -4699,7 +4699,7 @@ def cmd_resumen():
             totales[cat] = totales.get(cat, 0.0) + pips_op
 
     if totales:
-        _etq = {"crypto": "Crypto", "forex": "Forex", "futuros": "Futuros", "accion": "Acc"}
+        _etq = {"crypto": "Crypto", "forex": "Forex", "futuros": "Futures", "accion": "Stocks"}
         _uni = {"crypto": "$", "forex": "p", "futuros": "pts", "accion": "pts"}
         _dec = {"crypto": 2, "forex": 1, "futuros": 1, "accion": 1}
         _parts = []
@@ -4737,28 +4737,28 @@ def cmd_resumen_ganancias():
             totales_ganados[cat] = totales_ganados.get(cat, 0.0) + pips_op
 
     if not totales_ganados and not totales_perdidos:
-        return "📭 Sin movimientos registrados hoy."
+        return "📭 No movements recorded today."
 
-    lineas = [f"📊 *RESUMEN DE GANANCIAS* · {ahora().strftime('%d/%m')}"]
-    
-    etiquetas = {"crypto": "Cripto", "forex": "Forex", "futuros": "Futuros", "accion": "Acciones"}
+    lineas = [f"📊 *P&L SUMMARY* · {ahora().strftime('%d/%m')}"]
+
+    etiquetas = {"crypto": "Crypto", "forex": "Forex", "futuros": "Futures", "accion": "Stocks"}
     unidades  = {"crypto": "%",      "forex": "pips",  "futuros": "pts",     "accion": "pts"}
     decimales = {"crypto": 2,        "forex": 1,       "futuros": 1,         "accion": 1}
 
     todas_categorias = set(list(totales_ganados.keys()) + list(totales_perdidos.keys()))
-    
+
     for cat in todas_categorias:
         g   = totales_ganados.get(cat, 0.0)
         p   = totales_perdidos.get(cat, 0.0)
         uni = unidades.get(cat, "pts")
         dec = decimales.get(cat, 1)
         etq = etiquetas.get(cat, str(cat).capitalize())
-        
+
         lineas.append(f"\n━━━━━━━━━━")
         lineas.append(f"📦 *{etq}*")
-        lineas.append(f"📈 Ganados:  *+{g:.{dec}f} {uni}*")
-        lineas.append(f"📉 Perdidos:  *-{p:.{dec}f} {uni}*")
-        lineas.append(f"✨ Neto:     *{ (g-p):+.{dec}f} {uni}*")
+        lineas.append(f"📈 Won:  *+{g:.{dec}f} {uni}*")
+        lineas.append(f"📉 Lost:  *-{p:.{dec}f} {uni}*")
+        lineas.append(f"✨ Net:     *{ (g-p):+.{dec}f} {uni}*")
 
     return "\n".join(lineas)
 
@@ -4769,10 +4769,10 @@ def cmd_precio(activo_raw: str):
 
     if not nombre:
         return (
-            f"❓ No reconozco '*{activo_raw}*'.\n\n"
-            "Activos disponibles:\n"
-            "oro · eurusd · usdjpy · gbpjpy · nasdaq · sp500\n\n"
-            "O escribe */mercados* para ver todos."
+            f"❓ I don't recognize '*{activo_raw}*'.\n\n"
+            "Available assets:\n"
+            "gold · eurusd · usdjpy · gbpjpy · nasdaq · sp500\n\n"
+            "Or type */mercados* to see them all."
         )
 
     ticker = ACTIVOS[nombre]
@@ -4793,7 +4793,7 @@ def cmd_precio(activo_raw: str):
             else:
                 df = descargar_datos_seguro(ticker, period="5d", interval="15m")
                 if df is None or df.empty:
-                    return f"⚠️ No hay datos disponibles para {nombre} ahora mismo."
+                    return f"⚠️ No data available for {nombre} right now."
                 precio   = float(df['Close'].iloc[-1])
                 apertura = float(df['Open'].iloc[0])
                 fuente   = "yfinance 15m"
@@ -4813,38 +4813,38 @@ def cmd_precio(activo_raw: str):
         if ind:
             # Tendencia rápida
             if ind['ema9'] > ind['ema20'] > ind['ema50']:
-                tend = "📈 Alcista"
+                tend = "📈 Bullish"
             elif ind['ema9'] < ind['ema20'] < ind['ema50']:
-                tend = "📉 Bajista"
+                tend = "📉 Bearish"
             else:
-                tend = "➡️ Lateral"
+                tend = "➡️ Sideways"
 
             contexto_extra = (
-                f"\n📊 *Contexto rápido:*\n"
-                f"   Tendencia: {tend}\n"
+                f"\n📊 *Quick context:*\n"
+                f"   Trend: {tend}\n"
                 f"   RSI: {ind['rsi']:.1f}  │  ADX: {ind['adx']:.1f}\n"
-                f"   Soporte: {f_(ind['soporte'])}  │  Resistencia: {f_(ind['resistencia'])}\n"
+                f"   Support: {f_(ind['soporte'])}  │  Resistance: {f_(ind['resistencia'])}\n"
             )
 
         # Nota de instrumento
         nota_instrumento = ""
         if ticker in ("NQ=F", "ES=F") and ("US100" in fuente or "US500" in fuente):
-            nota_instrumento = "\n📌 _CFD (igual a XM)_"
+            nota_instrumento = "\n📌 _CFD (same as XM)_"
         elif "Yahoo" in fuente and ticker in ("NQ=F", "ES=F"):
-            nota_instrumento = "\n⚠️ _Futuros YF (puede diferir ~$5-20 de XM)_"
+            nota_instrumento = "\n⚠️ _YF Futures (may differ ~$5-20 from XM)_"
 
         return (
             f"{CATEGORIA_EMOJI[cat]} *{nombre}*\n"
             "━━━━━━━━━━\n"
-            f"💵 Precio: *{f_(precio)}*\n"
-            f"{emoji_cambio} Cambio hoy: {signo}{f_(cambio)} ({signo}{pct:.2f}%)\n"
-            f"📈 Apertura: {f_(apertura)}{contexto_extra}\n"
+            f"💵 Price: *{f_(precio)}*\n"
+            f"{emoji_cambio} Change today: {signo}{f_(cambio)} ({signo}{pct:.2f}%)\n"
+            f"📈 Open: {f_(apertura)}{contexto_extra}\n"
             f"🕐 {ahora().strftime('%H:%M:%S')} · _{fuente}_{nota_instrumento}\n\n"
-            "💡 Escribe `/analisis {0}` para el análisis completo.".format(activo_key)
+            "💡 Type `/analisis {0}` for the full analysis.".format(activo_key)
         )
 
     except Exception as e:
-        return f"⚠️ Error obteniendo precio de {nombre}: {e}"
+        return f"⚠️ Error fetching price for {nombre}: {e}"
 
 def cmd_capital(monto_str):
     global CAPITAL_USUARIO
@@ -4852,21 +4852,21 @@ def cmd_capital(monto_str):
         # Extraer solo números de la cadena (maneja $, puntos, comas)
         numeros = re.findall(r"[-+]?\d*\.?\d+", monto_str.replace(",", ""))
         if not numeros:
-            return "❌ No detecté ningún número. Usa: `/capital 1000`"
-        
+            return "❌ No number detected. Use: `/capital 1000`"
+
         monto = float(numeros[0])
         if monto < 50:
-            return "⚠️ El capital mínimo para una gestión de riesgo profesional es de $50."
-        
+            return "⚠️ The minimum capital for professional risk management is $50."
+
         CAPITAL_USUARIO = monto
         guardar_estado()
-        
+
         return (
-            f"✅ *CAPITAL ACTUALIZADO: ${CAPITAL_USUARIO:,.0f}*\n\n"
-            "A partir de ahora, las nuevas señales calcularán tu lotaje sugerido basado en este capital arriesgando el 1% por trade."
+            f"✅ *CAPITAL UPDATED: ${CAPITAL_USUARIO:,.0f}*\n\n"
+            "From now on, new signals will calculate your suggested lot size based on this capital risking 1% per trade."
         )
     except Exception as e:
-        return f"❌ Error al procesar el monto: {e}. Usa: `/capital 1000`"
+        return f"❌ Error processing amount: {e}. Use: `/capital 1000`"
 
 def cmd_analisis(activo_raw: str):
     """Análisis técnico completo premium de un activo a demanda."""
@@ -4875,8 +4875,8 @@ def cmd_analisis(activo_raw: str):
 
     if not nombre:
         return (
-            f"❓ No reconozco '*{activo_raw}*'.\n"
-            "Prueba: /analisis oro, /analisis nasdaq"
+            f"❓ I don't recognize '*{activo_raw}*'.\n"
+            "Try: /analisis gold, /analisis nasdaq"
         )
 
     ticker = ACTIVOS[nombre]
@@ -4885,7 +4885,7 @@ def cmd_analisis(activo_raw: str):
         df = descargar_datos_seguro(ticker)
 
         if df is None or df.empty or len(df) < 100:
-            return f"⚠️ No pude obtener datos de {nombre} ahora mismo. yFinance está tardando — prueba en 1-2 minutos."
+            return f"⚠️ Couldn't fetch data for {nombre} right now. yFinance is slow — try again in 1-2 minutes."
 
         # Precio en vivo (cascada de fuentes)
         cot = obtener_cotizacion(ticker)
@@ -4899,7 +4899,7 @@ def cmd_analisis(activo_raw: str):
         ind = calcular_indicadores_profesionales(df, precio, ticker)
 
         if not ind:
-            return f"⚠️ Error calculando indicadores para {nombre}."
+            return f"⚠️ Error calculating indicators for {nombre}."
 
         tipo, score, razones = evaluar_senal_profesional(ind, ticker)
 
@@ -4913,63 +4913,63 @@ def cmd_analisis(activo_raw: str):
         _mercado_cerrado = _es_weekend_analisis
 
         if 13 <= hora_utc < 17:
-            sesion_txt  = "🇺🇸🇬🇧 Overlap NY-Londres"
-            sesion_info = "Máxima liquidez — los mejores movimientos ocurren ahora"
+            sesion_txt  = "🇺🇸🇬🇧 NY-London Overlap"
+            sesion_info = "Peak liquidity — the best moves happen now"
         elif 7 <= hora_utc < 13:
-            sesion_txt  = "🇬🇧 Sesión Londres"
-            sesion_info = "Alta liquidez en EUR/GBP — índices con menor volumen"
+            sesion_txt  = "🇬🇧 London Session"
+            sesion_info = "High liquidity in EUR/GBP — indices with lower volume"
         elif 17 <= hora_utc < 21:
-            sesion_txt  = "🇺🇸 Sesión Nueva York"
-            sesion_info = "Máxima volatilidad en NASDAQ/S&P 500 — buena liquidez en forex"
+            sesion_txt  = "🇺🇸 New York Session"
+            sesion_info = "Peak volatility in NASDAQ/S&P 500 — good forex liquidity"
         elif 0 <= hora_utc < 7:
-            sesion_txt  = "🌏 Sesión Asiática"
-            sesion_info = "Mercados de Asia activos — menor volatilidad en EUR/USD"
+            sesion_txt  = "🌏 Asian Session"
+            sesion_info = "Asian markets active — lower volatility in EUR/USD"
         else:
-            sesion_txt  = "🌙 Post-mercado"
-            sesion_info = "Liquidez reducida — evitar entradas en índices"
+            sesion_txt  = "🌙 After-hours"
+            sesion_info = "Reduced liquidity — avoid index entries"
 
         # Calidad de sesión para este activo específico
         _es_indice = ticker in ('NQ=F', 'ES=F', 'YM=F')
         _es_oro    = 'XAU' in ticker or 'GOLD' in ticker
         if _es_indice:
             if 13 <= hora_utc < 21:
-                _sesion_calidad = "✅ Sesión ideal para este activo"
+                _sesion_calidad = "✅ Ideal session for this asset"
             elif _mercado_cerrado:
-                _sesion_calidad = "🔴 Mercado cerrado — solo referencia"
+                _sesion_calidad = "🔴 Market closed — reference only"
             else:
-                _sesion_calidad = "⚠️ Sesión subóptima para índices USA"
+                _sesion_calidad = "⚠️ Suboptimal session for USA indices"
         elif _es_oro:
             if 7 <= hora_utc < 21:
-                _sesion_calidad = "✅ Sesión activa para ORO"
+                _sesion_calidad = "✅ Active session for Gold"
             else:
-                _sesion_calidad = "⚠️ Sesión asiática — movimientos más lentos en ORO"
+                _sesion_calidad = "⚠️ Asian session — slower moves in Gold"
         else:  # forex
             if 7 <= hora_utc < 17:
-                _sesion_calidad = "✅ Sesión ideal para este par"
+                _sesion_calidad = "✅ Ideal session for this pair"
             else:
-                _sesion_calidad = "⚠️ Liquidez reducida — spreads más amplios"
+                _sesion_calidad = "⚠️ Reduced liquidity — wider spreads"
 
         # ── TENDENCIA MULTI-TEMPORAL ──────────────────────────
-        tendencia_15m = "📈 Alcista" if ind['ema9'] > ind['ema20'] > ind['ema50'] else ("📉 Bajista" if ind['ema9'] < ind['ema20'] < ind['ema50'] else "➡️ Mixta")
+        tendencia_15m = "📈 Bullish" if ind['ema9'] > ind['ema20'] > ind['ema50'] else ("📉 Bearish" if ind['ema9'] < ind['ema20'] < ind['ema50'] else "➡️ Mixed")
         alcista_1h = _obtener_tendencia_tf(ticker, "1h", _cache_mtf_1h, ttl=900)
-        tendencia_1h = "📈 Alcista" if alcista_1h is True else ("📉 Bajista" if alcista_1h is False else "➡️ Neutra")
+        tendencia_1h = "📈 Bullish" if alcista_1h is True else ("📉 Bearish" if alcista_1h is False else "➡️ Neutral")
         alcista_4h = _obtener_tendencia_tf(ticker, "4h", _cache_mtf_4h, ttl=1800)
-        tendencia_4h = "📈 Alcista" if alcista_4h is True else ("📉 Bajista" if alcista_4h is False else "➡️ Neutra")
+        tendencia_4h = "📈 Bullish" if alcista_4h is True else ("📉 Bearish" if alcista_4h is False else "➡️ Neutral")
 
         # Alineación de tendencias
         _tendencias = [tendencia_15m, tendencia_1h, tendencia_4h]
-        _alcistas_count = sum(1 for t in _tendencias if "Alcista" in t)
-        _bajistas_count = sum(1 for t in _tendencias if "Bajista" in t)
+        _alcistas_count = sum(1 for t in _tendencias if "Bullish" in t)
+        _bajistas_count = sum(1 for t in _tendencias if "Bearish" in t)
         if _alcistas_count == 3:
-            _alineacion = "🟢 Triple alineación alcista (muy favorable)"
+            _alineacion = "🟢 Triple bullish alignment (very favorable)"
         elif _bajistas_count == 3:
-            _alineacion = "🔴 Triple alineación bajista (muy favorable)"
+            _alineacion = "🔴 Triple bearish alignment (very favorable)"
         elif _alcistas_count == 2:
-            _alineacion = "↗️ Mayoría alcista (2/3 temporales)"
+            _alineacion = "↗️ Bullish majority (2/3 timeframes)"
         elif _bajistas_count == 2:
-            _alineacion = "↘️ Mayoría bajista (2/3 temporales)"
+            _alineacion = "↘️ Bearish majority (2/3 timeframes)"
         else:
-            _alineacion = "⚖️ Tendencias mixtas — esperar claridad"
+            _alineacion = "⚖️ Mixed trends — wait for clarity"
 
         # ── NIVELES Y DISTANCIAS ──────────────────────────────
         dist_s_pct  = ind['dist_soporte']
@@ -4978,65 +4978,65 @@ def cmd_analisis(activo_raw: str):
         dist_r_abs  = abs(precio - ind['resistencia'])
 
         if dist_s_pct < 0.5:
-            _pos_sr = f"⚠️ *En soporte* — zona de rebote o ruptura"
+            _pos_sr = f"⚠️ *At support* — bounce or breakout zone"
         elif dist_r_pct < 0.5:
-            _pos_sr = f"⚠️ *En resistencia* — zona de rechazo o ruptura"
+            _pos_sr = f"⚠️ *At resistance* — rejection or breakout zone"
         elif dist_s_pct < dist_r_pct:
-            _pos_sr = f"Más cerca del soporte ({dist_s_pct:.1f}% de distancia)"
+            _pos_sr = f"Closer to support ({dist_s_pct:.1f}% away)"
         else:
-            _pos_sr = f"Más cerca de resistencia ({dist_r_pct:.1f}% de distancia)"
+            _pos_sr = f"Closer to resistance ({dist_r_pct:.1f}% away)"
 
-        _macro_txt = "ALCISTA ↑" if precio > ind['ema200'] else "BAJISTA ↓"
+        _macro_txt = "BULLISH ↑" if precio > ind['ema200'] else "BEARISH ↓"
         _macro_dist = abs(precio - ind['ema200']) / ind['ema200'] * 100
 
         # ── RSI / MACD / ADX ─────────────────────────────────
         rsi = ind['rsi']
         if rsi > 75:
-            _rsi_txt = f"*{rsi:.0f}* 🔴 Sobrecomprado extremo — riesgo de reversión"
+            _rsi_txt = f"*{rsi:.0f}* 🔴 Extreme overbought — reversal risk"
         elif rsi > 65:
-            _rsi_txt = f"*{rsi:.0f}* 🟠 Sobrecomprado — cuidado con compras"
+            _rsi_txt = f"*{rsi:.0f}* 🟠 Overbought — careful with buys"
         elif rsi < 25:
-            _rsi_txt = f"*{rsi:.0f}* 🟢 Sobrevendido extremo — posible rebote"
+            _rsi_txt = f"*{rsi:.0f}* 🟢 Extreme oversold — possible bounce"
         elif rsi < 35:
-            _rsi_txt = f"*{rsi:.0f}* 🟡 Sobrevendido — cerca de zona de compra"
+            _rsi_txt = f"*{rsi:.0f}* 🟡 Oversold — near buy zone"
         elif rsi > 50:
-            _rsi_txt = f"*{rsi:.0f}* ↗️ Zona alcista (>50)"
+            _rsi_txt = f"*{rsi:.0f}* ↗️ Bullish zone (>50)"
         else:
-            _rsi_txt = f"*{rsi:.0f}* ↘️ Zona bajista (<50)"
+            _rsi_txt = f"*{rsi:.0f}* ↘️ Bearish zone (<50)"
 
-        _macd_dir  = "🟢 Alcista" if ind['macd'] > ind['signal'] else "🔴 Bajista"
+        _macd_dir  = "🟢 Bullish" if ind['macd'] > ind['signal'] else "🔴 Bearish"
         _macd_hist = ind['macd_hist']
-        _macd_txt  = f"{_macd_dir}  _(histograma {'creciendo' if abs(_macd_hist) > 0 and _macd_hist == _macd_hist else 'decreciendo'})_"
+        _macd_txt  = f"{_macd_dir}  _(histogram {'rising' if abs(_macd_hist) > 0 and _macd_hist == _macd_hist else 'falling'})_"
 
         if ind['adx'] > 35:
-            _adx_txt = f"*{ind['adx']:.0f}* — Tendencia muy fuerte"
+            _adx_txt = f"*{ind['adx']:.0f}* — Very strong trend"
         elif ind['adx'] > 25:
-            _adx_txt = f"*{ind['adx']:.0f}* — Tendencia activa"
+            _adx_txt = f"*{ind['adx']:.0f}* — Active trend"
         elif ind['adx'] > 15:
-            _adx_txt = f"*{ind['adx']:.0f}* — Tendencia débil / rango"
+            _adx_txt = f"*{ind['adx']:.0f}* — Weak trend / range"
         else:
-            _adx_txt = f"*{ind['adx']:.0f}* — Mercado lateral"
+            _adx_txt = f"*{ind['adx']:.0f}* — Sideways market"
 
         # Volumen
         vr = ind['vol_ratio']
         if vr > 2.0:
-            _vol_txt = f"🔥 {vr:.1f}x la media — movimiento institucional"
+            _vol_txt = f"🔥 {vr:.1f}x average — institutional move"
         elif vr > 1.3:
-            _vol_txt = f"⬆️ {vr:.1f}x la media — volumen elevado"
+            _vol_txt = f"⬆️ {vr:.1f}x average — high volume"
         elif vr < 0.5:
-            _vol_txt = f"⬇️ {vr:.1f}x la media — sin convicción"
+            _vol_txt = f"⬇️ {vr:.1f}x average — no conviction"
         else:
-            _vol_txt = f"➡️ {vr:.1f}x la media — normal"
+            _vol_txt = f"➡️ {vr:.1f}x average — normal"
 
         # ── ML PROBABILIDAD ──────────────────────────────────
         prob_alcista = ind.get('ml_prob_alcista', 50.0)
         prob_bajista = round(100.0 - prob_alcista, 1)
         if prob_alcista >= 65:
-            ml_txt = f"🟢 *{prob_alcista:.0f}% alcista* — IA favorece subida"
+            ml_txt = f"🟢 *{prob_alcista:.0f}% bullish* — AI favors upside"
         elif prob_bajista >= 65:
-            ml_txt = f"🔴 *{prob_bajista:.0f}% bajista* — IA favorece caída"
+            ml_txt = f"🔴 *{prob_bajista:.0f}% bearish* — AI favors downside"
         else:
-            ml_txt = f"⚖️ *Indeciso* ({prob_alcista:.0f}% alcista / {prob_bajista:.0f}% bajista)"
+            ml_txt = f"⚖️ *Undecided* ({prob_alcista:.0f}% bullish / {prob_bajista:.0f}% bearish)"
 
         # ── FEAR & GREED (índices) ────────────────────────────
         fg_val, fg_class = get_fear_greed()
@@ -5046,30 +5046,30 @@ def cmd_analisis(activo_raw: str):
         if _es_indice and fg_val:
             _fg_txt = f"\n{fg_emoji} *Fear & Greed:* {fg_val}/100 ({fg_class})"
             if fg_val <= 20:
-                _fg_txt += " — mercado en pánico, rebotes posibles"
+                _fg_txt += " — market in panic, bounces possible"
             elif fg_val >= 80:
-                _fg_txt += " — euforia, cuidado con correcciones"
+                _fg_txt += " — euphoria, watch for corrections"
 
         # ── DIVERGENCIAS Y PATRONES ───────────────────────────
         div_txt = ""
         if ind.get('div_alcista'):
-            div_txt = "\n⭐ *DIVERGENCIA ALCISTA* — RSI sube mientras precio baja → suelo potencial\n"
+            div_txt = "\n⭐ *BULLISH DIVERGENCE* — RSI rising while price falls → potential floor\n"
         elif ind.get('div_bajista'):
-            div_txt = "\n⭐ *DIVERGENCIA BAJISTA* — RSI baja mientras precio sube → techo potencial\n"
+            div_txt = "\n⭐ *BEARISH DIVERGENCE* — RSI falling while price rises → potential top\n"
         patrones = ind.get('patrones', [])
-        patron_txt = f"\n🕯️ *Patrón detectado:* {', '.join(patrones[:2])}\n" if patrones else ""
+        patron_txt = f"\n🕯️ *Pattern detected:* {', '.join(patrones[:2])}\n" if patrones else ""
 
         # ── VEREDICTO ────────────────────────────────────────
         if tipo == "COMPRA":
-            veredicto = "🟢 *SEÑAL DE COMPRA ACTIVA*"
+            veredicto = "🟢 *ACTIVE BUY SIGNAL*"
         elif tipo == "VENTA":
-            veredicto = "🔴 *SEÑAL DE VENTA ACTIVA*"
+            veredicto = "🔴 *ACTIVE SELL SIGNAL*"
         elif _alcistas_count >= 2 and rsi < 60:
-            veredicto = "↗️ *SESGO ALCISTA — Esperando entrada*"
+            veredicto = "↗️ *BULLISH BIAS — Waiting for entry*"
         elif _bajistas_count >= 2 and rsi > 40:
-            veredicto = "↘️ *SESGO BAJISTA — Esperando entrada*"
+            veredicto = "↘️ *BEARISH BIAS — Waiting for entry*"
         else:
-            veredicto = "⚖️ *MERCADO EN RANGO — Sin señal clara*"
+            veredicto = "⚖️ *MARKET IN RANGE — No clear signal*"
 
         # ── BLOQUE DE SEÑAL O CONSEJO ────────────────────────
         if tipo:
@@ -5090,53 +5090,53 @@ def cmd_analisis(activo_raw: str):
             senal_txt = (
                 f"\n━━━━━━━━━━━━━━━━━━━━\n"
                 f"🚨 *{tipo_txt}*  {barra_confianza(score)}\n\n"
-                f"   📍 *Zona de entrada:*  `{_zona_inf}` — `{_zona_sup}`\n"
-                f"   🛑 *Stop Loss:*        `{f_(niveles['sl'])}`  _({sl_dist/precio*100:.1f}% de riesgo)_\n"
+                f"   📍 *Entry zone:*       `{_zona_inf}` — `{_zona_sup}`\n"
+                f"   🛑 *Stop Loss:*        `{f_(niveles['sl'])}`  _({sl_dist/precio*100:.1f}% risk)_\n"
                 f"   1️⃣ *TP1:*              `{f_(niveles['tp1'])}`  _(R:R {rr1:.1f}:1)_\n"
                 f"   2️⃣ *TP2:*              `{f_(niveles['tp2'])}`  _(R:R {rr2:.1f}:1)_\n"
                 f"   3️⃣ *TP3:*              `{f_(niveles['tp3'])}`  _(R:R {rr3:.1f}:1)_\n\n"
-                f"   ✅ *Confluencias:*\n"
+                f"   ✅ *Confluences:*\n"
                 + "".join(f"   • _{r}_\n" for r in razones[:4])
             )
         else:
             # Sin señal — dar consejo condicional según sesgo
             if _alcistas_count >= 2:
                 _consejo = (
-                    f"   👀 *Qué observar para COMPRA:*\n"
-                    f"   • RSI supere 50 con volumen alto\n"
-                    f"   • Precio rompa resistencia `{f_(ind['resistencia'])}`\n"
-                    f"   • MACD cruce al alza\n"
+                    f"   👀 *What to watch for BUY:*\n"
+                    f"   • RSI breaks above 50 with high volume\n"
+                    f"   • Price breaks resistance `{f_(ind['resistencia'])}`\n"
+                    f"   • MACD crosses up\n"
                 )
             elif _bajistas_count >= 2:
                 _consejo = (
-                    f"   👀 *Qué observar para VENTA:*\n"
-                    f"   • RSI caiga bajo 50 con volumen\n"
-                    f"   • Precio pierda soporte `{f_(ind['soporte'])}`\n"
-                    f"   • MACD cruce a la baja\n"
+                    f"   👀 *What to watch for SELL:*\n"
+                    f"   • RSI drops below 50 with volume\n"
+                    f"   • Price loses support `{f_(ind['soporte'])}`\n"
+                    f"   • MACD crosses down\n"
                 )
             else:
                 _consejo = (
-                    f"   👀 *Mercado en rango:*\n"
-                    f"   • COMPRA cerca de soporte `{f_(ind['soporte'])}`\n"
-                    f"   • VENTA cerca de resistencia `{f_(ind['resistencia'])}`\n"
-                    f"   • Confirmar con ruptura de volumen\n"
+                    f"   👀 *Market in range:*\n"
+                    f"   • BUY near support `{f_(ind['soporte'])}`\n"
+                    f"   • SELL near resistance `{f_(ind['resistencia'])}`\n"
+                    f"   • Confirm with volume breakout\n"
                 )
 
             senal_txt = (
                 f"\n━━━━━━━━━━━━━━━━━━━━\n"
-                f"⏸️ *SIN SEÑAL ACTIVA*\n"
-                f"   _Razón: {razones[0] if razones else 'Esperando alineación técnica'}_\n\n"
+                f"⏸️ *NO ACTIVE SIGNAL*\n"
+                f"   _Reason: {razones[0] if razones else 'Waiting for technical alignment'}_\n\n"
                 + _consejo
             )
 
         # ── FUENTE DE PRECIO ─────────────────────────────────
         _fuente_precio = cot.get('fuente', 'yfinance') if cot else 'yfinance'
         _fuente_tag    = "" if "MT5" in _fuente_precio else f" _({_fuente_precio})_"
-        _precio_label  = "Último cierre" if _mercado_cerrado else "Precio en vivo"
+        _precio_label  = "Last close" if _mercado_cerrado else "Live price"
 
         # ── MENSAJE FINAL ─────────────────────────────────────
         return (
-            f"📊 *ANÁLISIS — {nombre}*\n"
+            f"📊 *ANALYSIS — {nombre}*\n"
             f"🕐 {sesion_txt}  •  {_sesion_calidad}\n"
             f"💵 {_precio_label}: *{f_(precio)}*{_fuente_tag}\n"
             f"{_fg_txt}\n\n"
@@ -5144,27 +5144,27 @@ def cmd_analisis(activo_raw: str):
             f"{div_txt}{patron_txt}"
             f"{senal_txt}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"📈 *Tendencia multi-temporal*\n"
+            f"📈 *Multi-timeframe trend*\n"
             f"   15min: {tendencia_15m}  │  1H: {tendencia_1h}  │  4H: {tendencia_4h}\n"
             f"   {_alineacion}\n\n"
-            f"🏛️ *Mapa de precio*\n"
-            f"   🔴 Resistencia:  `{f_(ind['resistencia'])}`  _({dist_r_pct:.1f}% arriba — {f_(dist_r_abs)} pts)_\n"
-            f"   📍 Precio actual: `{f_(precio)}`  ← {_pos_sr}\n"
-            f"   🟢 Soporte:      `{f_(ind['soporte'])}`  _({dist_s_pct:.1f}% abajo — {f_(dist_s_abs)} pts)_\n"
+            f"🏛️ *Price map*\n"
+            f"   🔴 Resistance:   `{f_(ind['resistencia'])}`  _({dist_r_pct:.1f}% above — {f_(dist_r_abs)} pts)_\n"
+            f"   📍 Current price: `{f_(precio)}`  ← {_pos_sr}\n"
+            f"   🟢 Support:      `{f_(ind['soporte'])}`  _({dist_s_pct:.1f}% below — {f_(dist_s_abs)} pts)_\n"
             f"   📏 EMA200:       `{f_(ind['ema200'])}`  _({_macro_dist:.1f}% — macro {_macro_txt})_\n\n"
-            f"⚡ *Indicadores*\n"
+            f"⚡ *Indicators*\n"
             f"   RSI(14):  {_rsi_txt}\n"
             f"   MACD:     {_macd_txt}\n"
             f"   ADX:      {_adx_txt}\n"
-            f"   Volumen:  {_vol_txt}\n\n"
-            f"🧠 *IA:*  {ml_txt}\n"
+            f"   Volume:   {_vol_txt}\n\n"
+            f"🧠 *AI:*  {ml_txt}\n"
             f"💬 _{sesion_info}_\n"
         )
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return f"⚠️ Error analizando {nombre}: {e}"
+        return f"⚠️ Error analyzing {nombre}: {e}"
 
 def cmd_precios_tv():
     """Dashboard de precios — limpio, sin fuente ni hora."""
@@ -5181,7 +5181,7 @@ def cmd_precios_tv():
             pass
 
     orden = ["EUR/USD", "NASDAQ", "S&P 500"]
-    _titulo = "ÚLTIMO CIERRE" if _es_weekend_p else "PRECIOS EN VIVO"
+    _titulo = "LAST CLOSE" if _es_weekend_p else "LIVE PRICES"
     lineas = [f"📊 *{_titulo}*", "━━━━━━━━━━\n"]
 
     for nombre in orden:
@@ -5198,12 +5198,12 @@ def cmd_precios_tv():
                 emoji  = "🟢" if cambio >= 0 else "🔴"
                 signo  = "+" if cambio >= 0 else ""
                 precio_fmt = fmt(precio, ticker)
-                _estado = "  🔴 _CERRADO_" if _cerrado else ""
+                _estado = "  🔴 _CLOSED_" if _cerrado else ""
                 lineas.append(
                     f"{emoji} *{nombre}:* `{precio_fmt}` ({signo}{pct:.2f}%){_estado}"
                 )
             else:
-                lineas.append(f"⚪ *{nombre}:* `Sin datos`")
+                lineas.append(f"⚪ *{nombre}:* `No data`")
         except Exception:
             lineas.append(f"❌ *{nombre}:* `Error`")
 
@@ -5213,37 +5213,37 @@ def cmd_url_dashboard():
     """Retorna el mensaje con el link al dashboard web."""
     teclado = {
         "inline_keyboard": [
-            [{"text": "🌐 WEB OFICIAL", "url": "https://buysell365.pro"}],
-            [{"text": "📊 TRADING EN VIVO", "url": DASHBOARD_URL}],
-            [{"text": "📅 News", "callback_data": "/noticias"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+            [{"text": "🌐 OFFICIAL WEB", "url": "https://buysell365.pro"}],
+            [{"text": "📊 LIVE TRADING", "url": DASHBOARD_URL}],
+            [{"text": "📅 News", "callback_data": "/noticias"}, {"text": "⏰ Schedule", "callback_data": "/horarios"}]
         ]
     }
     msg = (
-        "📊 *WEB EN VIVO — BuySell365.pro*\n"
+        "📊 *LIVE WEB — BuySell365.pro*\n"
         "━━━━━━━━━━\n\n"
-        "🌐 *Web oficial:* buysell365.pro\n"
-        "📊 *Trading en Vivo:* buysell365.pro/dashboard\n\n"
-        "📌 *Que puedes ver:*\n"
-        "   • Operaciones abiertas con P&L en vivo\n"
-        "   • Historial de senales del dia\n"
-        "   • Estado del scanner de IA\n"
-        "   • Spreads y conexion MT5\n\n"
-        "📧 *Soporte:* soporte@buysell365.pro\n\n"
-        "💡 En Telegram escribe: *web* o */web*\n\n"
-        "🛡️ _Transparencia total para nuestra comunidad._"
+        "🌐 *Official site:* buysell365.pro\n"
+        "📊 *Live Trading:* buysell365.pro/dashboard\n\n"
+        "📌 *What you can see:*\n"
+        "   • Open trades with live P&L\n"
+        "   • Today's signal history\n"
+        "   • AI scanner status\n"
+        "   • Spreads and MT5 connection\n\n"
+        "📧 *Support:* soporte@buysell365.pro\n\n"
+        "💡 On Telegram type: *web* or */web*\n\n"
+        "🛡️ _Full transparency for our community._"
     )
     return msg, teclado
 
 def cmd_mercados():
     lineas = [
-        "*+20 ACTIVOS*\n",
+        "*+20 ASSETS*\n",
         "━━━━━━━━━━\n",
         "EUR/USD · NASDAQ · S&P 500\n",
-        "AUD/CAD · EUR/CHF · USD/CAD · y más\n",
+        "AUD/CAD · EUR/CHF · USD/CAD · and more\n",
         "━━━━━━━━━━\n",
-        "Horario: 8:00 - 18:00 (L-V)\n",
-        "`/precios` — Precios en vivo",
-        "`/analisis [activo]` — Analisis tecnico",
+        "Hours: 8:00 - 18:00 (Mon-Fri)\n",
+        "`/precios` — Live prices",
+        "`/analisis [asset]` — Technical analysis",
     ]
     return "\n".join(lineas)
 
@@ -5252,14 +5252,14 @@ def cmd_mercados():
 # ============================================================
 
 def cmd_ping():
-    return "🏓 *Pong!* El bot está activo y funcionando. ✅"
+    return "🏓 *Pong!* The bot is active and running. ✅"
 
 def cmd_fuentes():
     """Diagnóstico de fuentes de precio — muestra de dónde viene cada precio."""
     lineas = [
-        "🔍 *DIAGNÓSTICO DE FUENTES DE PRECIO*\n"
+        "🔍 *PRICE SOURCE DIAGNOSTIC*\n"
         "━━━━━━━━━━\n"
-        "Verificando cada activo...\n"
+        "Checking each asset...\n"
     ]
 
     # Forzar refresh (limpiar caché)
@@ -5275,7 +5275,7 @@ def cmd_fuentes():
                 f_ = lambda v, tk=ticker: fmt(v, tk)
 
                 if 'MT5' in fuente or 'TwelveData' in fuente:
-                    estado = "✅ EXACTO"
+                    estado = "✅ EXACT"
                 else:
                     estado = "⚠️ FALLBACK"
 
@@ -5285,49 +5285,49 @@ def cmd_fuentes():
                     f"   📡 _{fuente}_\n"
                 )
             else:
-                lineas.append(f"❌ *{nombre}*\n   Sin datos de ninguna fuente\n")
+                lineas.append(f"❌ *{nombre}*\n   No data from any source\n")
         except Exception as e:
             lineas.append(f"❌ *{nombre}*: {e}\n")
 
     lineas.append(
         "━━━━━━━━━━\n"
-        "✅ = Precio de MT5 o Twelve Data (exacto)\n"
-        "⚠️ = Precio de Yahoo Finance (puede diferir $5-30 en Oro/Índices)\n"
-        "❌ = Sin datos"
+        "✅ = MT5 or Twelve Data price (exact)\n"
+        "⚠️ = Yahoo Finance price (may differ $5-30 on Gold/Indices)\n"
+        "❌ = No data"
     )
     return "\n".join(lineas)
 
 def cmd_como():
     return (
-        "🔬 *¿CÓMO OPERA EL CEREBRO DE ESTE BOT?*\n"
+        "🔬 *HOW DOES THIS BOT'S BRAIN WORK?*\n"
         "━━━━━━━━━━\n\n"
-        "1️⃣ *Escaneo de Alta Frecuencia (3 min)*\n"
-        "   Nuestros servidores analizan EUR/USD, NASDAQ, S&P 500 y señales de canales afiliados ininterrumpidamente.\n\n"
-        "2️⃣ *Motor de Inteligencia Artificial (ML)*\n"
-        "   Usa el algoritmo Random Forest junto con 9 indicadores matemáticos pesados (RSI, EMAs, MACD, ADX) para no fallar.\n\n"
-        "3️⃣ *Aprobación Multidimensional*\n"
-        "   No lanzamos alertas al azar. Buscamos divergencias extremas, inyección de dinero en Volumen y rupturas limpias.\n\n"
-        "4️⃣ *Gestión Estricta del Capital*\n"
-        "   Si la auditoría es EXITOSA, te entregamos una Entrada precisa, un Stop Loss para proteger tu dinero, y un objetivo de ganancia (TP) calculado por Volatilidad (ATR).\n\n"
-        "💡 *Consejo:* Escribe el nombre de un activo (Ej: *Oro*) para que te dé el pronóstico inmediato de lo que sucederá."
+        "1️⃣ *High-Frequency Scanning (3 min)*\n"
+        "   Our servers analyze EUR/USD, NASDAQ, S&P 500 and partner-channel signals non-stop.\n\n"
+        "2️⃣ *Machine Learning Engine*\n"
+        "   Uses the Random Forest algorithm with 9 heavyweight mathematical indicators (RSI, EMAs, MACD, ADX) to avoid mistakes.\n\n"
+        "3️⃣ *Multi-dimensional Approval*\n"
+        "   We don't fire alerts at random. We look for extreme divergences, smart-money volume injection and clean breakouts.\n\n"
+        "4️⃣ *Strict Capital Management*\n"
+        "   If the audit is SUCCESSFUL, we deliver a precise Entry, a Stop Loss to protect your money, and a profit target (TP) calculated by Volatility (ATR).\n\n"
+        "💡 *Tip:* Type an asset name (e.g. *Gold*) to get an instant forecast of what's coming."
     )
 
 def cmd_riesgo():
     return (
-        "⚠️ *GESTIÓN DE RIESGO*\n"
+        "⚠️ *RISK MANAGEMENT*\n"
         "━━━━━━━━━━\n\n"
-        "📌 *Regla del 1-2%*\n"
-        "   Nunca arriesgues más del 2% de tu capital por operación\n\n"
-        "🛑 *Stop Loss siempre activo*\n"
-        "   El SL está calculado con ATR × multiplicador\n\n"
-        "🎯 *Take Profits escalonados*\n"
-        "   TP → objetivo de ganancia calculado por IA\n\n"
-        "📊 *Ratio Riesgo:Beneficio*\n"
+        "📌 *The 1-2% rule*\n"
+        "   Never risk more than 2% of your capital per trade\n\n"
+        "🛑 *Stop Loss always active*\n"
+        "   SL is calculated with ATR × multiplier\n\n"
+        "🎯 *Scaled Take Profits*\n"
+        "   TP → profit target calculated by AI\n\n"
+        "📊 *Risk:Reward Ratio*\n"
         "   Crypto:  1:1.5 / 1:2.5 / 1:4\n"
         "   Forex:   1:1.5 / 1:2.1 / 1:3.3\n"
-        "   Futuros: 1:1.3 / 1:2.0 / 1:3.3\n\n"
-        "💡 Reduce el tamaño de posición cuando\n"
-        "   el mercado esté muy volátil."
+        "   Futures: 1:1.3 / 1:2.0 / 1:3.3\n\n"
+        "💡 Reduce position size when\n"
+        "   the market is very volatile."
     )
 
 def cmd_horarios():
@@ -5338,12 +5338,12 @@ def cmd_horarios():
         ("S&P 500",   "ES=F",     "09:00 — 21:00"),
     ]
     lineas = [
-        "🕐 *HORARIOS DE MERCADO* (UTC)\n"
+        "🕐 *MARKET HOURS* (UTC)\n"
         "━━━━━━━━━━\n"
-        f"Hora UTC actual: *{hora_utc}*\n"
+        f"Current UTC time: *{hora_utc}*\n"
     ]
     for nombre, ticker, horario in info:
-        estado = "🟢 ABIERTO" if en_horario_mercado(ticker) else "🔴 CERRADO"
+        estado = "🟢 OPEN" if en_horario_mercado(ticker) else "🔴 CLOSED"
         lineas.append(f"{nombre}\n   {horario}  │  {estado}\n")
     lineas.append("━━━━━━━━━━")
     return "\n".join(lineas)
@@ -5351,25 +5351,25 @@ def cmd_horarios():
 def cmd_sentimiento():
     fg, _ = get_fear_greed()
     if fg >= 75:
-        emoji, texto = "🔴", "Codicia Extrema"
-        consejo = "⚠️ *Precaución:* Históricamente el mercado tiende a corregir en estos niveles. Evita compras impulsivas."
-        contexto = "Los inversores están eufóricos. El Smart Money suele VENDER cuando el retail compra por FOMO."
+        emoji, texto = "🔴", "Extreme Greed"
+        consejo = "⚠️ *Caution:* Historically the market tends to correct at these levels. Avoid impulsive buys."
+        contexto = "Investors are euphoric. Smart Money usually SELLS when retail buys out of FOMO."
     elif fg >= 55:
-        emoji, texto = "🟡", "Codicia"
-        consejo = "📊 Mercado optimista. Buenas condiciones para mantener posiciones alcistas."
-        contexto = "El mercado tiene confianza pero no está en extremos. Zona favorable para trading direccional."
+        emoji, texto = "🟡", "Greed"
+        consejo = "📊 Optimistic market. Good conditions for holding bullish positions."
+        contexto = "Market has confidence but is not at extremes. Favorable zone for directional trading."
     elif fg >= 45:
         emoji, texto = "🟢", "Neutral"
-        consejo = "✅ Condiciones normales de mercado. Sin sesgo emocional extremo."
-        contexto = "Equilibrio entre compradores y vendedores. Las señales técnicas tienen más peso en esta zona."
+        consejo = "✅ Normal market conditions. No extreme emotional bias."
+        contexto = "Balance between buyers and sellers. Technical signals carry more weight in this zone."
     elif fg >= 25:
-        emoji, texto = "🔵", "Miedo"
-        consejo = "📊 Mercado pesimista. Posibles oportunidades de compra a largo plazo."
-        contexto = "Los inversores están nerviosos. Warren Buffett diría: 'Sé codicioso cuando otros tienen miedo'."
+        emoji, texto = "🔵", "Fear"
+        consejo = "📊 Pessimistic market. Possible long-term buying opportunities."
+        contexto = "Investors are nervous. Warren Buffett would say: 'Be greedy when others are fearful'."
     else:
-        emoji, texto = "🟣", "Miedo Extremo"
-        consejo = "⚠️ *Zona de capitulación.* Históricamente los fondos de mercado se forman aquí."
-        contexto = "Pánico generalizado. Los grandes fondos suelen acumular en estas zonas para posiciones de largo plazo."
+        emoji, texto = "🟣", "Extreme Fear"
+        consejo = "⚠️ *Capitulation zone.* Historically market bottoms form here."
+        contexto = "Widespread panic. Big funds usually accumulate in these zones for long-term positions."
 
     barra_llena = int(fg / 10)
     barra = "█" * barra_llena + "░" * (10 - barra_llena)
@@ -5378,20 +5378,20 @@ def cmd_sentimiento():
         "😱 *FEAR & GREED INDEX*\n"
         "━━━━━━━━━━\n\n"
         f"{emoji} *{texto}*\n\n"
-        f"Valor: *{fg}/100*\n"
-        f"🟣Miedo|{barra}|Codicia🟡\n\n"
+        f"Value: *{fg}/100*\n"
+        f"🟣Fear|{barra}|Greed🟡\n\n"
         f"📖 _{contexto}_\n\n"
         f"💡 {consejo}\n\n"
         "━━━━━━━━━━\n"
-        "🔄 Actualizado cada 4 horas\n"
-        "📊 Fuente: Alternative.me\n"
-        "⚠️ Aplica al sentimiento general del mercado"
+        "🔄 Updated every 4 hours\n"
+        "📊 Source: Alternative.me\n"
+        "⚠️ Reflects overall market sentiment"
     )
 
 def cmd_tendencia():
     hora = ahora().strftime("%H:%M")
     lineas = [
-        "📈 *MAPA DE TENDENCIAS EN TIEMPO REAL*\n"
+        "📈 *REAL-TIME TREND MAP*\n"
         "━━━━━━━━━━\n"
         f"🕐 {hora}\n"
     ]
@@ -5418,11 +5418,11 @@ def cmd_tendencia():
 
             # Fuerza
             if ind['adx'] > 30:
-                fuerza = "💪 Fuerte"
+                fuerza = "💪 Strong"
             elif ind['adx'] > 20:
-                fuerza = "✊ Moderada"
+                fuerza = "✊ Moderate"
             else:
-                fuerza = "😴 Débil"
+                fuerza = "😴 Weak"
 
             # Momentum
             if ind['rsi'] > 70:
@@ -5442,20 +5442,20 @@ def cmd_tendencia():
                 f"   ADX {ind['adx']:.0f} {fuerza}  │  Vol {ind['vol_ratio']:.1f}x\n"
             )
         else:
-            lineas.append(f"*{nombre}*\n   ⏳ Sin datos aún\n")
+            lineas.append(f"*{nombre}*\n   ⏳ No data yet\n")
 
     # Resumen del mercado
     total = alcistas + bajistas
     if total > 0:
         if alcistas > bajistas:
-            sentimiento = "🟢 *SENTIMIENTO GENERAL: ALCISTA*"
+            sentimiento = "🟢 *OVERALL SENTIMENT: BULLISH*"
         elif bajistas > alcistas:
-            sentimiento = "🔴 *SENTIMIENTO GENERAL: BAJISTA*"
+            sentimiento = "🔴 *OVERALL SENTIMENT: BEARISH*"
         else:
-            sentimiento = "⚖️ *SENTIMIENTO GENERAL: MIXTO*"
-        lineas.append(f"\n{sentimiento}\n📈 {alcistas} alcistas  │  📉 {bajistas} bajistas  │  ➡️ {len(ACTIVOS)-alcistas-bajistas} neutros")
+            sentimiento = "⚖️ *OVERALL SENTIMENT: MIXED*"
+        lineas.append(f"\n{sentimiento}\n📈 {alcistas} bullish  │  📉 {bajistas} bearish  │  ➡️ {len(ACTIVOS)-alcistas-bajistas} neutral")
 
-    lineas.append("\n━━━━━━━━━━\n💡 Basado en EMA 9/20/50 (15m y 1H) + ADX + RSI")
+    lineas.append("\n━━━━━━━━━━\n💡 Based on EMA 9/20/50 (15m & 1H) + ADX + RSI")
     return "\n".join(lineas)
 
 def cmd_volatilidad():
@@ -5467,25 +5467,25 @@ def cmd_volatilidad():
             atr_pct = (ind['atr'] / ind['precio']) * 100
             ranking.append((nombre, atr_pct, ind['atr'], ticker))
     if not ranking:
-        return "⏳ Aún no hay datos de volatilidad. Espera al primer escaneo."
+        return "⏳ No volatility data yet. Wait for the first scan."
     ranking.sort(key=lambda x: x[1], reverse=True)
     emojis_pos = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
     lineas = [
-        "⚡ *RANKING DE VOLATILIDAD*\n"
+        "⚡ *VOLATILITY RANKING*\n"
         "━━━━━━━━━━\n"
         f"🕐 {hora}\n"
     ]
     for i, (nombre, atr_pct, atr_val, ticker) in enumerate(ranking):
         barras = "█" * min(int(atr_pct * 3), 10)
         lineas.append(f"{emojis_pos[i]} {nombre}\n   ATR: {fmt(atr_val, ticker)}  │  {atr_pct:.2f}%  {barras}\n")
-    lineas.append("━━━━━━━━━━\n💡 Mayor ATR = Mayor riesgo/oportunidad")
+    lineas.append("━━━━━━━━━━\n💡 Higher ATR = greater risk/opportunity")
     return "\n".join(lineas)
 
 def cmd_noticias():
     hora = ahora().strftime("%H:%M")
     noticias = cargar_calendario_economico()
     if not noticias:
-        return "📰 No se pudieron cargar las noticias ahora mismo."
+        return "📰 Couldn't load the news right now."
     ahora_utc = datetime.now(pytz.UTC)
     tz_ny = pytz.timezone("America/New_York")
     proximas = []
@@ -5509,43 +5509,43 @@ def cmd_noticias():
             continue
     if not proximas:
         return (
-            "📰 *NOTICIAS ECONÓMICAS*\n"
+            "📰 *ECONOMIC NEWS*\n"
             "━━━━━━━━━━\n"
-            "✅ No hay noticias de impacto\n"
-            "en las próximas 24 horas.\n\n"
-            "🟢 Buenas condiciones para operar."
+            "✅ No high-impact news\n"
+            "in the next 24 hours.\n\n"
+            "🟢 Good conditions to trade."
         )
     proximas.sort()
     lineas = [
-        "📰 *NOTICIAS ECONÓMICAS*\n"
+        "📰 *ECONOMIC NEWS*\n"
         "━━━━━━━━━━\n"
-        f"🕐 {hora}  •  Próximas 24h\n"
+        f"🕐 {hora}  •  Next 24h\n"
     ]
     for diff, titulo, pais, dt_utc, impacto, es_critica in proximas[:10]:
         hora_noticia = dt_utc.strftime("%H:%M")
         if diff < 0:
-            tiempo_txt = "⚡ En curso"
+            tiempo_txt = "⚡ Ongoing"
         elif diff < 1:
-            tiempo_txt = f"⏰ En {int(diff*60)}min"
+            tiempo_txt = f"⏰ In {int(diff*60)}min"
         else:
-            tiempo_txt = f"En {diff:.1f}h"
+            tiempo_txt = f"In {diff:.1f}h"
         if es_critica:
             icono = "🔴🔴"
-            ventana = "Bloqueo: 4h antes / 3h después"
+            ventana = "Block: 4h before / 3h after"
         elif impacto == "high":
             icono = "🔴"
-            ventana = "Bloqueo: 3h antes / 2h después"
+            ventana = "Block: 3h before / 2h after"
         else:
             icono = "🟡"
-            ventana = "Bloqueo: 1h antes / 30min después"
+            ventana = "Block: 1h before / 30min after"
         lineas.append(f"{icono} *{pais}* — {titulo}\n   🕐 {hora_noticia} UTC  │  {tiempo_txt}\n   _{ventana}_\n")
     lineas.append(
         "━━━━━━━━━━\n"
-        "🛡️ *PROTECCIÓN ACTIVA:*\n"
-        "• Noticias críticas (NFP/FOMC/CPI): 4h antes / 3h después\n"
-        "• Alto impacto: 3h antes / 2h después\n"
-        "• Medio impacto: 1h antes / 30min después\n"
-        "• Cierre automático de trades 30min antes de noticias críticas"
+        "🛡️ *ACTIVE PROTECTION:*\n"
+        "• Critical news (NFP/FOMC/CPI): 4h before / 3h after\n"
+        "• High impact: 3h before / 2h after\n"
+        "• Medium impact: 1h before / 30min after\n"
+        "• Auto-close trades 30min before critical news"
     )
     return "\n".join(lineas)
 
@@ -5988,13 +5988,13 @@ def cmd_glosario(termino):
     niveles  = "`sl` `tp` `soporte` `resistencia` `breakout` `pullback` `fibonacci` `divergencia`"
     estilos  = "`scalping` `swing` `ordenes` `patrones`"
     return (
-        f"❓ No encontré '*{termino}*' en el glosario.\n\n"
-        "📚 *Términos disponibles:*\n\n"
-        f"📊 Indicadores: {tecnico}\n"
-        f"💰 Trading:     {trading}\n"
-        f"📍 Niveles:     {niveles}\n"
-        f"⚙️ Estilos:     {estilos}\n\n"
-        "💡 Ej: `/glosario rsi` · `/glosario apalancamiento` · `/glosario patrones`"
+        f"❓ Couldn't find '*{termino}*' in the glossary.\n\n"
+        "📚 *Available terms:*\n\n"
+        f"📊 Indicators: {tecnico}\n"
+        f"💰 Trading:    {trading}\n"
+        f"📍 Levels:     {niveles}\n"
+        f"⚙️ Styles:     {estilos}\n\n"
+        "💡 e.g.: `/glosario rsi` · `/glosario apalancamiento` · `/glosario patrones`"
     )
 
 # ── Descripciones de activos ─────────────────────────────────
@@ -6045,16 +6045,16 @@ DESCRIPCIONES_ACTIVOS = {
 def cmd_que_es(activo_raw):
     nombre = KEYWORDS_ACTIVOS.get(activo_raw.lower().strip())
     if not nombre:
-        return f"❓ No reconozco '*{activo_raw}*'.\nPrueba: /que es oro, /que es nasdaq"
+        return f"❓ I don't recognize '*{activo_raw}*'.\nTry: /que es gold, /que es nasdaq"
     desc = DESCRIPCIONES_ACTIVOS.get(nombre)
     if not desc:
-        return f"ℹ️ Sin descripción disponible para {nombre}."
+        return f"ℹ️ No description available for {nombre}."
     return desc
 
 def cmd_pip(activo_raw):
     nombre = KEYWORDS_ACTIVOS.get(activo_raw.lower().strip())
     if not nombre:
-        return f"❓ No reconozco '*{activo_raw}*'.\nPrueba: /pip oro, /pip eurusd"
+        return f"❓ I don't recognize '*{activo_raw}*'.\nTry: /pip gold, /pip eurusd"
     ticker = ACTIVOS[nombre]
     cat = get_categoria(ticker)
     if cat == "forex":
@@ -6062,69 +6062,69 @@ def cmd_pip(activo_raw):
             return (
                 f"📏 *PIPS — {nombre}*\n"
                 "━━━━━━━━━━\n\n"
-                "Para pares con JPY:\n"
-                "   1 pip = 0.01  │  Multiplicador: ×100\n\n"
-                "💡 Ej: si precio va de 150.00 a 150.50\n"
-                "   → 50 pips de ganancia"
+                "For JPY pairs:\n"
+                "   1 pip = 0.01  │  Multiplier: ×100\n\n"
+                "💡 e.g.: if price goes from 150.00 to 150.50\n"
+                "   → 50 pips profit"
             )
         return (
             f"📏 *PIPS — {nombre}*\n"
             "━━━━━━━━━━\n\n"
-            "Para pares forex estándar:\n"
-            "   1 pip = 0.0001  │  Multiplicador: ×10,000\n\n"
-            "💡 Ej: si precio va de 1.0800 a 1.0850\n"
-            "   → 50 pips de ganancia"
+            "For standard forex pairs:\n"
+            "   1 pip = 0.0001  │  Multiplier: ×10,000\n\n"
+            "💡 e.g.: if price goes from 1.0800 to 1.0850\n"
+            "   → 50 pips profit"
         )
     elif cat == "crypto":
         return (
-            f"📏 *RENDIMIENTO — {nombre}*\n"
+            f"📏 *RETURN — {nombre}*\n"
             "━━━━━━━━━━\n\n"
-            "Para crypto se usa porcentaje (%):\n"
-            "   Ganancia = (salida − entrada) / entrada × 100\n\n"
-            "💡 Ej: compra a 95,000 y vende a 97,000\n"
-            "   → +2.10% de ganancia"
+            "Crypto uses percentage (%):\n"
+            "   Profit = (exit − entry) / entry × 100\n\n"
+            "💡 e.g.: buy at 95,000 and sell at 97,000\n"
+            "   → +2.10% profit"
         )
     else:
         return (
-            f"📏 *PUNTOS — {nombre}*\n"
+            f"📏 *POINTS — {nombre}*\n"
             "━━━━━━━━━━\n\n"
-            "Para futuros se usan puntos directos:\n"
-            "   Ganancia = diferencia de precio\n\n"
-            "💡 Ej: si NASDAQ va de 18,000 a 18,050\n"
-            "   → 50 puntos de ganancia"
+            "Futures use direct points:\n"
+            "   Profit = price difference\n\n"
+            "💡 e.g.: if NASDAQ goes from 18,000 to 18,050\n"
+            "   → 50 points profit"
         )
 
 def cmd_abierto(activo_raw):
     nombre = KEYWORDS_ACTIVOS.get(activo_raw.lower().strip())
     if not nombre:
-        return f"❓ No reconozco '*{activo_raw}*'.\nPrueba: /abierto oro"
+        return f"❓ I don't recognize '*{activo_raw}*'.\nTry: /abierto gold"
     ticker = ACTIVOS[nombre]
     hora_utc = datetime.now(pytz.UTC).strftime("%H:%M")
     inicio, fin = HORARIOS_MERCADO.get(ticker, (0, 24))
     if en_horario_mercado(ticker):
-        horario_txt = "24 horas" if fin == 24 else f"{inicio:02d}:00 — {fin:02d}:00 UTC"
+        horario_txt = "24 hours" if fin == 24 else f"{inicio:02d}:00 — {fin:02d}:00 UTC"
         return (
-            f"🟢 *{nombre} — ABIERTO*\n"
+            f"🟢 *{nombre} — OPEN*\n"
             "━━━━━━━━━━\n"
-            f"🕐 Hora UTC: {hora_utc}\n"
-            f"📅 Horario: {horario_txt}\n\n"
-            "✅ El bot puede generar señales ahora."
+            f"🕐 UTC time: {hora_utc}\n"
+            f"📅 Hours: {horario_txt}\n\n"
+            "✅ The bot can generate signals now."
         )
     else:
         horario_txt = f"{inicio:02d}:00 — {fin:02d}:00 UTC"
         horas_hasta = (inicio - datetime.now(pytz.UTC).hour) % 24
         return (
-            f"🔴 *{nombre} — CERRADO*\n"
+            f"🔴 *{nombre} — CLOSED*\n"
             "━━━━━━━━━━\n"
-            f"🕐 Hora UTC: {hora_utc}\n"
-            f"📅 Horario: {horario_txt}\n\n"
-            f"⏳ Abre en aprox. {horas_hasta}h\n"
-            "⏸️ El bot no opera fuera de horario."
+            f"🕐 UTC time: {hora_utc}\n"
+            f"📅 Hours: {horario_txt}\n\n"
+            f"⏳ Opens in approx. {horas_hasta}h\n"
+            "⏸️ The bot doesn't trade off-hours."
         )
 
 def cmd_top():
     if not _cache_ind:
-        return "⏳ Aún no hay datos del primer escaneo. Espera unos minutos."
+        return "⏳ No data yet from the first scan. Wait a few minutes."
     hora = ahora().strftime("%H:%M")
     ranking = []
     for nombre, ticker in ACTIVOS.items():
@@ -6133,12 +6133,12 @@ def cmd_top():
             atr_pct = (ind['atr'] / ind['precio']) * 100
             ranking.append((nombre, ticker, atr_pct, ind))
     if not ranking:
-        return "⏳ Sin datos disponibles aún."
+        return "⏳ No data available yet."
     ranking.sort(key=lambda x: x[2], reverse=True)
 
     emojis_pos = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣"]
     lineas = [
-        "🔥 *RANKING DE OPORTUNIDADES*\n"
+        "🔥 *OPPORTUNITY RANKING*\n"
         "━━━━━━━━━━\n"
         f"🕐 {hora}\n"
     ]
@@ -6146,30 +6146,30 @@ def cmd_top():
     for i, (nombre, ticker, atr_pct, ind) in enumerate(ranking):
         # Tendencia
         if ind['ema9'] > ind['ema20'] > ind['ema50']:
-            tend = "📈 ALC"
+            tend = "📈 BULL"
         elif ind['ema9'] < ind['ema20'] < ind['ema50']:
-            tend = "📉 BAJ"
+            tend = "📉 BEAR"
         else:
-            tend = "➡️ LAT"
+            tend = "➡️ SIDE"
 
         # Señal potencial
         tipo_sig, score_sig, _ = evaluar_senal_profesional(ind, ticker)
         if tipo_sig and score_sig >= 4:
             senal_txt = f"🚨 *{tipo_sig}* (Score {score_sig}/5)"
         elif tipo_sig and score_sig >= 3:
-            senal_txt = f"👀 {tipo_sig} potencial (Score {score_sig}/5)"
+            senal_txt = f"👀 {tipo_sig} potential (Score {score_sig}/5)"
         else:
-            senal_txt = "⏸️ Sin señal"
+            senal_txt = "⏸️ No signal"
 
         lineas.append(
             f"\n{emojis_pos[i]} *{nombre}*\n"
             f"   {tend}  │  RSI {ind['rsi']:.0f}  │  ADX {ind['adx']:.0f}  │  Vol {ind['vol_ratio']:.1f}x\n"
-            f"   Volatilidad: {atr_pct:.2f}%  │  {senal_txt}"
+            f"   Volatility: {atr_pct:.2f}%  │  {senal_txt}"
         )
 
     lineas.append("\n\n━━━━━━━━━━")
-    lineas.append("💡 Mayor volatilidad = mayor oportunidad/riesgo")
-    lineas.append("🔍 Usa `/analisis [activo]` para detalle completo")
+    lineas.append("💡 Higher volatility = greater opportunity/risk")
+    lineas.append("🔍 Use `/analisis [asset]` for full detail")
     return "\n".join(lineas)
 
 def formatear_lista_resultados():
@@ -6223,12 +6223,12 @@ def formatear_lista_resultados():
         activas_count += 1
 
     if not por_activo and activas_count == 0:
-        return "📭 No hay operaciones registradas aun en este ciclo."
+        return "📭 No trades recorded yet in this cycle."
 
     # Ordenar por pips descendente
     activos_ordenados = sorted(por_activo.items(), key=lambda x: x[1]["pips"], reverse=True)
 
-    lineas = [f"📊 *{total_ops} operaciones*\n"]
+    lineas = [f"📊 *{total_ops} trades*\n"]
     for tkr, data in activos_ordenados:
         emoji = _emojis_activo.get(tkr, "📌")
         nombre = _nombres_activo.get(tkr, tkr)
@@ -6237,7 +6237,7 @@ def formatear_lista_resultados():
         lineas.append(f"{emoji} *{nombre}:* {total_tkr} ops | {data['wins']}W/{data['losses']}L | {pips_txt} pips")
 
     if activas_count > 0:
-        lineas.append(f"\n🏃 *{activas_count} operaciones en curso*")
+        lineas.append(f"\n🏃 *{activas_count} trades in progress*")
 
     total_pips = pips_premium + pips_swing
     lineas.append(f"\n💎 Premium {pips_premium:+.0f} Pips")
@@ -6256,33 +6256,33 @@ def cmd_semana():
     lista = formatear_lista_resultados()
     
     return (
-        f"🏆 CIERRE SEMANAL DE RESULTADOS\n"
+        f"🏆 WEEKLY RESULTS SUMMARY\n"
         "━━━━━━━━━━\n\n"
         f"{lista}"
     )
 
 def cmd_record():
     if not historial_operaciones:
-        return "📭 No hay operaciones registradas aún."
+        return "📭 No trades recorded yet."
     wins   = [op for op in historial_operaciones if op['resultado'] == "WIN"]
     losses = [op for op in historial_operaciones if op['resultado'] == "LOSS"]
-    lineas = ["🏆 *RECORDS DEL BOT*\n━━━━━━━━━━\n"]
+    lineas = ["🏆 *BOT RECORDS*\n━━━━━━━━━━\n"]
     if wins:
         mejor = max(wins, key=lambda x: x['pips'])
         cat   = get_categoria(mejor.get('ticker', ''))
         p_txt = f"{mejor['pips']:.2f}%" if cat == "crypto" else f"{mejor['pips']:.1f} pips"
-        lineas.append(f"🥇 *MEJOR OPERACIÓN*\n   {mejor['nombre']} — {mejor['tipo']}\n   +{p_txt}\n")
+        lineas.append(f"🥇 *BEST TRADE*\n   {mejor['nombre']} — {mejor['tipo']}\n   +{p_txt}\n")
     if losses:
         peor  = min(losses, key=lambda x: x['pips'])
         cat   = get_categoria(peor.get('ticker', ''))
         p_txt = f"{peor['pips']:.2f}%" if cat == "crypto" else f"{peor['pips']:.1f} pips"
-        lineas.append(f"📉 *PEOR OPERACIÓN*\n   {peor['nombre']} — {peor['tipo']}\n   -{p_txt}\n")
-    lineas.append(f"━━━━━━━━━━\n📊 Total registradas: {len(historial_operaciones)}")
+        lineas.append(f"📉 *WORST TRADE*\n   {peor['nombre']} — {peor['tipo']}\n   -{p_txt}\n")
+    lineas.append(f"━━━━━━━━━━\n📊 Total recorded: {len(historial_operaciones)}")
     return "\n".join(lineas)
 
 def cmd_racha():
     if not historial_operaciones:
-        return "📭 No hay operaciones registradas aún."
+        return "📭 No trades recorded yet."
     racha = 0
     tipo_racha = None
     for op in reversed(historial_operaciones):
@@ -6303,36 +6303,36 @@ def cmd_racha():
             racha_temp = 0
     if tipo_racha == "WIN":
         fuego = "🔥" * min(racha, 5)
-        txt_racha = f"✅ *{racha} GANADAS* consecutivas {fuego}"
+        txt_racha = f"✅ *{racha} WINS* in a row {fuego}"
     else:
-        txt_racha = f"❌ *{racha} PERDIDAS* consecutivas"
+        txt_racha = f"❌ *{racha} LOSSES* in a row"
     return (
-        "📊 *RACHA ACTUAL*\n"
+        "📊 *CURRENT STREAK*\n"
         "━━━━━━━━━━\n\n"
         f"{txt_racha}\n\n"
-        f"🏆 Mejor racha ganadora: *{mejor_racha}*\n"
-        f"📈 Total operaciones: *{len(historial_operaciones)}*"
+        f"🏆 Best winning streak: *{mejor_racha}*\n"
+        f"📈 Total trades: *{len(historial_operaciones)}*"
     )
 
 def cmd_estado_bot():
     uptime_seg  = time.time() - bot_inicio
     horas       = int(uptime_seg // 3600)
     minutos     = int((uptime_seg % 3600) // 60)
-    estado_scan = "⏸️ PAUSADO" if escaneo_pausado else "🟢 ACTIVO"
+    estado_scan = "⏸️ PAUSED" if escaneo_pausado else "🟢 ACTIVE"
     if ultimo_escaneo > 0:
         hace_min = int((time.time() - ultimo_escaneo) / 60)
-        scan_txt = f"hace {hace_min}min"
+        scan_txt = f"{hace_min}min ago"
     else:
-        scan_txt = "Pendiente"
+        scan_txt = "Pending"
     return (
-        "🤖 *ESTADO DEL BOT*\n"
+        "🤖 *BOT STATUS*\n"
         "━━━━━━━━━━\n\n"
-        f"🟢 Online hace: *{horas}h {minutos}min*\n"
-        f"📡 Escaneo: *{estado_scan}*\n"
-        f"⏱️ Último scan: *{scan_txt}*\n"
-        "🔄 Intervalo: *cada 3 minutos*\n\n"
-        f"📊 *ACTIVOS MONITOREADOS:* {len(ACTIVOS)}\n"
-        f"💾 *Abiertas:* {len(operaciones_activas)}  │  *Historial:* {len(historial_operaciones)}"
+        f"🟢 Online for: *{horas}h {minutos}min*\n"
+        f"📡 Scanner: *{estado_scan}*\n"
+        f"⏱️ Last scan: *{scan_txt}*\n"
+        "🔄 Interval: *every 3 minutes*\n\n"
+        f"📊 *MONITORED ASSETS:* {len(ACTIVOS)}\n"
+        f"💾 *Open:* {len(operaciones_activas)}  │  *History:* {len(historial_operaciones)}"
     )
 
 def cmd_mi_cuenta(user_id):
@@ -6340,16 +6340,16 @@ def cmd_mi_cuenta(user_id):
     # VIP status
     sub = suscripciones_vip.get(user_id)
     if user_id in ADMIN_IDS:
-        vip_txt = "👑 *VIP PERMANENTE* (Admin)"
+        vip_txt = "👑 *PERMANENT VIP* (Admin)"
     elif sub and sub.get("entrada_confirmada", False):
         try:
             expira = _parse_expira(sub["expira"])
             dias_r = (expira - ahora().replace(tzinfo=None)).days
-            vip_txt = f"💎 *VIP ACTIVO* — {dias_r} días restantes"
+            vip_txt = f"💎 *VIP ACTIVE* — {dias_r} days remaining"
         except Exception:
-            vip_txt = "💎 *VIP ACTIVO*"
+            vip_txt = "💎 *VIP ACTIVE*"
     else:
-        vip_txt = "📢 Sin suscripción VIP"
+        vip_txt = "📢 No VIP subscription"
 
     # Stats personales
     ganadas = estadisticas_diarias.get("ganadas", 0)
@@ -6359,14 +6359,14 @@ def cmd_mi_cuenta(user_id):
     pips_net = estadisticas_diarias.get("pips_ganados", 0) - estadisticas_diarias.get("pips_perdidos", 0)
 
     return (
-        f"💰 *MI CUENTA*\n"
+        f"💰 *MY ACCOUNT*\n"
         f"━━━━━━━━━━\n\n"
         f"{vip_txt}\n\n"
-        f"📊 *Hoy:*\n"
-        f"   Señales: *{total}* | WR: *{wr:.0f}%*\n"
-        f"   Pips netos: *{pips_net:+.1f}*\n"
-        f"   ✅ {ganadas} ganadas | ❌ {perdidas} perdidas\n\n"
-        f"🔔 Operaciones abiertas: *{len(operaciones_activas)}*\n"
+        f"📊 *Today:*\n"
+        f"   Signals: *{total}* | WR: *{wr:.0f}%*\n"
+        f"   Net pips: *{pips_net:+.1f}*\n"
+        f"   ✅ {ganadas} wins | ❌ {perdidas} losses\n\n"
+        f"🔔 Open trades: *{len(operaciones_activas)}*\n"
         f"💰 Capital: *${CAPITAL_USUARIO:.0f}*"
     )
 
@@ -7104,9 +7104,9 @@ def _enviar_aviso_vip(user_id: str, dias_restantes: int):
 def cmd_vip_lista():
     """Lista todas las suscripciones VIP activas."""
     if not suscripciones_vip:
-        return "📋 *No hay suscripciones VIP activas.*"
+        return "📋 *No active VIP subscriptions.*"
 
-    lineas = ["👑 *SUSCRIPCIONES VIP ACTIVAS*\n━━━━━━━━━━\n"]
+    lineas = ["👑 *ACTIVE VIP SUBSCRIPTIONS*\n━━━━━━━━━━\n"]
     for uid, sub in suscripciones_vip.items():
         try:
             expira = _parse_expira(sub["expira"])
@@ -7114,28 +7114,28 @@ def cmd_vip_lista():
         except Exception:
             dias = 0
         estado = "🟢" if dias > 3 else "🟡" if dias > 0 else "🔴"
-        tipo = "🎁TRIAL" if sub.get("es_trial") else "💰PAGO"
+        tipo = "🎁TRIAL" if sub.get("es_trial") else "💰PAID"
         lineas.append(
             f"{estado} *{sub.get('nombre', '?')}* (@{sub.get('username', '?')}) [{tipo}]\n"
-            f"   ID: `{uid}` | Expira: {sub.get('expira', '?')[:10]} ({dias}d)"
+            f"   ID: `{uid}` | Expires: {sub.get('expira', '?')[:10]} ({dias}d)"
         )
-    lineas.append(f"\n📊 Total: *{len(suscripciones_vip)}* suscriptores")
+    lineas.append(f"\n📊 Total: *{len(suscripciones_vip)}* subscribers")
     return "\n".join(lineas)
 
 
 def cmd_vip_pendientes():
     """Lista pagos VIP pendientes de verificación."""
     if not pagos_pendientes_vip:
-        return "📋 *No hay pagos VIP pendientes.*"
+        return "📋 *No pending VIP payments.*"
 
-    lineas = ["⏳ *PAGOS VIP PENDIENTES*\n━━━━━━━━━━\n"]
+    lineas = ["⏳ *PENDING VIP PAYMENTS*\n━━━━━━━━━━\n"]
     for uid, pend in pagos_pendientes_vip.items():
         lineas.append(
             f"👤 *{pend.get('nombre', '?')}* (@{pend.get('username', '?')})\n"
-            f"   ID: `{uid}` | Monto: `{pend.get('monto_unico', 0):.3f}` USDT\n"
-            f"   Solicitado: {pend.get('timestamp', '?')[:16]}"
+            f"   ID: `{uid}` | Amount: `{pend.get('monto_unico', 0):.3f}` USDT\n"
+            f"   Requested: {pend.get('timestamp', '?')[:16]}"
         )
-    lineas.append(f"\n📊 Total pendientes: *{len(pagos_pendientes_vip)}*")
+    lineas.append(f"\n📊 Total pending: *{len(pagos_pendientes_vip)}*")
     return "\n".join(lineas)
 
 
@@ -7146,7 +7146,7 @@ def cmd_vip_dar(args: str):
     """
     parts = args.strip().split()
     if not parts or not parts[0].isdigit():
-        return "❌ Formato: `/vip_dar [user_id] [dias]`\nEjemplo: `/vip_dar 123456789 4`"
+        return "❌ Format: `/vip_dar [user_id] [days]`\nExample: `/vip_dar 123456789 4`"
 
     target_id = parts[0]
     dias = None
@@ -7154,9 +7154,9 @@ def cmd_vip_dar(args: str):
         try:
             dias = int(parts[1])
             if dias < 1 or dias > 365:
-                return "❌ Dias debe ser entre 1 y 365."
+                return "❌ Days must be between 1 and 365."
         except ValueError:
-            return "❌ Formato: `/vip_dar [user_id] [dias]`\nEjemplo: `/vip_dar 123456789 4`"
+            return "❌ Format: `/vip_dar [user_id] [days]`\nExample: `/vip_dar 123456789 4`"
 
     dias_final = dias if dias is not None else VIP_DURACION_DIAS
 
@@ -7169,21 +7169,21 @@ def cmd_vip_dar(args: str):
         pagos_pendientes_vip.pop(target_id, None)
 
     _otorgar_acceso_vip(target_id, nombre, username, monto=0, tx_id="admin_grant", dias=dias)
-    return f"✅ *VIP otorgado a {nombre}* (`{target_id}`) por {dias_final} dias."
+    return f"✅ *VIP granted to {nombre}* (`{target_id}`) for {dias_final} days."
 
 
 def cmd_vip_quitar(target_id: str):
     """Admin: revoca acceso VIP de un usuario."""
     target_id = target_id.strip()
     if not target_id.isdigit():
-        return "❌ Formato: `/vip_quitar [user_id]`\nEjemplo: `/vip_quitar 123456789`"
+        return "❌ Format: `/vip_quitar [user_id]`\nExample: `/vip_quitar 123456789`"
 
     if target_id not in suscripciones_vip:
-        return f"❌ El usuario `{target_id}` no tiene suscripcion VIP activa."
+        return f"❌ User `{target_id}` has no active VIP subscription."
 
     nombre = suscripciones_vip[target_id].get("nombre", "Usuario")
     _revocar_acceso_vip(target_id, notificar=True)
-    return f"🚫 *VIP revocado para {nombre}* (`{target_id}`)."
+    return f"🚫 *VIP revoked for {nombre}* (`{target_id}`)."
 
 
 def cmd_senal_manual(texto_completo: str) -> str:
@@ -7217,10 +7217,10 @@ def cmd_senal_manual(texto_completo: str) -> str:
             break
     if not par:
         return (
-            "❌ Par no reconocido.\n\n"
-            "Formato:\n"
+            "❌ Pair not recognized.\n\n"
+            "Format:\n"
             "`/señal GBPAUD SELL 1.93236 TP:1.91500 SL:1.93900`\n\n"
-            "Pares: XAUUSD · EURUSD · GBPUSD · GBPAUD · GBPNZD\n"
+            "Pairs: XAUUSD · EURUSD · GBPUSD · GBPAUD · GBPNZD\n"
             "       AUDUSD · USDJPY · GBPJPY · EURJPY · USDCAD\n"
             "       USDCHF · AUDCAD · EURCHF · NASDAQ · US30"
         )
@@ -7231,15 +7231,15 @@ def cmd_senal_manual(texto_completo: str) -> str:
     elif "BUY" in upper or "COMPRA" in upper:
         direccion = "BUY"
     else:
-        return "❌ Indica BUY o SELL.\nEjemplo: `/señal XAUUSD BUY 4458 TP:4482 SL:4450`"
+        return "❌ Specify BUY or SELL.\nExample: `/señal XAUUSD BUY 4458 TP:4482 SL:4450`"
 
     # ── Extraer TP y SL (acepta TP:xxx o TP xxx) ──
     tp_m = _re.search(r'TP[:\s]+(\d+\.?\d*)', upper)
     sl_m = _re.search(r'SL[:\s]+(\d+\.?\d*)', upper)
     if not tp_m or not sl_m:
         return (
-            "❌ Faltan TP o SL.\n\n"
-            "Formato:\n"
+            "❌ Missing TP or SL.\n\n"
+            "Format:\n"
             "`/señal XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
         )
     tp = float(tp_m.group(1))
@@ -7280,7 +7280,7 @@ def cmd_senal_manual(texto_completo: str) -> str:
         pass
 
     if not pub_ok:
-        return "❌ No se pudo publicar en el canal. Verifica CHANNEL_ID y TELEGRAM_TOKEN."
+        return "❌ Couldn't publish to channel. Check CHANNEL_ID and TELEGRAM_TOKEN."
 
     # ── Registrar en manual_signals.json para monitoreo TP/SL ──
     sig_id = f"{par}_manual_{int(_time.time())}"
@@ -7341,18 +7341,18 @@ def cmd_rastrear(texto_completo: str) -> str:
     ]
     par = next((p for p in _pares if p in upper), None)
     if not par:
-        return "❌ Par no reconocido. Ejemplo:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
+        return "❌ Pair not recognized. Example:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
     # Detectar dirección
     direccion = "BUY" if "BUY" in upper or "COMPRA" in upper else ("SELL" if "SELL" in upper or "VENTA" in upper else None)
     if not direccion:
-        return "❌ Dirección no reconocida (BUY/SELL)."
+        return "❌ Direction not recognized (BUY/SELL)."
     # Extraer números
     tp_m = _re.search(r'TP[:\s]+(\d+\.?\d*)', upper)
     sl_m = _re.search(r'SL[:\s]+(\d+\.?\d*)', upper)
     # Entrada: primer número grande después de dirección
     entry_m = _re.search(rf'{direccion}\s+(\d{{4,6}}\.?\d*)', upper)
     if not tp_m or not sl_m:
-        return "❌ Faltan TP o SL. Ejemplo:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
+        return "❌ Missing TP or SL. Example:\n`/rastrear XAUUSD BUY 4458.22 TP:4482.32 SL:4450.32`"
     tp    = float(tp_m.group(1))
     sl    = float(sl_m.group(1))
     entry = float(entry_m.group(1)) if entry_m else 0.0
@@ -7401,10 +7401,10 @@ def cmd_pausar():
     mt5_pausado = True
     guardar_estado()
     return (
-        "⏸️ *MT5 PAUSADO*\n\n"
-        "🔒 No se ejecutan operaciones en MT5\n"
-        "📡 Escáner y Telegram siguen activos\n\n"
-        "▶️ Escribe `continuar` o `play` para reactivar"
+        "⏸️ *MT5 PAUSED*\n\n"
+        "🔒 No trades will execute on MT5\n"
+        "📡 Scanner and Telegram remain active\n\n"
+        "▶️ Type `continuar` or `play` to reactivate"
     )
 
 def cmd_reanudar():
@@ -7413,10 +7413,10 @@ def cmd_reanudar():
     mt5_pausado = False
     guardar_estado()
     return (
-        "▶️ *MT5 ACTIVO*\n\n"
-        "🟢 Operaciones se ejecutan en MT5\n"
-        "📡 Escáner + Telegram + MT5 funcionando\n\n"
-        "⏸️ Escribe `pausar` o `pause` para detener MT5"
+        "▶️ *MT5 ACTIVE*\n\n"
+        "🟢 Trades will execute on MT5\n"
+        "📡 Scanner + Telegram + MT5 running\n\n"
+        "⏸️ Type `pausar` or `pause` to stop MT5"
     )
 
 
@@ -7428,12 +7428,12 @@ def cmd_pausar_todo():
     guardar_estado()
     log_sistema("🛑 PAUSA TOTAL activada por admin — scanner y MT5 detenidos")
     return (
-        "🛑 *TODO PAUSADO*\n\n"
-        "⏸️ Scanner Premium — DETENIDO\n"
-        "⏸️ MT5 — NO ejecuta ordenes\n\n"
-        "📌 Las posiciones abiertas se mantienen.\n"
-        "No se abren operaciones nuevas.\n\n"
-        "▶️ Escribe `reanudar todo` o `play todo` para reactivar"
+        "🛑 *EVERYTHING PAUSED*\n\n"
+        "⏸️ Premium Scanner — STOPPED\n"
+        "⏸️ MT5 — NOT executing orders\n\n"
+        "📌 Open positions remain in place.\n"
+        "No new trades will open.\n\n"
+        "▶️ Type `reanudar todo` or `play todo` to reactivate"
     )
 
 
@@ -7445,10 +7445,10 @@ def cmd_reanudar_todo():
     guardar_estado()
     log_sistema("▶️ PAUSA TOTAL desactivada por admin — todo reactivado")
     return (
-        "▶️ *TODO ACTIVO*\n\n"
-        "🟢 Scanner Premium — ACTIVO\n"
-        "🟢 MT5 — Ejecutando ordenes\n\n"
-        "⏸️ Escribe `pausar todo` para detener todo"
+        "▶️ *EVERYTHING ACTIVE*\n\n"
+        "🟢 Premium Scanner — ACTIVE\n"
+        "🟢 MT5 — Executing orders\n\n"
+        "⏸️ Type `pausar todo` to stop everything"
     )
 
 # ━━━━━━━━━━
