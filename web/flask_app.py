@@ -54,7 +54,19 @@ except Exception:
 # FIX 2026-04-23: Historial del canal VIP (trades publicados por signal_copier)
 # Se sincroniza desde el bot local via POST /api/sync con key 'copier_trades'.
 # Reemplaza a _historial_real (MT5 personal) como fuente del dashboard público.
+# FIX 2026-04-26: persistir a disco para sobrevivir reinicios del proceso
+# (gunicorn workers, restarts sin redeploy). Render filesystem es efimero entre
+# redeploys completos pero estable mientras el contenedor este vivo.
+_COPIER_TRADES_CACHE = os.path.join(os.path.dirname(__file__), "copier_trades_cache.json")
 _copier_trades: list = []
+try:
+    if os.path.exists(_COPIER_TRADES_CACHE):
+        with open(_COPIER_TRADES_CACHE, "r", encoding="utf-8") as _f:
+            _ct = _json.load(_f)
+            if isinstance(_ct, list):
+                _copier_trades = _ct
+except Exception:
+    pass
 
 # Bot state — pushed by the bot every ~30 seconds
 _store = {
@@ -408,6 +420,14 @@ def api_sync():
                 incoming_copier = data["copier_trades"]
                 if isinstance(incoming_copier, list):
                     _copier_trades = incoming_copier
+                    # FIX 2026-04-26: persistir a disco para sobrevivir
+                    # reinicios de gunicorn (Render filesystem estable entre
+                    # restarts del proceso, efimero solo en redeploys).
+                    try:
+                        with open(_COPIER_TRADES_CACHE, "w", encoding="utf-8") as _fc:
+                            _json.dump(_copier_trades, _fc)
+                    except Exception:
+                        pass
             # historial_operaciones: merge (dedupe by id or ticker+fecha+hora)
             if "historial_operaciones" in data:
                 incoming = data["historial_operaciones"]

@@ -308,13 +308,13 @@ def generate_story_slides(stats: dict) -> List[Path]:
     img.save(str(s1), "JPEG", quality=95)
     slides.append(s1)
 
-    # ═══ SLIDE 2: DESGLOSE 7 DÍAS ═══
+    # ═══ SLIDE 2: 7-DAY BREAKDOWN ═══
     img = Image.new("RGB", (W, H), BG_TOP)
     _gradient_bg(img)
     _starry_dots(img, count=100, seed=20)
     d = ImageDraw.Draw(img)
-    d.text((W // 2, 120), "DÍA A DÍA", fill=GOLD, font=_font(70, True), anchor="mm")
-    d.text((W // 2, 200), f"Semana {stats['fecha_inicio']} — {stats['fecha_fin']}",
+    d.text((W // 2, 120), "DAY BY DAY", fill=GOLD, font=_font(70, True), anchor="mm")
+    d.text((W // 2, 200), f"Week {stats['fecha_inicio']} — {stats['fecha_fin']}",
            fill=GRAY, font=_font(32), anchor="mm")
     # Filas grandes
     row_h = 170
@@ -342,20 +342,20 @@ def generate_story_slides(stats: dict) -> List[Path]:
     _starry_dots(img, count=120, seed=30)
     d = ImageDraw.Draw(img)
     _draw_emoji(d, (W // 2, 350), "🎁", 180)
-    d.text((W // 2, 600), "¿LA PRÓXIMA SEMANA", fill=WHITE, font=_font(60, True), anchor="mm")
-    d.text((W // 2, 680), "TAMBIÉN TE LA PIERDES?", fill=GOLD, font=_font(60, True), anchor="mm")
-    # Precio/oferta
+    d.text((W // 2, 600), "WILL YOU MISS", fill=WHITE, font=_font(60, True), anchor="mm")
+    d.text((W // 2, 680), "NEXT WEEK TOO?", fill=GOLD, font=_font(60, True), anchor="mm")
+    # Price/offer
     d.rounded_rectangle([(100, 830), (W - 100, 1120)], radius=30, fill=(50, 36, 14), outline=GOLD, width=4)
-    d.text((W // 2, 880), "CANAL VIP", fill=GOLD, font=_font(45, True), anchor="mm")
-    d.text((W // 2, 960), "Cada señal en tiempo real", fill=WHITE, font=_font(36), anchor="mm")
-    d.text((W // 2, 1010), "Entry · TP · SL claros", fill=WHITE, font=_font(36), anchor="mm")
-    d.text((W // 2, 1060), "Resultados reales como este", fill=WHITE, font=_font(36), anchor="mm")
-    # Botón enorme
+    d.text((W // 2, 880), "VIP CHANNEL", fill=GOLD, font=_font(45, True), anchor="mm")
+    d.text((W // 2, 960), "Every signal in real time", fill=WHITE, font=_font(36), anchor="mm")
+    d.text((W // 2, 1010), "Clear Entry · TP · SL", fill=WHITE, font=_font(36), anchor="mm")
+    d.text((W // 2, 1060), "Real results like this", fill=WHITE, font=_font(36), anchor="mm")
+    # Big button
     d.rounded_rectangle([(100, 1250), (W - 100, 1400)], radius=30, fill=GOLD)
-    d.text((W // 2, 1325), "ÚNETE AHORA", fill=(5, 8, 15), font=_font(80, True), anchor="mm")
+    d.text((W // 2, 1325), "JOIN NOW", fill=(5, 8, 15), font=_font(80, True), anchor="mm")
     _draw_emoji(d, (W // 2, 1500), "👇", 90)
     d.text((W // 2, 1620), "@Andoperandobot", fill=GOLD_L, font=_font(52, True), anchor="mm")
-    d.text((W // 2, 1710), "Toca el enlace ↓", fill=GRAY, font=_font(34), anchor="mm")
+    d.text((W // 2, 1710), "Tap the link ↓", fill=GRAY, font=_font(34), anchor="mm")
     s3 = IMAGES_DIR / f"story3_cta_{datetime.now().strftime('%Y%m%d')}.jpg"
     img.save(str(s3), "JPEG", quality=95)
     slides.append(s3)
@@ -365,10 +365,10 @@ def generate_story_slides(stats: dict) -> List[Path]:
 
 def build_caption_publico(stats: dict) -> str:
     lines = [
-        "🔥 *AQUÍ ESTÁ LO QUE TE PERDISTE ESTA SEMANA*",
+        "🔥 *HERE'S WHAT YOU MISSED THIS WEEK*",
         "",
-        f"💎 +{stats['total_pts']:,.0f} puntos ganados en 7 días",
-        f"🎯 {stats['total_tp']} TPs alcanzados · {stats['wr']:.1f}% Win Rate",
+        f"💎 +{stats['total_pts']:,.0f} points gained in 7 days",
+        f"🎯 {stats['total_tp']} TPs hit · {stats['wr']:.1f}% Win Rate",
         "",
     ]
     for d in stats["days"]:
@@ -376,11 +376,11 @@ def build_caption_publico(stats: dict) -> str:
         lines.append(f"{d['emoji']} {d['name']:10s} {pts} pts")
     lines += [
         "",
-        "Los VIPs recibieron CADA señal en tiempo real.",
-        "Tú leíste este resumen.",
-        "Diferencia: miles de puntos.",
+        "VIPs received EVERY signal in real time.",
+        "You just read the recap.",
+        "The difference: thousands of points.",
         "",
-        "🎁 Únete HOY → @Andoperandobot",
+        "🎁 Join TODAY → @Andoperandobot",
     ]
     return "\n".join(lines)
 
@@ -388,9 +388,9 @@ def build_caption_publico(stats: dict) -> str:
 def build_caption_vip(stats: dict) -> str:
     best = stats.get("best_day") or {}
     lines = [
-        "💎 *GRACIAS FAMILIA VIP* 💎",
+        "💎 *THANK YOU VIP FAMILY* 💎",
         "",
-        "Esta semana JUNTOS conseguimos:",
+        "This week TOGETHER we achieved:",
         "",
     ]
     for d in stats["days"]:
@@ -401,34 +401,34 @@ def build_caption_vip(stats: dict) -> str:
         f"🏆 TOTAL: +{stats['total_pts']:,.0f} pts · {stats['total_tp']} TPs · {stats['wr']:.1f}% WR",
     ]
     if best:
-        lines.append(f"🥇 Mejor día: {best['name']} (+{best['pts']:.0f} pts)")
+        lines.append(f"🥇 Best day: {best['name']} (+{best['pts']:.0f} pts)")
     lines += [
         "",
-        "No es suerte. Es sistema, disciplina y confianza.",
+        "Not luck. System, discipline, and trust.",
         "",
-        "Disfruten el finde 🌴",
-        "El lunes volvemos con todo 💪",
+        "Enjoy the weekend 🌴",
+        "We're back full force on Monday 💪",
     ]
     return "\n".join(lines)
 
 
 def build_caption_instagram(stats: dict) -> str:
     lines = [
-        f"💎 Cerramos la semana en VERDE 🟢",
+        f"💎 Closing the week in GREEN 🟢",
         "",
-        f"+{stats['total_pts']:,.0f} pts en 7 días de trading",
-        f"{stats['total_tp']} TPs alcanzados · {stats['wr']:.1f}% Win Rate",
+        f"+{stats['total_pts']:,.0f} pts in 7 days of trading",
+        f"{stats['total_tp']} TPs hit · {stats['wr']:.1f}% Win Rate",
         "",
-        "Señales de Oro · NAS100 · US30 · Forex · BTC",
-        "Entregadas en tiempo real al canal VIP.",
+        "Signals on Gold · NAS100 · US30 · Forex · BTC",
+        "Delivered in real time to the VIP channel.",
         "",
-        "Resultados reales. Transparencia total.",
+        "Real results. Full transparency.",
         "",
-        "🔗 Link en bio para unirte al VIP",
+        "🔗 Link in bio to join the VIP",
         "",
-        "#trading #forex #xauusd #oro #nas100 #us30",
-        "#bitcoin #señalesforex #tradersvip #daytrading",
-        "#spain #andorra #traders #investment",
+        "#trading #forex #xauusd #gold #nas100 #us30",
+        "#bitcoin #forexsignals #vipsignals #daytrading",
+        "#traders #investment #fx #tradingsignals",
     ]
     return "\n".join(lines)
 
