@@ -13372,13 +13372,14 @@ def enviar_briefing_matutino():
     noticias_hoy = (noticias_high + noticias_medium + noticias_todo_dia)[:6]
     eventos_para_imagen = (eventos_img_high + eventos_img_medium + eventos_img_todo_dia)[:6]
 
+    # FIX 2026-04-26: saludo en INGLES
     _hora_actual = ahora().replace(tzinfo=None).hour
     if _hora_actual < 12:
-        _saludo_emoji, _saludo = "☀️", "BUENOS DÍAS"
+        _saludo_emoji, _saludo = "☀️", "GOOD MORNING"
     elif _hora_actual < 20:
-        _saludo_emoji, _saludo = "🌞", "BUENAS TARDES"
+        _saludo_emoji, _saludo = "🌞", "GOOD AFTERNOON"
     else:
-        _saludo_emoji, _saludo = "🌙", "BUENAS NOCHES"
+        _saludo_emoji, _saludo = "🌙", "GOOD EVENING"
 
     # Construir panorama PRIMERO (para pasárselo a la IA como contexto)
     _alcistas = []
@@ -13422,22 +13423,22 @@ def enviar_briefing_matutino():
         f"━━━━━━━━━━━━━━━━━━━━"
     ]
 
-    # Panorama compacto
-    lineas.append("\n📊 *PANORAMA*")
+    # FIX 2026-04-26: panorama en INGLES
+    lineas.append("\n📊 *MARKET OVERVIEW*")
     if _alcistas:
-        lineas.append("🟢 *Alcistas:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _alcistas))
+        lineas.append("🟢 *Bullish:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _alcistas))
     if _bajistas:
-        lineas.append("🔴 *Bajistas:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _bajistas))
+        lineas.append("🔴 *Bearish:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _bajistas))
     if _neutros:
-        lineas.append("⚪ *Neutros:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _neutros))
+        lineas.append("⚪ *Neutral:* " + ", ".join(f"{n} (RSI {r:.0f})" for n, r in _neutros))
 
-    # FIX 2026-04-17: Miedo y Codicia con contexto accionable
+    # Fear & Greed with actionable context (EN)
     _fg_insight = ""
     if _fg_val <= 25:
-        _fg_insight = " — miedo extremo, históricamente buen momento contrarian 🎯"
+        _fg_insight = " — extreme fear, historically a good contrarian moment 🎯"
     elif _fg_val >= 75:
-        _fg_insight = " — codicia extrema, precaución en longs ⚠️"
-    lineas.append(f"\n😱 *Miedo y Codicia:* {_fg_val}/100 ({_fg_class}){_fg_insight}")
+        _fg_insight = " — extreme greed, caution on longs ⚠️"
+    lineas.append(f"\n😱 *Fear & Greed:* {_fg_val}/100 ({_fg_class}){_fg_insight}")
 
     # FIX 2026-04-23: Si hay eventos de alto impacto, generar IMAGEN estilo
     # ProSignalsFX y enviarla como foto con el briefing como caption.
@@ -13458,11 +13459,11 @@ def enviar_briefing_matutino():
     if _imagen_generada:
         # Texto ligero: panorama + IA + ops (sin duplicar noticias — ya están en la imagen)
         if _ia_outlook:
-            lineas.append(f"\n💡 *Perspectiva:*\n{_ia_outlook[:400]}")
+            lineas.append(f"\n💡 *Outlook:*\n{_ia_outlook[:400]}")
         with _lock_ops:
             n_activas = len(operaciones_activas)
         if n_activas > 0:
-            lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
+            lineas.append(f"\n🔔 *{n_activas} active op(s)* from yesterday")
         lineas.append("━━━━━━━━━━━━━━━━━━━━")
         caption = "\n".join(lineas)
         # Telegram caption máx 1024 chars
@@ -13477,7 +13478,7 @@ def enviar_briefing_matutino():
             # con CTA al VIP. Politica del usuario: el briefing se publica
             # automaticamente en ambos lados todos los dias.
             try:
-                _grupo_caption = caption + "\n\n🎁 ¿Quieres las señales VIP? → @Andoperandobot"
+                _grupo_caption = caption + "\n\n🎁 Want VIP signals? → @Andoperandobot"
                 if len(_grupo_caption) > 1020:
                     _grupo_caption = caption[:950] + "...\n\n🎁 VIP → @Andoperandobot"
                 _enviar_grupo_foto(_photo_bytes, _grupo_caption)
@@ -13487,7 +13488,7 @@ def enviar_briefing_matutino():
             logger.warning(f"Error enviando briefing como foto: {_e_send} — fallback texto")
             # Fallback: texto plano con las noticias
             if noticias_hoy:
-                lineas.insert(-1, "\n📰 *Alto impacto hoy:*")
+                lineas.insert(-1, "\n📰 *High impact today:*")
                 for _l in noticias_hoy[:5]:
                     lineas.insert(-1, _l)
             _texto_briefing = "\n".join(lineas)
@@ -13502,14 +13503,14 @@ def enviar_briefing_matutino():
     else:
         # Sin imagen → flujo original texto
         if noticias_hoy:
-            lineas.append("\n📰 *Alto impacto hoy:*")
+            lineas.append("\n📰 *High impact today:*")
             lineas.extend(noticias_hoy[:5])
         if _ia_outlook:
-            lineas.append(f"\n💡 *Perspectiva:*\n{_ia_outlook[:400]}")
+            lineas.append(f"\n💡 *Outlook:*\n{_ia_outlook[:400]}")
         with _lock_ops:
             n_activas = len(operaciones_activas)
         if n_activas > 0:
-            lineas.append(f"\n🔔 *{n_activas} op(s) activas* desde ayer")
+            lineas.append(f"\n🔔 *{n_activas} active op(s)* from yesterday")
         lineas.append("━━━━━━━━━━━━━━━━━━━━")
         _texto_briefing = "\n".join(lineas)
         _msg_id = enviar_canal(_texto_briefing)
@@ -13543,56 +13544,57 @@ def enviar_cierre_nocturno():
 
     lineas = []
 
+    # FIX 2026-04-26: cierre nocturno traducido a INGLES
     if es_domingo:
-        lineas.append(f"🏆 *CIERRE SEMANAL* | {momento.strftime('%d/%m/%Y')} {hora}")
+        lineas.append(f"🏆 *WEEKLY CLOSE* | {momento.strftime('%d/%m/%Y')} {hora}")
     else:
-        lineas.append(f"🌙 *CIERRE DEL DÍA* | {momento.strftime('%d/%m/%Y')} {hora}")
+        lineas.append(f"🌙 *DAILY CLOSE* | {momento.strftime('%d/%m/%Y')} {hora}")
 
     lineas.append("━━━━━━━━━━━━━━━━━━━━")
 
     if total > 0:
         emoji_resultado = "🟢" if pips_net > 0 else "🔴" if pips_net < 0 else "⚪"
-        lineas.append(f"\n📊 *RESULTADOS*")
-        lineas.append(f"   {emoji_resultado} Pips netos: *{pips_net:+.1f}*")
-        lineas.append(f"   ✅ Ganadas: *{ganadas}*  |  ❌ Perdidas: *{perdidas}*")
+        lineas.append(f"\n📊 *RESULTS*")
+        lineas.append(f"   {emoji_resultado} Net pips: *{pips_net:+.1f}*")
+        lineas.append(f"   ✅ Wins: *{ganadas}*  |  ❌ Losses: *{perdidas}*")
         lineas.append(f"   🎯 Win Rate: *{wr:.0f}%*")
 
-        # Mejor y peor operación del día
+        # Best and worst trade of the day
         if historial_operaciones:
             mejor = max(historial_operaciones, key=lambda x: x.get('pips', 0))
             peor = min(historial_operaciones, key=lambda x: x.get('pips', 0))
             if mejor.get('pips', 0) > 0:
-                lineas.append(f"   🏆 Mejor: *{mejor['nombre']}* +{mejor['pips']:.1f}")
+                lineas.append(f"   🏆 Best: *{mejor['nombre']}* +{mejor['pips']:.1f}")
             if peor.get('pips', 0) < 0:
-                lineas.append(f"   💔 Peor: *{peor['nombre']}* {peor['pips']:.1f}")
+                lineas.append(f"   💔 Worst: *{peor['nombre']}* {peor['pips']:.1f}")
     else:
-        lineas.append(f"\n📊 Sin operaciones cerradas hoy")
+        lineas.append(f"\n📊 No closed trades today")
 
     if n_activas > 0:
-        lineas.append(f"\n🔔 *{n_activas} operaciones* siguen abiertas overnight")
+        lineas.append(f"\n🔔 *{n_activas} trades* still open overnight")
 
-    # IA resumen nocturno
+    # AI nightly summary
     try:
         _ia_cierre = _ia_responder(
-            f"Resume el día de trading en 2 líneas. Resultados: {ganadas}W/{perdidas}L, pips netos: {pips_net:+.1f}. Da una perspectiva para mañana.",
+            f"Summarize the trading day in 2 lines IN ENGLISH. Results: {ganadas}W/{perdidas}L, net pips: {pips_net:+.1f}. Give a perspective for tomorrow.",
             "Canal VIP"
         ) or ""
         if _ia_cierre:
-            lineas.append(f"\n💡 *IA:* {_ia_cierre[:250]}")
+            lineas.append(f"\n💡 *AI:* {_ia_cierre[:250]}")
     except Exception:
         pass
 
     lineas.append("\n━━━━━━━━━━━━━━━━━━━━")
-    lineas.append("Buenas noches. Nos vemos mañana a las 7:00 AM 🌙")
+    lineas.append("Good night. See you tomorrow at 7:00 AM 🌙")
 
     enviar_canal("\n".join(lineas))
 
-    # Enviar al grupo público solo si positivo
+    # Send to public group only if positive
     if GROUP_ID and GROUP_ID != CHANNEL_ID and pips_net > 0 and total > 0:
         enviar_grupo(
-            f"🏆 *RESULTADOS DEL DÍA*\n"
+            f"🏆 *DAY RESULTS*\n"
             f"✅ {ganadas}W / ❌ {perdidas}L | WR: {wr:.0f}%\n"
-            f"📊 +{pips_net:.0f} Pips netos",
+            f"📊 +{pips_net:.0f} Net pips",
             incluir_promo=True
         )
 
