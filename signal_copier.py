@@ -943,6 +943,13 @@ def _should_gift_signal(pair: str) -> bool:
     today_str = now.strftime("%Y-%m-%d")
     hour = now.hour
 
+    # FIX 2026-04-26: PROHIBIDO regalar señales sabado/domingo (mercado Forex
+    # cerrado, no tiene sentido regalar algo que no se puede ejecutar).
+    # weekday(): Mon=0, Tue=1, ..., Sat=5, Sun=6
+    weekday = now.weekday()
+    if weekday >= 5:  # Sabado o domingo
+        return False
+
     is_gold = pair.upper() in ("GOLD", "XAUUSD", "XAUUSD=X")
 
     with _gift_lock:
@@ -4759,13 +4766,13 @@ def send_to_channel(signal, executed, detail):
 
     pair_display = _get_display_pair(pair)
 
-    # Tipo de orden en español
-    tipo_label = {"Market": "Mercado", "Limit": "Orden Límite", "Stop": "Orden Stop"}.get(order_type, order_type)
+    # FIX 2026-04-26: order type en INGLES
+    tipo_label = {"Market": "Market", "Limit": "Limit Order", "Stop": "Stop Order"}.get(order_type, order_type)
 
-    # Formato de precios
+    # Format prices
     fmt = fmt_price
 
-    entry_display = fmt(entry) if entry > 0 else "Precio de Mercado"
+    entry_display = fmt(entry) if entry > 0 else "Market Price"
 
     tp2 = signal.get("tp2", 0) or 0
     tp3 = signal.get("tp3", 0) or 0
@@ -4774,10 +4781,11 @@ def send_to_channel(signal, executed, detail):
     has_multi_tp = any(t > 0 for t in [tp2, tp3, tp4, tp5])
     tp_label = "TP1" if has_multi_tp else "TP"
 
+    # FIX 2026-04-26: traducido a INGLES (Entrada -> Entry)
     lines = [
         f"{dir_emoji} *{dir_label} — {pair_display}*",
         f"",
-        f"📍 Entrada: {entry_display}",
+        f"📍 Entry: {entry_display}",
     ]
     # FIX 2026-04-08: No mostrar "TP: Open" — si no hay TP válido, omitir línea
     if tp > 0:
@@ -4792,11 +4800,18 @@ def send_to_channel(signal, executed, detail):
         lines.append(f"🎯 TP5: {fmt(tp5)}")
     lines.append(f"🛡️ SL: {fmt(sl)}")
 
-    # FIX 2026-04-07: Comentario IA removido por solicitud del usuario
-    # ia_comment = signal.get("ia_comment", "")
-    # if ia_comment:
-    #     lines.append(f"")
-    #     lines.append(f"🤖 _{ia_comment}_")
+    # FIX 2026-04-26: si el mercado Forex está cerrado (fin de semana)
+    # añadir nota indicando que la señal se activará al abrir el lunes.
+    # Aplicable solo a señales no-crypto (crypto opera 24/7).
+    try:
+        if _is_forex_market_closed() and not _is_24_7_asset(pair):
+            lines.append(f"")
+            lines.append(f"🔒 *Forex market is CLOSED (weekend)*")
+            lines.append(f"🟢 Signal will activate at *Monday market open*")
+            lines.append(f"   _(Sunday 22:00 UTC — Sydney open)_")
+            lines.append(f"⚠️ _If price gaps strongly at open, validate before executing._")
+    except Exception:
+        pass
 
     msg = "\n".join(lines)
 
