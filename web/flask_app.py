@@ -864,45 +864,7 @@ def index_web():
     if not _recent_trades_html:
         _recent_trades_html = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#8b9fc4;font-size:12px">A\xfan no hay se\xf1ales publicadas</td></tr>'
 
-    # Rendimiento por activo — agrupar señales del canal
-    _asset_perf = {}
-    for _t in _copier_sorted:
-        _nombre = _t.get("pair_display") or _t.get("pair", "N/A")
-        if _nombre not in _asset_perf:
-            _asset_perf[_nombre] = {'wins': 0, 'total': 0, 'pips': 0.0}
-        _asset_perf[_nombre]['total'] += 1
-        _r = _t.get("result", "")
-        _p = float(_t.get("pips", 0) or 0)
-        if _r in _WIN_RESULTS and _p > 0:
-            _asset_perf[_nombre]['wins'] += 1
-        _asset_perf[_nombre]['pips'] += _p
-    _asset_groups = [
-        ('ORO', '#f0b90b', ['ORO', 'GOLD', 'XAUUSD', 'XAU']),
-        ('NASDAQ', '#00d4aa', ['NASDAQ', 'NQ', 'US100']),
-        ('S&amp;P 500', '#3b82f6', ['S&P', 'SP500', 'US500', 'ES']),
-        ('EUR/USD', '#a855f7', ['EUR/USD', 'EURUSD']),
-        ('USD/JPY', '#ef4444', ['USD/JPY', 'USDJPY']),
-        ('AUD/CAD', '#22c55e', ['AUD/CAD', 'AUDCAD']),
-    ]
-    _live_asset_cards = ""
-    for _display, _accent, _aliases in _asset_groups:
-        _st = {'wins': 0, 'total': 0, 'pips': 0.0}
-        for _k, _v in _asset_perf.items():
-            if any(_a.lower() in _k.lower() for _a in _aliases):
-                _st['wins'] += _v['wins']
-                _st['total'] += _v['total']
-                _st['pips'] += _v['pips']
-        _a_wr = round(_st['wins'] / _st['total'] * 100) if _st['total'] > 0 else 0
-        _a_pips = round(_st['pips'], 1)
-        _a_pc = "#00e676" if _a_pips >= 0 else "#ff3b30"
-        _live_asset_cards += (
-            f'<div style="background:rgba(10,15,30,.6);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;text-align:center;min-width:120px;flex:1">'
-            f'<div style="display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;color:#fff;font-size:13px;margin-bottom:6px"><span style="width:8px;height:8px;border-radius:50%;background:{_accent}"></span>{_display}</div>'
-            f'<div style="font-size:1.5rem;font-weight:800;color:{_accent};text-shadow:0 0 20px {_accent}40">{_a_wr}%</div>'
-            f'<div style="font-size:10px;color:#8b9fc4;margin-top:2px">Win Rate &bull; {_st["total"]} ops</div>'
-            f'<div style="font-size:11px;color:{_a_pc};font-weight:700;margin-top:4px">{_a_pips:+.1f} pips</div>'
-            f'</div>'
-        )
+    # FIX 2026-04-26: Bloque "Rendimiento por Activo" eliminado por solicitud del usuario.
 
     _html = f"""<!DOCTYPE html>
 <html lang="es">
@@ -1364,16 +1326,7 @@ if('serviceWorker' in navigator){{
       </div>
     </div>
 
-    <!-- ASSET PERFORMANCE -->
-    <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px">
-      <div style="display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:14px;margin-bottom:14px">
-        <span style="font-size:16px">&#128178;</span>
-        <span data-i18n="live.asset_perf">Rendimiento por Activo</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px">
-        {_live_asset_cards}
-      </div>
-    </div>
+    <!-- ASSET PERFORMANCE — eliminado por solicitud usuario 2026-04-26 -->
 
     <!-- CTA TELEGRAM -->
     <div style="text-align:center;margin-top:24px">

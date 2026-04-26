@@ -333,11 +333,11 @@ def _generate_tp_image(pair: str, direction: str, entry: float, tp: float,
     # ── Mensaje de marketing ──
     _draw_rounded_rect(draw, [80, 695, IMG_W - 80, 835], radius=16,
                        fill=COLOR_CARD_BG, outline=(40, 46, 54), width=1)
-    draw.text((IMG_W // 2, 725), "Otra se\u00f1al exitosa de nuestro",
+    draw.text((IMG_W // 2, 725), "Another successful signal from our",
               fill=COLOR_GRAY, font=font_small, anchor="mt")
-    draw.text((IMG_W // 2, 760), "Canal VIP", fill=COLOR_GOLD,
+    draw.text((IMG_W // 2, 760), "VIP Channel", fill=COLOR_GOLD,
               font=font_value, anchor="mt")
-    draw.text((IMG_W // 2, 805), "\u00bfQuieres recibir estas se\u00f1ales?",
+    draw.text((IMG_W // 2, 805), "Want to receive these signals?",
               fill=COLOR_WHITE, font=font_small, anchor="mt")
 
     # CTA
@@ -416,7 +416,7 @@ def _generate_daily_summary_image(stats: dict) -> Path:
 
     # Titulo
     fecha = stats.get("fecha", datetime.now().strftime("%d/%m/%Y"))
-    draw.text((IMG_W // 2, 88), f"RESUMEN DEL D\u00cdA", fill=COLOR_WHITE,
+    draw.text((IMG_W // 2, 88), f"DAILY RECAP", fill=COLOR_WHITE,
               font=font_title, anchor="mt")
     draw.text((IMG_W // 2, 138), fecha, fill=COLOR_GRAY,
               font=font_label, anchor="mt")
@@ -552,11 +552,11 @@ def _generate_new_signal_image(pair: str, direction: str, entry: float,
               font=font_brand, anchor="mt")
     draw.line([(390, 73), (690, 73)], fill=dir_color, width=2)
 
-    # NUEVA SE\u00d1AL banner
+    # NEW SIGNAL banner
     _draw_rounded_rect(draw, [100, 95, IMG_W - 100, 180], radius=16, fill=dir_color)
     _draw_rounded_rect(draw, [104, 98, IMG_W - 104, 142], radius=14,
                        fill=(min(dir_color[0] + 30, 255), min(dir_color[1] + 30, 255), min(dir_color[2] + 30, 255)))
-    draw.text((IMG_W // 2, 137), "NUEVA SE\u00d1AL", fill=(10, 15, 10),
+    draw.text((IMG_W // 2, 137), "NEW SIGNAL", fill=(10, 15, 10),
               font=font_title, anchor="mm")
 
     # Par
@@ -1531,13 +1531,13 @@ def _generate_tp_reel_video(pair: str, direction: str, pips: str,
                           font=_get_font(150, bold=True), anchor="mm")
                 # Entrada/TP/CTA visibles desde el inicio (eran fade in)
                 if entry_price > 0:
-                    draw.text((REEL_W // 2, 1180), f"Entrada: {entry_price:.0f}",
+                    draw.text((REEL_W // 2, 1180), f"Entry: {entry_price:.0f}",
                               fill=COLOR_GRAY, font=_get_font(38), anchor="mt")
                     draw.text((REEL_W // 2, 1240), f"Take Profit: {tp_price:.0f}",
                               fill=COLOR_GREEN, font=_get_font(38), anchor="mt")
-                draw.text((REEL_W // 2, 1380), "Senal exitosa del Canal VIP",
+                draw.text((REEL_W // 2, 1380), "Successful VIP Channel signal",
                           fill=COLOR_GOLD, font=_get_font(40, bold=True), anchor="mt")
-                draw.text((REEL_W // 2, 1460), "Unite — Link en bio",
+                draw.text((REEL_W // 2, 1460), "Join us — Link in bio",
                           fill=COLOR_GRAY, font=_get_font(32), anchor="mt")
                 draw.text((REEL_W // 2, REEL_H - 80), "buysell365.pro",
                           fill=(50, 56, 68), font=_get_font(24), anchor="mt")
@@ -1813,16 +1813,16 @@ def _generate_tp_telegram_video(pair: str, direction: str, pips: str,
                 draw.text((TG_W // 2, 375), pips, fill=COLOR_GREEN,
                           font=_get_font(90, bold=True), anchor="mm")
 
-                # Entrada/TP visibles desde el inicio (era con scene_t > 0.2)
+                # Entry/TP visibles desde el inicio (era con scene_t > 0.2)
                 if entry_price > 0:
-                    draw.text((TG_W // 2, 490), f"Entrada: {entry_price:.0f}",
+                    draw.text((TG_W // 2, 490), f"Entry: {entry_price:.0f}",
                               fill=COLOR_GRAY, font=_get_font(24), anchor="mt")
                     draw.text((TG_W // 2, 525), f"Take Profit: {tp_price:.0f}",
                               fill=COLOR_GREEN, font=_get_font(24), anchor="mt")
                 # CTA visible desde el inicio (era con scene_t > 0.4 y > 0.6)
-                draw.text((TG_W // 2, 580), "Senal exitosa del Canal VIP",
+                draw.text((TG_W // 2, 580), "Successful VIP Channel signal",
                           fill=COLOR_GOLD, font=_get_font(26, bold=True), anchor="mt")
-                draw.text((TG_W // 2, 635), "Unite al VIP — /vip",
+                draw.text((TG_W // 2, 635), "Join the VIP — /vip",
                           fill=COLOR_WHITE, font=_get_font(22, bold=True), anchor="mt")
                 draw.text((TG_W // 2, 670), "buysell365.pro",
                           fill=(50, 56, 68), font=_get_font(18), anchor="mt")
@@ -2199,9 +2199,9 @@ def post_vip_signal_teaser_story(pair: str, direction: str, nivel: str = "PREMIU
                 f_cta = _get_font(72, bold=True)
                 f_small = _get_font(44)
 
-                # FIX 2026-04-26: titulo principal en INGLES, subtitulo ES
+                # FIX 2026-04-26: solo INGLES (eliminado subtitulo ES)
                 draw.text((540, 280), "⚡ NEW VIP SIGNAL", font=f_title, fill=COLOR_GOLD, anchor="mm")
-                draw.text((540, 420), "⚡ NUEVA SEÑAL VIP", font=f_small, fill=COLOR_GRAY, anchor="mm")
+                draw.text((540, 420), "Real-time alert", font=f_small, fill=COLOR_GRAY, anchor="mm")
 
                 # Par grande
                 draw.text((540, 680), _fmt_pair_ig(pair), font=f_pair, fill=COLOR_WHITE, anchor="mm")
