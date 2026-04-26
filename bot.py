@@ -3476,7 +3476,7 @@ def _ejecutar_senal_manual(senal: dict, chat_id: str, nombre_admin: str = "Admin
     ind_mock = {'estrategia': 'manual', 'confianza_total': 100}
     msg_canal = mensaje_nueva_senal(nombre, ticker, tipo, entrada, niveles, ind_mock, 5, [], fuente="Manual", premium=True, nivel_senal="PREMIUM")
     enviar_canal(msg_canal, teclado={"inline_keyboard": [
-        [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+        [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
     ]})
 
     # Confirmar resultado
@@ -5215,7 +5215,7 @@ def cmd_url_dashboard():
         "inline_keyboard": [
             [{"text": "🌐 WEB OFICIAL", "url": "https://buysell365.pro"}],
             [{"text": "📊 TRADING EN VIVO", "url": DASHBOARD_URL}],
-            [{"text": "📅 Noticias", "callback_data": "/noticias"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
+            [{"text": "📅 News", "callback_data": "/noticias"}, {"text": "⏰ Horarios", "callback_data": "/horarios"}]
         ]
     }
     msg = (
@@ -6590,7 +6590,7 @@ def cmd_vip(user_id: str = None):
         texto += f"\n\n💡 _Tienes un pago pendiente de {monto_pend:.3f} USDT_"
 
     # Botones — Pago directo (sin trial)
-    btn_pago = f"💰 SUSCRIBIRME (50% OFF)" if pi["en_descuento"] else f"💰 SUSCRIBIRME"
+    btn_pago = f"💰 SUBSCRIBE (50% OFF)" if pi["en_descuento"] else f"💰 SUSCRIBIRME"
     botones = []
     botones.append([{"text": "📊 VER RESULTADOS EN VIVO", "url": "https://buysell365.pro"}])
     # Métodos de pago en la misma fila si es posible
@@ -6598,7 +6598,7 @@ def cmd_vip(user_id: str = None):
     botones.append(fila_pago)
     admin_user_clean = ADMIN_USER.replace("@", "")
     precio_t = pi["precio"]
-    botones.append([{"text": "💬 Otro método de pago — Hablar con Admin", "url": f"https://t.me/{admin_user_clean}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{precio_t:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}])
+    botones.append([{"text": "💬 Other payment method — Talk to Admin", "url": f"https://t.me/{admin_user_clean}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{precio_t:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}])
     if _tiene_pago_pendiente:
         pend_info = pagos_pendientes_vip[user_id]
         if pend_info.get("monto_unico"):
@@ -6606,8 +6606,8 @@ def cmd_vip(user_id: str = None):
             botones.append([{"text": f"⏳ VER PAGO PENDIENTE ({monto_pend:.3f} USDT)", "callback_data": "vip_ver_pago_pendiente"}])
     # Botón Términos y Condiciones + Cancelar
     botones.append([
-        {"text": "📜 Términos y Condiciones", "url": "https://buysell365.pro/terminos"},
-        {"text": "❌ Cancelar", "callback_data": "vip_cancelar"},
+        {"text": "📜 Terms & Conditions", "url": "https://buysell365.pro/terminos"},
+        {"text": "❌ Cancel", "callback_data": "vip_cancelar"},
     ])
     botones.append([{"text": f"❓ Contactar Admin", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}])
     return texto, {"inline_keyboard": botones}
@@ -6699,10 +6699,10 @@ def _mostrar_instrucciones_pago(chat_id: str, user_id: str, nombre: str, usernam
 
     _pago_teclado = {
         "inline_keyboard": [
-            [{"text": "💰 ABRIR BINANCE PARA PAGAR", "url": "https://app.binance.com/en/my/wallet/account/main/withdrawal/crypto/USDT"}],
+            [{"text": "💰 OPEN BINANCE TO PAY", "url": "https://app.binance.com/en/my/wallet/account/main/withdrawal/crypto/USDT"}],
             [{"text": f"❓ AYUDA — {ADMIN_USER}", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}],
-            [{"text": "◀️ Volver al menú de pago", "callback_data": "vip_aceptar_terminos"}],
-            [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
+            [{"text": "◀️ Back to payment menu", "callback_data": "vip_aceptar_terminos"}],
+            [{"text": "❌ Cancel", "callback_data": "vip_cancelar"}],
         ]
     }
     msg_id = enviar_telegram(
@@ -6994,7 +6994,7 @@ def _revocar_acceso_vip(user_id: str, notificar: bool = True):
                 user_id,
                 teclado={
                     "inline_keyboard": [[
-                        {"text": "💰 SUSCRIBIRME (50% OFF)", "callback_data": "vip_pagar_usdt"}
+                        {"text": "💰 SUBSCRIBE (50% OFF)", "callback_data": "vip_pagar_usdt"}
                     ]]
                 }
             )
@@ -7053,7 +7053,7 @@ def _enviar_aviso_vip(user_id: str, dias_restantes: int):
             user_id,
             teclado={
                 "inline_keyboard": [[
-                    {"text": "💰 SUSCRIBIRME (50% OFF)", "callback_data": "vip_pagar_usdt"}
+                    {"text": "💰 SUBSCRIBE (50% OFF)", "callback_data": "vip_pagar_usdt"}
                 ]]
             }
         )
@@ -7785,7 +7785,7 @@ def _procesar_codigo_invitacion(code: str, user_id: str, nombre: str):
         user_id,
         teclado={"inline_keyboard": [
             [{"text": "✅ ACEPTO — ACTIVAR CODIGO", "callback_data": f"codigo_aceptar_{code}"}],
-            [{"text": "❌ CANCELAR", "callback_data": "vip_cancelar"}]
+            [{"text": "❌ CANCEL", "callback_data": "vip_cancelar"}]
         ]}
     )
     log_vip(f"🎟️ CÓDIGO PRESENTADO: {code} a usuario {user_id} ({nombre})")
@@ -8910,11 +8910,11 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                     ],
                     [
                         {"text": "📊 Estado Sistema", "callback_data": "/estado"},
-                        {"text": "📂 Señales Activas", "callback_data": "/senales"},
+                        {"text": "📂 Active Signals", "callback_data": "/senales"},
                     ],
                     [
                         {"text": "💰 Capital & Stats", "callback_data": "/cuenta"},
-                        {"text": "📋 Resumen del Día", "callback_data": "/resumen"},
+                        {"text": "📋 Daily Recap", "callback_data": "/resumen"},
                     ],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
                 ]
@@ -8940,9 +8940,9 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             )
             start_botones = {
                 "inline_keyboard": [
-                    [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
-                    [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"}],
-                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "📊 Live Prices", "callback_data": "/precios"}, {"text": "📅 News", "callback_data": "/noticias"}],
+                    [{"text": "💎 My VIP Status", "callback_data": "/cuenta"}],
+                    [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
                 ]
             }
@@ -8971,8 +8971,8 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             )
             start_botones = {
                 "inline_keyboard": [
-                    [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],                    [{"text": "📊 Precios en Vivo", "callback_data": "/precios"}, {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                    [{"text": "💎 SUBSCRIBE TO VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],                    [{"text": "📊 Live Prices", "callback_data": "/precios"}, {"text": "📅 News", "callback_data": "/noticias"}],
                     [{"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}],
                 ]
             }
@@ -9013,11 +9013,11 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         _es_vip_esc = (remitente in suscripciones_vip
                        and suscripciones_vip[remitente].get("entrada_confirmada", False))
         _teclado_escape = {"inline_keyboard": [
-            [{"text": "🔄 Reiniciar — Menú principal", "callback_data": "/start"}],
-            [{"text": "🔍 Análisis de mercado",  "callback_data": "/analisis_eurusd"},
-             {"text": "📡 Señales activas",      "callback_data": "/activas"}],
+            [{"text": "🔄 Restart — Main Menu", "callback_data": "/start"}],
+            [{"text": "🔍 Market Analysis",  "callback_data": "/analisis_eurusd"},
+             {"text": "📡 Active Signals",      "callback_data": "/activas"}],
             [{"text": "📊 Precios en vivo",      "callback_data": "/precios"},
-             {"text": "📈 Resumen del día",      "callback_data": "/resumen"}],
+             {"text": "📈 Daily Recap",      "callback_data": "/resumen"}],
             *([[{"text": "🏆 Mi Panel VIP",      "callback_data": "/panel"}]] if _es_vip_esc else []),
             [{"text": "💎 Planes VIP",           "callback_data": "vip_pagar_usdt"}],
             [{"text": "🌐 Dashboard en vivo",    "url": "https://buysell365.pro"}],
@@ -9057,19 +9057,19 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 "━━━━━━━━━━━━━━━━━━━━\n\n"
                 "Selecciona lo que necesitas 👇",
                 {"inline_keyboard": [
-                    [{"text": "🔍 Análisis EUR/USD",  "callback_data": "/analisis_eurusd"},
-                     {"text": "🔍 Análisis NASDAQ",   "callback_data": "/analisis_nasdaq"}],
-                    [{"text": "🔍 Análisis S&P 500",  "callback_data": "/analisis_sp500"},
-                     {"text": "🔍 Análisis ORO",      "callback_data": "/analisis_xauusd"}],
-                    [{"text": "📡 Señales Activas",   "callback_data": "/activas"},
-                     {"text": "📈 Resumen del Día",   "callback_data": "/resumen"}],
-                    [{"text": "📊 Precios en Vivo",   "callback_data": "/precios"},
-                     {"text": "📅 Noticias Eco.",     "callback_data": "/noticias"}],
-                    [{"text": "💎 Mi Estado VIP",     "callback_data": "/cuenta"},
+                    [{"text": "🔍 EUR/USD Analysis",  "callback_data": "/analisis_eurusd"},
+                     {"text": "🔍 NASDAQ Analysis",   "callback_data": "/analisis_nasdaq"}],
+                    [{"text": "🔍 S&P 500 Analysis",  "callback_data": "/analisis_sp500"},
+                     {"text": "🔍 GOLD Analysis",      "callback_data": "/analisis_xauusd"}],
+                    [{"text": "📡 Active Signals",   "callback_data": "/activas"},
+                     {"text": "📈 Daily Recap",   "callback_data": "/resumen"}],
+                    [{"text": "📊 Live Prices",   "callback_data": "/precios"},
+                     {"text": "📅 Economic News",     "callback_data": "/noticias"}],
+                    [{"text": "💎 My VIP Status",     "callback_data": "/cuenta"},
                      {"text": "📉 Resumen Semanal",   "callback_data": "/semana"}],
                     [{"text": "⏰ Horarios",           "callback_data": "/horarios"},
                      {"text": "📌 Estado del Bot",    "callback_data": "/estado"}],
-                    [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                    [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
                     [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
                 ]}
             )
@@ -9196,10 +9196,10 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
         )
         panel_botones = {
             "inline_keyboard": [
-                [{"text": "💬 Hablar con el Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
-                [{"text": "🔍 Análisis de Mercado", "callback_data": "/analisis_eurusd"},
+                [{"text": "💬 Talk to the Bot", "url": f"https://t.me/{BOT_USERNAME}?start=grupo"}],
+                [{"text": "🔍 Market Analysis", "callback_data": "/analisis_eurusd"},
                  {"text": "💎 Ver Planes VIP", "callback_data": "vip_pagar_usdt"}],
-                [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
                 [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro/dashboard"}],
             ]
         }
@@ -13047,7 +13047,7 @@ def _procesar_webhook_bg(data, ticker, source, raw_body):
 
         # Enviar a Telegram (solo en horario)
         enviar_canal(msg, teclado={"inline_keyboard": [
-            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
         ]})
 
         # Actualizar la reserva con datos finales (MT5 result, etc.)
@@ -13637,14 +13637,14 @@ def enviar_notificacion_sesion(sesion):
     enviar_telegram_temporal("\n".join(lineas), destino=CHANNEL_ID, delay_borrado=600, teclado=teclado)
 
 def crear_teclado_principal():
-    """Menú persistente con botones rápidos organizados por función."""
+    """Persistent reply keyboard with quick actions (FIX 2026-04-26: EN)."""
     return {
         "keyboard": [
-            [{"text": "📊 Señales Activas"}, {"text": "📈 Resumen Diario"}],
-            [{"text": "💱 Análisis EUR/USD"}, {"text": "🔍 Análisis NASDAQ"}],
-            [{"text": "📅 Noticias"}, {"text": "☀️ Briefing"}],
-            [{"text": "💰 Mi Cuenta"}, {"text": "⚙️ Estado Bot"}],
-            [{"text": "💎 VIP"}, {"text": "❓ Ayuda"}]
+            [{"text": "📊 Active Signals"}, {"text": "📈 Daily Recap"}],
+            [{"text": "💱 EUR/USD Analysis"}, {"text": "🔍 NASDAQ Analysis"}],
+            [{"text": "📅 News"}, {"text": "☀️ Briefing"}],
+            [{"text": "💰 My Account"}, {"text": "⚙️ Bot Status"}],
+            [{"text": "💎 VIP"}, {"text": "❓ Help"}]
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False
@@ -14719,7 +14719,7 @@ def loop_publicidad_canal():
             "🔥 *Sin filtros, sin esperas, sin ruido.*\n\n"
             "👇 *Suscríbete y empieza a operar como un pro*",
             {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}
+                {"text": "💎 SUBSCRIBE TO VIP CHANNEL", "callback_data": "vip_pagar_usdt"}
             ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
@@ -14737,7 +14737,7 @@ def loop_publicidad_canal():
             "✅ Cancelas la suscripción cuando quieras\n"
             "💰 *Suscripción mensual transparente*",
             {"inline_keyboard": [[
-                {"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}
+                {"text": "💎 SUBSCRIBE TO VIP CHANNEL", "callback_data": "vip_pagar_usdt"}
             ], [
                 {"text": "🌐 BuySell365.pro", "url": "https://buysell365.pro"}
             ]]}
@@ -15505,19 +15505,19 @@ def _enviar_bienvenida_vip(user_dict: dict, chat_id_str: str = "") -> bool:
     )
     _botones_vip = {
         "inline_keyboard": [
-            [{"text": "🥇 Análisis GOLD", "callback_data": "/analisis_xauusd"},
-             {"text": "📈 Análisis NASDAQ", "callback_data": "/analisis_nasdaq"}],
-            [{"text": "💱 Análisis EUR/USD", "callback_data": "/analisis_eurusd"},
-             {"text": "💱 Análisis GBP/USD", "callback_data": "/analisis_gbpusd"}],
-            [{"text": "📊 Análisis S&P 500", "callback_data": "/analisis_sp500"},
-             {"text": "💱 Análisis EUR/JPY", "callback_data": "/analisis_eurjpy"}],
-            [{"text": "📡 Señales Activas", "callback_data": "/activas"},
-             {"text": "📈 Resumen del Día", "callback_data": "/resumen"}],
-            [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
-             {"text": "📅 Noticias Eco.", "callback_data": "/noticias"}],
-            [{"text": "💎 Mi Estado VIP", "callback_data": "/cuenta"},
+            [{"text": "🥇 GOLD Analysis", "callback_data": "/analisis_xauusd"},
+             {"text": "📈 NASDAQ Analysis", "callback_data": "/analisis_nasdaq"}],
+            [{"text": "💱 EUR/USD Analysis", "callback_data": "/analisis_eurusd"},
+             {"text": "💱 GBP/USD Analysis", "callback_data": "/analisis_gbpusd"}],
+            [{"text": "📊 S&P 500 Analysis", "callback_data": "/analisis_sp500"},
+             {"text": "💱 EUR/JPY Analysis", "callback_data": "/analisis_eurjpy"}],
+            [{"text": "📡 Active Signals", "callback_data": "/activas"},
+             {"text": "📈 Daily Recap", "callback_data": "/resumen"}],
+            [{"text": "📊 Live Prices", "callback_data": "/precios"},
+             {"text": "📅 Economic News", "callback_data": "/noticias"}],
+            [{"text": "💎 My VIP Status", "callback_data": "/cuenta"},
              {"text": "📉 Resumen Semanal", "callback_data": "/semana"}],
-            [{"text": "💎 VER CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+            [{"text": "💎 VIEW VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
             [{"text": "🌐 Dashboard en Vivo", "url": "https://buysell365.pro"}],
         ]
     }
@@ -15777,9 +15777,9 @@ def loop_polling():
                                 f"👇 *Elige tu método de pago:*",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "💰 PAGAR CON BINANCE (USDT) — Activación inmediata ⚡", "callback_data": "vip_pagar_confirmar"}],
-                                    [{"text": "💬 Otro método — Hablar con Admin", "url": f"https://t.me/{_admin_clean_p}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{_precio_p:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}],
-                                    [{"text": "❌ Cancelar", "callback_data": "vip_cancelar"}],
+                                    [{"text": "💰 PAY WITH BINANCE (USDT) — Instant activation ⚡", "callback_data": "vip_pagar_confirmar"}],
+                                    [{"text": "💬 Other method — Talk to Admin", "url": f"https://t.me/{_admin_clean_p}?text=Hola%2C+quiero+suscribirme+al+VIP+%28{_precio_p:.0f}+EUR%2Fmes%29+con+otro+m%C3%A9todo+de+pago"}],
+                                    [{"text": "❌ Cancel", "callback_data": "vip_cancelar"}],
                                 ]}
                             )
                             if _dm_pago is None and tipo_chat in ("group", "supergroup"):
@@ -15835,7 +15835,7 @@ def loop_polling():
                                 "👇 Suscríbete al Canal VIP:",
                                 user_id,
                                 teclado={"inline_keyboard": [
-                                    [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
+                                    [{"text": "💎 SUBSCRIBE TO VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
                                 ]}
                             )
                             continue
@@ -15855,7 +15855,7 @@ def loop_polling():
                                     "✅ _Verificacion automatica en ~5 min._",
                                     user_id,
                                     teclado={"inline_keyboard": [
-                                        [{"text": "💰 ABRIR BINANCE PARA PAGAR", "url": "https://app.binance.com/en/my/wallet/account/main/withdrawal/crypto/USDT"}],
+                                        [{"text": "💰 OPEN BINANCE TO PAY", "url": "https://app.binance.com/en/my/wallet/account/main/withdrawal/crypto/USDT"}],
                                         [{"text": "❌ CANCELAR PAGO", "callback_data": "vip_cancelar_pago"}],
                                         [{"text": f"❓ AYUDA — {ADMIN_USER}", "url": f"https://t.me/{ADMIN_USER.replace('@','')}"}]
                                     ]}
@@ -16268,9 +16268,9 @@ def loop_polling():
                                     chat_id,
                                     teclado={"inline_keyboard": [
                                         [{"text": "💎 VER PLANES VIP", "callback_data": "vip_pagar_usdt"}],
-                                        [{"text": "💎 SUSCRIBIRME AL CANAL VIP", "callback_data": "vip_pagar_usdt"}],
-                                        [{"text": "📊 Precios en Vivo", "callback_data": "/precios"},
-                                         {"text": "📅 Noticias", "callback_data": "/noticias"}],
+                                        [{"text": "💎 SUBSCRIBE TO VIP CHANNEL", "callback_data": "vip_pagar_usdt"}],
+                                        [{"text": "📊 Live Prices", "callback_data": "/precios"},
+                                         {"text": "📅 News", "callback_data": "/noticias"}],
                                         [{"text": "🌐 Dashboard buysell365.pro", "url": "https://buysell365.pro"}],
                                     ]}
                                 )
