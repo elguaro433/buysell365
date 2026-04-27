@@ -1637,7 +1637,11 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
 
     direction = signal["direction"]
     pair = signal["pair"]
-    entry = signal["entry"]
+    # FIX 2026-04-27: usar mt5_entry (precio REAL ejecutado en MT5) cuando exista.
+    # Caso GBPUSD 27/04: entry teorico 1.35320 pero MT5 ejecuto a 1.35118 → la
+    # celebracion mostraba "+16 pips" calculados sobre el teorico, mientras que
+    # la cuenta real cerro practicamente neutra. Ahora reflejamos el real.
+    entry = signal.get("mt5_entry", 0) or signal["entry"]
     # FIX 2026-04-08: Usar TP final (el más alto/bajo) para calcular profit real
     tp = signal.get("_tp_final") or signal.get("tp", 0) or 0
     pair_d = _get_display_pair(pair)
@@ -2151,7 +2155,9 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
 
     direction = signal["direction"]
     pair = signal["pair"]
-    entry = signal["entry"]
+    # FIX 2026-04-27: usar mt5_entry (precio REAL ejecutado en MT5) cuando exista
+    # para calcular pips perdidos honestos respecto a la posicion real.
+    entry = signal.get("mt5_entry", 0) or signal["entry"]
     sl = signal["sl"]
     pair_d = _get_display_pair(pair)
 
@@ -2214,7 +2220,9 @@ def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_m
 
     direction = signal.get("direction", "BUY")
     pair = signal.get("pair", "?")
-    entry = signal.get("entry", 0) or 0
+    # FIX 2026-04-27: usar mt5_entry real cuando exista — net contra el precio
+    # ACTUAL debe medirse desde donde MT5 entro, no desde el teorico del aliado.
+    entry = signal.get("mt5_entry", 0) or signal.get("entry", 0) or 0
     pair_d = _get_display_pair(pair)
     dir_emoji = "🟢" if direction == "BUY" else "🔴"
     _dir_label_es = "BUY" if direction.upper() == "BUY" else "SELL"
@@ -2330,7 +2338,10 @@ def _record_daily_result(signal: dict, result: str) -> None:
     """Registra un TP o SL en el tracker diario para los reportes del grupo."""
     pair = signal.get("pair", "?")
     direction = signal.get("direction", "?")
-    entry = signal.get("entry", 0) or 0
+    # FIX 2026-04-27: priorizar mt5_entry (precio real ejecutado) sobre el
+    # entry teorico del aliado. El daily tracker alimenta los reportes promo
+    # publicos — debe reflejar pips reales, no teoricos.
+    entry = signal.get("mt5_entry", 0) or signal.get("entry", 0) or 0
     tp = signal.get("_tp_final", signal.get("tp", 0)) or 0
     sl = signal.get("sl", 0) or 0
 
@@ -2871,6 +2882,12 @@ def _retry_pending_market_open_signals() -> int:
 
     log.info(f"🔓 Mercado abierto — reintentando {len(pending)} señales pendientes en MT5")
 
+    # FIX 2026-04-27: umbral minimo de R:R para retry tras fin de semana.
+    # Bajo este umbral consideramos que el precio se movio demasiado durante el
+    # cierre y la senal del aliado ya no es viable. Override por env si se quiere
+    # mas/menos estricto. 1.0 = reward minimo == riesgo (R:R 1:1).
+    _min_rr_retry = float(os.getenv("COPIER_RETRY_MIN_RR", "1.0"))
+
     for sig_id, sdata in pending:
         sig = sdata.get("signal", {})
         pair = sig.get("pair", "?")
@@ -2885,6 +2902,68 @@ def _retry_pending_market_open_signals() -> int:
                     _open_signals[sig_id].pop("_pending_market_open", None)
             continue
 
+        # FIX 2026-04-27: PRE-CHECK R:R real con tick actual del broker.
+        # Caso real 27/04 00:00: GBPUSD SELL del sabado entry=1.35320 TP=1.35160
+        # SL=1.35470. Lunes abre a 1.35118 (precio bajo del entry teorico). MT5
+        # ejecuta a precio actual → R:R=0.13 (TP a 4 pips, SL a 35 pips). Trade
+        # PESIMO publicado como ganador. Ahora abortamos si R:R < umbral.
+        _abort_reason = None
+        try:
+            import MetaTrader5 as _mt5_chk
+            if _mt5_chk.terminal_info() is not None or _mt5_chk.initialize():
+                _sym_chk = sig.get("mt5_symbol") or sig.get("pair", "")
+                _tick_chk = _mt5_chk.symbol_info_tick(_sym_chk)
+                if _tick_chk:
+                    _is_buy_chk = sig.get("direction") == "BUY"
+                    _live_price = _tick_chk.ask if _is_buy_chk else _tick_chk.bid
+                    _tp_chk = sig.get("tp", 0) or 0
+                    _sl_chk = sig.get("sl", 0) or 0
+                    if _live_price > 0 and _tp_chk > 0 and _sl_chk > 0:
+                        # Direccion: TP debe estar al lado correcto del precio actual.
+                        _wrong_dir = (
+                            (_is_buy_chk and _tp_chk <= _live_price) or
+                            (not _is_buy_chk and _tp_chk >= _live_price)
+                        )
+                        if _wrong_dir:
+                            _abort_reason = f"TP {_tp_chk} ya quedo del lado equivocado (precio {_live_price})"
+                        else:
+                            _risk_real = abs(_live_price - _sl_chk)
+                            _reward_real = abs(_tp_chk - _live_price)
+                            _rr_real = (_reward_real / _risk_real) if _risk_real > 0 else 0
+                            if _rr_real < _min_rr_retry:
+                                _abort_reason = f"R:R real {_rr_real:.2f} < min {_min_rr_retry}"
+        except Exception as _e_rrcheck:
+            log.debug(f"R:R precheck error {pair_d}: {_e_rrcheck}")
+
+        if _abort_reason:
+            log.warning(f"🚫 Retry abortado {pair_d} {direction}: {_abort_reason}")
+            # Sacar de _open_signals para que no quede colgada
+            with _signals_lock:
+                _open_signals.pop(sig_id, None)
+            _resolved_signals.add(sig_id)
+            # Notificar al canal VIP — honestidad sobre por que NO se ejecuto
+            if BOT_TOKEN and CHANNEL_ID and msg_id:
+                try:
+                    _msg_skip = (
+                        f"⚠️ *Signal SKIPPED*\n\n"
+                        f"_{pair_d} {direction}_ — market moved during weekend.\n"
+                        f"Original setup no longer valid.\n"
+                        f"_{_abort_reason}_"
+                    )
+                    requests.post(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                        json={
+                            "chat_id": CHANNEL_ID,
+                            "text": _msg_skip,
+                            "parse_mode": "Markdown",
+                            "reply_to_message_id": msg_id,
+                        },
+                        timeout=10,
+                    )
+                except Exception as _e_skipnotif:
+                    log.debug(f"Skip notif error: {_e_skipnotif}")
+            continue
+
         try:
             executed, detail = execute_in_mt5(sig)
             retried += 1
@@ -2897,13 +2976,28 @@ def _retry_pending_market_open_signals() -> int:
                     if sig_id in _open_signals:
                         _open_signals[sig_id].pop("_pending_market_open", None)
 
+                # FIX 2026-04-27: el mensaje al canal ahora muestra el entry MT5
+                # REAL ademas del teorico (cuando difieren) — antes mentia
+                # diciendo "ACTIVADA" sin aclarar que el precio cambio.
+                _mt5_e = sig.get("mt5_entry", 0) or 0
+                _e_teorico = sig.get("entry", 0) or 0
+                _entry_line = f"📍 Entry MT5: {_mt5_e}"
+                if _e_teorico > 0 and _mt5_e > 0:
+                    _entry_diff_pct = abs(_mt5_e - _e_teorico) / _e_teorico * 100
+                    if _entry_diff_pct >= 0.1:
+                        _entry_line += (
+                            f"\n⚠️ Signal entry: {_e_teorico} "
+                            f"(price moved {_entry_diff_pct:.2f}% over weekend)"
+                        )
+
                 # Notificar al canal VIP en respuesta al mensaje original
                 if BOT_TOKEN and CHANNEL_ID and msg_id:
                     try:
                         _msg_act = (
                             f"✅ *Signal ACTIVATED*\n\n"
                             f"Market is now open — order executed in MT5.\n"
-                            f"_{pair_d} {direction}_"
+                            f"_{pair_d} {direction}_\n\n"
+                            f"{_entry_line}"
                         )
                         _payload_act = {
                             "chat_id": CHANNEL_ID,
@@ -3379,6 +3473,36 @@ async def _monitor_tp_loop() -> None:
             if sl > 0:
                 sl_hit = (direction == "BUY" and price <= sl) or (direction == "SELL" and price >= sl)
 
+            # FIX 2026-04-27: detectar DRIFT — si hay mt5_entry (precio real
+            # ejecutado en MT5) y el TP esta del lado equivocado vs ese entry,
+            # disparar tp_hit seria celebrar una "ganancia" que en MT5 real es
+            # PERDIDA. Caso GBPUSD 27/04: entry teorico 1.35320, MT5 ejecuto a
+            # 1.35118, TP teorico 1.35160 → cumplio para "teorico" pero MT5
+            # real cerro en perdida. Convertir a orphan honesto.
+            if tp_hit:
+                _mt5_e_drift = signal.get("mt5_entry", 0) or 0
+                if _mt5_e_drift > 0:
+                    _tp_lado_correcto = (
+                        (direction == "BUY" and tp > _mt5_e_drift) or
+                        (direction == "SELL" and tp < _mt5_e_drift)
+                    )
+                    if not _tp_lado_correcto:
+                        log.warning(
+                            f"⚠️ DRIFT detectado {pair} {direction}: TP={tp} esta "
+                            f"del lado equivocado vs mt5_entry={_mt5_e_drift} — "
+                            f"cerrando como orphan (no celebrar TP falso)"
+                        )
+                        tp_hit = False
+                        _dedup_key_drift = f"{pair}_{direction}_drift"
+                        if _dedup_key_drift not in _already_in_cycle:
+                            _already_in_cycle.add(_dedup_key_drift)
+                            to_resolve.append((sig_id, sdata, "orphan"))
+                        else:
+                            with _signals_lock:
+                                _open_signals.pop(sig_id, None)
+                            _resolved_signals.add(sig_id)
+                        continue
+
             if tp_hit:
                 # FIX 2026-04-16: Anti-duplicado dentro del mismo ciclo
                 _dedup_key = f"{pair}_{direction}_tp{signal.get('_tp_idx', 0)}"
@@ -3680,6 +3804,11 @@ def _parse_signal_impl(text, chat_title=""):
     # FIX 2026-04-24: ampliar separadores a `_`, `-`, `=`, `|`, `—` — aliados usan
     # variantes raras ("SL_ 4686" AnabelSignals 24/04 06:50 que crasheaba antes).
     sl_match = re.search(r'(?:SL|STOP\s*LOSS)\s*[:\s→@_\-=\|—]*(\d{1,6}\.?\d+)', upper_clean)
+    # FIX 2026-04-27: Learn 2 Trade VIP SWING usa "Stop: $100.00" (STOP solo,
+    # sin LOSS). Requerimos ":" o "→" obligatorio para NO capturar "SELL STOP"
+    # / "BUY STOP" (tipo de orden). Lookbehind evita prefijos como "AUTOSTOP".
+    if not sl_match:
+        sl_match = re.search(r'(?<![A-Z])STOP\s*[:→]\s*(\d{1,6}\.?\d+)', upper_clean)
     # FIX 2026-04-24: detectar "SL OPEN/NONE/N/A/SIN/ABIERTO/-" — el aliado dice
     # explicitamente "sin SL" (AnabelSignals "SL OPEN", otros canales "NO SL").
     # En ese caso sl=0 es INTENCIONAL, no un parser fail. Sirve para no capturar
@@ -3712,6 +3841,10 @@ def _parse_signal_impl(text, chat_title=""):
     # Fallback AnabelSignals: "TP4430" o "TP1.9150" (sin espacio entre TP y número)
     if not tp_match:
         tp_match = re.search(r'\bTP(\d{1,6}\.?\d+)', _upper_clean_no_abierto)
+    # FIX 2026-04-27: Learn 2 Trade VIP SWING usa "Target: $80.00" (sin "TP" ni
+    # "Take Profit"). Lookbehind evita prefijos tipo "PRICETARGET".
+    if not tp_match:
+        tp_match = re.search(r'(?<![A-Z])TARGET\s*[:\s]\s*(\d{1,6}\.?\d+)', _upper_clean_no_abierto)
     # ── TP2-TP5: extraer por número explícito ──
     def _extract_tp_n(n, txt):
         """Extract TPn from text using multiple patterns."""
@@ -4393,9 +4526,28 @@ def execute_in_mt5(signal):
         "type_filling": mt5.ORDER_FILLING_IOC,
     }
 
+    # FIX 2026-04-27: helper para guardar precio REAL de ejecucion en el signal.
+    # Antes: el signal mantenia solo el entry teorico del aliado. Cuando el bot
+    # ejecutaba a precio distinto (ej. retry tras fin de semana con mercado
+    # movido) el monitor TP/SL y el daily tracker seguian usando el entry
+    # teorico → "TP HIT +16 pips" falso mientras la cuenta real perdia.
+    # Ahora signal["mt5_entry"] queda con el precio efectivo del broker.
+    def _record_execution(_res, _exec_default):
+        try:
+            _real = float(getattr(_res, "price", 0) or _exec_default)
+        except (TypeError, ValueError):
+            _real = float(_exec_default)
+        signal["mt5_entry"] = _real
+        signal["mt5_executed_at"] = time.time()
+        signal["mt5_lot"] = float(lot)
+        signal["mt5_sl_set"] = float(request.get("sl", 0) or 0)
+        signal["mt5_tp_set"] = float(request.get("tp", 0) or 0)
+        return _real
+
     result = mt5.order_send(request)
     if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-        return True, f"Executed {signal['direction']} {sym} @ {exec_price} Lot={lot} [{sig_order_type}]"
+        _real = _record_execution(result, exec_price)
+        return True, f"Executed {signal['direction']} {sym} @ {_real} Lot={lot} [{sig_order_type}]"
 
     err = result.comment if result else "No response"
 
@@ -4420,7 +4572,8 @@ def execute_in_mt5(signal):
             request["tp"] = tp_adj
         result2 = mt5.order_send(request)
         if result2 and result2.retcode == mt5.TRADE_RETCODE_DONE:
-            return True, f"Executed {signal['direction']} {sym} @ {exec_price} [SL/TP ajustados: {sl_adj}/{tp_adj}]"
+            _real2 = _record_execution(result2, exec_price)
+            return True, f"Executed {signal['direction']} {sym} @ {_real2} [SL/TP ajustados: {sl_adj}/{tp_adj}]"
         # FIX 2026-04-24: si el ajuste tambien falla → ejecutar SIN SL ni TP (usuario los pone manual).
         # Caso real 24/04 14:12: SureShot XAUUSD BUY 4715.97 con precio 4707.60 → SL imposible, pero
         # politica usuario es EJECUTAR TODA senal. Antes era return False, ahora reintento sin stops.
@@ -4429,7 +4582,8 @@ def execute_in_mt5(signal):
         request["tp"] = 0.0
         result3 = mt5.order_send(request)
         if result3 and result3.retcode == mt5.TRADE_RETCODE_DONE:
-            return True, f"Executed {signal['direction']} {sym} @ {exec_price} [SIN SL/TP — ajusta manual]"
+            _real3 = _record_execution(result3, exec_price)
+            return True, f"Executed {signal['direction']} {sym} @ {_real3} [SIN SL/TP — ajusta manual]"
         err = result3.comment if result3 else "No response"
         return False, f"MT5 skip (invalid stops tras 2 reintentos): {err}"
 
@@ -4441,7 +4595,8 @@ def execute_in_mt5(signal):
         request["price"] = tick.ask if is_buy else tick.bid
         result3 = mt5.order_send(request)
         if result3 and result3.retcode == mt5.TRADE_RETCODE_DONE:
-            return True, f"Executed {signal['direction']} {sym} @ market [fallback de {sig_order_type}]"
+            _real_mkt = _record_execution(result3, request["price"])
+            return True, f"Executed {signal['direction']} {sym} @ {_real_mkt} [fallback de {sig_order_type}]"
         err = result3.comment if result3 else "No response"
         return False, f"MT5 skip (invalid price tras fallback Market): {err}"
 
