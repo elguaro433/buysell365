@@ -88,29 +88,48 @@ C:\Users\hpint\Desktop\
 
 ## 🔧 Cómo desplegar cambios al VPS
 
-Flujo recomendado:
+### Workflow rápido (recomendado, 30-60 s)
+
+```powershell
+# 1) Editar archivos en app/
+# 2) Deploy con un solo comando
+.\deploy.ps1 "fix: descripcion del cambio"
+```
+
+Eso hace automáticamente:
+1. `git add -A` + `git commit` + `git push origin HEAD:main`
+2. SSH al VPS con la key dedicada
+3. `cd /opt/buysell365 && git fetch && git pull`
+4. Si `requirements.txt` cambió → `pip install -r requirements.txt`
+5. `systemctl restart buysell365` + `buysell365_admin`
+6. Verifica `is-active` y muestra últimas líneas de log
+
+### Helpers disponibles (en `tools/`)
+
+| Comando | Qué hace |
+|---|---|
+| `.\deploy.ps1 "msg"` | Pipeline completo de deploy |
+| `.\deploy.ps1 -DryRun` | Preview sin tocar nada |
+| `.\deploy.ps1 -SkipGit` | Solo redeploy en VPS, sin commit |
+| `.\tools\vps_ssh.ps1` | SSH interactivo al VPS |
+| `.\tools\vps_ssh.ps1 "comando"` | Ejecuta comando puntual |
+| `.\tools\vps_logs.ps1` | Logs del bot en vivo (tail -f) |
+| `.\tools\vps_logs.ps1 -Tail 200` | Últimas 200 líneas |
+| `.\tools\vps_logs.ps1 -Errors` | Solo errores |
+| `.\tools\vps_status.ps1` | Snapshot (servicios, git, RAM, disco) |
+| `.\tools\vps_restart.ps1` | Restart sin pull |
+
+### Flujo manual (si los scripts fallan)
 
 ```bash
-# 1) Hacer cambios en local (esta carpeta)
-# 2) Commit en branch nuevo (NUNCA push a main directo)
-git checkout -b fix/<descripcion>
-git add -A
-git commit -m "fix: descripcion clara"
-git push -u origin fix/<descripcion>
+# 1) En local
+git add -A && git commit -m "fix: ..." && git push
 
-# 3) SSH al VPS y pull
-ssh root@208.73.204.188
-cd /opt/buysell365
-git fetch origin
-git checkout fix/<descripcion>     # o merge a main si está validado
-
-# 4) Reiniciar bot
+# 2) SSH al VPS
+ssh -i ~/.ssh/id_ed25519_buysell365 root@208.73.204.188
+cd /opt/buysell365 && git pull
 systemctl restart buysell365
-systemctl status buysell365 --no-pager
-
-# 5) Verificar
-journalctl -u buysell365 -f       # logs en vivo
-# O abrir panel: http://208.73.204.188:5001
+journalctl -u buysell365 -f       # verificar arranque
 ```
 
 > **Reglas duras de deploy:**
