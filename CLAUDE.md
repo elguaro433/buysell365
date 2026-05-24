@@ -214,7 +214,21 @@ Reglas que se han ido endureciendo por feedback del usuario:
 6. Se inició git en la carpeta nueva, conectada al repo existente, push a
    branch `migration/clean-2026-05-24`
 7. SSH al VPS desbloqueado (ticket RMK-122-71751 resuelto por Akshay Pradeep)
-8. Pendiente: renombrar `BuySell365_VPS_Migration` → `BuySell365` y deploy al VPS
+   - SSH key dedicada en `~/.ssh/id_ed25519_buysell365` (autoriza passwordless)
+   - **La password root quedó visible en una captura de chat — cambiarla.**
+8. **Deploy al VPS INTENTADO y REVERTIDO (22:05):**
+   - Subí 6 .py + borré `transparency_publisher.py`
+   - Tras restart, **el launcher no spawn los hijos** (bot.py, signal_copier.py)
+   - Logs no mostraron errors visibles, launcher quedó "sleeping" sin hijos
+   - **Rollback automático con los .bak_pre_deploy_20260524_215729 restauró todo**
+   - Bot operativo de nuevo desde 22:02 con código viejo
+   - **Las versiones merged listas para reintentar están en `_staging_vps/`**
+     (también en la carpeta local — incluye los edits sobre versiones actuales del VPS)
+9. **Pendiente próxima sesión:**
+   - Investigar por qué falló el launcher con mi versión (sintaxis y encoding OK)
+   - Sospechas: race con xvfb-run, algún lock stale, dependencia oculta
+   - Estrategia recomendada: deploy archivo a archivo con restart+verify entre cada uno
+   - Renombrar `BuySell365_VPS_Migration` → `BuySell365` (script en Desktop)
 
 ---
 
