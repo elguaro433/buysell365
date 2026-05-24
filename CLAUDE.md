@@ -104,20 +104,39 @@ Eso hace automáticamente:
 5. `systemctl restart buysell365` + `buysell365_admin`
 6. Verifica `is-active` y muestra últimas líneas de log
 
-### Helpers disponibles (en `tools/`)
+### Helpers disponibles
 
 | Comando | Qué hace |
 |---|---|
-| `.\deploy.ps1 "msg"` | Pipeline completo de deploy |
-| `.\deploy.ps1 -DryRun` | Preview sin tocar nada |
-| `.\deploy.ps1 -SkipGit` | Solo redeploy en VPS, sin commit |
+| `.\deploy-files.ps1 app/bot.py [...]` | **(USAR HOY)** Deploy archivo(s) por scp + stop+clean+start + verify |
+| `.\deploy-files.ps1 -DeleteRemote app/foo.py` | Borrar archivo del VPS |
+| `.\deploy.ps1 "msg"` | (Futuro, cuando VPS sea git clone) git commit + push + pull + restart |
 | `.\tools\vps_ssh.ps1` | SSH interactivo al VPS |
 | `.\tools\vps_ssh.ps1 "comando"` | Ejecuta comando puntual |
 | `.\tools\vps_logs.ps1` | Logs del bot en vivo (tail -f) |
 | `.\tools\vps_logs.ps1 -Tail 200` | Últimas 200 líneas |
 | `.\tools\vps_logs.ps1 -Errors` | Solo errores |
 | `.\tools\vps_status.ps1` | Snapshot (servicios, git, RAM, disco) |
-| `.\tools\vps_restart.ps1` | Restart sin pull |
+| `.\tools\vps_restart.ps1` | Restart sin pull (incluye limpieza de locks) |
+
+### ⚠️ Lección crítica del 2026-05-24: lock files stale
+
+**`systemctl restart buysell365` SOLO falla**. El launcher queda colgado sin
+spawnear `bot.py` + `signal_copier.py` + `monitor_real.py`.
+
+**Causa**: el bot anterior deja `.bot.singleton.lock`, `.copier.singleton.lock`
+y `.copier.lock` en `/opt/buysell365/app/`. El launcher nuevo los detecta y
+asume que hay otra instancia, queda esperando.
+
+**Fix**: SIEMPRE usar el patrón **stop → sleep 4 → rm locks → start**:
+```bash
+systemctl stop buysell365 && sleep 4 && \
+  rm -f /opt/buysell365/app/.*.lock /opt/buysell365/app/.*.heartbeat && \
+  systemctl start buysell365
+```
+
+Ya está integrado en `deploy-files.ps1`, `deploy.ps1` y `tools/vps_restart.ps1`.
+**Nunca uses `systemctl restart buysell365` directo** — usa estos scripts.
 
 ### Flujo manual (si los scripts fallan)
 

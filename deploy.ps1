@@ -159,20 +159,48 @@ if (-not $DryRun) {
     exit 0
 }
 
-# ── 5) Restart del servicio ─────────────────────────────────
+# ── 5) Restart del servicio (CRITICO: stop + limpiar locks + start) ──
+# Lesson learned 2026-05-24: 'systemctl restart' SOLO falla porque deja locks
+# stale (.bot.singleton.lock, .copier.singleton.lock, .copier.lock). El launcher
+# nuevo los ve y se cuelga sin spawn de bot.py + signal_copier.py + monitor_real.py.
+# Solucion confirmada: stop -> sleep 4 -> rm locks -> start.
 if (-not $SkipRestart) {
-    Show-Step 5 "Restart $SERVICE"
-    $restartOut = Invoke-Ssh "systemctl restart $SERVICE && sleep 3 && systemctl is-active $SERVICE"
-    Write-Host "    $restartOut"
+    Show-Step 5 "Restart $SERVICE (stop + clean locks + start)"
+    $restartCmd = @"
+systemctl stop $SERVICE
+sleep 4
+rm -f $VPS_PATH/app/.bot.singleton.lock $VPS_PATH/app/.copier.singleton.lock $VPS_PATH/app/.copier.lock $VPS_PATH/app/.bot.heartbeat $VPS_PATH/app/.copier.heartbeat
+systemctl start $SERVICE
+echo STOP_CLEAN_START_OK
+"@
+    $rOut = Invoke-Ssh $restartCmd
+    if ($rOut -notmatch "STOP_CLEAN_START_OK") {
+        Show-Err "Stop+clean+start fallo: $rOut"
+        exit 1
+    }
+    Show-OK "stop + clean locks + start ejecutado"
 
-    if ($restartOut -match "^active$") {
-        Show-OK "$SERVICE esta active"
+    Show-Step "5b" "Esperando 75s para que el launcher levante todos los hijos..."
+    Start-Sleep -Seconds 75
+
+    Show-Step "5c" "Verificando que el bot realmente arranco"
+    $logCheck = Invoke-Ssh "tail -8 $VPS_PATH/app/logs/launcher.log | grep -c 'Bot iniciado'"
+    $procCount = Invoke-Ssh "ps aux | grep -E 'launcher|bot.py|signal_copier|monitor_real' | grep -v grep | wc -l"
+
+    $logOK = ($logCheck -replace '\s+','').Trim()
+    $procOK = ($procCount -replace '\s+','').Trim()
+    Write-Host "    Procesos bot: $procOK (esperado 4+), 'Bot iniciado' en launcher.log: $logOK"
+
+    if ([int]$logOK -ge 1 -and [int]$procOK -ge 4) {
+        Show-OK "$SERVICE arrancado correctamente con $procOK procesos hijo"
     } else {
-        Show-Err "$SERVICE NO esta active. Output: $restartOut"
+        Show-Err "$SERVICE NO arranco bien (procesos=$procOK, log=$logOK)"
         Write-Host ""
-        Write-Host "    Ultimas 15 lineas de log:" -ForegroundColor Yellow
-        $logs = Invoke-Ssh "journalctl -u $SERVICE -n 15 --no-pager"
-        Write-Host $logs
+        Write-Host "    Ultimas 20 lineas de launcher.log:" -ForegroundColor Yellow
+        $launcherLog = Invoke-Ssh "tail -20 $VPS_PATH/app/logs/launcher.log"
+        Write-Host $launcherLog
+        Write-Host ""
+        Write-Host "    Si tienes backup local previo a este deploy, rollback manualmente." -ForegroundColor Yellow
         exit 1
     }
 
