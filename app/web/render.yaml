@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: compraventa365
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn flask_app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
+    envVars:
+      - key: SYNC_SECRET
+        sync: false
+      - key: TV_SECRET
+        sync: false
+      - key: API_SECRET_KEY
+        sync: false
+      - key: LOGS_PASSWORD
+        sync: false
+      - key: VIP_PRECIO_EUR
+        value: "149"
+      - key: PYTHON_VERSION
+        value: "3.11.0"

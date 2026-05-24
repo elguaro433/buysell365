@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — BuySell365{% endblock %}
+{% block content %}
+
+<!-- Controles -->
+<div class="bg-bs-card border border-bs-border rounded-lg p-4 mb-6">
+  <h2 class="text-sm uppercase tracking-wider text-bs-text/60 mb-3">🎛️ Controles</h2>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <form method="POST" action="{{ url_for('control.start') }}"><button class="btn btn-green w-full py-3">▶ Iniciar Bot</button></form>
+    <form method="POST" action="{{ url_for('control.stop') }}" onsubmit="return confirm('¿Detener el bot?')"><button class="btn btn-red w-full py-3">■ Detener Bot</button></form>
+    <form method="POST" action="{{ url_for('control.restart') }}"><button class="btn btn-yellow w-full py-3">🔄 Reiniciar</button></form>
+    <a href="{{ url_for('signals.index') }}" class="btn btn-purple w-full py-3 text-center">📋 Señal Manual</a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <div class="text-bs-text/60 text-xs uppercase tracking-wider mb-1">📡 Señales Hoy</div>
+    <div class="text-4xl font-bold text-bs-blue">{{ stats.signals_received or 0 }}</div>
+    <div class="text-xs text-bs-text/60 mt-1">✅ {{ stats.signals_processed or 0 }} procesadas · {{ open_count }} abiertas</div>
+  </div>
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <div class="text-bs-text/60 text-xs uppercase tracking-wider mb-1">🎯 Win Rate Hoy</div>
+    {% set wins = stats.wins or 0 %}{% set losses = stats.losses or 0 %}
+    {% set wr = (wins * 100 // (wins + losses)) if (wins + losses) > 0 else 0 %}
+    <div class="text-4xl font-bold text-bs-green">{{ wr }}%</div>
+    <div class="text-xs text-bs-text/60 mt-1">{{ wins }} W / {{ losses }} L</div>
+  </div>
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <div class="text-bs-text/60 text-xs uppercase tracking-wider mb-1">💰 Pips Netos</div>
+    <div class="text-4xl font-bold {% if (stats.pips_net or 0) >= 0 %}text-bs-green{% else %}text-bs-red{% endif %}">
+      {% if (stats.pips_net or 0) >= 0 %}+{% endif %}{{ stats.pips_net or 0 }}
+    </div>
+    <div class="text-xs text-bs-text/60 mt-1">📈 hoy</div>
+  </div>
+</div>
+
+<!-- Conexiones + LLM -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <h3 class="text-sm uppercase tracking-wider text-bs-text/60 mb-3">🔌 Conexiones</h3>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span>Telegram Bot</span><span class="{% if conns.telegram %}text-bs-green{% else %}text-bs-red{% endif %}">● {% if conns.telegram %}Conectado{% else %}Desconectado{% endif %}</span></div>
+      <div class="flex justify-between"><span>Telethon (canales aliados)</span><span class="{% if conns.telethon %}text-bs-green{% else %}text-bs-red{% endif %}">● {% if conns.telethon %}Activo{% else %}Inactivo{% endif %}</span></div>
+      <div class="flex justify-between"><span>WhatsApp ({{ whatsapp_count }} destinatarios)</span><span class="{% if conns.whatsapp %}text-bs-green{% else %}text-bs-red{% endif %}">● OK</span></div>
+      <div class="flex justify-between"><span>Render Dashboard</span><span class="{% if conns.render_sync %}text-bs-green{% else %}text-bs-yellow{% endif %}">● {% if conns.render_sync %}Sync OK{% else %}Stale{% endif %}</span></div>
+      <div class="flex justify-between"><span>MT5</span><span class="text-bs-yellow">● Desactivado (manual)</span></div>
+    </div>
+  </div>
+
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <h3 class="text-sm uppercase tracking-wider text-bs-text/60 mb-3">🧠 LLM PRO</h3>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-bs-text/60">Modelo:</span><span class="text-bs-blue">{{ llm.model }}</span></div>
+      <div class="flex justify-between"><span class="text-bs-text/60">Llamadas hoy:</span><span>{{ llm.calls_today }}</span></div>
+      <div class="flex justify-between"><span class="text-bs-text/60">Coste hoy:</span><span class="text-bs-green">${{ '%.4f' % llm.cost_today_usd }}</span></div>
+      <div class="flex justify-between"><span class="text-bs-text/60">Tokens entrada:</span><span>{{ llm.tokens_in }}</span></div>
+      <div class="flex justify-between"><span class="text-bs-text/60">Tokens salida:</span><span>{{ llm.tokens_out }}</span></div>
+      <div class="flex justify-between"><span class="text-bs-text/60">VIPs activos:</span><span class="text-bs-purple">{{ vip_count }}</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Últimas señales -->
+<div class="bg-bs-card border border-bs-border rounded-lg p-4">
+  <h3 class="text-sm uppercase tracking-wider text-bs-text/60 mb-3">📜 Últimas señales</h3>
+  {% if recent %}
+  <div class="overflow-x-auto">
+    <table>
+      <thead>
+        <tr><th>Hora</th><th>Par</th><th>Dir</th><th class="text-right">Entry</th><th class="text-right">Prob</th><th class="text-right">Resultado</th></tr>
+      </thead>
+      <tbody>
+        {% for s in recent %}
+        <tr>
+          <td class="text-bs-text/60">{{ s.get('time') or s.get('hora_envio') or '-' }}</td>
+          <td>{{ s.get('pair') or s.get('par', '?') }}</td>
+          <td class="{% if (s.get('direction') or s.get('direccion','')).upper() == 'BUY' %}text-bs-green{% else %}text-bs-red{% endif %}">{{ s.get('direction') or s.get('direccion', '?') }}</td>
+          <td class="text-right">{{ s.get('entry') or s.get('entrada', '-') }}</td>
+          <td class="text-right">{{ s.get('probability', '-') }}%</td>
+          <td class="text-right">{{ s.get('result') or s.get('resultado', '-') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-bs-text/40 text-sm">Sin señales aún.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

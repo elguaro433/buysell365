@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Ejemplo - Propietario",
+    "phone": "+34611111111",
+    "apikey": "TU_APIKEY_AQUI",
+    "backend": "textmebot",
+    "filter_pair": "GOLD",
+    "events": ["new_signal", "be_activated", "position_closed"],
+    "enabled": true,
+    "notes": "Plantilla. Copia este archivo a whatsapp_recipients.json y rellena con datos reales. NO subir whatsapp_recipients.json a git (ya esta en .gitignore)."
+  },
+  {
+    "name": "Ejemplo - Esposa (recibe TODO)",
+    "phone": "+34622222222",
+    "apikey": "TU_APIKEY_AQUI",
+    "backend": "textmebot",
+    "filter_pair": "ALL",
+    "events": ["new_signal", "be_activated", "tp_hit", "partial_close", "position_closed"],
+    "enabled": true,
+    "notes": "Filtro ALL = recibe todas las senales (oro, cripto, divisas, indices). Eventos: todos."
+  },
+  {
+    "name": "Ejemplo - Cliente VIP solo CRIPTO",
+    "phone": "+34633333333",
+    "apikey": "TU_APIKEY_AQUI",
+    "backend": "textmebot",
+    "filter_pair": "CRYPTO",
+    "events": ["new_signal", "position_closed"],
+    "enabled": false,
+    "notes": "Cliente que solo quiere BTC+ETH y solo notificacion al abrir/cerrar."
+  }
+]

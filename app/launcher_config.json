@@ -1,0 +1,6 @@
+{
+  "autostart_bot": true,
+  "minimize_to_tray": true,
+  "auto_restart": true,
+  "first_run": true
+}

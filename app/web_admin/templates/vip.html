@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}VIP — BuySell365{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+  <h1 class="text-xl font-bold">👑 Suscriptores VIP ({{ vips|length }})</h1>
+  <button onclick="document.getElementById('add-vip-modal').classList.remove('hidden')" class="btn btn-green">+ Dar VIP manual</button>
+</div>
+
+{% if vips %}
+<div class="bg-bs-card border border-bs-border rounded-lg p-4 overflow-x-auto">
+  <table>
+    <thead>
+      <tr>
+        <th>ID / Username</th>
+        <th>Nombre</th>
+        <th>Inicio</th>
+        <th>Expira</th>
+        <th>Días rest.</th>
+        <th>Tier</th>
+        <th>Estado</th>
+        <th class="text-right">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in vips %}
+      <tr>
+        <td>
+          <div class="font-medium">{{ v.id }}</div>
+          {% if v.username %}<div class="text-xs text-bs-text/60">@{{ v.username }}</div>{% endif %}
+        </td>
+        <td>{{ v.name or '-' }}</td>
+        <td class="text-bs-text/60">{{ v.started_at or '-' }}</td>
+        <td>{{ v.expires_at or '-' }}</td>
+        <td>
+          {% if v.days_remaining is none %}
+            <span class="text-bs-green">∞ Permanente</span>
+          {% elif v.days_remaining < 7 %}
+            <span class="text-bs-yellow">{{ v.days_remaining }}d</span>
+          {% else %}
+            <span>{{ v.days_remaining }}d</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="bg-bs-purple/20 text-bs-purple px-2 py-0.5 rounded text-xs">{{ v.tier }}</span>
+        </td>
+        <td>
+          {% if v.status == 'active' %}
+            <span class="bg-bs-green/20 text-bs-green px-2 py-0.5 rounded text-xs">Activo</span>
+          {% else %}
+            <span class="bg-bs-red/20 text-bs-red px-2 py-0.5 rounded text-xs">Expirado</span>
+          {% endif %}
+        </td>
+        <td class="text-right">
+          <form method="POST" action="{{ url_for('vip.revoke', user_id=v.id) }}" class="inline" onsubmit="return confirm('¿Revocar VIP de {{ v.name or v.id }}?')">
+            <button class="btn btn-red text-xs px-2 py-1">🚫 Revocar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="bg-bs-card border border-bs-border rounded-lg p-8 text-center text-bs-text/60">
+  <div class="text-4xl mb-2">👑</div>
+  <div>No hay suscriptores VIP todavía.</div>
+</div>
+{% endif %}
+
+<!-- Modal añadir VIP -->
+<div id="add-vip-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+  <div class="bg-bs-card border border-bs-border rounded-lg max-w-md w-full p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold">➕ Dar VIP manual</h2>
+      <button onclick="document.getElementById('add-vip-modal').classList.add('hidden')" class="text-bs-text/60 text-2xl">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('vip.add') }}" class="space-y-3">
+      <div>
+        <label class="block text-xs text-bs-text/60 mb-1">User ID Telegram *</label>
+        <input type="text" name="user_id" required placeholder="123456789">
+      </div>
+      <div>
+        <label class="block text-xs text-bs-text/60 mb-1">Nombre (opcional)</label>
+        <input type="text" name="name" placeholder="Ej: Juan García">
+      </div>
+      <div>
+        <label class="block text-xs text-bs-text/60 mb-1">Días</label>
+        <input type="number" name="days" value="30" min="1">
+      </div>
+      <div class="flex gap-2 pt-3">
+        <button type="submit" class="btn btn-green">💾 Otorgar VIP</button>
+        <button type="button" onclick="document.getElementById('add-vip-modal').classList.add('hidden')" class="btn btn-ghost">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}WhatsApp — BuySell365{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+  <h1 class="text-xl font-bold">📱 Destinatarios WhatsApp ({{ recipients|length }})</h1>
+  <div class="flex gap-2">
+    <button onclick="document.getElementById('add-modal').classList.remove('hidden')" class="btn btn-green">+ Añadir destinatario</button>
+    <form method="POST" action="{{ url_for('whatsapp.bulk', action='enable_all') }}" class="inline"><button class="btn btn-blue">✅ Activar todos</button></form>
+    <form method="POST" action="{{ url_for('whatsapp.bulk', action='pause_all') }}" class="inline"><button class="btn btn-yellow">⏸ Pausar todos</button></form>
+  </div>
+</div>
+
+<div class="text-xs text-bs-text/60 mb-4">
+  Backend principal: <span class="text-bs-blue">TextMeBot Premium</span> · Sender: +34 674 97 65 72 BuySell365 Pro
+</div>
+
+{% if recipients %}
+<div class="space-y-3">
+  {% for r in recipients %}
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <span class="font-medium text-base">{{ r.name }}</span>
+          {% if r.enabled %}
+            <span class="bg-bs-green/20 text-bs-green px-2 py-0.5 rounded text-xs">✅ Activo</span>
+          {% else %}
+            <span class="bg-bs-text/20 text-bs-text/60 px-2 py-0.5 rounded text-xs">⏸ Pausado</span>
+          {% endif %}
+          <span class="text-bs-text/60 text-sm">{{ r.phone }}</span>
+        </div>
+        <div class="text-xs text-bs-text/60 space-y-1">
+          <div>📦 Backend: <span class="text-bs-blue">{{ r.backend or 'textmebot' }}</span>{% if r.apikey %} · API key: <span class="font-mono">{{ r.apikey[:6] }}...</span>{% endif %}</div>
+          <div>🎯 Filtros pares: <span class="text-bs-yellow">{{ r.filter_pair or 'ALL' }}</span> · Min prob: {{ r.min_probability or 0 }}%</div>
+          <div>📡 Eventos:
+            {% for ev in (r.events or ['new_signal']) %}
+              <span class="bg-bs-border px-2 py-0.5 rounded text-xs mr-1">{{ ev }}</span>
+            {% endfor %}
+          </div>
+          {% if r.quiet_hours %}<div>🌙 Quiet hours: {{ r.quiet_hours }}</div>{% endif %}
+          {% if r.notes %}<div class="italic text-bs-text/50 mt-2">📝 {{ r.notes }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="flex flex-col gap-1 items-end">
+        <div class="flex gap-1 flex-wrap justify-end">
+          <form method="POST" action="{{ url_for('whatsapp.test_send', idx=r._index) }}" class="inline"><button class="btn btn-blue text-xs px-2 py-1" title="Enviar WhatsApp de prueba ahora">🧪 Test</button></form>
+          <form method="POST" action="{{ url_for('whatsapp.toggle', idx=r._index) }}" class="inline"><button class="btn btn-ghost text-xs px-2 py-1">{% if r.enabled %}⏸ Pausar{% else %}▶ Activar{% endif %}</button></form>
+          <button onclick="openEditModal({{ loop.index0 }})" class="btn btn-yellow text-xs px-2 py-1">✏️ Editar</button>
+          <form method="POST" action="{{ url_for('whatsapp.delete', idx=r._index) }}" class="inline" onsubmit="return confirm('¿Eliminar destinatario {{ r.name }}?')"><button class="btn btn-red text-xs px-2 py-1">🗑️</button></form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-bs-card border border-bs-border rounded-lg p-8 text-center text-bs-text/60">
+  <div class="text-4xl mb-2">📱</div>
+  <div>No hay destinatarios WhatsApp configurados.</div>
+  <button onclick="document.getElementById('add-modal').classList.remove('hidden')" class="btn btn-green mt-4">+ Añadir el primero</button>
+</div>
+{% endif %}
+
+<!-- ─── MODAL AÑADIR ─── -->
+<div id="add-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-bs-card border border-bs-border rounded-lg max-w-2xl w-full p-6 my-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold">➕ Añadir destinatario WhatsApp</h2>
+      <button onclick="document.getElementById('add-modal').classList.add('hidden')" class="text-bs-text/60 hover:text-bs-text text-2xl">×</button>
+    </div>
+    {{ recipient_form(None, events_available, pairs_preset, url_for('whatsapp.add')) }}
+  </div>
+</div>
+
+<!-- ─── MODALES EDITAR (uno por destinatario) ─── -->
+{% for r in recipients %}
+<div id="edit-modal-{{ loop.index0 }}" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
+  <div class="bg-bs-card border border-bs-border rounded-lg max-w-2xl w-full p-6 my-8">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-bold">✏️ Editar: {{ r.name }}</h2>
+      <button onclick="document.getElementById('edit-modal-{{ loop.index0 }}').classList.add('hidden')" class="text-bs-text/60 hover:text-bs-text text-2xl">×</button>
+    </div>
+    {{ recipient_form(r, events_available, pairs_preset, url_for('whatsapp.edit', idx=r._index)) }}
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% macro recipient_form(r, events_available, pairs_preset, action_url) %}
+<form method="POST" action="{{ action_url }}" class="space-y-3">
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-xs text-bs-text/60 mb-1">Nombre amigable *</label>
+      <input type="text" name="name" required value="{{ r.name if r else '' }}" placeholder="Ej: Cliente Pedro">
+    </div>
+    <div>
+      <label class="block text-xs text-bs-text/60 mb-1">Teléfono internacional *</label>
+      <input type="text" name="phone" required value="{{ r.phone if r else '' }}" placeholder="+34612345678">
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-xs text-bs-text/60 mb-1">API key TextMeBot</label>
+      <input type="text" name="apikey" value="{{ r.apikey if r else 'ReJEFMj44U7Q' }}" placeholder="Default: la del propietario">
+    </div>
+    <div>
+      <label class="block text-xs text-bs-text/60 mb-1">Backend</label>
+      <select name="backend">
+        <option value="textmebot" {% if not r or r.backend == 'textmebot' %}selected{% endif %}>TextMeBot (recomendado)</option>
+        <option value="callmebot" {% if r and r.backend == 'callmebot' %}selected{% endif %}>CallMeBot</option>
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-xs text-bs-text/60 mb-1">🎯 Filtros de pares (selecciona varios)</label>
+    {% set current_pairs = (r.filter_pair if r else 'ALL').split(',') if r else ['ALL'] %}
+    <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
+      {% for p in pairs_preset %}
+        <label class="flex items-center gap-1 text-sm">
+          <input type="checkbox" name="filter_pair" value="{{ p }}" {% if p in current_pairs %}checked{% endif %} class="accent-bs-blue">
+          {{ p }}
+        </label>
+      {% endfor %}
+    </div>
+    <input type="text" name="filter_pair_custom" placeholder="O escribe pares custom separados por coma: EURJPY, AUDCAD..." class="text-xs">
+    <div class="text-xs text-bs-text/40 mt-1">💡 "ALL" = recibe todas las señales. Selecciona pares específicos para filtrar.</div>
+  </div>
+
+  <div>
+    <label class="block text-xs text-bs-text/60 mb-1">📡 Eventos a recibir</label>
+    {% set current_events = (r.events if r else ['new_signal']) %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {% for key, label in events_available %}
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="events" value="{{ key }}" {% if key in current_events %}checked{% endif %} class="accent-bs-blue">
+          <span class="text-xs">{{ label }} <span class="text-bs-text/40">({{ key }})</span></span>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-xs text-bs-text/60 mb-1">🎲 Probabilidad mínima (0-100)</label>
+      <input type="number" name="min_probability" min="0" max="100" value="{{ r.min_probability if r else 0 }}">
+      <div class="text-xs text-bs-text/40 mt-1">0 = recibe todas. 70 = solo señales con prob ≥70%.</div>
+    </div>
+    <div>
+      <label class="block text-xs text-bs-text/60 mb-1">🌙 Quiet hours (opcional)</label>
+      <input type="text" name="quiet_hours" value="{{ r.quiet_hours if r else '' }}" placeholder="Ej: 23:00-07:00">
+      <div class="text-xs text-bs-text/40 mt-1">No envía señales en este rango horario.</div>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-xs text-bs-text/60 mb-1">📝 Notas internas</label>
+    <textarea name="notes" rows="2" placeholder="Notas sobre este destinatario...">{{ r.notes if r else '' }}</textarea>
+  </div>
+
+  <div>
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" name="enabled" {% if not r or r.enabled %}checked{% endif %} class="accent-bs-green">
+      ✅ Activo (recibirá señales)
+    </label>
+  </div>
+
+  <div class="flex gap-2 pt-3 border-t border-bs-border">
+    <button type="submit" class="btn btn-green">💾 Guardar</button>
+    <button type="button" onclick="closeAllModals()" class="btn btn-ghost">Cancelar</button>
+  </div>
+</form>
+{% endmacro %}
+
+{% block extra_scripts %}
+<script>
+function openEditModal(idx) {
+  document.getElementById('edit-modal-' + idx).classList.remove('hidden');
+}
+function closeAllModals() {
+  document.querySelectorAll('[id^="edit-modal-"], #add-modal').forEach(m => m.classList.add('hidden'));
+}
+// Cerrar modal con Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+</script>
+{% endblock %}

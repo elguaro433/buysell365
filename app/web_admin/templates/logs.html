@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Logs — BuySell365{% endblock %}
+{% block content %}
+
+<div class="bg-bs-card border border-bs-border rounded-lg p-4">
+  <div class="flex flex-wrap gap-3 mb-3 items-center justify-between">
+    <h1 class="text-xl font-bold">📜 Logs en vivo</h1>
+    <div class="flex gap-2 flex-wrap">
+      <button onclick="toggleAutoScroll()" id="autoscroll-btn" class="btn btn-ghost text-xs">📜 Auto-scroll ON</button>
+      <button onclick="toggleStream()" id="stream-btn" class="btn btn-green text-xs">▶ Streaming ON</button>
+      <button onclick="clearLogs()" class="btn btn-ghost text-xs">🧹 Limpiar</button>
+      <button onclick="downloadLogs()" class="btn btn-blue text-xs">⬇ Descargar</button>
+    </div>
+  </div>
+
+  <div class="flex gap-2 mb-3 flex-wrap items-center">
+    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="f-info" checked class="accent-bs-blue"> INFO</label>
+    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="f-warn" checked class="accent-bs-yellow"> WARN</label>
+    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="f-err" checked class="accent-bs-red"> ERROR</label>
+    <input type="text" id="search-input" placeholder="🔍 Buscar..." class="text-sm w-full sm:w-64" oninput="filterLogs()">
+  </div>
+
+  <div id="logs-container" class="bg-bs-bg border border-bs-border rounded p-2 h-[60vh] overflow-y-auto font-mono text-xs">
+    <div class="text-bs-text/40 text-center py-4">Cargando logs...</div>
+  </div>
+
+  <div class="text-xs text-bs-text/60 mt-2"><span id="line-count">0</span> líneas mostradas</div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const container = document.getElementById('logs-container');
+const autoScrollBtn = document.getElementById('autoscroll-btn');
+const streamBtn = document.getElementById('stream-btn');
+const lineCount = document.getElementById('line-count');
+let autoScroll = true;
+let streaming = true;
+let evtSource = null;
+let allLines = [];
+
+function classifyLine(text) {
+  const t = text.toUpperCase();
+  if (t.includes('[ERROR]') || t.includes(' ERROR ')) return 'err';
+  if (t.includes('[WARN]') || t.includes('[WARNING]') || t.includes(' WARN ')) return 'warn';
+  if (t.includes('[INFO]')) return 'info';
+  return 'info';
+}
+
+function colorClass(lvl) {
+  return { 'info': 'text-bs-text/70', 'warn': 'text-bs-yellow', 'err': 'text-bs-red' }[lvl];
+}
+
+function addLine(text) {
+  const lvl = classifyLine(text);
+  allLines.push({ text, lvl });
+  if (allLines.length > 2000) allLines.shift();
+  renderLines();
+}
+
+function renderLines() {
+  const showInfo = document.getElementById('f-info').checked;
+  const showWarn = document.getElementById('f-warn').checked;
+  const showErr = document.getElementById('f-err').checked;
+  const q = document.getElementById('search-input').value.toLowerCase();
+
+  let html = '';
+  let shown = 0;
+  for (const l of allLines) {
+    if ((l.lvl === 'info' && !showInfo) || (l.lvl === 'warn' && !showWarn) || (l.lvl === 'err' && !showErr)) continue;
+    if (q && !l.text.toLowerCase().includes(q)) continue;
+    html += '<div class="' + colorClass(l.lvl) + ' py-0.5">' + escapeHtml(l.text) + '</div>';
+    shown++;
+  }
+  container.innerHTML = html || '<div class="text-bs-text/40 text-center py-4">Sin líneas que mostrar.</div>';
+  lineCount.textContent = shown;
+  if (autoScroll) container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function filterLogs() { renderLines(); }
+function toggleAutoScroll() {
+  autoScroll = !autoScroll;
+  autoScrollBtn.textContent = autoScroll ? '📜 Auto-scroll ON' : '📜 Auto-scroll OFF';
+}
+function clearLogs() { allLines = []; renderLines(); }
+function downloadLogs() {
+  const blob = new Blob([allLines.map(l => l.text).join('\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'buysell365_logs_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.log';
+  a.click();
+}
+
+function startStream() {
+  if (evtSource) return;
+  evtSource = new EventSource('{{ url_for("logs.stream") }}');
+  evtSource.onmessage = (e) => addLine(e.data);
+  evtSource.onerror = () => { console.warn('Stream error, reconnecting...'); };
+  streamBtn.textContent = '⏸ Streaming ON';
+  streamBtn.classList.remove('btn-green'); streamBtn.classList.add('btn-yellow');
+}
+function stopStream() {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  streamBtn.textContent = '▶ Streaming OFF';
+  streamBtn.classList.remove('btn-yellow'); streamBtn.classList.add('btn-green');
+}
+function toggleStream() {
+  streaming = !streaming;
+  if (streaming) startStream(); else stopStream();
+}
+
+// Carga inicial
+fetch('{{ url_for("logs.tail") }}?n=200')
+  .then(r => r.text())
+  .then(t => {
+    t.split('\n').forEach(line => { if (line.trim()) addLine(line); });
+    if (streaming) startStream();
+  });
+
+['f-info','f-warn','f-err'].forEach(id => document.getElementById(id).addEventListener('change', renderLines));
+</script>
+{% endblock %}

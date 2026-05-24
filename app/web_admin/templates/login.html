@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Login — BuySell365 Admin{% endblock %}
+{% block content %}
+<div class="max-w-sm mx-auto mt-16 bg-bs-card border border-bs-border rounded-lg p-6">
+  <div class="text-center mb-6">
+    <div class="text-4xl mb-2">📈</div>
+    <h1 class="text-xl font-bold">BuySell365 Admin</h1>
+    <div class="text-bs-text/60 text-sm">Web Admin Panel</div>
+  </div>
+
+  {% if error %}
+    <div class="flash flash-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" class="space-y-4">
+    <div>
+      <label class="block text-sm text-bs-text/60 mb-1">Usuario</label>
+      <input type="text" name="user" required autofocus>
+    </div>
+    <div>
+      <label class="block text-sm text-bs-text/60 mb-1">Contraseña</label>
+      <input type="password" name="password" required>
+    </div>
+    <button type="submit" class="btn btn-blue w-full py-2">Entrar</button>
+  </form>
+</div>
+{% endblock %}

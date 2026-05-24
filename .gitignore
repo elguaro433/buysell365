@@ -1,0 +1,118 @@
+# ============================================================
+# BuySell365 — .gitignore
+# Ignora secrets, estado runtime y artefactos generados.
+# ============================================================
+
+# Secrets / credenciales
+.env
+.env.*
+!.env.template
+*.pem
+*.key
+ssl_cert.pem
+ssl_key.pem
+
+# Sesiones de Telegram / Instagram (contienen tokens de acceso)
+*.session
+*.session-journal
+*.session-shm
+*.session-wal
+sessions/
+app/sessions/
+ig_session.json
+userbot_session.session
+
+# Estado runtime (cambia constantemente, no debe versionarse)
+state/
+app/state/
+*.lock
+.copier.singleton.lock
+.bot.singleton.lock
+.copier_stats.lock
+copier_stats.lock
+.ig_feed_locked_until.txt
+.last_online_msg.ts
+.briefing_last_msg.txt
+.notif_dedup.json
+.resolved_signals.json
+.calendar_cache.json
+
+# JSON de estado que el bot modifica en vivo
+copier_open_signals.json
+copier_sent_state.json
+copier_stats.json
+generated_signals.json
+generator_signals_queue.json
+generator_state.json
+gift_history.json
+gift_tracker.json
+estado.json
+historial_real.json
+historial_trades.csv
+ig_follow_log.json
+ig_rate_state.json
+manual_signals.json
+mt5_realtime.json
+mt5_trades_sync.json
+mt5_circuit_breaker.json
+pub_state.json
+weekly_stats.json
+daily_summary_state.json
+monthly_summary_state.json
+llm_features_stats.json
+whatsapp_recipients.json
+winning_trades.json
+copier_open_signals.json.bak
+*.json.bak
+*.json.bak_*
+*.json.backup_*
+
+# Imagenes generadas runtime
+ig_images/
+ig_images_historico/
+xm_images/
+xm_images_historico/
+
+# Logs
+logs/
+app/logs/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Backups antiguos
+*.bak
+*.bak_*
+*_backup_*
+backups/
+_backups/
+_autostart_disabled_backup/
+_archive_mt5_only/
+_archive_scripts/
+_archive_windows/
+
+# Extras solo locales (no se despliegan al VPS)
+_extras_local/
+
+# Build artifacts
+dist/
+build/

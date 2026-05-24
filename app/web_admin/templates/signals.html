@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Señales — BuySell365{% endblock %}
+{% block content %}
+
+<!-- Señal manual -->
+<div class="bg-bs-card border border-bs-border rounded-lg p-4 mb-6">
+  <h2 class="text-lg font-bold mb-3">📋 Pegar señal manual</h2>
+  <form method="POST" action="{{ url_for('signals.manual') }}" class="space-y-3">
+    <textarea name="signal_text" rows="8" class="font-mono text-sm" placeholder="Pega aquí el texto de la señal&#10;Ejemplo:&#10;BUY ORO @ 4523&#10;SL: 4505&#10;TP1: 4530&#10;TP2: 4540&#10;TP3: 4555"></textarea>
+    <div class="flex gap-2 items-center flex-wrap">
+      <button type="submit" class="btn btn-purple">📤 Procesar y publicar</button>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="preview_only" class="accent-bs-blue">
+        👁️ Solo previsualizar (no publicar)
+      </label>
+    </div>
+  </form>
+  <div class="text-xs text-bs-text/40 mt-2">💡 La señal se añade a la cola — el bot la procesará en ~30 segundos.</div>
+</div>
+
+<!-- Abiertas -->
+<div class="bg-bs-card border border-bs-border rounded-lg p-4 mb-6">
+  <h2 class="text-lg font-bold mb-3">⏳ Señales abiertas ({{ open_signals|length }})</h2>
+  {% if open_signals %}
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr><th>Par</th><th>Dir</th><th class="text-right">Entry</th><th class="text-right">SL</th><th class="text-right">TPs</th><th>Origen</th></tr></thead>
+      <tbody>
+        {% for s in open_signals %}
+        <tr>
+          <td><strong>{{ s.pair }}</strong></td>
+          <td class="{% if s.direction == 'BUY' %}text-bs-green{% else %}text-bs-red{% endif %}">{{ s.direction }}</td>
+          <td class="text-right">{{ s.entry }}</td>
+          <td class="text-right">{{ s.sl }}</td>
+          <td class="text-right text-xs">{% for tp in (s.tps or [s.tp]) %}{{ tp }}{% if not loop.last %} · {% endif %}{% endfor %}</td>
+          <td class="text-xs text-bs-text/60">{{ s.source or '?' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-bs-text/40 text-sm">Ninguna señal abierta en este momento.</div>
+  {% endif %}
+</div>
+
+<!-- Recientes -->
+<div class="bg-bs-card border border-bs-border rounded-lg p-4">
+  <h2 class="text-lg font-bold mb-3">📜 Últimas 30 señales del historial</h2>
+  {% if recent %}
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr><th>Hora</th><th>Par</th><th>Dir</th><th class="text-right">Entry</th><th class="text-right">Resultado</th><th class="text-right">Pips</th></tr></thead>
+      <tbody>
+        {% for s in recent %}
+        <tr>
+          <td class="text-bs-text/60 text-xs">{{ s.get('hora_envio') or s.get('time', '-') }}</td>
+          <td>{{ s.get('par') or s.get('pair', '?') }}</td>
+          <td class="{% if (s.get('direccion') or s.get('direction','')).upper() == 'BUY' %}text-bs-green{% else %}text-bs-red{% endif %}">{{ s.get('direccion') or s.get('direction','?') }}</td>
+          <td class="text-right">{{ s.get('entrada') or s.get('entry','-') }}</td>
+          <td class="text-right">
+            {% set r = (s.get('resultado') or s.get('result','-')) %}
+            {% if 'TP' in r|string %}<span class="text-bs-green">{{ r }}</span>
+            {% elif 'SL' in r|string %}<span class="text-bs-red">{{ r }}</span>
+            {% else %}{{ r }}{% endif %}
+          </td>
+          <td class="text-right">
+            {% set p = (s.get('pips') or 0) %}
+            <span class="{% if p > 0 %}text-bs-green{% elif p < 0 %}text-bs-red{% else %}text-bs-text/60{% endif %}">{% if p > 0 %}+{% endif %}{{ p }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-bs-text/40 text-sm">Sin historial.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

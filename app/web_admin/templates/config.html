@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Config — BuySell365{% endblock %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+  <h1 class="text-xl font-bold">⚙️ Configuración (.env)</h1>
+  <div class="text-xs text-bs-text/60">⚠️ Tras guardar, reinicia el bot para aplicar.</div>
+</div>
+
+<form method="POST" action="{{ url_for('config.save') }}" class="space-y-6">
+
+  {% for group_name, group_keys in env_groups.items() %}
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <h2 class="text-bs-blue text-sm uppercase tracking-wider mb-3">{{ group_name }}</h2>
+    <div class="space-y-2">
+      {% for key in group_keys %}
+        {% if key in env_data %}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+          <label class="text-sm text-bs-text/70 sm:text-right" title="{{ key }}">{{ key }}</label>
+          <div class="sm:col-span-2 flex gap-2">
+            {% set is_secret = 'KEY' in key or 'TOKEN' in key or 'PASSWORD' in key or 'SECRET' in key or 'APIKEY' in key %}
+            {% if is_secret %}
+              <input type="password" name="env_{{ key }}" value="{{ env_data[key] }}" class="font-mono text-xs flex-1">
+              <button type="button" onclick="togglePassword(this)" class="btn btn-ghost text-xs">👁️</button>
+            {% else %}
+              <input type="text" name="env_{{ key }}" value="{{ env_data[key] }}" class="font-mono text-xs flex-1">
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Otras variables no agrupadas -->
+  {% set known_keys = [] %}
+  {% for keys in env_groups.values() %}{% for k in keys %}{% set _ = known_keys.append(k) %}{% endfor %}{% endfor %}
+  {% set other_keys = [] %}
+  {% for k in env_data %}{% if k not in known_keys %}{% set _ = other_keys.append(k) %}{% endif %}{% endfor %}
+
+  {% if other_keys %}
+  <div class="bg-bs-card border border-bs-border rounded-lg p-4">
+    <h2 class="text-bs-text/60 text-sm uppercase tracking-wider mb-3">📦 Otras variables</h2>
+    <div class="space-y-2">
+      {% for key in other_keys %}
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+        <label class="text-sm text-bs-text/70 sm:text-right" title="{{ key }}">{{ key }}</label>
+        <div class="sm:col-span-2">
+          {% set is_secret = 'KEY' in key or 'TOKEN' in key or 'PASSWORD' in key or 'SECRET' in key %}
+          {% if is_secret %}
+            <input type="password" name="env_{{ key }}" value="{{ env_data[key] }}" class="font-mono text-xs">
+          {% else %}
+            <input type="text" name="env_{{ key }}" value="{{ env_data[key] }}" class="font-mono text-xs">
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="flex gap-2 sticky bottom-4 bg-bs-card border border-bs-border rounded-lg p-3 z-40">
+    <button type="submit" class="btn btn-green">💾 Guardar cambios</button>
+    <form method="POST" action="{{ url_for('control.restart') }}" class="inline" onsubmit="return confirm('¿Reiniciar el bot ahora?')">
+      <button class="btn btn-yellow">🔄 Reiniciar bot</button>
+    </form>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-ghost">Cancelar</a>
+  </div>
+</form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function togglePassword(btn) {
+  const input = btn.parentElement.querySelector('input');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+</script>
+{% endblock %}
