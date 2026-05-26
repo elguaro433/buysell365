@@ -166,15 +166,66 @@ def _get_bot_status_psutil() -> dict:
 
 # ─── Stats del copier ─────────────────────────────────────────────────
 def get_copier_stats() -> dict:
-    """Stats del día. Si no encuentra, devuelve struct vacía coherente."""
-    stats = read_json("copier_stats", default={})
-    today = time.strftime("%Y-%m-%d")
-    if isinstance(stats, dict) and today in stats:
-        return stats[today]
-    return {
+    """Stats del día construidas desde copier_stats.json["trades"] vía compute_day_stats.
+
+    El archivo se persiste como {"trades":[{result, pips_numeric, fecha:"DD/MM/YYYY", ...}, ...]}
+    (ver signal_copier._save_copier_stats). Antes este lector esperaba {"YYYY-MM-DD": {...}}
+    y devolvía ceros siempre. Ahora agrega los trades de hoy y mapea a las claves
+    que consume dashboard.html.
+    """
+    empty = {
         "signals_received": 0, "signals_processed": 0,
         "tps": 0, "sls": 0, "pips_net": 0,
         "wins": 0, "losses": 0,
+    }
+    raw = read_json("copier_stats", default={})
+    trades = raw.get("trades", []) if isinstance(raw, dict) else []
+    if not trades:
+        return empty
+
+    try:
+        import sys
+        if str(APP_DIR) not in sys.path:
+            sys.path.insert(0, str(APP_DIR))
+        from stats_normalizer import compute_day_stats
+    except Exception:
+        return empty
+
+    today_dmy = time.strftime("%d/%m/%Y")
+    try:
+        ds = compute_day_stats(trades, today_dmy)
+    except Exception:
+        return empty
+
+    tps_u = int(ds.get("tps_unique", 0) or 0)
+    sls_u = int(ds.get("sls_unique", 0) or 0)
+    net = ds.get("net_total", 0) or 0
+    try:
+        net = round(float(net), 1)
+    except Exception:
+        net = 0
+    closed_unique = tps_u + sls_u
+
+    # Señales abiertas que se ingestaron hoy (para sumarlas a "recibidas hoy")
+    opened_today = 0
+    try:
+        opens = read_json("copier_open_signals", default={})
+        if isinstance(opens, dict):
+            start_of_day = time.mktime(time.strptime(time.strftime("%Y-%m-%d"), "%Y-%m-%d"))
+            for sd in opens.values():
+                if isinstance(sd, dict) and float(sd.get("sent_at", 0) or 0) >= start_of_day:
+                    opened_today += 1
+    except Exception:
+        pass
+
+    return {
+        "signals_received": closed_unique + opened_today,
+        "signals_processed": closed_unique,
+        "tps": tps_u,
+        "sls": sls_u,
+        "pips_net": net,
+        "wins": tps_u,
+        "losses": sls_u,
     }
 
 
@@ -256,5 +307,4 @@ def get_connections_status() -> dict:
         "telethon": _age("copier_stats") is not None and _age("copier_stats") < 600,
         "whatsapp": True,  # No tenemos heartbeat directo
         "render_sync": _age("historial_real") is not None and _age("historial_real") < 600,
-        "mt5": False,  # Sin MT5 tras refactor
     }
