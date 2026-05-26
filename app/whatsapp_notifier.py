@@ -237,14 +237,26 @@ def _send_one(recipient: dict, text: str) -> None:
         # Set _last_global_send AFTER HTTP completes — asi reflejamos cuando
         # TextMeBot realmente vio el mensaje (no cuando empezamos a enviar).
         _last_global_send = time.time()
-        ok = resp.status_code == 200
+        # FIX 2026-05-26: TextMeBot ahora devuelve 201 cuando OK (antes 200).
+        # Aceptar ambos para no marcar falsos fallos.
+        ok = resp.status_code in (200, 201)
         if ok and backend == "textmebot":
-            # TextMeBot devuelve HTML con "Success!" en body cuando OK
-            ok = "Success" in resp.text
+            # TextMeBot devuelve HTML con "Success!" en body cuando OK.
+            # Si el body trae "ERROR" o "disconnected" -> falla real.
+            body_lower = resp.text.lower()
+            if "error" in body_lower or "disconnected" in body_lower:
+                ok = False
+            elif "success" not in body_lower:
+                # ambiguo: si HTTP es 200/201 pero no contiene "Success" ni "ERROR",
+                # asumimos OK (TextMeBot a veces cambia el copy del mensaje exitoso).
+                ok = True
         if ok:
             log.info(f"[WSP] {name} ({backend}) enviado ({len(text)}c)")
         else:
-            log.warning(f"[WSP] {name} ({backend}) fallo status={resp.status_code} body={resp.text[:200]}")
+            # FIX 2026-05-26: body completo (no 200 chars) para diagnosticar.
+            # El caso "Phone number is disconnected from the API" quedaba truncado.
+            _body_clean = resp.text.replace("\n", " ").replace("\r", " ")[:600]
+            log.warning(f"[WSP] {name} ({backend}) fallo status={resp.status_code} body={_body_clean}")
     except Exception as e:
         # Si hubo excepcion sin completar HTTP, igual marcamos el timestamp
         # para no acumular intentos rapidos hacia TextMeBot que pueden bannear.
