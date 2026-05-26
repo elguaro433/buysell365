@@ -11676,7 +11676,7 @@ section{{padding:50px 20px}}
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px" data-i18n="about.stat_assets">Activos</div>
     </div>
   </div>
-  <p style="text-align:center;font-size:.8rem;color:var(--text2);margin:16px auto 0;max-width:800px;opacity:.7" data-i18n="about.powered">⚡ Inteligencia Artificial · An\u00e1lisis de Noticias · Datos Institucionales · An\u00e1lisis T\u00e9cnico · MetaTrader 5</p>
+  <p style="text-align:center;font-size:.8rem;color:var(--text2);margin:16px auto 0;max-width:800px;opacity:.7" data-i18n="about.powered">⚡ Inteligencia Artificial · An\u00e1lisis de Noticias · Datos Institucionales · An\u00e1lisis T\u00e9cnico · 24/7</p>
 </section>
 
 <!-- ASSETS -->
@@ -11772,7 +11772,7 @@ section{{padding:50px 20px}}
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q4">\u00bfQu\u00e9 broker necesito?</div>
-      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para mejor ejecuci\u00f3n.</div>
+      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers regulados con buen spread.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q5">\u00bfC\u00f3mo cancelo mi suscripci\u00f3n VIP?</div>
