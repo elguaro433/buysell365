@@ -5071,7 +5071,7 @@ def cmd_estado():
         f"📊 *STATUS* {ahora().strftime('%d/%m %H:%M')}\n"
         f"✅ *{_g}*  ❌ *{_p}*  │  🎯 *{efectividad:.0f}%*  │  PF *{pf_txt}*\n"
         f"💰 *{pips_netos:+.1f}* {emoji_res}  │  🔥 {racha_txt}\n"
-        f"⚙️ {modo_txt} │ 💼 ${CAPITAL_USUARIO:,.0f} │ 🔄 {len(operaciones_activas)} │ 📡{'🟢' if not escaneo_pausado else '⏸️'} │ MT5:{'🟢' if not mt5_pausado else '⏸️'}\n"
+        f"⚙️ {modo_txt} │ 🔄 {len(operaciones_activas)} │ 📡{'🟢' if not escaneo_pausado else '⏸️'}\n"
     )
 
     # Spreads: solo mostrar los que están MAL (⚠️)
@@ -8056,7 +8056,6 @@ def _generar_reporte_diario():
         reporte += (
             f"\n🤖 *SISTEMA*\n"
             f"  🔹 Scanner: {'▶️ Activo' if not escaneo_pausado else '⏸️ Pausado'}\n"
-            f"  🔹 MT5: {'✅ Conectado' if MT5_AVAILABLE else '❌ No disponible'}\n"
             f"  🔹 Hora: {ahora_dt.strftime('%H:%M:%S')}\n"
         )
 
@@ -8237,7 +8236,6 @@ def _build_digest_admin() -> str:
         f"   Total: *{_n_vips}* ({_n_pagados} pagados)\n"
         f"   Pagos pendientes: {_n_pendientes}\n\n"
         f"⚙️ *SISTEMA*\n"
-        f"   MT5: {_mt5_modo}\n"
         f"   Hora: {ahora_dt.strftime('%H:%M')} Andorra\n\n"
         f"━━━━━━━━━━━━━━━━\n"
         f"_Auto-digest 23:00 · /digest manual_"
@@ -9849,8 +9847,6 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 f"👤 *Administrador* — BuySell365.pro\n\n"
                 f"📊 *ESTADO REAL DEL SISTEMA:*\n"
                 f"   📡 Copier: 🟢 ACTIVO · {_cop_open_count} abiertas\n"
-                f"   💹 MT5: {_mt5_icon}\n"
-                f"   💰 Balance MT5: {_capital_p}\n"
                 f"   🎁 Regalos hoy: ORO {_gift_oro_icon}  ·  OTRA {_gift_other_icon}\n\n"
                 f"📈 *HOY · Canal VIP:*\n"
                 f"   🎯 {_cop_today_tps + _cop_today_sls} señales decididas\n"
@@ -9859,9 +9855,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
                 f"{_best_line}\n"
                 f"🛠️ *CONTROLES:*\n"
                 f"   /reiniciar — Reiniciar bot+copier\n"
-                f"   /apagar — Apagar bot\n"
-                f"   /mt5_on — Habilitar ejecución MT5\n"
-                f"   /mt5_off — Deshabilitar ejecución MT5\n\n"
+                f"   /apagar — Apagar bot\n\n"
                 f"📋 *INFO:*\n"
                 f"   /estado — Estado detallado\n"
                 f"   /copier — Stats copier hoy\n"
