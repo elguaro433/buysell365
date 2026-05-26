@@ -1793,8 +1793,8 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\u26a1</div>
-      <h3 data-i18n="features.mt5.title">Ejecuci\u00f3n Autom\u00e1tica MT5</h3>
-      <p data-i18n="features.mt5.desc">Conexi\u00f3n directa a MetaTrader 5. Las \u00f3rdenes se ejecutan en milisegundos con Stop Loss y Take Profits autom\u00e1ticos. Resultados verificables en cuenta real.</p>
+      <h3 data-i18n="features.mt5.title">Se\u00f1ales Listas para Ejecutar</h3>
+      <p data-i18n="features.mt5.desc">Cada se\u00f1al llega con entry, Stop Loss y TPs precalculados \u2014 listas para copiar y ejecutar manualmente en tu broker preferido.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon blue">\U0001f6e1\ufe0f</div>

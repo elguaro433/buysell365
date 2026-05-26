@@ -3869,7 +3869,7 @@ def _verify_mt5_trade_exists(signal: dict, context: str = "") -> tuple[bool, str
 
         # FIX 2026-05-12 (C): usar init+login propio en vez de bare initialize().
         # `_mt5_init_and_login` aplica MT5_LOGIN/PASSWORD/SERVER del .env y
-        # asegura que la sesion apunte a la cuenta correcta (1301348583 demo XM).
+        # asegura que la sesion apunte a la cuenta correcta del usuario.
         # Sin esto, positions_get(ticket=...) devuelve () para tickets vivos cuando
         # MT5 reattacha a la sesion sin login activo.
         try:
@@ -9269,7 +9269,6 @@ def execute_in_mt5(signal):
             return False, f"Spread alto: {_spread_pts:.0f}pts (max {_max_spread})"
 
     # FIX 2026-04-21 (C2): Limite de posiciones simultaneas — solo si COPIER_GUARDS=true.
-    # Cuenta DEMO sin limite (margen libre €10k cubre ~50 trades de 1% riesgo).
     if _guards_on:
         try:
             _max_positions = int(os.getenv("COPIER_MAX_POSITIONS", "8"))
@@ -11369,10 +11368,9 @@ async def main():
                         _recently_sent[_pair_key] = _now_t               # registro global
 
             # ══════════════════════════════════════════════════════════════
-            # 🟢 MT5 EXECUTION ACTIVADO — Cuenta DEMO (1301348583 / XMGlobal-MT5 6)
-            # Autorizado por el usuario 2026-05-02 (refresh: lote risk-based 1%)
-            # Cada señal del canal VIP se replica con lotaje dinámico (RISK_PER_TRADE_PCT)
-            # Para desactivar: COPIER_MT5_ENABLED=false en .env
+            # MT5 EXECUTION — desactivado por defecto desde 2026-05-24.
+            # Para reactivar: COPIER_MT5_ENABLED=true en .env (no recomendado;
+            # el bot ahora es 100% copier sin ejecución de órdenes).
             # ══════════════════════════════════════════════════════════════
             # FIX 2026-04-21 (M3): ahora por .env — default False por seguridad
             MT5_EXECUTION_ENABLED = os.getenv("COPIER_MT5_ENABLED", "True").lower() in ("true", "1", "yes")

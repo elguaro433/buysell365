@@ -11647,8 +11647,8 @@ section{{padding:50px 20px}}
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\u26a1</div>
-      <h3 data-i18n="features.mt5.title">Ejecuci\u00f3n Autom\u00e1tica</h3>
-      <p data-i18n="features.mt5.desc">Conexi\u00f3n directa a MetaTrader 5. Las \u00f3rdenes se ejecutan en milisegundos con Stop Loss y TP autom\u00e1ticos.</p>
+      <h3 data-i18n="features.mt5.title">Se\u00f1ales Listas para Ejecutar</h3>
+      <p data-i18n="features.mt5.desc">Cada se\u00f1al llega con entry, Stop Loss y TPs precalculados \u2014 listas para copiar y ejecutar manualmente en tu broker preferido.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon blue">\U0001f6e1\ufe0f</div>
@@ -13140,39 +13140,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
     </div>
 
 
-    <!-- CUENTA REAL MT5 -->
-    {"" if not _rt else f"""
-    <div class="card" style="margin-bottom:24px;border-color:rgba(0,212,170,.3)">
-        <div class="card-title" style="color:var(--primary)">&#128178; Cuenta Real MT5 &mdash; {_rt.get('last_update','')}</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
-            <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
-                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Balance</div>
-                <div style="font-size:22px;font-weight:800;color:#fff">${_rt['cuenta']['balance']:,.2f}</div>
-            </div>
-            <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
-                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Equity</div>
-                <div style="font-size:22px;font-weight:800;color:{'#00e676' if _rt['cuenta']['equity'] >= _rt['cuenta']['balance'] else '#ff3b30'}">${_rt['cuenta']['equity']:,.2f}</div>
-            </div>
-            <div style="background:var(--panel2);border-radius:10px;padding:14px;text-align:center">
-                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Profit Flotante</div>
-                <div style="font-size:22px;font-weight:800;color:{'#00e676' if _rt['cuenta']['profit_fl'] >= 0 else '#ff3b30'}">${_rt['cuenta']['profit_fl']:+,.2f}</div>
-            </div>
-        </div>
-        {"<div style='color:var(--muted);text-align:center;padding:12px;font-size:13px'>Sin posiciones abiertas ahora mismo</div>" if not _rt.get('posiciones_abiertas') else "".join(f'''
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--panel2);border-radius:8px;padding:12px 14px;margin-bottom:8px;border-left:3px solid {"#00e676" if p["tipo"]=="COMPRA" else "#ff3b30"}">
-            <div>
-                <span style="font-weight:700">{p["symbol"]}</span>
-                <span style="margin-left:8px;color:{"#00e676" if p["tipo"]=="COMPRA" else "#ff3b30"};font-size:12px">{"&#9650;" if p["tipo"]=="COMPRA" else "&#9660;"} {p["tipo"]}</span>
-                <span style="margin-left:8px;color:var(--muted);font-size:12px">Entrada: {p["entrada"]}</span>
-                <span style="margin-left:8px;color:var(--muted);font-size:12px">Vol: {p["volumen"]}</span>
-            </div>
-            <div style="text-align:right">
-                <div style="font-weight:700;color:{"#00e676" if p["profit"]>=0 else "#ff3b30"}">${p["profit"]:+,.2f}</div>
-                <div style="font-size:11px;color:var(--muted)">{p.get("hora_apertura","")} &bull; {p["pips"]:+.1f} pts</div>
-            </div>
-        </div>''' for p in _rt["posiciones_abiertas"])}
-    </div>
-    """}
+    <!-- CUENTA REAL MT5 ELIMINADA 2026-05-26: ya no se publica MT5 al cliente -->
 
     <!-- FOOTER -->
     <div class="footer">
@@ -21305,12 +21273,8 @@ def _arrancar_interno():
         def _get_web_state():
             """Collect current state for web sync.
 
-            FIX 2026-04-21 (v3): Transparencia total — el dashboard web muestra:
-              - Señales del canal VIP (copier_*)
-              - Operaciones REALES de MT5 (cuenta DEMO 1301348583) en vivo
-              - Historial de trades MT5 cerrados
-              - Posiciones abiertas con P&L flotante
-            Los clientes ven lo que realmente pasa en la cuenta.
+            2026-05-26: bot 100% copier. El dashboard web muestra solo señales
+            del canal VIP (copier_*) y estadísticas agregadas. Sin datos MT5.
             """
             import json as _jr
             _base = os.path.dirname(__file__)
@@ -21567,9 +21531,9 @@ def _arrancar_interno():
                     "lost_pips": round(_lifetime_lost, 1),
                     "current_streak": _current_streak,
                 },
-                # === MT5 EN VIVO (transparencia — cuenta DEMO 1301348583) ===
-                "mt5_live": _mt5_live,                         # posiciones abiertas + stats hoy + historial día
-                "historial_real": _hist_real_sync,             # historial completo MT5 real
+                # 2026-05-26: mt5_live / historial_real / account_type / account_login
+                # ELIMINADOS — el dashboard público ya no muestra cuenta MT5. Solo
+                # señales del copier y stats del bot.
                 "operaciones_activas": _ops_activas_web,       # desde el bot
                 "active_ops_detail": _active_ops_detail,       # posiciones con progreso visual
                 # === Stats + meta ===
@@ -21582,9 +21546,7 @@ def _arrancar_interno():
                 "bot_active": True,
                 "auto_trading": AUTO_TRADING,                  # refleja estado real
                 "assets_count": len(ACTIVOS),
-                "data_source": "copier_plus_mt5_live",          # nueva marca: ambas fuentes
-                "account_type": "real",                         # cuenta real activada 21/04/2026
-                "account_login": os.getenv("MT5_LOGIN", ""),
+                "data_source": "copier",                        # 2026-05-26: solo copier, sin MT5
             }
 
         def _build_active_ops_for_web():
