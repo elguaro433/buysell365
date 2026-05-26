@@ -1,4 +1,4 @@
-﻿"""
+"""
 BuySell365 Signal Copier — Userbot que escucha canales VIP de Telegram
 Lee senales de canales aliados activos y las ejecuta en MT5 + reenvia al canal BuySell365.
 Usa Telethon (cuenta personal de Telegram).
@@ -3185,8 +3185,11 @@ def _validate_entry_vs_market(signal: dict) -> bool:
     _limit_max_pct = 0.015
     if pct_diff <= _limit_max_pct:
         if direction == "BUY" and entry < live:
+            # FIX 2026-05-26: usar :.6g para evitar el efecto cosmetico
+            # "entry=0.9884 < precio_actual=0.9884" cuando son distintos
+            # pero el .4f los redondea iguales. .6g mantiene precision.
             log.info(
-                f"🔧 AUTO-FIX BUY LIMIT detectado: {pair} entry={entry} < precio_actual={live:.4f} "
+                f"🔧 AUTO-FIX BUY LIMIT detectado: {pair} entry={entry:.6g} < precio_actual={live:.6g} "
                 f"(dif {pct_diff:.2%}) — preservando entry original como pending order"
             )
             signal["is_limit"] = True
@@ -3194,7 +3197,7 @@ def _validate_entry_vs_market(signal: dict) -> bool:
             return True
         if direction == "SELL" and entry > live:
             log.info(
-                f"🔧 AUTO-FIX SELL LIMIT detectado: {pair} entry={entry} > precio_actual={live:.4f} "
+                f"🔧 AUTO-FIX SELL LIMIT detectado: {pair} entry={entry:.6g} > precio_actual={live:.6g} "
                 f"(dif {pct_diff:.2%}) — preservando entry original como pending order"
             )
             signal["is_limit"] = True
@@ -3226,8 +3229,12 @@ def _get_current_price(pair: str) -> float | None:
         # Petróleo
         "BRENT": "BZ=F", "BRENTCash": "BZ=F", "UKOIL": "BZ=F",
         "OILCash": "CL=F", "USOIL": "CL=F", "USOILCash": "CL=F", "WTI": "CL=F",
-        # Crypto — XM usa "BTCUSD"
+        # Crypto — XM usa "BTCUSD"/"ETHUSD" pero Yahoo usa formato con guion.
+        # FIX 2026-05-26: añadido ETHUSD → ETH-USD. Antes caia al fallback
+        # generico (=X formato Forex) y Yahoo respondia "possibly delisted"
+        # spameando logs cada 30s. Caso reportado por usuario en panel /logs.
         "BTCUSD": "BTC-USD",
+        "ETHUSD": "ETH-USD",
         # Forex — pares USD principales
         "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X",
         "AUDUSD": "AUDUSD=X", "NZDUSD": "NZDUSD=X", "USDCAD": "USDCAD=X",
@@ -5428,129 +5435,9 @@ async def _loop_sync_web_periodico() -> None:
             log.debug(f"Loop sync web fallo (no critico): {_e_sync_loop}")
 
 
-async def _loop_ingest_generator_signals() -> None:
-    """FIX 2026-05-09: ingesta de senales del btc_eth_generator.
-
-    El generator (que corre en bot.py) escribe senales a generator_signals_queue.json.
-    Este loop las lee cada 30s y las registra en _open_signals para que el monitor
-    TP/SL del copier las trackee normal — celebracion, WhatsApp, etc.
-
-    El generator ya:
-    - Publico al canal VIP
-    - Ejecuto en MT5 (si MT5_EXECUTE=true)
-    - Solo falta el tracking — eso es lo que hace este loop.
-    """
-    queue_file = Path(__file__).parent / "generator_signals_queue.json"
-    last_ingested_ts = 0.0
-
-    # Esperar 30s tras arranque para no chocar con _load_open_signals
-    await asyncio.sleep(30)
-
-    while True:
-        try:
-            await asyncio.sleep(30)
-            if not queue_file.exists():
-                continue
-
-            try:
-                with open(queue_file, "r", encoding="utf-8") as f:
-                    queue = json.load(f)
-            except Exception:
-                continue
-
-            new_count = 0
-            for entry in queue:
-                if entry.get("ingested"):
-                    continue
-                ts = entry.get("ts", 0)
-                if ts <= last_ingested_ts:
-                    continue
-
-                # Construir signal dict en formato que entiende _open_signals
-                # (campos compatibles con _send_tp_celebration y monitor)
-                signal = {
-                    "pair": entry.get("symbol"),
-                    "pair_display": entry.get("pair_display", entry.get("symbol")),
-                    "mt5_symbol": entry.get("mt5_symbol", entry.get("symbol")),
-                    "direction": entry.get("direction"),
-                    "entry": entry.get("entry"),
-                    "mt5_entry": entry.get("mt5_entry"),  # precio REAL ejecutado en MT5
-                    "sl": entry.get("sl"),
-                    "tp": entry.get("tp"),
-                    "tp2": entry.get("tp2"),
-                    "tp3": entry.get("tp3"),
-                    "source": entry.get("source", "BS365_IA_Generator"),
-                    "sent_at": entry.get("ts", time.time()),
-                    "score": entry.get("score"),
-                    # FIX 2026-05-11: mapear score → probability para que _record_daily_result
-                    # persista el % en copier_stats.json (igual flujo que canales aliados).
-                    "probability": entry.get("score"),
-                    "probability_tech": entry.get("tech_score"),
-                    "probability_vision": entry.get("vision_score"),
-                    "probability_source": "generator",
-                    "mt5_executed": entry.get("mt5_executed", False),
-                    "mt5_ticket": entry.get("mt5_ticket"),
-                    "mt5_lot": entry.get("mt5_lot"),
-                    "_from_generator": True,
-                }
-
-                sig_id = f"{signal['pair']}_GEN_{int(ts)}"
-                with _signals_lock:
-                    if sig_id in _open_signals:
-                        entry["ingested"] = True
-                        continue
-                    _open_signals[sig_id] = {
-                        "signal": signal,
-                        "sent_at": ts,
-                        "telegram_msg_id": None,  # generator publica directo, sin id capturado aún
-                    }
-                entry["ingested"] = True
-                new_count += 1
-                last_ingested_ts = max(last_ingested_ts, ts)
-                log.info(f"📥 Senal generator ingerida: {sig_id} ({signal['direction']} {signal['pair']} @ {signal['entry']})")
-
-            if new_count > 0:
-                _save_open_signals()
-                # Re-escribir queue con flag ingested actualizado.
-                # Fix 2026-05-10: ANTES de escribir, re-leer el archivo y MERGEAR
-                # cualquier entrada nueva que el generator haya añadido entre
-                # nuestra lectura inicial y este momento. Sin esto, la escritura
-                # sobrescribia la version del generator → entradas perdidas
-                # silenciosamente (race condition cross-process).
-                try:
-                    fresh_queue = []
-                    try:
-                        with open(queue_file, "r", encoding="utf-8") as f:
-                            fresh_queue = json.load(f)
-                    except Exception:
-                        fresh_queue = queue  # fallback: usar nuestra version
-                    # Identificar entradas en fresh que NO esten en nuestra version
-                    # (clave: ts + mt5_ticket por si hay multiples por par)
-                    our_keys = {(e.get("ts"), e.get("mt5_ticket")) for e in queue}
-                    merged = list(queue)
-                    for fe in fresh_queue:
-                        fkey = (fe.get("ts"), fe.get("mt5_ticket"))
-                        if fkey not in our_keys:
-                            merged.append(fe)
-                            log.info(f"📥 Re-merge: entrada nueva del generator preservada ({fe.get('symbol')} {fe.get('direction')} ts={fe.get('ts')})")
-                    # Cap a 200 (mismo cap que el generator)
-                    merged = merged[-200:]
-                    tmp = str(queue_file) + ".tmp"
-                    with open(tmp, "w", encoding="utf-8") as f:
-                        json.dump(merged, f, ensure_ascii=False, indent=2, default=str)
-                        f.flush()
-                        try:
-                            os.fsync(f.fileno())
-                        except (OSError, AttributeError):
-                            pass
-                    os.replace(tmp, str(queue_file))
-                except Exception as _e_qsave:
-                    log.debug(f"queue update skip: {_e_qsave}")
-
-        except asyncio.CancelledError:
-            break
-        except Exception as _e_ing:
-            log.debug(f"Ingest generator fallo (no critico): {_e_ing}")
+# 2026-05-26: _loop_ingest_generator_signals() ELIMINADO.
+# El btc_eth_generator se borró del repo — sin él esta función no tiene
+# nada que ingerir. Bot ahora es 100% copier (señales aliadas → canal VIP).
 
 
 async def _loop_promo_reportes() -> None:
@@ -6842,6 +6729,23 @@ async def _monitor_tp_loop() -> None:
             # no es 24/7. La señal sigue en seguimiento — solo no consultamos precio
             # hasta que reabra. TP/SL no se pueden tocar con mercado cerrado.
             if _market_closed and not _is_24_7_asset(pair):
+                continue
+
+            # FIX 2026-05-25: skip dead-on-arrival (precio actual ya pasado TP1
+            # cuando se publicó al VIP). _safe_publish_vip las marca con
+            # _pub_blocked="dead-signal" pero las publica al canal como info-only
+            # (directiva del usuario "no perder ninguna señal"). El monitor NO
+            # debe celebrar TPs falsos sobre operaciones que nunca pudieron abrirse.
+            # Caso 25-may 11:53: SELL ORO @4567 con precio en 4523 disparó
+            # TP1/TP2/TP3/TP4 en cadena en 2 min — +120 pips fantasma al daily.
+            if signal.get("_pub_blocked") == "dead-signal":
+                with _signals_lock:
+                    _open_signals.pop(sig_id, None)
+                _resolved_signals.add(sig_id)
+                log.info(
+                    f"🪦 Dead-on-arrival removida del monitor sin celebrar: "
+                    f"{pair} {direction} entry={signal.get('entry', 0)}"
+                )
                 continue
 
             # FIX 2026-04-10: Filtrar TPs basura ANTES de seleccionar _tp_final
@@ -12094,11 +11998,8 @@ async def main():
     # que maximo cada 5 min la web vuelva a tener los stats aunque reinicie.
     asyncio.ensure_future(_loop_sync_web_periodico())
 
-    # FIX 2026-05-09: ingesta de senales del btc_eth_generator (BTC+ETH propias).
-    # El generator escribe a generator_signals_queue.json. Aqui las leemos cada
-    # 30s, las registramos en _open_signals para que el monitor TP/SL las trackee
-    # igual que las del copier (celebracion, WhatsApp, etc.).
-    asyncio.ensure_future(_loop_ingest_generator_signals())
+    # 2026-05-26: _loop_ingest_generator_signals() eliminado junto con el
+    # btc_eth_generator. Bot ahora es 100% copier (señales aliadas → VIP).
 
     # FIX 2026-05-18: loop proactivo de regalos — garantiza 2/día aunque no lleguen
     # señales nuevas exactamente en el minuto del target. Corre cada 10 min.

@@ -1,4 +1,4 @@
-﻿import sys, io
+import sys, io
 # Forzar UTF-8 en la consola de Windows para que los emojis no crasheen
 if sys.stdout and hasattr(sys.stdout, 'encoding') and sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
@@ -8122,7 +8122,12 @@ def _build_digest_admin() -> str:
     _losses = [h for h in _hist_hoy if h.get("resultado") == "LOSS"]
     _total = len(_wins) + len(_losses)
     _wr = round(len(_wins) / max(1, _total) * 100) if _total else 0
-    _pips_net = sum(h.get("pips", 0) for h in _hist_hoy)
+    # FIX 2026-05-26: defensivo contra entradas con pips no numéricos (dicts viejos
+    # quedaron en el historial). Causaba `int + dict` y mataba el digest entero.
+    _pips_net = sum(
+        h.get("pips", 0) for h in _hist_hoy
+        if isinstance(h.get("pips"), (int, float))
+    )
     _ops_activas = len(operaciones_activas)
 
     # 2. Stats parser LLM
@@ -8144,7 +8149,12 @@ def _build_digest_admin() -> str:
         _fs = get_features_stats()
     except Exception:
         _fs = {}
-    _feat_total = sum(v for k, v in _fs.items() if k not in ("cache_hits", "errors"))
+    # FIX 2026-05-26: defensivo contra valores no numéricos en _fs (algunos
+    # buckets de stats vienen como dict en versiones viejas del JSON).
+    _feat_total = sum(
+        v for k, v in _fs.items()
+        if k not in ("cache_hits", "errors") and isinstance(v, (int, float))
+    )
 
     # 4. Estimacion coste hoy (Sonnet 4.6: ~$0.001/llamada parser, ~$0.002/feature)
     _model = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
@@ -8244,15 +8254,19 @@ def _enviar_digest_admin():
     hoy_str = ahora().strftime("%Y-%m-%d")
     if _ultimo_digest_admin == hoy_str:
         return  # ya enviado hoy
+    # FIX 2026-05-26: marcar como "intentado hoy" ANTES del envío. Si falla
+    # por cualquier razón, no reintentar cada 5min como hicimos toda la
+    # noche 24-may (el bug int+dict reventaba el digest y el loop reintentaba
+    # 12 veces/hora). Mejor 1 intento fallido que 144 al día.
+    _ultimo_digest_admin = hoy_str
+    try:
+        guardar_estado()
+    except Exception:
+        pass
     try:
         msg = _build_digest_admin()
         enviar_telegram(msg, admin_id)
-        _ultimo_digest_admin = hoy_str
         log_sistema(f"🌙 Digest admin enviado a {admin_id}")
-        try:
-            guardar_estado()
-        except Exception:
-            pass
     except Exception as e:
         logger.error(f"❌ Error enviando digest admin: {e}")
 
@@ -20869,17 +20883,10 @@ def _arrancar_interno():
     except Exception as _e_ox:
         log_sistema(f"⚠️ Outbox no arranco: {_e_ox}", "warning")
 
-    # FIX 2026-05-09: BTC+ETH Signal Generator — generación propia de señales crypto.
-    # Escanea cada 15 min BTCUSD y ETHUSD en M15/H1/H4, detecta setups, valida con
-    # Claude Vision y publica al canal VIP. Cobertura 24/7 incluyendo fines de semana.
-    # Toggle: GENERATOR_ENABLED=true en .env
-    try:
-        from btc_eth_generator import start_in_thread as _start_btc_gen
-        _t_gen = _start_btc_gen()
-        if _t_gen:
-            log_sistema("🤖 BTC+ETH Generator iniciado (señales propias 24/7)")
-    except Exception as _e_gen:
-        log_sistema(f"⚠️ BTC+ETH Generator no arranco: {_e_gen}", "warning")
+    # 2026-05-26: BTC+ETH Generator ELIMINADO. El bot ahora es 100% copier
+    # (señales aliadas via Telethon → canal VIP). El generador propio gastaba
+    # crédito Anthropic Vision sin publicar nada útil (mercado lateral lo dejaba
+    # en tech=55 < umbral 70). Archivo btc_eth_generator.py borrado del repo.
 
     # FIX 2026-05-01: AUDITOR LLM NOCTURNO — pilar de confianza.
     # Cada noche a las 23:30 Andorra, Sonnet 4.6 revisa TODA la actividad del dia
@@ -21084,8 +21091,12 @@ def _arrancar_interno():
                 log_sistema(f"⚠️ Self-test error: {_e_st}", "warning")
             time.sleep(900)  # cada 15 min
 
-    _iniciar_hilo("selftest_llm", _loop_selftest_llm)
-    log_sistema("💚 Self-test LLM programado cada 15 min")
+    # 2026-05-26: Self-test LLM DESACTIVADO por usuario. Con el generator propio
+    # apagado permanentemente (solo copier), el chequeo cada 15 min solo gasta
+    # crédito Anthropic sin output útil. La función _loop_selftest_llm queda
+    # definida pero no se spawnea.
+    # _iniciar_hilo("selftest_llm", _loop_selftest_llm)
+    # log_sistema("💚 Self-test LLM programado cada 15 min")
 
     # FIX 2026-05-01: RECOVERY LLM tras reinicio — pilar de confianza.
     # 60s tras boot, Sonnet revisa estado.json + copier_open_signals.json y
@@ -21228,8 +21239,13 @@ def _arrancar_interno():
         while True:
             time.sleep(3600)
 
-    _iniciar_hilo("recovery_llm_once", _loop_recovery_llm_once)
-    log_sistema("🔧 Recovery LLM programado para 60s tras boot")
+    # 2026-05-26: Recovery LLM DESACTIVADO por usuario. Esta mañana se ejecutó 4
+    # veces tras 4 reinicios y devolvió "HEALTHY (0 actions)" cada vez. Sin
+    # generator propio + sin MT5, el análisis post-reinicio ya no aporta valor —
+    # solo gasta crédito Anthropic. La función _loop_recovery_llm_once queda
+    # definida pero no se spawnea.
+    # _iniciar_hilo("recovery_llm_once", _loop_recovery_llm_once)
+    # log_sistema("🔧 Recovery LLM programado para 60s tras boot")
 
     # FIX 2026-05-01: HEALTH-CHECK HTTP local — pilar de sincronizacion.
     # Bot expone localhost:5556/health. Copier puede consultar el estado del bot
