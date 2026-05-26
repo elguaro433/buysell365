@@ -1020,10 +1020,10 @@ def index_web():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BuySell365 Pro — Se\u00f1ales de Trading con IA H\u00edbrida + Visi\u00f3n</title>
-<meta name="description" content="Se\u00f1ales de trading con sistema h\u00edbrido IA + Visi\u00f3n. Cada se\u00f1al incluye % de probabilidad calculado en tiempo real. Oro, NASDAQ, S&amp;P 500, Forex. Entry/SL/TP exactos, ejecuci\u00f3n MT5 verificada.">
-<meta name="keywords" content="se\u00f1ales trading IA, se\u00f1ales con probabilidad, sistema h\u00edbrido trading, se\u00f1ales oro telegram, gold signals AI, se\u00f1ales NASDAQ con IA, se\u00f1ales EUR/USD, BuySell365, trading con visi\u00f3n IA, MT5 verificado, se\u00f1ales con porcentaje, se\u00f1ales premium telegram, se\u00f1ales XAUUSD, forex signals AI">
+<meta name="description" content="Se\u00f1ales de trading con sistema h\u00edbrido IA + Visi\u00f3n. Cada se\u00f1al incluye % de probabilidad calculado en tiempo real. Oro, NASDAQ, S&amp;P 500, Forex. Entry/SL/TP exactos, listos para ejecutar.">
+<meta name="keywords" content="se\u00f1ales trading IA, se\u00f1ales con probabilidad, sistema h\u00edbrido trading, se\u00f1ales oro telegram, gold signals AI, se\u00f1ales NASDAQ con IA, se\u00f1ales EUR/USD, BuySell365, trading con visi\u00f3n IA, se\u00f1ales con porcentaje, se\u00f1ales premium telegram, se\u00f1ales XAUUSD, forex signals AI">
 <meta property="og:title" content="BuySell365 Pro \u2014 Sistema H\u00edbrido IA + Visi\u00f3n con % de Probabilidad">
-<meta property="og:description" content="Cada se\u00f1al pasa por dos capas de an\u00e1lisis (t\u00e9cnico + IA con visi\u00f3n) y llega con un % de probabilidad. Oro, NASDAQ, Forex en tiempo real. Resultados verificados en MT5.">
+<meta property="og:description" content="Cada se\u00f1al pasa por dos capas de an\u00e1lisis (t\u00e9cnico + IA con visi\u00f3n) y llega con un % de probabilidad. Oro, NASDAQ, Forex en tiempo real.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -1703,7 +1703,7 @@ if('serviceWorker' in navigator){{
       <span data-i18n="partners.headline">Opera con el broker oficial de BuySell365</span>
     </h2>
     <p style="font-size:1.05rem;color:var(--text2);max-width:640px;margin:0 auto 8px;line-height:1.6">
-      <span data-i18n="partners.subline">El mismo MT5 que usamos para nuestras señales VIP.</span>
+      <span data-i18n="partners.subline">El mismo broker que usamos para nuestro análisis VIP.</span>
     </p>
     <p style="font-size:0.95rem;color:var(--text2);max-width:640px;margin:0 auto 24px;line-height:1.6">
       <span data-i18n="footer.xm_intro">Operamos con XM Global. Abre tu cuenta real con nuestro código de afiliado oficial:</span>
@@ -1774,7 +1774,7 @@ if('serviceWorker' in navigator){{
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon green">\U0001f9e0</div>
       <h3 data-i18n="features.hybrid.title">Sistema H\u00edbrido IA + Visi\u00f3n</h3>
-      <p data-i18n="features.hybrid.desc">Cada se\u00f1al pasa por dos capas independientes: an\u00e1lisis t\u00e9cnico instant\u00e1neo (EMA, RSI, ATR, R:R) sobre datos en vivo de MT5, m\u00e1s Claude Sonnet 4.6 con Visi\u00f3n leyendo la gr\u00e1fica real como un trader profesional. El resultado: un % de probabilidad por se\u00f1al, antes de publicarla.</p>
+      <p data-i18n="features.hybrid.desc">Cada se\u00f1al pasa por dos capas independientes: an\u00e1lisis t\u00e9cnico instant\u00e1neo (EMA, RSI, ATR, R:R) sobre datos de mercado en vivo, m\u00e1s Claude Sonnet 4.6 con Visi\u00f3n leyendo la gr\u00e1fica real como un trader profesional. El resultado: un % de probabilidad por se\u00f1al, antes de publicarla.</p>
     </div>
     <div class="feature-card" style="padding:20px">
       <div class="feature-icon gold">\U0001f4ca</div>
@@ -1820,8 +1820,8 @@ if('serviceWorker' in navigator){{
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_monitor">Monitoreo</div>
     </div>
     <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(167,139,250,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(167,139,250,0.06)">
-      <div style="font-size:1.8rem;font-weight:900;color:#a78bfa;text-shadow:0 0 20px rgba(167,139,250,0.6)">MT5</div>
-      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_verified">Resultados Verificados</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#a78bfa;text-shadow:0 0 20px rgba(167,139,250,0.6)">+15</div>
+      <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_verified">Activos Cubiertos</div>
     </div>
     <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(251,191,36,0.2);border-radius:16px;padding:20px 28px;text-align:center;flex:1;min-width:140px;box-shadow:0 0 20px rgba(251,191,36,0.06)">
       <div style="font-size:1.8rem;font-weight:900;color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,0.6)">100%</div>
@@ -1832,7 +1832,7 @@ if('serviceWorker' in navigator){{
       <div style="font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px" data-i18n="about.stat_assets">Activos</div>
     </div>
   </div>
-  <p style="text-align:center;font-size:.8rem;color:var(--text2);margin:16px auto 0;max-width:800px;opacity:.7" data-i18n="about.powered">\u26a1 Sistema H\u00edbrido IA + Visi\u00f3n \u00b7 Probabilidad por Se\u00f1al \u00b7 MetaTrader 5 \u00b7 24/7</p>
+  <p style="text-align:center;font-size:.8rem;color:var(--text2);margin:16px auto 0;max-width:800px;opacity:.7" data-i18n="about.powered">\u26a1 Sistema H\u00edbrido IA + Visi\u00f3n \u00b7 Probabilidad por Se\u00f1al \u00b7 24/7</p>
 </section>
 
 <!-- CALCULADORA INTERACTIVA — engagement + visualización (FIX 2026-05-08) -->
@@ -1982,7 +1982,7 @@ if('serviceWorker' in navigator){{
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q4">\u00bfQu\u00e9 broker necesito?</div>
-      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers con MetaTrader 5 para mejor ejecuci\u00f3n de las se\u00f1ales.</div>
+      <div class="faq-a" data-i18n="faq.a4">Puedes usar cualquier broker que soporte los activos que operamos (EUR/USD, NASDAQ, S&amp;P 500 y m\u00e1s). Recomendamos brokers regulados con buen spread para mejor ejecuci\u00f3n de las se\u00f1ales.</div>
     </div>
     <div class="faq-item" onclick="this.classList.toggle('open')">
       <div class="faq-q" data-i18n="faq.q5">\u00bfC\u00f3mo cancelo mi suscripci\u00f3n VIP?</div>
@@ -2114,7 +2114,7 @@ if('serviceWorker' in navigator){{
       </div>
       <div style="background:rgba(22,32,53,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:18px">
         <div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:6px">\U0001f4c8 Resultados pasados</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.6">Los resultados pasados no garantizan resultados futuros. Los stats publicados reflejan el desempe\u00f1o hist\u00f3rico verificado en MT5, no una proyecci\u00f3n.</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.6">Los resultados pasados no garantizan resultados futuros. Los stats publicados reflejan el desempe\u00f1o hist\u00f3rico de las se\u00f1ales del canal VIP, no una proyecci\u00f3n.</div>
       </div>
     </div>
     <div style="margin-top:20px;padding:18px 22px;background:rgba(0,0,0,0.25);border-radius:12px;border:1px solid rgba(255,255,255,0.08);max-width:780px;margin-left:auto;margin-right:auto">
@@ -2635,10 +2635,10 @@ def pagina_unete():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Se&ntilde;ales de Trading con IA H&iacute;brida + Visi&oacute;n &mdash; BuySell365 Pro</title>
-<meta name="description" content="Se&ntilde;ales de trading con sistema h&iacute;brido IA + Visi&oacute;n y % de probabilidad por se&ntilde;al. Oro, NASDAQ, S&amp;P 500, Forex. Entry/SL/TP exactos, ejecuci&oacute;n MT5 verificada.">
+<meta name="description" content="Se&ntilde;ales de trading con sistema h&iacute;brido IA + Visi&oacute;n y % de probabilidad por se&ntilde;al. Oro, NASDAQ, S&amp;P 500, Forex. Entry/SL/TP exactos, listos para ejecutar.">
 <meta name="keywords" content="se&ntilde;ales trading IA, se&ntilde;ales con probabilidad, sistema h&iacute;brido trading, se&ntilde;ales oro telegram, gold signals AI, BuySell365">
 <meta property="og:title" content="Se&ntilde;ales con IA H&iacute;brida + Visi&oacute;n &mdash; % de Probabilidad por Se&ntilde;al">
-<meta property="og:description" content="Cada se&ntilde;al pasa por dos capas (an&aacute;lisis t&eacute;cnico + IA con visi&oacute;n) y llega con un % de probabilidad. Resultados verificados en MT5.">
+<meta property="og:description" content="Cada se&ntilde;al pasa por dos capas (an&aacute;lisis t&eacute;cnico + IA con visi&oacute;n) y llega con un % de probabilidad.">
 <meta property="og:image" content="https://buysell365.pro/img/og_image.png">
 <meta property="og:url" content="https://buysell365.pro/unete">
 <meta property="og:type" content="website">
@@ -2691,7 +2691,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 <div class="stat"><div class="num">24/7</div><div class="label">Monitoreo</div></div>
 <div class="stat"><div class="num">+15</div><div class="label">Activos</div></div>
 <div class="stat"><div class="num">IA + Visi&oacute;n</div><div class="label">Sistema H&iacute;brido</div></div>
-<div class="stat"><div class="num">MT5</div><div class="label">Verificado</div></div>
+<div class="stat"><div class="num">100%</div><div class="label">Transparente</div></div>
 </div>
 </div>
 
@@ -2738,7 +2738,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 </div>
 <div class="benefit">
 <div class="icon">&#x1F4CA;</div>
-<div class="text"><h3>Resultados transparentes</h3><p>Dashboard en vivo en buysell365.pro. Cada operaci&oacute;n verificada en MT5.</p></div>
+<div class="text"><h3>Resultados transparentes</h3><p>Dashboard en vivo en buysell365.pro. Cada operaci&oacute;n del canal VIP publicada en tiempo real.</p></div>
 </div>
 </div>
 
@@ -2752,7 +2752,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:#07091f;color:#f0f6ff;m
 </div>
 
 <div class="trust">
-<p>BuySell365 Pro &mdash; Resultados reales, verificados en MT5</p>
+<p>BuySell365 Pro &mdash; Se&ntilde;ales transparentes, publicadas en tiempo real</p>
 <p style="margin-top:8px"><a href="https://buysell365.pro" style="color:#4d9fff;text-decoration:none">buysell365.pro</a> &middot; <a href="https://buysell365.pro/terminos" style="color:#4d9fff;text-decoration:none">T&eacute;rminos</a></p>
 </div>
 
@@ -2768,14 +2768,14 @@ def pagina_terminos():
 <style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:'Inter',sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.7;padding:20px}}.container{{max-width:800px;margin:0 auto}}h1{{color:#f0b90b;font-size:1.8rem;margin-bottom:10px}}h2{{color:#58a6ff;font-size:1.2rem;margin-top:25px;margin-bottom:8px}}p,li{{font-size:0.95rem;margin-bottom:8px}}ul{{padding-left:20px}}.date{{color:#8b949e;font-size:0.85rem;margin-bottom:20px}}a{{color:#58a6ff}}.back{{display:inline-block;margin-top:30px;padding:10px 20px;background:#f0b90b;color:#000;border-radius:8px;text-decoration:none;font-weight:bold}}</style></head>
 <body><div class="container">
 <h1>&#128221; T&eacute;rminos y Condiciones</h1><p class="date">&Uacute;ltima actualizaci&oacute;n: 8 de mayo de 2026</p>
-<h2>1. Qu&eacute; es BuySell365 Pro</h2><p>BuySell365 Pro es un servicio automatizado que genera alertas informativas sobre activos financieros mediante un sistema h&iacute;brido propietario de Inteligencia Artificial. Cada se&ntilde;al pasa por dos capas independientes de an&aacute;lisis: indicadores t&eacute;cnicos en vivo sobre datos de MetaTrader 5, y un modelo de visi&oacute;n por computadora basado en Claude Sonnet 4.6 (Anthropic) que analiza la gr&aacute;fica del activo en el momento de la entrada. El resultado es un porcentaje de probabilidad estad&iacute;stica que acompa&ntilde;a a cada se&ntilde;al. Las alertas son de car&aacute;cter informativo y educativo &mdash; no son recomendaciones de inversi&oacute;n personalizadas.</p>
+<h2>1. Qu&eacute; es BuySell365 Pro</h2><p>BuySell365 Pro es un servicio automatizado que genera alertas informativas sobre activos financieros mediante un sistema h&iacute;brido propietario de Inteligencia Artificial. Cada se&ntilde;al pasa por dos capas independientes de an&aacute;lisis: indicadores t&eacute;cnicos en vivo sobre datos de mercado, y un modelo de visi&oacute;n por computadora basado en Claude Sonnet 4.6 (Anthropic) que analiza la gr&aacute;fica del activo en el momento de la entrada. El resultado es un porcentaje de probabilidad estad&iacute;stica que acompa&ntilde;a a cada se&ntilde;al. Las alertas son de car&aacute;cter informativo y educativo &mdash; no son recomendaciones de inversi&oacute;n personalizadas.</p>
 <h2>2. No es Asesor&iacute;a Financiera</h2><p>BuySell365 Pro NO proporciona asesor&iacute;a financiera personalizada. Cada usuario es responsable de sus propias decisiones de inversi&oacute;n. El % de probabilidad mostrado es una estimaci&oacute;n estad&iacute;stica calculada en tiempo real, NO una garant&iacute;a de resultado. Consulta a un profesional financiero antes de operar con dinero real.</p>
 <h2>3. Riesgo de Inversi&oacute;n</h2><p>Operar en mercados financieros conlleva un alto riesgo de p&eacute;rdida de capital. Los resultados pasados no garantizan resultados futuros. Una se&ntilde;al con probabilidad alta puede igualmente terminar en p&eacute;rdida. Nunca inviertas dinero que no puedas permitirte perder.</p>
 <h2>4. Suscripci&oacute;n VIP</h2><ul><li>Precio: &euro;149/mes (equivalente en USDT TRC20), pagado manualmente.</li><li>Incluye: se&ntilde;ales del canal VIP con sistema h&iacute;brido IA + Visi&oacute;n, % de probabilidad por se&ntilde;al, an&aacute;lisis bajo petici&oacute;n y soporte directo.</li><li>Sin cobros autom&aacute;ticos ni recurrentes. T&uacute; decides cu&aacute;ndo renovar.</li><li>Cancela cuando quieras: simplemente no renuevas y el acceso expira al final del periodo pagado.</li><li>No se ofrecen reembolsos una vez procesado el pago, ya que el acceso al canal VIP se activa de forma inmediata.</li></ul>
 <h2>5. Sistema de Probabilidad</h2><p>El porcentaje de probabilidad que aparece en cada se&ntilde;al se calcula combinando dos capas: (a) an&aacute;lisis t&eacute;cnico cuantitativo en tiempo real (EMA, RSI, ATR, R:R, tendencia M15/H1) y (b) an&aacute;lisis cualitativo de la gr&aacute;fica mediante un modelo de visi&oacute;n IA. El servicio nunca filtra ni descarta se&ntilde;ales en base al %; todas las se&ntilde;ales se publican y la decisi&oacute;n final de operar corresponde al usuario. Si el sistema de probabilidad falla por causas t&eacute;cnicas (API, conectividad), la se&ntilde;al se publica sin la l&iacute;nea de probabilidad.</p>
 <h2>6. Uso Aceptable</h2><ul><li>No redistribuir ni revender las se&ntilde;ales del canal VIP.</li><li>No usar bots ni scrapers para extraer contenido del canal.</li><li>No enviar spam en el grupo de Telegram.</li><li>Respetar a los dem&aacute;s miembros de la comunidad.</li></ul>
 <h2>7. Limitaci&oacute;n de Responsabilidad</h2><p>BuySell365 Pro y su equipo no ser&aacute;n responsables de p&eacute;rdidas financieras derivadas del uso del servicio. Al usar el servicio aceptas que operas bajo tu propia responsabilidad.</p>
-<h2>8. Disponibilidad</h2><p>Trabajamos para mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida. Puede haber pausas por mantenimiento, actualizaciones o dependencias externas (proveedor de IA, broker MT5, Telegram).</p>
+<h2>8. Disponibilidad</h2><p>Trabajamos para mantener el servicio operativo 24/7, pero no garantizamos disponibilidad ininterrumpida. Puede haber pausas por mantenimiento, actualizaciones o dependencias externas (proveedor de IA, broker, Telegram).</p>
 <h2>9. Modificaciones</h2><p>Podemos actualizar estos t&eacute;rminos en cualquier momento. Los cambios se publican en esta p&aacute;gina. El uso continuado del servicio implica la aceptaci&oacute;n de los cambios.</p>
 <h2>10. Contacto</h2><p><a href="https://t.me/BuySell365Traiding">@BuySell365Traiding</a> en Telegram.</p>
 <a href="/" class="back">&larr; Volver</a>
@@ -2906,7 +2906,7 @@ def pagina_resultados():
     return f"""<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Track Record Completo — BuySell365 Pro</title>
-<meta name="description" content="Historial completo de señales del Canal VIP de BuySell365 Pro. Stats por mes, por par. Resultados verificados en MetaTrader 5.">
+<meta name="description" content="Historial completo de señales del Canal VIP de BuySell365 Pro. Stats por mes, por par. Resultados publicados en tiempo real.">
 <link rel="canonical" href="https://buysell365.pro/resultados">
 <style>
 *{{margin:0;padding:0;box-sizing:border-box}}

@@ -617,7 +617,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"Te escribo porque vi que hace un par de días te interesaste por *BuySell365 Pro*.\n\n"
                 f"📊 En estas últimas 48h nuestro canal VIP tuvo:\n"
                 f"   ✓ Varios TPs alcanzados\n"
-                f"   📈 Operaciones rentables verificadas en MT5\n\n"
+                f"   📈 Operaciones rentables publicadas en tiempo real\n\n"
                 f"💎 Si quieres ver lo que estamos haciendo ahora mismo, la puerta está abierta.\n\n"
                 f"Cualquier duda, escríbeme. ✅"
             ),
@@ -626,7 +626,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"Estou passando para dizer oi — vi que você se interessou pelo *BuySell365 Pro* há 2 dias.\n\n"
                 f"📊 Nestas últimas 48h nosso canal VIP teve:\n"
                 f"   ✓ Vários TPs alcançados\n"
-                f"   📈 Operações lucrativas verificadas no MT5\n\n"
+                f"   📈 Operações lucrativas publicadas em tempo real\n\n"
                 f"💎 Se quiser ver o que estamos fazendo agora, a porta está aberta.\n\n"
                 f"Qualquer dúvida, me chama. ✅"
             ),
@@ -635,7 +635,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"أتفقد فقط — لاحظت أنك كنت مهتمًا بـ *BuySell365 Pro* قبل يومين.\n\n"
                 f"📊 خلال آخر 48 ساعة، كانت قناة VIP لدينا:\n"
                 f"   ✓ تحقيق عدة TPs\n"
-                f"   📈 صفقات مربحة موثقة على MT5\n\n"
+                f"   📈 صفقات مربحة منشورة في الوقت الفعلي\n\n"
                 f"💎 إذا كنت تريد رؤية ما نقوم به الآن، الباب مفتوح.\n\n"
                 f"أي سؤال، راسلني. ✅"
             ),
@@ -644,7 +644,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"Je passe juste pour te dire que j'ai vu ton intérêt pour *BuySell365 Pro* il y a 2 jours.\n\n"
                 f"📊 Ces dernières 48h notre canal VIP a eu :\n"
                 f"   ✓ Plusieurs TPs atteints\n"
-                f"   📈 Trades rentables vérifiés sur MT5\n\n"
+                f"   📈 Trades rentables publiés en temps réel\n\n"
                 f"💎 Si tu veux voir ce qu'on fait en ce moment, la porte est ouverte.\n\n"
                 f"Une question ? Écris-moi. ✅"
             ),
@@ -653,7 +653,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"Ich melde mich kurz — du hast vor 2 Tagen Interesse an *BuySell365 Pro* gezeigt.\n\n"
                 f"📊 In den letzten 48h hatte unser VIP-Kanal:\n"
                 f"   ✓ Mehrere TPs erreicht\n"
-                f"   📈 Profitable Trades, MT5-verifiziert\n\n"
+                f"   📈 Profitable Trades, in Echtzeit veröffentlicht\n\n"
                 f"💎 Wenn du sehen willst, was wir gerade machen, die Tür ist offen.\n\n"
                 f"Fragen? Schreib mir. ✅"
             ),
@@ -662,7 +662,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"Ti scrivo perché 2 giorni fa ti sei interessato a *BuySell365 Pro*.\n\n"
                 f"📊 In queste ultime 48h il nostro canale VIP ha avuto:\n"
                 f"   ✓ Diversi TPs raggiunti\n"
-                f"   📈 Trade profittevoli verificati su MT5\n\n"
+                f"   📈 Trade profittevoli pubblicati in tempo reale\n\n"
                 f"💎 Se vuoi vedere cosa stiamo facendo, la porta è aperta.\n\n"
                 f"Domande? Scrivimi. ✅"
             ),
@@ -671,7 +671,7 @@ def _enviar_followup_a_lead(user_id: str, data: dict) -> bool:
                 f"Хотел напомнить — пару дней назад ты интересовался *BuySell365 Pro*.\n\n"
                 f"📊 За последние 48 часов наш VIP канал:\n"
                 f"   ✓ Несколько TP достигнуто\n"
-                f"   📈 Прибыльные сделки подтверждены на MT5\n\n"
+                f"   📈 Прибыльные сделки опубликованы в реальном времени\n\n"
                 f"💎 Если хочешь посмотреть, что делаем сейчас, дверь открыта.\n\n"
                 f"Вопросы? Напиши. ✅"
             ),
@@ -10644,7 +10644,7 @@ def procesar_mensaje(texto: str, remitente: str, es_admin: bool = False):
             "GBP/USD · USD/CHF · AUD/USD · NZD/USD\n"
             "GBP/JPY · EUR/JPY · USD/CAD · EUR/GBP\n\n"
             "🧠 *Cada señal incluye % de probabilidad* calculado por IA antes de publicarse.\n"
-            "✅ Entry, SL y TPs exactos · Verificado en MT5\n"
+            "✅ Entry, SL y TPs exactos · Listos para ejecutar\n"
             "🔒 Este grupo es solo lectura.\n"
             "💬 Para análisis y soporte escribe al bot:"
         )
@@ -13129,7 +13129,7 @@ body::before{{content:'';position:fixed;top:0;left:0;right:0;height:400px;backgr
                 <a href="https://t.me/BUYSELL_365_24_7" target="_blank" class="cta-btn" style="padding:12px 24px">&#128172; TELEGRAM</a>
                 <a href="https://t.me/{BOT_USERNAME}?start=vip" target="_blank" class="cta-btn" style="padding:12px 24px">&#128142; CANAL VIP</a>
             </div>
-            <p style="font-size:11px;color:var(--muted);margin-top:12px">Resultados verificados en MT5 &mdash; 100% transparente</p>
+            <p style="font-size:11px;color:var(--muted);margin-top:12px">Se&ntilde;ales publicadas en tiempo real &mdash; 100% transparente</p>
         </div>
     </div>
 
@@ -16733,7 +16733,7 @@ def loop_publicidad_canal():
         (
             "💼 *CANAL VIP — 3 PASOS Y A OPERAR*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "📊 Resultados verificados en MT5 — sin trucos\n"
+            "📊 Resultados publicados en tiempo real — sin trucos\n"
             "🛡️ Gestión profesional · 100% transparente\n\n"
             "1️⃣  *Suscríbete* al Canal VIP _(en 1 min)_\n"
             "2️⃣  *Recibe alertas* al instante en Telegram\n"
