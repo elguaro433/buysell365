@@ -242,12 +242,65 @@ def get_open_signals() -> list[dict]:
     return []
 
 
+_DIR_ES_TO_EN = {"VENTA": "SELL", "COMPRA": "BUY", "SHORT": "SELL", "LONG": "BUY"}
+
+
+def _normalize_signal(s: dict) -> dict:
+    """Mapea campos legacy ES (nombre/tipo/entrada/hora/tag) al esquema EN
+    que esperan los templates (pair/direction/entry/time/result). Preserva
+    todos los campos originales para no romper consumidores existentes."""
+    if not isinstance(s, dict):
+        return s
+    out = dict(s)
+    if not out.get("pair"):
+        out["pair"] = out.get("par") or out.get("nombre") or "?"
+    if not out.get("direction"):
+        d_raw = out.get("direccion") or out.get("tipo") or ""
+        out["direction"] = _DIR_ES_TO_EN.get(str(d_raw).upper(), str(d_raw).upper() or "?")
+    if not out.get("entry"):
+        out["entry"] = out.get("entrada") or "-"
+    if not out.get("time"):
+        out["time"] = out.get("hora_envio") or out.get("hora") or "-"
+    if not out.get("result"):
+        out["result"] = out.get("tag") or out.get("resultado") or "-"
+    return out
+
+
 def get_recent_signals(limit: int = 20) -> list[dict]:
-    """Últimas N señales del historial."""
-    data = read_json("historial_real", default=[])
-    if isinstance(data, list):
-        return list(reversed(data[-limit:]))
-    return []
+    """Últimas N señales reales desde copier_stats.json["trades"] (fuente VIVA).
+
+    FIX 2026-06-06: antes leía historial_real.json — un archivo legacy de la era
+    MT5 que NO se actualiza desde marzo (mostraba señales de hace 2 meses, todas
+    GOLD y con PROB vacía porque esos registros no llevan 'probability'). Las
+    señales vivas (con probabilidad de aliados) están en copier_stats.json.
+    """
+    import datetime
+    raw = read_json("copier_stats", default={})
+    trades = raw.get("trades", []) if isinstance(raw, dict) else []
+    if not isinstance(trades, list) or not trades:
+        return []
+    _res_map = {"tp": "TP", "sl": "SL", "close_half": "TP½",
+                "close_partial": "TP½", "full_close": "CLOSE"}
+    out = []
+    for t in reversed(trades[-limit:]):
+        if not isinstance(t, dict):
+            continue
+        ts = t.get("closed_at") or t.get("time") or 0
+        try:
+            hora = datetime.datetime.fromtimestamp(ts).strftime("%d/%m %H:%M") if ts else "-"
+        except Exception:
+            hora = "-"
+        prob = t.get("probability")
+        res = (t.get("result") or "").lower()
+        out.append({
+            "pair": t.get("pair_display") or t.get("pair") or "?",
+            "direction": (t.get("direction") or "?").upper(),
+            "entry": t.get("entry") or "-",
+            "time": hora,
+            "probability": prob if (prob is not None and prob != "") else "-",
+            "result": _res_map.get(res, (res.upper() or "-")),
+        })
+    return out
 
 
 # ─── LLM stats ─────────────────────────────────────────────────────────
@@ -269,26 +322,29 @@ def get_llm_stats() -> dict:
 
 # ─── VIPs ──────────────────────────────────────────────────────────────
 def get_vip_subscribers() -> list[dict]:
-    """Lista de VIPs activos."""
-    gifts = read_json("gift_history", default={})
-    trackers = read_json("gift_tracker", default={})
+    """Lista de VIPs activos leida de estado.json["suscripciones_vip"].
 
+    Estructura real: {user_id: {nombre, username, expira, activo, tipo,
+    fecha_inicio, es_trial, entrada_confirmada, ...}}
+    """
+    estado = read_json("estado", default={})
+    subs = estado.get("suscripciones_vip", {}) if isinstance(estado, dict) else {}
     out = []
-    # gift_history estructura típica: {user_id: {data}}
-    if isinstance(gifts, dict):
-        for uid, data in gifts.items():
+    if isinstance(subs, dict):
+        for uid, data in subs.items():
             if not isinstance(data, dict):
                 continue
             out.append({
                 "id": uid,
-                "username": data.get("username") or data.get("name") or "?",
-                "name": data.get("name", ""),
-                "started_at": data.get("started_at", ""),
-                "expires_at": data.get("expires_at", ""),
+                "username": data.get("username") or data.get("nombre") or "?",
+                "name": data.get("nombre", ""),
+                "started_at": data.get("fecha_inicio", ""),
+                "expires_at": data.get("expira", ""),
                 "days_remaining": data.get("days_remaining"),
-                "tier": data.get("tier", "VIP"),
-                "amount": data.get("amount", ""),
-                "status": "active" if data.get("active", True) else "expired",
+                "tier": data.get("tipo", "VIP"),
+                "amount": data.get("monto", ""),
+                "is_trial": bool(data.get("es_trial", False)),
+                "status": "active" if data.get("activo", True) else "expired",
             })
     return out
 
@@ -302,9 +358,19 @@ def get_connections_status() -> dict:
         if p and p.exists():
             return int(now - p.stat().st_mtime)
         return None
+    def _age_path(p):
+        try:
+            return int(now - p.stat().st_mtime) if p and p.exists() else None
+        except Exception:
+            return None
+    # FIX 2026-06-06: Telethon se mide por el heartbeat del copier (se actualiza cada
+    # 20s pase lo que pase), NO por copier_stats.json — ese solo se escribe al cerrar
+    # un trade, así que daba falso "Inactivo" cuando no había cierres recientes aunque
+    # el copier estuviera perfectamente vivo.
+    _copier_hb = _age_path(APP_DIR / ".copier.heartbeat")
     return {
         "telegram": True,  # Asumimos True si bot está corriendo
-        "telethon": _age("copier_stats") is not None and _age("copier_stats") < 600,
+        "telethon": _copier_hb is not None and _copier_hb < 90,
         "whatsapp": True,  # No tenemos heartbeat directo
         "render_sync": _age("historial_real") is not None and _age("historial_real") < 600,
     }

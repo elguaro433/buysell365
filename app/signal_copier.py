@@ -251,7 +251,6 @@ def _get_weekly_stats_block() -> str:
         _total = len(_week)
         return (
             f"\n📊 *Last week's track record:*\n"
-            f"✅ {_wr:.0f}% win rate\n"
             f"💰 +{int(_pips_net):,} pips locked\n"
             f"🏆 {_win_n}/{_decisive} signals were winners\n"
         )
@@ -274,7 +273,6 @@ def _get_weekly_stats_block() -> str:
             return ""
         return (
             f"\n📊 *Last week's track record:*\n"
-            f"✅ {_wr_f}% win rate\n"
             f"💰 +{_pips_f:,} pips locked\n"
             f"🏆 {_win_f}/{_tot_f} signals were winners\n"
         )
@@ -1053,7 +1051,7 @@ def _get_pips_info(pair: str, entry: float, exit_price: float) -> tuple:
     _p_up = pair.upper()
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         return round(pips_raw * 10, 1), "pips"
-    elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL")):
+    elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
         # Petróleo: pip = 0.01 → ×100 para contar céntimos como "pts"
         return round(pips_raw * 100, 1), "pts"
     elif any(x in _p_up for x in ("BTC", "ETH", "BITCOIN")):
@@ -2707,15 +2705,22 @@ def _format_gift_message(signal: dict) -> str:
         tp_lines += f"\n🎯 TP3: {fmt(tp3)}"
 
     # Contar operaciones del día para el texto promo
-    ops_hoy = 0
+    # FIX 2026-06-06: antes contaba SOLO _open_signals (señales abiertas ahora) → el
+    # número bajaba al cerrarse trades (se vio 9 → 6 el mismo día). Ahora suma
+    # abiertas-hoy + cerradas-hoy (terminal) → monotónico, refleja el total del día.
+    from datetime import datetime
+    import pytz
+    tz = pytz.timezone("Europe/Andorra")
+    hoy_ts = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
     with _signals_lock:
-        from datetime import datetime
-        import pytz
-        tz = pytz.timezone("Europe/Andorra")
-        hoy_ts = datetime.now(tz).replace(hour=0, minute=0, second=0).timestamp()
-        ops_hoy = sum(1 for s in _open_signals.values()
-                      if s.get("sent_at", 0) >= hoy_ts)
-    ops_hoy = max(ops_hoy, 2)  # Mínimo 2 para que el texto tenga sentido
+        _open_hoy = sum(1 for s in _open_signals.values()
+                        if s.get("sent_at", 0) >= hoy_ts)
+    _TERMINAL_RES = ("tp", "sl", "full_close")
+    with _daily_results_lock:
+        _closed_hoy = sum(1 for r in _daily_results
+                          if r.get("closed_at", r.get("time", 0)) >= hoy_ts
+                          and r.get("result") in _TERMINAL_RES)
+    ops_hoy = max(_open_hoy + _closed_hoy, 2)  # Mínimo 2 para que el texto tenga sentido
 
     # FIX 2026-04-26: traducido a INGLES — todo el sistema en EN
     msg = (
@@ -3729,6 +3734,8 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         pips_won = abs(tp - entry) if entry > 0 else 0
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             pips_label = f"+{pips_won * 10:.0f} pips" if pips_won >= 0.1 else ""
+        elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+            pips_label = f"+{pips_won * 100:.1f} pts" if pips_won > 0 else ""
         elif "JPY" in pair.upper():
             # JPY pairs: 1 pip = 0.01 → multiply by 100
             pips_label = f"+{pips_won * 100:.0f} pips" if pips_won > 0 else ""
@@ -4053,6 +4060,8 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     pips_won = abs(tp - entry) if entry > 0 and tp > 0 else 0
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         pips_str = f"+{pips_won * 10:.0f} pips" if pips_won >= 0.1 else ""
+    elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+        pips_str = f"+{pips_won * 100:.1f} pts" if pips_won > 0 else ""
     elif "JPY" in pair.upper():
         # JPY pairs: 1 pip = 0.01 → multiply by 100
         pips_str = f"+{pips_won * 100:.0f} pips" if pips_won > 0 else ""
@@ -4199,6 +4208,8 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 _pair_up = (pair or "").upper()
                 if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
                     _pips_disp = pips_won * 10
+                elif any(x in _pair_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+                    _pips_disp = pips_won * 100
                 elif "JPY" in _pair_up:
                     _pips_disp = pips_won * 100
                 elif entry >= 100:
@@ -4297,6 +4308,9 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
                     _pips_disp_gt = round(_pips_disp_gt * 10, 1)
                     _unit_gt = "pips"
+                elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+                    _pips_disp_gt = round(_pips_disp_gt * 100, 1)
+                    _unit_gt = "pts"
                 elif "JPY" in pair.upper():
                     _pips_disp_gt = round(_pips_disp_gt * 100, 1)
                 elif entry >= 100:
@@ -4807,6 +4821,8 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
         # FIX 2026-05-01: GOLD usa "pips" con factor x10 (estandar mercado).
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             return f"{signo}{v * 10:.0f} pips"
+        elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+            return f"{signo}{v * 100:.1f} pts"
         elif "JPY" in pair.upper():
             return f"{signo}{v * 100:.0f} pips"
         elif entry >= 100:
@@ -4926,6 +4942,8 @@ def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_m
         # FIX 2026-05-01: GOLD usa "pips" con factor x10 (estandar mercado).
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             return f"{signo}{v * 10:.0f} pips"
+        elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+            return f"{signo}{v * 100:.1f} pts"
         elif "JPY" in pair.upper():
             return f"{signo}{v * 100:.0f} pips"
         elif entry >= 100:
@@ -5046,7 +5064,7 @@ def _record_daily_result(signal: dict, result: str) -> None:
         pips_str = f"{pips_raw * 10:.0f} pips"
         pips_numeric = pips_raw * 10
         pips_unit = "pips"
-    elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL")):
+    elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
         pips_str = f"{pips_raw * 100:.1f} pts"
         pips_numeric = pips_raw * 100
         pips_unit = "pts"
@@ -5146,15 +5164,14 @@ def _build_promo_report(hora_label: str) -> str | None:
     # FIX 2026-04-27: GOLD ahora usa "pips" (alineado con aliados, antes "pts").
     # FIX 2026-04-30: clasificacion robusta por nombre de pair (los partials tienen
     # entry=0, antes caian todos en "Forex" por la rama entry<100).
-    def _is_index(p):
-        u = (p or "").upper()
-        return any(x in u for x in ("NAS", "US30", "US100", "US500", "SP500", "DOW", "DAX", "FTSE", "NIKKEI"))
-    def _is_gold(p):
-        return p in ("GOLD", "XAUUSD", "XAUUSD=X") or "XAU" in (p or "").upper()
-    # Agrupar pips por tipo: GOLD=pips, indices=pts, forex=pips
-    gold_pips_total = sum(_pips(r) for r in tps if _is_gold(r["pair"]))
-    index_pts = sum(_pips(r) for r in tps if not _is_gold(r["pair"]) and (_is_index(r["pair"]) or r.get("entry", 0) >= 100))
-    forex_pips = sum(_pips(r) for r in tps if not _is_gold(r["pair"]) and not _is_index(r["pair"]) and r.get("entry", 0) < 100)
+    # FIX 2026-06-06: categorizar con classify_pair (canónico, mismo que stats_normalizer)
+    # en vez del heurístico entry>=100, que metía AUD/JPY (114) en "Indices" y
+    # USOIL/NATGAS (<100) en "Forex". Ahora: ORO/INDICES/OIL/FOREX/CRIPTO correctos.
+    from stats_normalizer import classify_pair
+    _cat_totals = {}
+    for r in tps:
+        _cat = classify_pair(r.get("pair_display") or r.get("pair") or "")
+        _cat_totals[_cat] = _cat_totals.get(_cat, 0) + _pips(r)
 
     # Detalle de cada TP
     tp_lines = ""
@@ -5162,14 +5179,20 @@ def _build_promo_report(hora_label: str) -> str | None:
         dir_emoji = "🟢" if r["direction"] == "BUY" else "🔴"
         tp_lines += f"  {dir_emoji} {r['pair_display']} — *+{r['pips_str']}*\n"
 
-    # Resumen de puntos/pips — FIX 2026-04-27: GOLD = pips (no pts)
+    # Resumen por categoría con la unidad correcta (FOREX=pips, ORO=pips, resto=pts/USD)
     resumen_parts = []
-    if gold_pips_total > 0:
-        resumen_parts.append(f"🥇 GOLD: *+{gold_pips_total:.0f} pips*")
-    if index_pts > 0:
-        resumen_parts.append(f"📈 Indices: *+{index_pts:.1f} pts*")
-    if forex_pips > 0:
-        resumen_parts.append(f"💱 Forex: *+{forex_pips:.0f} pips*")
+    if _cat_totals.get("ORO", 0) > 0:
+        resumen_parts.append(f"🥇 GOLD: *+{_cat_totals['ORO']:.0f} pips*")
+    if _cat_totals.get("INDICES", 0) > 0:
+        resumen_parts.append(f"📈 Indices: *+{_cat_totals['INDICES']:.1f} pts*")
+    if _cat_totals.get("OIL", 0) > 0:
+        resumen_parts.append(f"🛢️ Oil/Gas: *+{_cat_totals['OIL']:.1f} pts*")
+    if _cat_totals.get("FOREX", 0) > 0:
+        resumen_parts.append(f"💱 Forex: *+{_cat_totals['FOREX']:.0f} pips*")
+    if _cat_totals.get("CRIPTO", 0) > 0:
+        resumen_parts.append(f"🪙 Crypto: *+{_cat_totals['CRIPTO']:.0f} USD*")
+    if _cat_totals.get("OTHER", 0) > 0:
+        resumen_parts.append(f"📊 Other: *+{_cat_totals['OTHER']:.1f} pts*")
     resumen = "\n".join(resumen_parts)
 
     wr = len(tps) / (len(tps) + len(sls)) * 100 if (tps or sls) else 0
@@ -6424,7 +6447,13 @@ async def _monitor_tp_loop() -> None:
             if (_now_sum and _now_sum.hour == 18 and _now_sum.minute < 5
                     and _sent_today.get("eod_text_admin") != _hoy_str):
                 _sent_today["eod_text_admin"] = _hoy_str
-                _save_sent_today(_sent_today)
+                try:
+                    _tmp_st = str(COPIER_SENT_STATE_FILE) + ".tmp"
+                    with open(_tmp_st, "w", encoding="utf-8") as _f_st:
+                        _f_st.write(json.dumps(_sent_today, ensure_ascii=False))
+                    os.replace(_tmp_st, str(COPIER_SENT_STATE_FILE))
+                except Exception:
+                    pass
 
                 _trades_hoy = _load_copier_stats_today()
                 _tps = [t for t in _trades_hoy if (t.get("result") or "").lower() == "tp"]
@@ -6517,9 +6546,11 @@ async def _monitor_tp_loop() -> None:
         except Exception as _e_pub:
             log.warning(f"Error programando publisher 19:00: {_e_pub}")
 
-        # ── 2026-05-05: Presentación Eli (solo GRUPO) a las 13:10 Andorra ──
+        # ── Presentación Eli (solo GRUPO) — FIX 2026-06-06: de diaria a SEMANAL
+        # (solo lunes 13:10) y un solo idioma (EN). Recorte de autopromo: el texto
+        # idéntico cada día saturaba el grupo. ──
         try:
-            if _now_sum.hour == 13 and _now_sum.minute == 10 and _daily_eli_sent != _hoy_str:
+            if _now_sum.weekday() == 0 and _now_sum.hour == 13 and _now_sum.minute == 10 and _daily_eli_sent != _hoy_str:
                 _daily_eli_sent = _hoy_str
                 def _run_eli_presentation():
                     try:
@@ -6565,7 +6596,7 @@ async def _monitor_tp_loop() -> None:
                             "Happy to be here with you every day. 🤖✨\n\n"
                             "*— Eli · BuySell365 Pro 🤖*"
                         )
-                        for _cap in [_es, _en]:
+                        for _cap in [_en]:  # FIX 2026-06-06: solo EN (antes _es + _en)
                             with open(str(_img), "rb") as _f:
                                 _req.post(
                                     f"https://api.telegram.org/bot{_tok}/sendPhoto",
@@ -6584,8 +6615,10 @@ async def _monitor_tp_loop() -> None:
         # el publisher de credenciales investor ha sido borrado por completo.
 
         # ── Publicidad diaria de Instagram en grupo Telegram (14:00) ──
+        # FIX 2026-06-06: DESACTIVADA — solapaba con "Discover all platforms" (12:00)
+        # que ya enlaza Instagram. Recorte de autopromo (grupo más limpio).
         try:
-            if _now_sum.hour == 14 and _now_sum.minute < 5 and _sent_today.get("ig_promo") != _hoy_str:
+            if False and _now_sum.hour == 14 and _now_sum.minute < 5 and _sent_today.get("ig_promo") != _hoy_str:
                 _sent_today["ig_promo"] = _hoy_str
                 try:
                     _tmp_st = str(COPIER_SENT_STATE_FILE) + ".tmp"
@@ -10090,6 +10123,9 @@ def send_to_channel(signal, executed, detail):
                                     else:
                                         _pips = round(_raw_diff, 1)
                                         _pips_signed = round(_signed_diff, 1)
+                                elif any(x in _pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
+                                    _pips = round(_raw_diff * 100, 1)
+                                    _pips_signed = round(_signed_diff * 100, 1)
                                 elif "JPY" in _pair.upper():
                                     _pips = round(_raw_diff * 100)
                                     _pips_signed = round(_signed_diff * 100)
@@ -11307,11 +11343,12 @@ async def main():
             # FIX 2026-05-08: Blacklist de PARES perdedores (analisis historico mostro
             # WR <50% y net pips negativo). Estos pares NO se copian a MT5 NI se publican
             # al canal VIP — para evitar danar la calidad del producto.
-            # Pares descartados (basado en 30dias de data):
+            # Pares descartados (basado en analisis completo):
             #   USDJPY 0% WR, GBPCAD 25%, GBPAUD 0%, GBPNZD 0%, EURCAD 33%,
-            #   GBPCHF 0%, NZDCAD 0%, EURUSD 0%, EURAUD 0%
+            #   GBPCHF 0%, NZDCAD 0%, EURUSD 0%, EURAUD 0%, AUDNZD 0%, CADCHF 0%
+            # FIX 2026-06-21: agregados AUDNZD y CADCHF (marginal profitability <50 pips, 0-50% WR)
             # Configurable por env var COPIER_PAIRS_DISABLED (csv, override del default).
-            _pair_blacklist_default = "USDJPY,GBPCAD,GBPAUD,GBPNZD,EURCAD,GBPCHF,NZDCAD,EURUSD,EURAUD"
+            _pair_blacklist_default = "USDJPY,GBPCAD,GBPAUD,GBPNZD,EURCAD,GBPCHF,NZDCAD,EURUSD,EURAUD,AUDNZD,CADCHF"
             _pair_blacklist_raw = os.getenv("COPIER_PAIRS_DISABLED", _pair_blacklist_default).strip()
             if _pair_blacklist_raw:
                 _pair_blacklist = {p.strip().upper().replace("/", "") for p in _pair_blacklist_raw.split(",") if p.strip()}

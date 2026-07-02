@@ -149,7 +149,7 @@ def _generate_grupo_image(stats: dict) -> Path:
     d.rounded_rectangle([(80, 1090), (W - 80, 1180)], radius=18, fill=GOLD)
     d.text((W // 2, 1135), "FOLLOW US ON ALL OUR CHANNELS", fill=(5, 8, 15), font=_font(26, True), anchor="mm")
 
-    stats_line = f"+{stats['total_pts']:,.0f} pts this week  ·  {stats['total_tp']} TPs  ·  {stats['wr']:.0f}% WR"
+    stats_line = f"+{stats['total_pts']:,.0f} pts this week  ·  {stats['total_tp']} TPs"
     d.text((W // 2, 1225), stats_line, fill=GREEN, font=_font(24, True), anchor="mm")
     d.text((W // 2, 1285), "BuySell365 Pro — AI Trading 24/7", fill=GRAY, font=_font(20), anchor="mm")
 
@@ -216,7 +216,7 @@ def _generate_ig_image(stats: dict) -> Path:
 
     d.rounded_rectangle([(80, 1060), (W - 80, 1180)], radius=18, fill=(18, 48, 30), outline=GREEN, width=2)
     d.text((W // 2, 1095), "THIS WEEK IN THE VIP CHANNEL", fill=WHITE, font=_font(22, True), anchor="mm")
-    stats_line = f"+{stats['total_pts']:,.0f} PTS  ·  {stats['total_tp']} TPs  ·  {stats['wr']:.0f}% WR"
+    stats_line = f"+{stats['total_pts']:,.0f} PTS  ·  {stats['total_tp']} TPs"
     d.text((W // 2, 1150), stats_line, fill=GREEN, font=_font(34, True), anchor="mm")
 
     em((W // 2 - 250, 1245), "👉", 50)
@@ -240,7 +240,7 @@ def _caption_grupo(stats: dict) -> str:
         "🤖 <b>VIP CHANNEL BOT</b> — @Andoperandobot\n"
         "   Direct access to the premium channel\n\n"
         f"💎 This week: +{stats['total_pts']:,.0f} pts · "
-        f"{stats['total_tp']} TPs · {stats['wr']:.0f}% WR\n\n"
+        f"{stats['total_tp']} TPs\n\n"
         "Real signals. Real results. 🔥"
     )
 
@@ -259,7 +259,7 @@ def _caption_ig(stats: dict) -> str:
         "🎁 Launch offer — 50% OFF\n"
         "🤖 Direct bot access\n\n"
         f"💎 This week: +{stats['total_pts']:,.0f} pts · "
-        f"{stats['total_tp']} TPs · {stats['wr']:.0f}% WR\n\n"
+        f"{stats['total_tp']} TPs\n\n"
         "👉 Link in bio — buysell365.pro\n\n"
         "#trading #forex #xauusd #gold #nas100\n"
         "#bitcoin #traders #daytrading #aitrading\n"
@@ -280,27 +280,12 @@ def publish_daily_promo(dry_run: bool = False) -> dict:
         log.info("🧪 DRY RUN — no se publica nada")
         return result
 
-    # ─ GRUPO Telegram ─
-    try:
-        import requests
-        with open(img_grupo, "rb") as f:
-            photo = f.read()
-        r = requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
-            data={"chat_id": GROUP_ID, "caption": _caption_grupo(stats)[:1020], "parse_mode": "HTML"},
-            files={"photo": ("promo.jpg", photo, "image/jpeg")},
-            timeout=30,
-        )
-        if r.status_code == 200:
-            mid = r.json().get("result", {}).get("message_id")
-            result["grupo_msg_id"] = mid
-            log.info(f"✅ Grupo publicado msg_id={mid}")
-        else:
-            log.warning(f"Grupo fallo: {r.status_code} {r.text[:150]}")
-            result["grupo_error"] = r.text[:200]
-    except Exception as e:
-        log.warning(f"Grupo exception: {e}")
-        result["grupo_error"] = str(e)
+    # ─ GRUPO Telegram — DESACTIVADO 2026-06-07 ─
+    # El post diario "Discover all platforms" al GRUPO se eliminó (decisión del
+    # usuario: menos humo en el grupo). Los links viven ahora en un mensaje FIJADO
+    # permanente. Se mantiene SOLO el post de Instagram Feed (abajo).
+    result["grupo"] = "disabled"
+    log.info("📢 Grupo daily promo DESACTIVADO (links en mensaje fijado) — solo IG")
 
     # ─ INSTAGRAM Feed ─
     # Respeta cooldown del circuit breaker anti-spam (ig_feed_locked_until.txt)

@@ -8150,9 +8150,14 @@ def _build_digest_admin() -> str:
         _fs = {}
     # FIX 2026-05-26: defensivo contra valores no numéricos en _fs (algunos
     # buckets de stats vienen como dict en versiones viejas del JSON).
+    # FIX 2026-06-07: sumar SOLO las claves de CONTEO de features. Antes sumaba
+    # todo valor numérico (excepto cache_hits/errors), incluyendo `_updated_at`
+    # (timestamp UNIX ~1.78e9) → el coste estimado salía en MILLONES (~$3.5M).
+    _FEAT_COUNT_KEYS = ("vip_chat", "vision", "pretrade", "posttrade", "content",
+                        "reliability", "language", "lead", "onboarding", "news")
     _feat_total = sum(
-        v for k, v in _fs.items()
-        if k not in ("cache_hits", "errors") and isinstance(v, (int, float))
+        _fs.get(k, 0) for k in _FEAT_COUNT_KEYS
+        if isinstance(_fs.get(k), (int, float))
     )
 
     # 4. Estimacion coste hoy (Sonnet 4.6: ~$0.001/llamada parser, ~$0.002/feature)
@@ -15030,9 +15035,11 @@ def enviar_briefing_matutino():
             # con CTA al VIP. Politica del usuario: el briefing se publica
             # automaticamente en ambos lados todos los dias.
             try:
-                _grupo_caption = "🎁 Want VIP signals? → @Andoperandobot"
+                # FIX 2026-06-06: caption limpio (sin ad "Want VIP signals") — el grupo
+                # recibe el mismo briefing que el VIP, sin micro-publicidad suelta.
+                _grupo_caption = f"🌅 *Market Briefing — {_fecha_brf_cap}*"
                 if n_activas > 0:
-                    _grupo_caption = f"🔔 {n_activas} active op(s) from yesterday\n\n" + _grupo_caption
+                    _grupo_caption += f"\n🔔 {n_activas} active op(s) from yesterday"
                 _enviar_grupo_foto(_photo_bytes, _grupo_caption)
             except Exception as _e_grupo:
                 logger.warning(f"Briefing al grupo fallo (no critico): {_e_grupo}")
@@ -16117,17 +16124,15 @@ def _verificar_entradas_pendientes():
 def loop_publicidad_grupo():
     """
     Hilo de publicidad automática en el grupo:
-    - 1 anuncio cada 2 horas, de 06:00 a 23:00  (~9 anuncios/día)
-    - Rota los 5 modelos en orden, sin repetir el mismo seguido
-    - El índice se calcula por hora del día para que los reinicios no repitan
-    - Borra el anuncio anterior antes de publicar el nuevo (incluso tras reinicios)
+    - 1 anuncio ÚNICO al día a las 21:00
+    - Rota los 5 modelos de forma equilibrada
+    - FIX 2026-06-21: recorte de ruido. Era cada 9h (2 anuncios/día) → ahora solo 1.
     """
     PUBLICIDAD_PRIMERA_ESPERA = 3 * 60  # Esperar 3 min al arrancar
-    # FIX 2026-05-08: aumentado de 1.5h -> 3h. Free users en el grupo se quejaban
-    # de spam-feeling con promos cada 1.5h (5 promos en 2h era mucho). Triplicar
-    # el intervalo da 3 promos al día (mañana, mediodía, tarde) — más respiro.
-    # Usar var de entorno para ajustar sin tocar codigo (ej. PUB_INTERVAL_HOURS=2.0).
-    PUBLICIDAD_INTERVALO_HORAS = float(os.getenv("PUB_INTERVAL_HOURS", "3.0"))
+    # FIX 2026-06-21: cambio a 1 publicación única al día a las 21:00 (menos ruido)
+    # Mantener variable de entorno para compatibilidad, pero se ignora (usa 24h fixed)
+    PUBLICIDAD_HORA_FIJA = 21  # 21:00 Andorra
+    PUBLICIDAD_INTERVALO_HORAS = float(os.getenv("PUB_INTERVAL_HOURS", "24.0"))  # ignorado, usa horario fijo
 
     # ── Persistencia de IDs en disco (sobrevive reinicios) ──────────────
     _PUB_STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pub_state.json")
@@ -16319,23 +16324,20 @@ def loop_publicidad_grupo():
                 time.sleep(60)
                 continue
 
-            # ── Solo enviar entre 06:00 y 22:59 ──
-            if not (6 <= _hora_g < 23):
+            # ── SOLO PUBLICAR A LAS 21:00 (1 vez/día) — FIX 2026-06-21 ──
+            if _hora_g != PUBLICIDAD_HORA_FIJA or _ahora_g.minute >= 5:
                 time.sleep(60)
                 continue
 
-            # ── Evitar enviar si no han pasado PUBLICIDAD_INTERVALO_HORAS horas ──
-            if _ultima_publicacion_g is not None:
-                _horas_desde_ultimo = (_ahora_g - _ultima_publicacion_g).total_seconds() / 3600
-                if _horas_desde_ultimo < PUBLICIDAD_INTERVALO_HORAS:
-                    time.sleep(60)
-                    continue
+            # Verificar que NO se haya publicado hoy
+            if _ultima_publicacion_g is not None and _ultima_publicacion_g.strftime("%Y-%m-%d") == _clave_dia_g:
+                time.sleep(60)
+                continue
 
-            # Índice basado en la hora del día para que los reinicios no repitan
-            # (hora 6=idx0, hora 8=idx1 … cicla entre los 5 modelos cada 2h)
-            # FIX 2026-04-28: convertir a int explicito porque PUBLICIDAD_INTERVALO_HORAS
-            # ahora puede ser float (1.5h, 1.0h, etc) y "//" con float retorna float.
-            _indice = int((_hora_g - 6) // PUBLICIDAD_INTERVALO_HORAS) % len(ANUNCIOS)
+            # Índice rotativo: cicla entre los 5 modelos cada día
+            # (usa día del año para que sea determinista)
+            _day_of_year = _ahora_g.timetuple().tm_yday
+            _indice = _day_of_year % len(ANUNCIOS)
             texto, teclado = ANUNCIOS[_indice]
 
             # Borrar anuncio anterior antes de publicar el nuevo
@@ -16422,44 +16424,8 @@ def loop_publicidad_xm_partner():
     URL_BONUSES      = "https://clicks.pipaffiliates.com/c?c=1197262&l=en&p=6"
     DISCLAIMER_ES    = "\n\n_ℹ️ Service not available for residents of Spain._"
 
+    # FIX 2026-06-21: Reducido de 3 anuncios/día (10:00, 14:00, 18:00) a 1 (solo 18:00) — recorte de ruido
     ANUNCIOS_XM = {
-        10: (
-            "☀️ *START YOUR TRADING DAY RIGHT*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🤝 *BuySell365 Pro — Official XM Global Partner*\n\n"
-            "Open a real account with our exclusive partner link\n"
-            "and trade GOLD, NASDAQ, S&P 500 and Forex like the pros.\n\n"
-            "✅ Use our partner code: *BUYSELL365*\n"
-            "✅ Same MT5 we use for our VIP signals\n"
-            "✅ Spreads from 0.0 pips · Leverage up to 1:1000\n"
-            "✅ Deposit from $5 · Withdraw any time\n"
-            "✅ Award-winning broker · Regulated globally\n\n"
-            "🚀 *Trade smart. Trade with us.*"
-            + DISCLAIMER_ES,
-            {"inline_keyboard": [
-                [{"text": "🟢 Open Real Account", "url": URL_OPEN_ACCOUNT}],
-                [{"text": "📲 XM Global App", "url": URL_XM_APP}],
-                [{"text": "💎 Join VIP Channel", "callback_data": "vip_pagar_usdt"}],
-            ]}
-        ),
-        14: (
-            "🌎 *TRADE WITH THE SAME BROKER WE USE*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🤝 We are *Official Partners of XM Global*\n"
-            "Our VIP signals run live on this exact account.\n\n"
-            "🔥 Open YOUR XM Global real account in 2 minutes:\n"
-            "✅ Partner code: *BUYSELL365*\n"
-            "✅ All VIP perks · Lower fees · Faster withdrawals\n"
-            "✅ MT5 + Mobile App · 24/7 Support\n"
-            "✅ Trade GOLD, Forex, Indices, Crypto, Oil\n\n"
-            "📡 *XM account + our VIP signals = consistent results*"
-            + DISCLAIMER_ES,
-            {"inline_keyboard": [
-                [{"text": "🟢 Open Account NOW", "url": URL_OPEN_ACCOUNT}],
-                [{"text": "🎁 Bonuses & Promos", "url": URL_BONUSES}],
-                [{"text": "💎 Join VIP Channel", "callback_data": "vip_pagar_usdt"}],
-            ]}
-        ),
         18: (
             "🌙 *GET READY FOR TOMORROW'S MARKETS*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -16912,8 +16878,9 @@ def loop_vip_check():
             #     _generar_reporte_diario()
             pass  # Placeholder para mantener indentación
 
-            # 0b. ☀️ BRIEFING MATUTINO AL CANAL VIP (7:00 AM L-V)
-            if not es_finde and (ahora_check.hour > BRIEFING_HORA or (ahora_check.hour == BRIEFING_HORA and ahora_check.minute >= BRIEFING_MINUTO)) and _ultimo_briefing_diario != hoy_str_check:
+            # 0b. ☀️ BRIEFING MATUTINO AL CANAL VIP (7:00 AM L-V) — DESACTIVADO 2026-06-21
+            # El briefing es ruido sin valor agregado. Se mantiene el código por compatibilidad.
+            if False and not es_finde and (ahora_check.hour > BRIEFING_HORA or (ahora_check.hour == BRIEFING_HORA and ahora_check.minute >= BRIEFING_MINUTO)) and _ultimo_briefing_diario != hoy_str_check:
                 _ultimo_briefing_diario = hoy_str_check
                 try:
                     enviar_briefing_matutino()
@@ -16921,9 +16888,9 @@ def loop_vip_check():
                 except Exception as e:
                     logger.error(f"❌ Error enviando briefing matutino: {e}")
 
-            # 0c2. 📢 PROMO DIARIA (TODOS LOS DIAS 12:00) — grupo + IG feed
-            # FIX 2026-04-24: publicidad diaria de la web + IG al grupo y web al IG
-            if (ahora_check.hour > DAILY_PROMO_HORA or (ahora_check.hour == DAILY_PROMO_HORA and ahora_check.minute >= DAILY_PROMO_MINUTO)) and _ultimo_daily_promo != hoy_str_check:
+            # 0c2. 📢 PROMO DIARIA (TODOS LOS DIAS 12:00) — DESACTIVADA 2026-06-21
+            # Recorte de ruido. La rotación de anuncios al grupo está en loop_publicidad_grupo (21:00).
+            if False and (ahora_check.hour > DAILY_PROMO_HORA or (ahora_check.hour == DAILY_PROMO_HORA and ahora_check.minute >= DAILY_PROMO_MINUTO)) and _ultimo_daily_promo != hoy_str_check:
                 _ultimo_daily_promo = hoy_str_check
                 try:
                     guardar_estado()  # persistir flag antes
@@ -16938,9 +16905,9 @@ def loop_vip_check():
                 except Exception as e:
                     logger.error(f"❌ Error promo diaria: {e}", exc_info=True)
 
-            # 0c3. 🎁 PROMO "2 SEÑALES GRATIS" (TODOS LOS DIAS 9:00 + 19:00) — grupo
-            # FIX 2026-04-25: 2x al dia, mensaje con boton inline al bot privado.
-            if (ahora_check.hour > SIGNALS_PROMO_AM_HORA or (ahora_check.hour == SIGNALS_PROMO_AM_HORA and ahora_check.minute >= SIGNALS_PROMO_AM_MINUTO)) and ahora_check.hour < SIGNALS_PROMO_PM_HORA and _ultimo_signals_promo_am != hoy_str_check:
+            # 0c3. 🎁 PROMO "2 SEÑALES GRATIS" (TODOS LOS DIAS 9:00 + 19:00) — DESACTIVADA 2026-06-21
+            # Recorte de ruido. Las señales libres ya se publican sin necesidad de promo.
+            if False and (ahora_check.hour > SIGNALS_PROMO_AM_HORA or (ahora_check.hour == SIGNALS_PROMO_AM_HORA and ahora_check.minute >= SIGNALS_PROMO_AM_MINUTO)) and ahora_check.hour < SIGNALS_PROMO_PM_HORA and _ultimo_signals_promo_am != hoy_str_check:
                 _ultimo_signals_promo_am = hoy_str_check
                 try:
                     guardar_estado()
@@ -16953,7 +16920,9 @@ def loop_vip_check():
                 except Exception as e:
                     logger.error(f"❌ Error promo 9am: {e}", exc_info=True)
 
-            if (ahora_check.hour > SIGNALS_PROMO_PM_HORA or (ahora_check.hour == SIGNALS_PROMO_PM_HORA and ahora_check.minute >= SIGNALS_PROMO_PM_MINUTO)) and _ultimo_signals_promo_pm != hoy_str_check:
+            # FIX 2026-06-06: promo PM (19:00) DESACTIVADA — era repetición exacta de
+            # la de las 09:00. Recorte de autopromo pedido por el usuario (grupo más limpio).
+            if False:  # 19:00 "2 free signals" desactivado (duplicado del 09:00)
                 _ultimo_signals_promo_pm = hoy_str_check
                 try:
                     guardar_estado()
@@ -17586,7 +17555,7 @@ _RATE_LIMIT_VENTANA = 30  # ventana en segundos
 # (/analisis, /precios, /tendencia) no bloquean el loop de polling
 _pool_comandos = ThreadPoolExecutor(max_workers=16, thread_name_prefix="cmd")
 
-def _check_rate_limit(user_id: str) -> bool:
+def _check_rate_limit_usuario(user_id: str) -> bool:
     """Retorna True si el usuario excede el rate limit. False = OK."""
     ahora = time.time()
     if user_id not in _rate_limit_usuarios:
@@ -18425,7 +18394,7 @@ def loop_polling():
                         # 🛡️ RATE LIMIT POR USUARIO — anti-spam (4 cmds/30s)
                         # Admins y admin anónimos están exentos
                         _es_admin_rl = user_id in ADMIN_IDS or str(from_user.get("id", "")) in ("1087968824", "136817688")
-                        if not _es_admin_rl and _check_rate_limit(user_id):
+                        if not _es_admin_rl and _check_rate_limit_usuario(user_id):
                             print(f"🛡️ Rate limit: user={user_id} excede {_RATE_LIMIT_MAX} cmds/{_RATE_LIMIT_VENTANA}s — ignorado")
                             continue
 
