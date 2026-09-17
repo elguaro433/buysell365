@@ -957,6 +957,8 @@ def index_web():
     for _rt in list(reversed(_copier_sorted))[:_RECENT_TRADES_LIMIT]:
         _rt_fecha = _rt.get("fecha", "")
         _rt_nombre = _rt.get("pair_display") or _rt.get("pair", "N/A")
+        if _rt_nombre in ("SIL/VER", "XAG/USD", "XAGUSD"):
+            _rt_nombre = "SILVER"
         _rt_tipo_en = _rt.get("direction", "")
         _rt_pips = float(_rt.get("pips", 0) or 0)
         _rt_unit = _rt.get("pips_unit", "pips")
@@ -1389,7 +1391,7 @@ if('serviceWorker' in navigator){{
     <div style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:5px 14px;background:rgba(0,255,204,0.05);border:1px solid rgba(0,255,204,0.18);border-radius:50px;font-size:.78rem;color:#a0aec0">
       <span style="display:inline-block;width:6px;height:6px;background:#00e676;border-radius:50%;animation:pulse 2s infinite"></span>
       <span data-i18n="hero.live_count" data-i18n-vars='{{"N":"{_total_senales}","WR":"{_wr_vip}","P":"{int(_pips_totales):+,}"}}'>
-        <strong style="color:#00ffcc">{_total_senales}</strong> señales · <strong style="color:#00ffcc">{_wr_vip}%</strong> WR · <strong style="color:#fbbf24">{int(_pips_totales):+,}</strong> pips netos
+        <strong style="color:#00ffcc">{_total_senales}</strong> señales · <strong style="color:#fbbf24">{int(_pips_totales):+,}</strong> pips netos
       </span>
     </div>
     <h1 data-i18n="hero.title">Señales VIP en tiempo real<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Opera con precisión, 24/7</span></h1>
@@ -1408,7 +1410,7 @@ if('serviceWorker' in navigator){{
       <button onclick="const t=this;const orig=t.getAttribute('data-i18n')||'hero.copy_link';navigator.clipboard.writeText('https://buysell365.pro').then(()=>{{t.textContent=(window.translations&&window.translations['hero.copied'])||'✓ Copiado';setTimeout(()=>{{const tr=window.translations&&window.translations[orig];t.innerHTML=tr||'\U0001f517 Copiar link';}},2000);}})" data-i18n="hero.copy_link" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(0,212,170,.15);border:1px solid rgba(0,212,170,.4);border-radius:8px;color:#00d4aa;font-size:.85rem;font-weight:600;min-height:36px;font-family:inherit">\U0001f517 Copiar link</button>
     </div>
     <div class="stats-bar" id="statsBar">
-      <div class="stat-item"><div class="stat-value" id="counterWr" data-target="{wr}">0%</div><div class="stat-label" data-i18n="stats.winrate">WIN RATE</div></div>
+      <div class="stat-item"><div class="stat-value" id="counterAssets" data-target="{activos}">0</div><div class="stat-label" data-i18n="stats.assets">ACTIVOS ANALIZADOS</div></div>
       <div class="stat-item"><div class="stat-value blue" id="counterTotal" data-target="{total}">0+</div><div class="stat-label" data-i18n="stats.signals">SE\u00d1ALES GENERADAS</div></div>
       <div class="stat-item"><div class="stat-value gold" id="counterPips" data-target="{pips:.0f}">0</div><div class="stat-label" data-i18n="stats.pips">PIPS ACUMULADOS</div></div>
       <div class="stat-item"><div class="stat-value purple">24/7</div><div class="stat-label" data-i18n="stats.analysis">AN\u00c1LISIS ACTIVO</div></div>
@@ -1439,12 +1441,7 @@ if('serviceWorker' in navigator){{
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid rgba(0,212,170,.25);border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
         <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.signals">Se&ntilde;ales Totales</div>
         <div style="font-size:2rem;font-weight:900;color:#00d4aa">{_total_senales}</div>
-        <div style="font-size:11px;color:#8b9fc4;margin-top:4px">{_wins_count_card}W &bull; {_losses_count_card}L</div>
-      </div>
-      <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid {_wr_color_live}50;border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
-        <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.winrate">Win Rate</div>
-        <div style="font-size:2rem;font-weight:900;color:{_wr_color_live}">{_wr_vip}%</div>
-        <div style="margin-top:6px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden"><div style="width:{_wr_vip}%;height:100%;background:{_wr_color_live}"></div></div>
+        <div style="font-size:11px;color:#8b9fc4;margin-top:4px" data-i18n="live.closed_note">cerradas</div>
       </div>
       <div style="background:linear-gradient(145deg,rgba(22,32,53,0.95),rgba(14,22,40,0.85));border:1px solid {_profit_color_live}50;border-radius:14px;padding:18px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.25)">
         <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px" data-i18n="live.profit">Net Pips</div>
@@ -1461,7 +1458,7 @@ if('serviceWorker' in navigator){{
         </div>
         <div style="font-size:11px;color:#8b9fc4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">En Vivo Hoy</div>
         <div style="font-size:2rem;font-weight:900;color:{_today_color}">{pips_today_real:+.0f}</div>
-        <div style="font-size:10px;color:#8b9fc4;margin-top:4px;line-height:1.4">{_today_tps}&#9989; &middot; {_today_sls}&#128721; &middot; {_today_partials}&#9889;<br>pips · WR {_today_wr:.0f}%</div>
+        <div style="font-size:10px;color:#8b9fc4;margin-top:4px;line-height:1.4">{_today_tps}&#9989; &middot; {_today_sls}&#128721; &middot; {_today_partials}&#9889;<br>pips hoy</div>
       </div>
     </div>
     <style>@keyframes pulse-live{{0%,100%{{opacity:1}}50%{{opacity:.3}}}}</style>
@@ -1530,8 +1527,7 @@ if('serviceWorker' in navigator){{
         <div style="color:#fff;font-weight:700">
           <span data-i18n="pricing.stats_signals">~18 se\u00f1ales/d\u00eda</span> &middot;
           <span data-i18n="pricing.stats_weekdays">Lunes a Viernes</span> &middot;
-          <span data-i18n="pricing.stats_monthly">~390/mes</span> &middot;
-          <span style="color:#22c55e" data-i18n="pricing.stats_wr">70% Win Rate</span>
+          <span data-i18n="pricing.stats_monthly">~390/mes</span>
         </div>
       </div>
       <div class="price-amount" style="font-size:3.8rem;text-shadow:0 0 30px rgba(255,255,255,0.1)">
@@ -1604,12 +1600,6 @@ if('serviceWorker' in navigator){{
           <span style="color:#25d366;font-weight:800">\U0001f4c5</span>
           <strong style="color:#fff">~390</strong>
           <span data-i18n="wsp.stats_per_month">señales/mes</span>
-        </div>
-        <div style="color:#475569;font-weight:300">|</div>
-        <div style="color:#cbd5e0">
-          <span style="color:#22c55e;font-weight:800">\U0001f3af</span>
-          <strong style="color:#fff">70%</strong>
-          <span data-i18n="wsp.stats_winrate">Win Rate</span>
         </div>
         <div style="color:#475569;font-weight:300">|</div>
         <div style="color:#cbd5e0">
@@ -2517,12 +2507,12 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){{
   // y los contadores quedan en "0%". Solucion: si NO esta visible al cargar,
   // setear los valores finales directamente (sin animacion).
   function setFinalValues(){{
-    const wr = document.getElementById('counterWr');
+    const wr = document.getElementById('counterAssets');
     const tot = document.getElementById('counterTotal');
     const pips = document.getElementById('counterPips');
     if(wr){{
       const v = parseInt(wr.getAttribute('data-target'));
-      if(!isNaN(v)) wr.textContent = v + '%';
+      if(!isNaN(v)) wr.textContent = v.toLocaleString() + '+';
     }}
     if(tot){{
       const v = parseInt(tot.getAttribute('data-target'));
@@ -2537,10 +2527,10 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){{
   function fireAnimation(){{
     if(fired) return;
     fired = true;
-    const wr = document.getElementById('counterWr');
+    const wr = document.getElementById('counterAssets');
     const tot = document.getElementById('counterTotal');
     const pips = document.getElementById('counterPips');
-    if(wr) animateCounter(wr, parseInt(wr.getAttribute('data-target')), '%');
+    if(wr) animateCounter(wr, parseInt(wr.getAttribute('data-target')), '+');
     if(tot) animateCounter(tot, parseInt(tot.getAttribute('data-target')), '+');
     if(pips){{
       const pv = parseInt(pips.getAttribute('data-target').replace(/[+,]/g,''));
@@ -2855,6 +2845,8 @@ def pagina_resultados():
     by_pair = defaultdict(lambda: {"wins": 0, "losses": 0, "pips": 0.0})
     for t in trades:
         pair = t.get("pair_display") or t.get("pair", "?")
+        if pair in ("SIL/VER", "XAG/USD", "XAGUSD"):  # FIX 2026-09-17: display legacy de plata
+            pair = "SILVER"
         p = float(t.get("pips", 0) or 0)
         if t.get("result") in WIN_R and p > 0:
             by_pair[pair]["wins"] += 1
@@ -2875,14 +2867,11 @@ def pagina_resultados():
             f'<tr style="border-bottom:1px solid rgba(255,255,255,.06)">'
             f'<td style="padding:14px 12px;font-weight:700;color:#fff">{_e(mm)}</td>'
             f'<td style="padding:14px 12px;color:#8b9fc4">{n}</td>'
-            f'<td style="padding:14px 12px;color:#00e676">{st["wins"]}W</td>'
-            f'<td style="padding:14px 12px;color:#ff6b35">{st["losses"]}L</td>'
-            f'<td style="padding:14px 12px;color:#fff;font-weight:700">{wr_m}%</td>'
             f'<td style="padding:14px 12px;text-align:right;color:{pips_color};font-weight:800;font-family:monospace">{sign}{st["pips"]:.1f}</td>'
             f'</tr>'
         )
     if not months_html:
-        months_html = '<tr><td colspan="6" style="padding:30px;text-align:center;color:#8b9fc4">Sin datos por ahora</td></tr>'
+        months_html = '<tr><td colspan="3" style="padding:30px;text-align:center;color:#8b9fc4">Sin datos por ahora</td></tr>'
 
     pairs_html = ""
     for pair, st in pairs_sorted:
@@ -2895,7 +2884,7 @@ def pagina_resultados():
             f'<div style="margin-bottom:14px">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
             f'<span style="font-weight:700;color:#fff;font-size:14px">{_e(pair)}</span>'
-            f'<span style="font-family:monospace;font-size:13px"><span style="color:#8b9fc4">{n} ops · {wr_p}% WR</span> · <span style="color:{bar_color};font-weight:800">{sign}{st["pips"]:.0f} pips</span></span>'
+            f'<span style="font-family:monospace;font-size:13px"><span style="color:#8b9fc4">{n} ops</span> · <span style="color:{bar_color};font-weight:800">{sign}{st["pips"]:.0f} pips</span></span>'
             f'</div>'
             f'<div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">'
             f'<div style="width:{bar_w}%;height:100%;background:{bar_color};border-radius:3px"></div>'
@@ -2937,16 +2926,13 @@ th{{padding:12px;text-align:left;color:#8b9fc4;font-weight:600;font-size:11px;te
 
 <div class="kpi-row">
   <div class="kpi"><div class="kpi-num" style="color:#00ffcc">{closed_total}</div><div class="kpi-label">Señales Cerradas</div></div>
-  <div class="kpi"><div class="kpi-num" style="color:#00d4aa">{wr_total}%</div><div class="kpi-label">Win Rate</div></div>
-  <div class="kpi"><div class="kpi-num" style="color:#fbbf24">+{int(net_total):,}</div><div class="kpi-label">Pips Netos</div></div>
-  <div class="kpi"><div class="kpi-num" style="color:#00e676">{wins_total}</div><div class="kpi-label">Ganadoras</div></div>
-  <div class="kpi"><div class="kpi-num" style="color:#ff6b35">{losses_total}</div><div class="kpi-label">Perdedoras</div></div>
+  <div class="kpi"><div class="kpi-num" style="color:#fbbf24">{int(net_total):+,}</div><div class="kpi-label">Pips Netos</div></div>
 </div>
 
 <div class="section">
   <div class="section-title">📅 Rendimiento por Mes</div>
   <table>
-    <thead><tr><th>Mes</th><th>Total</th><th>Wins</th><th>Losses</th><th>WR</th><th style="text-align:right">Pips Netos</th></tr></thead>
+    <thead><tr><th>Mes</th><th>Señales</th><th style="text-align:right">Pips Netos</th></tr></thead>
     <tbody>{months_html}</tbody>
   </table>
 </div>

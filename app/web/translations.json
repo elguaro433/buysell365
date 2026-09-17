@@ -366,7 +366,7 @@
     "about.stat_probability": "Probabilidad",
     "about.stat_verified": "Resultados Verificados",
     "nav.resultados": "Resultados",
-    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> señales · <strong style=\"color:#00ffcc\">{WR}%</strong> WR · <strong style=\"color:#fbbf24\">{P}</strong> pips netos",
+    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> señales · <strong style=\"color:#fbbf24\">{P}</strong> pips netos",
     "hero.copy_link": "🔗 Copiar link",
     "hero.copied": "✓ Copiado",
     "pricing.vp_wsp_addon": "📱 <strong>Complemento WhatsApp Alerts</strong> — opcional €19/mes (ver abajo)",
@@ -396,12 +396,13 @@
     "pricing.stats_signals": "~18 señales/día",
     "pricing.stats_weekdays": "Lunes a Viernes",
     "pricing.stats_monthly": "~390/mes",
-    "pricing.stats_wr": "70% Win Rate",
     "wsp.stats_per_day": "señales/día (Lun-Vie)",
     "wsp.stats_per_month": "señales/mes",
     "wsp.stats_winrate": "Win Rate",
     "wsp.stats_cost_intro": "Sólo",
-    "wsp.stats_cost_outro": "por señal"
+    "wsp.stats_cost_outro": "por señal",
+    "stats.assets": "ACTIVOS ANALIZADOS",
+    "live.closed_note": "cerradas"
   },
   "en": {
     "nav.technology": "Technology",
@@ -770,7 +771,7 @@
     "about.stat_probability": "Probability",
     "about.stat_verified": "Verified Results",
     "nav.resultados": "Results",
-    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> signals · <strong style=\"color:#00ffcc\">{WR}%</strong> WR · <strong style=\"color:#fbbf24\">{P}</strong> net pips",
+    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> signals · <strong style=\"color:#fbbf24\">{P}</strong> net pips",
     "hero.copy_link": "🔗 Copy link",
     "hero.copied": "✓ Copied",
     "pricing.vp_wsp_addon": "📱 <strong>WhatsApp Alerts add-on</strong> — optional €19/month (see below)",
@@ -800,12 +801,13 @@
     "pricing.stats_signals": "~18 signals/day",
     "pricing.stats_weekdays": "Monday to Friday",
     "pricing.stats_monthly": "~390/month",
-    "pricing.stats_wr": "70% Win Rate",
     "wsp.stats_per_day": "signals/day (Mon-Fri)",
     "wsp.stats_per_month": "signals/month",
     "wsp.stats_winrate": "Win Rate",
     "wsp.stats_cost_intro": "Only",
-    "wsp.stats_cost_outro": "per signal"
+    "wsp.stats_cost_outro": "per signal",
+    "stats.assets": "ASSETS ANALYZED",
+    "live.closed_note": "closed"
   },
   "pt": {
     "nav.technology": "Tecnologia",
@@ -1174,7 +1176,7 @@
     "about.stat_probability": "Probabilidade",
     "about.stat_verified": "Resultados Verificados",
     "nav.resultados": "Resultados",
-    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> sinais · <strong style=\"color:#00ffcc\">{WR}%</strong> WR · <strong style=\"color:#fbbf24\">{P}</strong> pips líquidos",
+    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> sinais · <strong style=\"color:#fbbf24\">{P}</strong> pips líquidos",
     "hero.copy_link": "🔗 Copiar link",
     "hero.copied": "✓ Copiado",
     "pricing.vp_wsp_addon": "📱 <strong>Complemento WhatsApp Alerts</strong> — opcional €19/mês (ver abaixo)",
@@ -1204,12 +1206,13 @@
     "pricing.stats_signals": "~18 sinais/dia",
     "pricing.stats_weekdays": "Segunda a Sexta",
     "pricing.stats_monthly": "~390/mês",
-    "pricing.stats_wr": "70% Win Rate",
     "wsp.stats_per_day": "sinais/dia (Seg-Sex)",
     "wsp.stats_per_month": "sinais/mês",
     "wsp.stats_winrate": "Win Rate",
     "wsp.stats_cost_intro": "Apenas",
-    "wsp.stats_cost_outro": "por sinal"
+    "wsp.stats_cost_outro": "por sinal",
+    "stats.assets": "ATIVOS ANALISADOS",
+    "live.closed_note": "encerradas"
   },
   "fr": {
     "nav.technology": "Technologie",
@@ -1578,7 +1581,7 @@
     "about.stat_probability": "Probabilité",
     "about.stat_verified": "Résultats Vérifiés",
     "nav.resultados": "Résultats",
-    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> signaux · <strong style=\"color:#00ffcc\">{WR}%</strong> WR · <strong style=\"color:#fbbf24\">{P}</strong> pips nets",
+    "hero.live_count": "<strong style=\"color:#00ffcc\">{N}</strong> signaux · <strong style=\"color:#fbbf24\">{P}</strong> pips nets",
     "hero.copy_link": "🔗 Copier le lien",
     "hero.copied": "✓ Copié",
     "pricing.vp_wsp_addon": "📱 <strong>Complément WhatsApp Alerts</strong> — optionnel €19/mois (voir ci-dessous)",
@@ -1608,11 +1611,12 @@
     "pricing.stats_signals": "~18 signaux/jour",
     "pricing.stats_weekdays": "Lundi à Vendredi",
     "pricing.stats_monthly": "~390/mois",
-    "pricing.stats_wr": "70% Win Rate",
     "wsp.stats_per_day": "signaux/jour (Lun-Ven)",
     "wsp.stats_per_month": "signaux/mois",
     "wsp.stats_winrate": "Win Rate",
     "wsp.stats_cost_intro": "Seulement",
-    "wsp.stats_cost_outro": "par signal"
+    "wsp.stats_cost_outro": "par signal",
+    "stats.assets": "ACTIFS ANALYSÉS",
+    "live.closed_note": "clôturées"
   }
 }
