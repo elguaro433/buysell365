@@ -305,19 +305,41 @@ def get_recent_signals(limit: int = 20) -> list[dict]:
 
 # ─── LLM stats ─────────────────────────────────────────────────────────
 def get_llm_stats() -> dict:
+    """FIX 2026-09-17: llm_features_stats.json NO tiene claves por fecha — es un
+    dict de contadores acumulados por feature ({vip_chat, vision, prepublish,
+    posttrade, errors, errors_by_type:{no_credit: N}, groq_fallback, ...}).
+    El lector antiguo buscaba stats["2026-09-17"]["calls"] y mostraba 0 siempre.
+    Ahora: llamadas OK acumuladas, errores, y alerta si el ultimo error es
+    'no_credit' (credito Anthropic agotado)."""
     stats = read_json("llm_features_stats", default={})
-    today = time.strftime("%Y-%m-%d")
-    if isinstance(stats, dict):
-        today_data = stats.get(today, {})
-        return {
-            "model": os.getenv("LLM_MODEL", "claude-sonnet-4-6"),
-            "calls_today": today_data.get("calls", 0),
-            "cost_today_usd": round(today_data.get("cost_usd", 0), 4),
-            "tokens_in": today_data.get("tokens_in", 0),
-            "tokens_out": today_data.get("tokens_out", 0),
-            "cache_hits": today_data.get("cache_hits", 0),
-        }
-    return {"model": "?", "calls_today": 0, "cost_today_usd": 0}
+    model = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
+    out = {
+        "model": model, "calls_total": 0, "errors_total": 0, "groq_fallback": 0,
+        "no_credit": False, "status": "sin datos", "status_ok": False,
+        "updated_ago_min": None,
+    }
+    if not isinstance(stats, dict) or not stats:
+        return out
+    _features = ("vip_chat", "vision", "pretrade", "posttrade", "content", "reliability",
+                 "language", "lead", "onboarding", "news", "prepublish", "wick_validator")
+    out["calls_total"] = sum(int(stats.get(k, 0) or 0) for k in _features)
+    out["errors_total"] = int(stats.get("errors", 0) or 0)
+    out["groq_fallback"] = int(stats.get("groq_fallback", 0) or 0)
+    _ebt = stats.get("errors_by_type") or {}
+    out["no_credit"] = int(_ebt.get("no_credit", 0) or 0) > 0
+    try:
+        _upd = float(stats.get("_updated_at", 0) or 0)
+        out["updated_ago_min"] = int((time.time() - _upd) / 60) if _upd else None
+    except Exception:
+        pass
+    # Estado: si la mayoria de intentos recientes son no_credit → alerta
+    if out["no_credit"] and out["errors_total"] >= max(3, out["calls_total"] // 10):
+        out["status"] = "SIN CREDITO — recargar en console.anthropic.com"
+        out["status_ok"] = False
+    elif out["calls_total"] > 0:
+        out["status"] = "OK"
+        out["status_ok"] = True
+    return out
 
 
 # ─── VIPs ──────────────────────────────────────────────────────────────
@@ -368,9 +390,75 @@ def get_connections_status() -> dict:
     # un trade, así que daba falso "Inactivo" cuando no había cierres recientes aunque
     # el copier estuviera perfectamente vivo.
     _copier_hb = _age_path(APP_DIR / ".copier.heartbeat")
+    # FIX 2026-09-17: antes WhatsApp era True fijo (llevaba 8 dias caido con
+    # TextMeBot 411 y el panel decia "OK") y Render miraba historial_real.json,
+    # archivo muerto de la era MT5 (siempre "Stale" aunque el sync fuera bien).
+    wsp_ok, wsp_detail = _whatsapp_status_from_log()
+    render_ok, render_detail = _render_status_from_log()
     return {
         "telegram": True,  # Asumimos True si bot está corriendo
         "telethon": _copier_hb is not None and _copier_hb < 90,
-        "whatsapp": True,  # No tenemos heartbeat directo
-        "render_sync": _age("historial_real") is not None and _age("historial_real") < 600,
+        "whatsapp": wsp_ok,
+        "whatsapp_detail": wsp_detail,
+        "render_sync": render_ok,
+        "render_detail": render_detail,
     }
+
+
+def _tail_lines(path, max_bytes: int = 400_000) -> list:
+    """Ultimas lineas de un archivo leyendo solo la cola (rapido con logs grandes)."""
+    try:
+        if not path.exists():
+            return []
+        size = path.stat().st_size
+        with open(path, "rb") as f:
+            f.seek(max(0, size - max_bytes))
+            data = f.read()
+        return data.decode("utf-8", errors="ignore").splitlines()
+    except Exception:
+        return []
+
+
+def _whatsapp_status_from_log():
+    """Ultimo resultado real de envio WhatsApp segun logs/copier.log.
+    Devuelve (ok: bool|None, detalle). None = sin envios recientes en el log."""
+    from .config import LOGS_DIR
+    last = None
+    # El log del copier es muy verboso (precios cada 30s): mirar la cola de 3 MB
+    # del actual y, si no hay nada, la rotacion anterior.
+    for _lf in ("copier.log", "copier.log.1"):
+        for line in reversed(_tail_lines(LOGS_DIR / _lf, max_bytes=3_000_000)):
+            if "[WSP]" in line and ("enviado" in line or "fallo" in line or "error:" in line):
+                last = line
+                break
+        if last:
+            break
+    if not last:
+        return None, "sin envios recientes"
+    ts = last[:16]
+    if "enviado" in last:
+        return True, f"ultimo envio OK {ts}"
+    if "disconnected" in last.lower():
+        return False, f"TextMeBot: numero emisor desconectado ({ts}) — reconectar QR"
+    return False, f"ultimo envio fallido {ts}"
+
+
+def _render_status_from_log():
+    """Estado del sync con Render segun las lineas '[Health] Web sync ...' de bot.log
+    (cada 10 min). Devuelve (ok, detalle)."""
+    from .config import LOGS_DIR
+    for line in reversed(_tail_lines(LOGS_DIR / "bot.log")):
+        if "Web sync" in line and ("[Health]" in line or "started" in line):
+            ts = line[:16]
+            try:
+                age_min = int((time.time() - time.mktime(time.strptime(ts, "%Y-%m-%d %H:%M"))) / 60)
+            except Exception:
+                age_min = 999
+            if "healthy" in line and age_min <= 20:
+                return True, f"healthy ({ts})"
+            if "started" in line and age_min <= 15:
+                return True, f"arrancando ({ts})"
+            if "degraded" in line:
+                return False, f"degraded ({ts})"
+            return False, f"sin health-check desde {ts}"
+    return False, "sin datos en bot.log"
