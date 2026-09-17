@@ -53,6 +53,10 @@ def _get_blacklist() -> set:
 
 # ── Clasificacion de pares ──
 GOLD_PAIRS = {"XAUUSD", "GOLD", "ORO", "XAU", "XAU/USD"}
+# FIX 2026-09-17: "SILVER" tiene 6 letras alfa → caia en FOREX (×10000): un
+# movimiento de 0.80$ se registraba como "8000 pips" y la web mostraba
+# "SIL/VER +20400 pips". Ahora categoria propia con factor ×100.
+SILVER_PAIRS = {"XAGUSD", "SILVER", "PLATA", "XAG", "XAG/USD"}
 INDEX_PAIRS = {
     "NAS100", "NDX100", "NDX", "USTEC", "NQ100",
     "US30", "DJ30", "DOW30", "WS30", "DJI",
@@ -73,6 +77,8 @@ def classify_pair(pair: str) -> str:
     p = pair.upper().replace("/", "").replace("-", "").replace(" ", "")
     if p in GOLD_PAIRS:
         return "ORO"
+    if p in SILVER_PAIRS:
+        return "PLATA"
     if p in INDEX_PAIRS:
         return "INDICES"
     if p in OIL_PAIRS:
@@ -87,7 +93,7 @@ def classify_pair(pair: str) -> str:
 
 def category_unit(cat: str) -> str:
     """Unidad de medida correcta por categoria."""
-    if cat == "FOREX":
+    if cat in ("FOREX", "PLATA"):
         return "pips"
     if cat == "CRIPTO":
         return "USD"
@@ -123,6 +129,20 @@ def normalize_pips(trade: Dict) -> tuple:
             if abs(raw_pips - raw_diff) < 0.5 and raw_diff < 30:
                 return raw_diff * 10, cat
             # Si ya esta x10 (raw_pips ≈ raw_diff*10) o es muy grande → mantener
+        return raw_pips, cat
+
+    if cat == "PLATA":
+        # FIX 2026-09-17: trades historicos de plata guardados con factor forex
+        # (×10000). Si el valor coincide con diff×10000 → reconvertir a diff×100.
+        entry = float(trade.get("entry", 0) or 0)
+        result = trade.get("result")
+        ref = float(trade.get("tp" if result == "tp" else "sl", 0) or 0) if result in ("tp", "sl") else 0
+        if entry > 0 and ref > 0:
+            raw_diff = abs(entry - ref)
+            if raw_diff > 0 and abs(raw_pips - raw_diff * 10000) < raw_diff * 100:
+                return round(raw_diff * 100, 1), cat
+        elif raw_pips > 1500:  # parciales sin referencia: valor absurdo → estaba ×10000
+            return round(raw_pips / 100, 1), cat
         return raw_pips, cat
 
     return raw_pips, cat

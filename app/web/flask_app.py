@@ -1388,8 +1388,8 @@ if('serviceWorker' in navigator){{
     <!-- LIVE COUNTER comunidad activa (FIX 2026-05-08) — i18n con data-i18n-vars -->
     <div style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:5px 14px;background:rgba(0,255,204,0.05);border:1px solid rgba(0,255,204,0.18);border-radius:50px;font-size:.78rem;color:#a0aec0">
       <span style="display:inline-block;width:6px;height:6px;background:#00e676;border-radius:50%;animation:pulse 2s infinite"></span>
-      <span data-i18n="hero.live_count" data-i18n-vars='{{"N":"{_total_senales}","WR":"{_wr_vip}","P":"{int(_pips_totales):,}"}}'>
-        <strong style="color:#00ffcc">{_total_senales}</strong> señales · <strong style="color:#00ffcc">{_wr_vip}%</strong> WR · <strong style="color:#fbbf24">+{int(_pips_totales):,}</strong> pips netos
+      <span data-i18n="hero.live_count" data-i18n-vars='{{"N":"{_total_senales}","WR":"{_wr_vip}","P":"{int(_pips_totales):+,}"}}'>
+        <strong style="color:#00ffcc">{_total_senales}</strong> señales · <strong style="color:#00ffcc">{_wr_vip}%</strong> WR · <strong style="color:#fbbf24">{int(_pips_totales):+,}</strong> pips netos
       </span>
     </div>
     <h1 data-i18n="hero.title">Señales VIP en tiempo real<br><span style="background:linear-gradient(90deg,#00ffc8,#4d9fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Opera con precisión, 24/7</span></h1>

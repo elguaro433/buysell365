@@ -158,9 +158,9 @@ def calcular_stats_mes(month: int, year: int) -> dict:
     worst_day = min(by_day.items(), key=lambda kv: kv[1]) if by_day else None
 
     categories = []
-    for cat in ("ORO", "FOREX", "INDICES", "OIL", "CRIPTO", "OTHER"):
+    for cat in ("ORO", "PLATA", "FOREX", "INDICES", "OIL", "CRIPTO", "OTHER"):
         if cat_net[cat] != 0 or cat_tps[cat] or cat_sls[cat] or cat_partials[cat]:
-            unit = "pips" if cat in ("ORO", "FOREX") else "pts"
+            unit = "pips" if cat in ("ORO", "PLATA", "FOREX") else "pts"
             categories.append({
                 "name": cat, "net": cat_net[cat], "unit": unit,
                 "tps": cat_tps[cat], "sls": cat_sls[cat],

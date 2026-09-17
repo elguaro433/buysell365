@@ -184,6 +184,8 @@ _DISPLAY_MAP = {
     "NGASCash": "NATGAS", "XNGUSD": "NATGAS", "NATGAS": "NATGAS", "NGAS": "NATGAS",
     # Crypto
     "BTCUSD": "BTC/USD",
+    # Plata (FIX 2026-09-17: "SILVER" tiene 6 letras y se partia como "SIL/VER")
+    "SILVER": "SILVER", "XAGUSD": "SILVER", "XAG/USD": "SILVER", "XAG": "SILVER", "PLATA": "SILVER",
 }
 
 def _get_display_pair(pair: str) -> str:
@@ -1051,6 +1053,9 @@ def _get_pips_info(pair: str, entry: float, exit_price: float) -> tuple:
     _p_up = pair.upper()
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         return round(pips_raw * 10, 1), "pips"
+    elif any(x in _p_up for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+        # Plata: pip = 0.01 → ×100 (FIX 2026-09-17)
+        return round(pips_raw * 100, 1), "pips"
     elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
         # Petróleo: pip = 0.01 → ×100 para contar céntimos como "pts"
         return round(pips_raw * 100, 1), "pts"
@@ -3779,6 +3784,8 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         pips_won = abs(tp - entry) if entry > 0 else 0
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             pips_label = f"+{pips_won * 10:.0f} pips" if pips_won >= 0.1 else ""
+        elif any(x in pair.upper() for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+            pips_label = f"+{pips_won * 100:.0f} pips" if pips_won > 0 else ""
         elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
             pips_label = f"+{pips_won * 100:.0f} pts" if pips_won > 0 else ""
         elif "JPY" in pair.upper():
@@ -4105,6 +4112,8 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     pips_won = abs(tp - entry) if entry > 0 and tp > 0 else 0
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         pips_str = f"+{pips_won * 10:.0f} pips" if pips_won >= 0.1 else ""
+    elif any(x in pair.upper() for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+        pips_str = f"+{pips_won * 100:.0f} pips" if pips_won > 0 else ""
     elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
         pips_str = f"+{pips_won * 100:.0f} pts" if pips_won > 0 else ""
     elif "JPY" in pair.upper():
@@ -4253,6 +4262,8 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 _pair_up = (pair or "").upper()
                 if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
                     _pips_disp = pips_won * 10
+                elif any(x in _pair_up for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+                    _pips_disp = pips_won * 100
                 elif any(x in _pair_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
                     _pips_disp = pips_won * 100
                 elif "JPY" in _pair_up:
@@ -4352,6 +4363,9 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
                 _unit_gt = "pips"
                 if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
                     _pips_disp_gt = round(_pips_disp_gt * 10, 1)
+                    _unit_gt = "pips"
+                elif any(x in pair.upper() for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+                    _pips_disp_gt = round(_pips_disp_gt * 100, 1)
                     _unit_gt = "pips"
                 elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
                     _pips_disp_gt = round(_pips_disp_gt * 100, 1)
@@ -4866,6 +4880,8 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
         # FIX 2026-05-01: GOLD usa "pips" con factor x10 (estandar mercado).
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             return f"{signo}{v * 10:.0f} pips"
+        elif any(x in pair.upper() for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+            return f"{signo}{v * 100:.0f} pips"
         elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
             return f"{signo}{v * 100:.0f} pts"
         elif "JPY" in pair.upper():
@@ -4987,6 +5003,8 @@ def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_m
         # FIX 2026-05-01: GOLD usa "pips" con factor x10 (estandar mercado).
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             return f"{signo}{v * 10:.0f} pips"
+        elif any(x in pair.upper() for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+            return f"{signo}{v * 100:.0f} pips"
         elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
             return f"{signo}{v * 100:.0f} pts"
         elif "JPY" in pair.upper():
@@ -5108,6 +5126,10 @@ def _record_daily_result(signal: dict, result: str) -> None:
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         pips_str = f"{pips_raw * 10:.0f} pips"
         pips_numeric = pips_raw * 10
+        pips_unit = "pips"
+    elif any(x in _p_up for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+        pips_str = f"{pips_raw * 100:.0f} pips"
+        pips_numeric = pips_raw * 100
         pips_unit = "pips"
     elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
         pips_str = f"{pips_raw * 100:.0f} pts"
@@ -10203,6 +10225,9 @@ def send_to_channel(signal, executed, detail):
                                     else:
                                         _pips = round(_raw_diff, 1)
                                         _pips_signed = round(_signed_diff, 1)
+                                elif any(x in _pair.upper() for x in ("SILVER", "XAGUSD", "XAG", "PLATA")):  # FIX 2026-09-17: plata ×100 "pips" (antes caia en forex ×10000 → "8000 pips")
+                                    _pips = round(_raw_diff * 100, 1)
+                                    _pips_signed = round(_signed_diff * 100, 1)
                                 elif any(x in _pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
                                     _pips = round(_raw_diff * 100, 1)
                                     _pips_signed = round(_signed_diff * 100, 1)

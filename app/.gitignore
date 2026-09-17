@@ -63,3 +63,8 @@ archivo/
 *.png
 *.jpg
 *.pptx
+
+# 2026-09-17: las imagenes de la web (logo/favicon/og:image) SI se versionan —
+# estaban ignoradas por *.png y buysell365.pro devolvia 404 en /img/bull_bear.png
+!web/bull_bear.png
+!web/og_image.png

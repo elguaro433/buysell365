@@ -421,7 +421,7 @@ def generar_imagen(stats: dict) -> Path:
     if best and best.get("pts", 0) > 0:
         bp    = best.get("pair", "ORO")
         bpts  = best.get("pts", 0)
-        bunit = "pips" if best.get("category") == "ORO" else "pts"
+        bunit = "pips" if best.get("category") in ("ORO", "PLATA", "FOREX") else "pts"
         best_txt = f"  MEJOR SEÑAL:  {bp}  +{bpts:.0f} {bunit}  "
         _rounded(d, [80, wr_y, W - 80, wr_y + 68], r=18,
                  fill=(10, 55, 35), outline=(0, 200, 100), width=2)
@@ -891,7 +891,7 @@ def _build_text_group(s: dict, fecha: str) -> str:
     if best and best.get("pts", 0) > 0:
         bp    = best.get("pair", "?")
         bpts  = best.get("pts", 0)
-        bunit = "pips" if best.get("category") == "ORO" else "pts"
+        bunit = "pips" if best.get("category") in ("ORO", "PLATA", "FOREX") else "pts"
         example_line = (
             f"📌 *Real example today:*\n"
             f"   {bp} — Entry ✅ → TP hit → *+{bpts:.0f} {bunit}*\n\n"
