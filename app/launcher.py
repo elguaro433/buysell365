@@ -15,7 +15,18 @@ import urllib.request
 import urllib.error
 import webbrowser
 import csv
-import winsound
+# FIX 2026-09-17: winsound solo existe en Windows. En el VPS Linux este import
+# hacia crashear el launcher (el VPS llevaba un parche manual sin commitear).
+try:
+    import winsound
+except ImportError:
+    class _WinsoundStub:
+        def Beep(self, *a, **k): pass
+        def PlaySound(self, *a, **k): pass
+        SND_ASYNC = 0
+        SND_FILENAME = 0
+        SND_LOOP = 0
+    winsound = _WinsoundStub()
 from datetime import datetime, timedelta
 
 # Force UTF-8 output
@@ -423,6 +434,20 @@ _MT5_PATHS = [
 ]
 
 
+def _rotate_big_log(path: str, max_mb: int = 20) -> None:
+    """FIX 2026-09-17: los *_stderr.log crecian sin limite (copier_stderr.log llego
+    a 200 MB en el VPS). Si supera max_mb se renombra a .1 (se conserva 1 copia)."""
+    try:
+        if os.path.exists(path) and os.path.getsize(path) > max_mb * 1024 * 1024:
+            bak = path + ".1"
+            if os.path.exists(bak):
+                os.remove(bak)
+            os.replace(path, bak)
+            _log(f"🧹 {os.path.basename(path)} > {max_mb} MB — rotado a .1")
+    except Exception as _e:
+        _log(f"Aviso: no se pudo rotar {path}: {_e}")
+
+
 def _ensure_mt5_running():
     """Verifica si MT5 esta corriendo, si no lo abre automaticamente."""
     try:
@@ -642,6 +667,7 @@ class BotManager:
             # crashea durante imports/init no podemos diagnosticar la causa.
             _stderr_path = os.path.join(BASE_DIR, "logs", "bot_stderr.log")
             try:
+                _rotate_big_log(_stderr_path)
                 _stderr_fp = open(_stderr_path, "ab")
                 _stderr_fp.write(f"\n=== START {time.strftime('%Y-%m-%d %H:%M:%S')} (launcher) ===\n".encode())
                 _stderr_fp.flush()

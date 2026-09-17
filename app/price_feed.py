@@ -71,13 +71,41 @@ _YF_SPECIAL = {
     "NASDAQ":  "^NDX",
     "US30":    "^DJI",          # Dow Jones
     "DOW":     "^DJI",
+    "DOW30":   "^DJI",
+    "DJ30":    "^DJI",
+    "SP500":   "^GSPC",
+    "DE40":    "^GDAXI",
+    "NASDAQ100": "^NDX",
+    "NQ":      "^NDX",
     "SPX500":  "^GSPC",         # S&P 500
     "US500":   "^GSPC",
     "GER40":   "^GDAXI",        # DAX
     "DAX":     "^GDAXI",
     "UK100":   "^FTSE",         # FTSE 100
     "JPN225":  "^N225",         # Nikkei
+    # FIX 2026-09-17: nombres de simbolo XM ("...Cash") que llegan desde
+    # SYMBOL_MAP del copier. Antes caian al fallback generico yfinance("US30CASH")
+    # -> "possibly delisted" cada 30s (18.000 lineas de log en una semana).
+    "US30CASH":  "^DJI",
+    "US100CASH": "^NDX",
+    "US500CASH": "^GSPC",
+    "GER40CASH": "^GDAXI",
+    "OILCASH":   "CL=F",
+    "BRENTCASH": "BZ=F",
+    "NGASCASH":  "NG=F",
 }
+
+# Simbolos que deben resolverse a precio SPOT (no futuro). Ver get_spot_gold().
+_GOLD_SYMBOLS = {"XAUUSD", "GOLD", "ORO", "XAU"}
+# Indices: cash (^DJI...) durante sesion; futuro menos basis cacheado fuera de sesion.
+_INDEX_CASH_FUT = {
+    "^DJI":   "YM=F",
+    "^NDX":   "NQ=F",
+    "^GSPC":  "ES=F",
+    "^GDAXI": None,
+}
+_INDEX_FRESH_SEC = 20 * 60  # ^DJI de yfinance se considera vivo si su ultima vela tiene <20 min
+_BASIS_CACHE: Dict[str, tuple[float, float]] = {}  # yticker_cash -> (ts, futuro - cash)
 
 
 def _clean_symbol(sym: str) -> str:
@@ -108,14 +136,28 @@ class Tick:
 
 
 # ─── Backend Binance (crypto) ─────────────────────────────────────────
+# FIX 2026-09-17: Binance responde HTTP 451 desde VPS en USA (bloqueo geografico).
+# Antes el VPS llevaba un parche manual que borraba la funcion entera (y de paso
+# _TWELVEDATA_MAP -> NameError en el fallback OHLC). Ahora: si Binance devuelve
+# 451/403 se desactiva sola durante 6h y caemos a yfinance sin ruido.
+_BINANCE_DISABLED_UNTIL = 0.0
+
+
 def _binance_tick(symbol: str) -> Optional[Tick]:
     """REST público de Binance — sub-segundo, sin auth."""
+    global _BINANCE_DISABLED_UNTIL
+    if time.time() < _BINANCE_DISABLED_UNTIL:
+        return None
     try:
         import requests
         r = requests.get(
             f"https://api.binance.com/api/v3/ticker/bookTicker?symbol={symbol}",
             timeout=5,
         )
+        if r.status_code in (451, 403):
+            _BINANCE_DISABLED_UNTIL = time.time() + 6 * 3600
+            log.warning(f"Binance {symbol} status {r.status_code} (bloqueo geografico) — desactivado 6h, usando yfinance")
+            return None
         if r.status_code != 200:
             log.warning(f"Binance {symbol} status {r.status_code}")
             return None
@@ -215,6 +257,131 @@ def _yfinance_tick(yticker: str) -> Optional[Tick]:
         return None
 
 
+# ─── ORO SPOT (FIX 2026-09-17) ────────────────────────────────────────
+# PROBLEMA: GC=F es el futuro COMEX (vencimiento lejano). Desde finales de julio
+# 2026 cotiza +30/+40 $ por encima del spot que usan los canales aliados
+# (SureShot, United Kings = CFD XAUUSD). Consecuencia real: TODOS los SELL ORO
+# recibian "SL HIT" a los 2-30 s de publicarse (el bot veia 4391 con SL 4372) y
+# los BUY se marcaban "senal muerta". ~150 SL falsos en 7 semanas.
+# SOLUCION: precio spot de 3 fuentes gratuitas (gold-api.com, Bitfinex XAUT,
+# Kraken PAXG — verificadas desde el VPS: 4363.8 / 4360 / 4357 vs aliados 4362.85).
+# Fallback final: GC=F menos el basis (futuro - spot) cacheado en la ultima
+# lectura buena, nunca el futuro "a pelo".
+_GOLD_SPOT_CACHE: tuple = (0.0, 0.0)  # (ts, price)
+_GOLD_BASIS: tuple = (0.0, 0.0)       # (ts, GC=F - spot)
+GOLD_SPOT_TTL = 10.0
+
+
+def _gold_spot_sources() -> list:
+    """Lista ordenada de (nombre, callable) que devuelven el spot de oro o None."""
+    import requests
+
+    def _gold_api():
+        r = requests.get("https://api.gold-api.com/price/XAU", timeout=6)
+        if r.status_code == 200:
+            v = float(r.json().get("price") or 0)
+            return v if v > 0 else None
+        return None
+
+    def _bitfinex_xaut():
+        r = requests.get("https://api-pub.bitfinex.com/v2/ticker/tXAUT:USD", timeout=6)
+        if r.status_code == 200:
+            d = r.json()
+            bid, ask = float(d[0]), float(d[2])  # [BID, BID_SIZE, ASK, ASK_SIZE, ...]
+            return (bid + ask) / 2 if bid > 0 and ask > 0 else None
+        return None
+
+    def _kraken_paxg():
+        r = requests.get("https://api.kraken.com/0/public/Ticker?pair=PAXGUSD", timeout=6)
+        if r.status_code == 200:
+            res = (r.json().get("result") or {})
+            for _k, v in res.items():
+                bid, ask = float(v["b"][0]), float(v["a"][0])
+                return (bid + ask) / 2 if bid > 0 and ask > 0 else None
+        return None
+
+    return [("gold-api", _gold_api), ("bitfinex-xaut", _bitfinex_xaut), ("kraken-paxg", _kraken_paxg)]
+
+
+def get_spot_gold() -> Optional[float]:
+    """Precio SPOT del oro (USD/oz). Cache 10s. None solo si fallan las 3 fuentes
+    y no hay basis cacheado para corregir GC=F."""
+    global _GOLD_SPOT_CACHE, _GOLD_BASIS
+    now = time.time()
+    ts, cached = _GOLD_SPOT_CACHE
+    if cached > 0 and (now - ts) < GOLD_SPOT_TTL:
+        return cached
+    for name, fn in _gold_spot_sources():
+        try:
+            v = fn()
+            if v and v > 0:
+                _GOLD_SPOT_CACHE = (now, v)
+                # Refrescar basis futuro-spot como maximo cada 5 min (GC=F via yfinance es lento)
+                if (now - _GOLD_BASIS[0]) > 300:
+                    try:
+                        fut = _yfinance_tick("GC=F")
+                        if fut and fut.last > 0:
+                            _GOLD_BASIS = (now, fut.last - v)
+                    except Exception:
+                        pass
+                return v
+        except Exception as e:
+            log.debug(f"spot gold {name} fail: {e}")
+    # Fallback: futuro menos basis conocido (nunca el futuro a pelo)
+    try:
+        fut = _yfinance_tick("GC=F")
+        b_ts, basis = _GOLD_BASIS
+        if fut and fut.last > 0 and b_ts > 0 and (now - b_ts) < 48 * 3600:
+            v = fut.last - basis
+            log.warning(f"spot gold: 3 fuentes fallaron — usando GC=F {fut.last:.2f} - basis {basis:.2f} = {v:.2f}")
+            _GOLD_SPOT_CACHE = (now, v)
+            return v
+    except Exception:
+        pass
+    log.error("spot gold: sin fuentes disponibles (gold-api/bitfinex/kraken/GC=F)")
+    return None
+
+
+def _index_cash_tick(cash_ticker: str) -> Optional[Tick]:
+    """Indice cash (^DJI, ^NDX, ^GSPC) si su ultima vela es reciente; si el mercado
+    de contado esta cerrado, futuro menos basis cacheado. Evita el desfase
+    YM=F vs US30 CFD (+400 pts el 17-sep-2026) que disparaba SL falsos."""
+    now = time.time()
+    fut_ticker = _INDEX_CASH_FUT.get(cash_ticker)
+    try:
+        import yfinance as yf, warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            hist = yf.Ticker(cash_ticker).history(period="1d", interval="1m")
+        if hist is not None and not hist.empty:
+            last_ts = hist.index[-1].timestamp()
+            last = float(hist["Close"].iloc[-1])
+            if last > 0 and (now - last_ts) < _INDEX_FRESH_SEC:
+                if fut_ticker:
+                    b_ts = _BASIS_CACHE.get(cash_ticker, (0.0, 0.0))[0]
+                    if (now - b_ts) > 300:
+                        try:
+                            fut = _yfinance_tick(fut_ticker)
+                            if fut and fut.last > 0:
+                                _BASIS_CACHE[cash_ticker] = (now, fut.last - last)
+                        except Exception:
+                            pass
+                spread = max(last * 0.00005, 0.01)
+                return Tick(bid=last - spread, ask=last + spread, last=last, time=int(now))
+    except Exception as e:
+        log.debug(f"index cash {cash_ticker} fail: {e}")
+    # Cash cerrado/stale: futuro - basis (si lo conocemos)
+    if fut_ticker:
+        fut = _yfinance_tick(fut_ticker)
+        b_ts, basis = _BASIS_CACHE.get(cash_ticker, (0.0, 0.0))
+        if fut and fut.last > 0 and b_ts > 0 and (now - b_ts) < 5 * 86400:
+            last = fut.last - basis
+            spread = max(last * 0.00005, 0.01)
+            return Tick(bid=last - spread, ask=last + spread, last=last, time=int(now))
+    # Ultimo recurso: cash aunque este stale (mejor que futuro sin corregir)
+    return _yfinance_tick(cash_ticker)
+
+
 # ─── API pública: get_tick ────────────────────────────────────────────
 def get_tick(symbol: str) -> Optional[Tick]:
     """
@@ -238,17 +405,31 @@ def get_tick(symbol: str) -> Optional[Tick]:
 
     tick: Optional[Tick] = None
 
-    # 1) Crypto → Binance
+    # 1) Crypto → Binance (fallback yfinance "BTC-USD" si Binance esta bloqueado/451)
     if sym in _BINANCE_MAP:
         tick = _binance_tick(_BINANCE_MAP[sym])
+        if tick is None:
+            _base = _BINANCE_MAP[sym].replace("USDT", "")
+            tick = _yfinance_tick(f"{_base}-USD")
 
     # 2) Forex → yfinance "PAIR=X"
     elif sym in _FOREX_PAIRS:
         tick = _yfinance_tick(f"{sym}=X")
 
-    # 3) Símbolos especiales (oro, índices, etc.)
+    # 2b) Oro → SPOT (FIX 2026-09-17, ver get_spot_gold)
+    elif sym in _GOLD_SYMBOLS:
+        v = get_spot_gold()
+        if v:
+            spread = 0.20  # ~spread tipico XAUUSD CFD
+            tick = Tick(bid=v - spread / 2, ask=v + spread / 2, last=v, time=int(now))
+
+    # 3) Símbolos especiales (índices cash, materias primas…)
     elif sym in _YF_SPECIAL:
-        tick = _yfinance_tick(_YF_SPECIAL[sym])
+        yt = _YF_SPECIAL[sym]
+        if yt in _INDEX_CASH_FUT:
+            tick = _index_cash_tick(yt)
+        else:
+            tick = _yfinance_tick(yt)
 
     # 4) Fallback genérico — intentar tal cual en yfinance
     else:

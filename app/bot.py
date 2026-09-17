@@ -20664,6 +20664,19 @@ def _arrancar_interno():
         os.makedirs(_logs_dir, exist_ok=True)
         _stderr_path = os.path.join(_logs_dir, "copier_stderr.log")
         _stdout_path = os.path.join(_logs_dir, "copier_stdout.log")
+        # FIX 2026-09-17: el copier ya escribe a logs/copier.log (rotativo 5MBx3) y
+        # ADEMAS a stderr -> este archivo duplicaba todo sin limite (200 MB en el VPS).
+        # Rotar a .1 si supera 20 MB antes de abrirlo.
+        for _big in (_stderr_path, _stdout_path):
+            try:
+                if os.path.exists(_big) and os.path.getsize(_big) > 20 * 1024 * 1024:
+                    _bak = _big + ".1"
+                    if os.path.exists(_bak):
+                        os.remove(_bak)
+                    os.replace(_big, _bak)
+                    logger.info(f"🧹 {os.path.basename(_big)} > 20 MB — rotado a .1")
+            except Exception as _e_rot:
+                logger.debug(f"rotacion {_big}: {_e_rot}")
         try:
             _stderr_file = open(_stderr_path, "a", encoding="utf-8")
             _stdout_file = open(_stdout_path, "a", encoding="utf-8")
@@ -21746,6 +21759,12 @@ if __name__ == "__main__":
                     print("⚠️ HTTP deshabilitado — webhooks no disponibles")
 
         # --- Servidor principal HTTPS — Waitress + SSL ---
+        # FIX 2026-09-17: HTTPS_ENABLED=false desactiva el servidor HTTPS interno.
+        # En el VPS el wrap_socket() bloqueante del listener se quedo colgado en un
+        # handshake el 03-jul (17h tras el restart): backlog lleno 1025/1024, 722
+        # sockets CLOSE-WAIT, hilo principal muerto durante 2.5 meses. La web publica
+        # vive en Render, asi que este puerto no tiene uso real en produccion.
+        _https_enabled = os.getenv("HTTPS_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
         le_cert = r"C:\Certbot\live\buysell365.pro\fullchain.pem"
         le_key  = r"C:\Certbot\live\buysell365.pro\privkey.pem"
         # Fallback: intentar cert antiguo duckdns si el nuevo no existe
@@ -21760,15 +21779,22 @@ if __name__ == "__main__":
             ssl_key  = os.path.join(os.getcwd(), "ssl_key.pem")
             print(f"🔒 HTTPS :{_https_port} activo (Waitress + SSL auto-firmado)")
 
+        srv_https = None
         try:
+            if not _https_enabled:
+                raise RuntimeError("HTTPS_ENABLED=false")
             srv_https = create_server(app, host="0.0.0.0", port=_https_port, url_scheme="https", threads=4)
             ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ssl_ctx.load_cert_chain(ssl_cert, ssl_key)
             srv_https.socket = ssl_ctx.wrap_socket(srv_https.socket, server_side=True)
         except Exception as e_ssl_init:
-            logger.warning(f"⚠️ No se pudo abrir HTTPS en puerto {_https_port}: {e_ssl_init}")
-            if _https_port < 1024:
+            if not _https_enabled:
+                srv_https = None
+                print("ℹ️ HTTPS interno desactivado por HTTPS_ENABLED=false (web publica en Render)")
+            else:
+                logger.warning(f"⚠️ No se pudo abrir HTTPS en puerto {_https_port}: {e_ssl_init}")
+            if _https_enabled and _https_port < 1024:
                 _https_port = 8443
                 try:
                     srv_https = create_server(app, host="0.0.0.0", port=_https_port, url_scheme="https", threads=4)

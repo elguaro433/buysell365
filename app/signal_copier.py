@@ -3215,10 +3215,36 @@ def _validate_entry_vs_market(signal: dict) -> bool:
     return True
 
 
+# FIX 2026-09-17: activos cuyo precio de referencia debe ser SPOT/CASH y no el
+# futuro de yfinance (GC=F / YM=F / NQ=F / ES=F). Desde finales de julio el basis
+# futuro-spot del oro subio a +30/+40 $ y el de US30 a +400 pts: TODOS los SELL
+# ORO/US30 recibian SL HIT en segundos y los BUY se marcaban "senal muerta".
+# price_feed.get_tick() resuelve estos simbolos con gold-api/bitfinex/kraken
+# (oro) y ^DJI/^NDX/^GSPC (indices, con futuro-basis fuera de sesion).
+_SPOT_ROUTED_PAIRS = {
+    "GOLD", "XAUUSD", "ORO", "XAU",
+    "US30", "US30CASH", "DOW", "DOW30", "DJ30",
+    "NAS100", "US100", "US100CASH", "NASDAQ", "NASDAQ100", "NQ",
+    "US500", "US500CASH", "SP500", "SPX500",
+    "GER40", "GER40CASH", "DAX", "DE40",
+}
+
+
 def _get_current_price(pair: str) -> float | None:
     """Fetch current price via yfinance (gratis, sin límite).
     Twelve Data se reserva SOLO para gráficos de velas.
     """
+    # FIX 2026-09-17: oro/indices -> spot/cash via price_feed (ver _SPOT_ROUTED_PAIRS)
+    _p_up = (pair or "").upper().replace("/", "").strip()
+    if _p_up in _SPOT_ROUTED_PAIRS:
+        try:
+            import price_feed as _pf_spot
+            _t_spot = _pf_spot.get_tick(_p_up)
+            if _t_spot and _t_spot.last > 0:
+                return float(_t_spot.last)
+            log.warning(f"⚠️ Precio spot no disponible para {pair} — cayendo a yfinance (futuro) como ultimo recurso")
+        except Exception as _e_spot:
+            log.warning(f"⚠️ price_feed spot {pair} error: {_e_spot} — fallback yfinance")
     # FIX 2026-04-12: Mapa COMPLETO — todos los pares que SYMBOL_MAP puede recibir
     _yf_map = {
         # Oro
@@ -3503,6 +3529,25 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
                     closes = _df["Close"].tolist()
                     highs  = _df["High"].tolist()
                     lows   = _df["Low"].tolist()
+                    # FIX 2026-09-17: las velas de futuros (GC=F / YM=F / NQ=F / ES=F)
+                    # van +30/+40 $ (oro) o +400 pts (US30) por encima del spot/CFD del
+                    # aliado -> las lineas entry/TP/SL quedaban fuera de las velas.
+                    # Desplazamos las velas por el basis (futuro - spot) actual.
+                    try:
+                        if _yf_ticker in ("GC=F", "YM=F", "NQ=F", "ES=F"):
+                            import price_feed as _pf_ch
+                            _spot_ch = _get_current_price(pair) or 0
+                            _fut_ch = _pf_ch._yfinance_tick(_yf_ticker)
+                            if _spot_ch > 0 and _fut_ch and _fut_ch.last > 0:
+                                _basis_ch = _fut_ch.last - _spot_ch
+                                if abs(_basis_ch) / _spot_ch < 0.03:  # sanity: basis < 3%
+                                    opens  = [v - _basis_ch for v in opens]
+                                    closes = [v - _basis_ch for v in closes]
+                                    highs  = [v - _basis_ch for v in highs]
+                                    lows   = [v - _basis_ch for v in lows]
+                                    log.info(f"📊 Chart {pair}: velas {_yf_ticker} ajustadas por basis {_basis_ch:+.2f} (spot={_spot_ch:.2f})")
+                    except Exception as _e_basis_ch:
+                        log.debug(f"chart basis adjust error: {_e_basis_ch}")
                     log.info(f"📊 Chart data from yfinance ({len(opens)} candles)")
                 else:
                     log.warning(f"📊 yfinance sin datos suficientes para {_yf_ticker}")
@@ -3735,13 +3780,13 @@ def _fetch_chart_image(pair: str, direction: str, entry: float, tp: float, *, ti
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             pips_label = f"+{pips_won * 10:.0f} pips" if pips_won >= 0.1 else ""
         elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
-            pips_label = f"+{pips_won * 100:.1f} pts" if pips_won > 0 else ""
+            pips_label = f"+{pips_won * 100:.0f} pts" if pips_won > 0 else ""
         elif "JPY" in pair.upper():
             # JPY pairs: 1 pip = 0.01 → multiply by 100
             pips_label = f"+{pips_won * 100:.0f} pips" if pips_won > 0 else ""
         elif entry >= 100:
             # Indices (NAS100, US30, etc.): raw points
-            pips_label = f"+{pips_won:.1f} pts" if pips_won > 0 else ""
+            pips_label = f"+{pips_won:.0f} pts" if pips_won > 0 else ""
         else:
             pips_label = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
 
@@ -4061,13 +4106,13 @@ def _send_tp_celebration(signal: dict, reply_to_msg_id: int = None) -> None:
     if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
         pips_str = f"+{pips_won * 10:.0f} pips" if pips_won >= 0.1 else ""
     elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
-        pips_str = f"+{pips_won * 100:.1f} pts" if pips_won > 0 else ""
+        pips_str = f"+{pips_won * 100:.0f} pts" if pips_won > 0 else ""
     elif "JPY" in pair.upper():
         # JPY pairs: 1 pip = 0.01 → multiply by 100
         pips_str = f"+{pips_won * 100:.0f} pips" if pips_won > 0 else ""
     elif entry >= 100:
         # Indices (NAS100, US30, etc.): raw points
-        pips_str = f"+{pips_won:.1f} pts" if pips_won > 0 else ""
+        pips_str = f"+{pips_won:.0f} pts" if pips_won > 0 else ""
     else:
         pips_str = f"+{pips_won * 10000:.0f} pips" if pips_won > 0 else ""
 
@@ -4822,11 +4867,11 @@ def _send_sl_notification(signal: dict, reply_to_msg_id: int = None) -> None:
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             return f"{signo}{v * 10:.0f} pips"
         elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
-            return f"{signo}{v * 100:.1f} pts"
+            return f"{signo}{v * 100:.0f} pts"
         elif "JPY" in pair.upper():
             return f"{signo}{v * 100:.0f} pips"
         elif entry >= 100:
-            return f"{signo}{v:.1f} pts"
+            return f"{signo}{v:.0f} pts"
         else:
             return f"{signo}{v * 10000:.0f} pips"
 
@@ -4943,11 +4988,11 @@ def _send_expired_notification(signal: dict, reason: str = "expired", reply_to_m
         if pair in ("GOLD", "XAUUSD", "XAUUSD=X"):
             return f"{signo}{v * 10:.0f} pips"
         elif any(x in pair.upper() for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
-            return f"{signo}{v * 100:.1f} pts"
+            return f"{signo}{v * 100:.0f} pts"
         elif "JPY" in pair.upper():
             return f"{signo}{v * 100:.0f} pips"
         elif entry >= 100:
-            return f"{signo}{v:.1f} pts"
+            return f"{signo}{v:.0f} pts"
         else:
             return f"{signo}{v * 10000:.0f} pips"
 
@@ -5065,11 +5110,11 @@ def _record_daily_result(signal: dict, result: str) -> None:
         pips_numeric = pips_raw * 10
         pips_unit = "pips"
     elif any(x in _p_up for x in ("BRENT", "OIL", "WTI", "USOIL", "UKOIL", "NATGAS", "NGAS", "XNGUSD")):
-        pips_str = f"{pips_raw * 100:.1f} pts"
+        pips_str = f"{pips_raw * 100:.0f} pts"
         pips_numeric = pips_raw * 100
         pips_unit = "pts"
     elif any(x in _p_up for x in ("BTC", "ETH", "BITCOIN")):
-        pips_str = f"{pips_raw:.1f} pts"
+        pips_str = f"{pips_raw:.0f} pts"
         pips_numeric = pips_raw
         pips_unit = "pts"
     elif "JPY" in _p_up:
@@ -5077,7 +5122,7 @@ def _record_daily_result(signal: dict, result: str) -> None:
         pips_numeric = pips_raw * 100
         pips_unit = "pips"
     elif entry >= 100:
-        pips_str = f"{pips_raw:.1f} pts"
+        pips_str = f"{pips_raw:.0f} pts"
         pips_numeric = pips_raw
         pips_unit = "pts"
     else:
@@ -5184,15 +5229,15 @@ def _build_promo_report(hora_label: str) -> str | None:
     if _cat_totals.get("ORO", 0) > 0:
         resumen_parts.append(f"🥇 GOLD: *+{_cat_totals['ORO']:.0f} pips*")
     if _cat_totals.get("INDICES", 0) > 0:
-        resumen_parts.append(f"📈 Indices: *+{_cat_totals['INDICES']:.1f} pts*")
+        resumen_parts.append(f"📈 Indices: *+{_cat_totals['INDICES']:.0f} pts*")
     if _cat_totals.get("OIL", 0) > 0:
-        resumen_parts.append(f"🛢️ Oil/Gas: *+{_cat_totals['OIL']:.1f} pts*")
+        resumen_parts.append(f"🛢️ Oil/Gas: *+{_cat_totals['OIL']:.0f} pts*")
     if _cat_totals.get("FOREX", 0) > 0:
         resumen_parts.append(f"💱 Forex: *+{_cat_totals['FOREX']:.0f} pips*")
     if _cat_totals.get("CRIPTO", 0) > 0:
         resumen_parts.append(f"🪙 Crypto: *+{_cat_totals['CRIPTO']:.0f} USD*")
     if _cat_totals.get("OTHER", 0) > 0:
-        resumen_parts.append(f"📊 Other: *+{_cat_totals['OTHER']:.1f} pts*")
+        resumen_parts.append(f"📊 Other: *+{_cat_totals['OTHER']:.0f} pts*")
     resumen = "\n".join(resumen_parts)
 
     wr = len(tps) / (len(tps) + len(sls)) * 100 if (tps or sls) else 0
@@ -6460,7 +6505,18 @@ async def _monitor_tp_loop() -> None:
                 _sls = [t for t in _trades_hoy if (t.get("result") or "").lower() == "sl"]
                 _total = len(_tps) + len(_sls)
                 _wr = (len(_tps) / _total * 100) if _total > 0 else 0.0
-                _net_pips = sum((t.get("pips") or 0) for t in _trades_hoy)
+                # FIX 2026-09-17: los SL se guardan con pips POSITIVOS en copier_stats
+                # -> sum() daba "net=+970" en un dia real de -680. Usar el mismo
+                # normalizador que el recap de las 19:00 (stats_normalizer).
+                try:
+                    from stats_normalizer import compute_day_stats as _cds_eod
+                    _net_pips = float(_cds_eod(_trades_hoy, _hoy_str).get("net_total", 0) or 0)
+                except Exception as _e_cds:
+                    log.debug(f"EOD compute_day_stats error: {_e_cds}")
+                    _net_pips = sum(
+                        (t.get("pips") or 0) * (-1 if (t.get("result") or "").lower() == "sl" else 1)
+                        for t in _trades_hoy
+                    )
                 _net_emoji = "🟢" if _net_pips > 0 else ("🔴" if _net_pips < 0 else "⚪")
 
                 # Gift signals de hoy
@@ -6971,6 +7027,30 @@ async def _monitor_tp_loop() -> None:
             if _entry <= 0:
                 signal["entry"] = price
                 log.info(f"📍 Entry auto-asignado en monitor: {price} para {pair}")
+
+            # FIX 2026-09-17: GUARD anti-SL/TP instantaneo. Si en los primeros 15 min
+            # el precio de referencia difiere >0.5% del entry del aliado, el feed esta
+            # desalineado (futuro vs spot, vela stale, ticker equivocado) — NO evaluar
+            # TP/SL hasta que cuadre. Caso real: 19 "SL HIT" falsos en 48h (15-17 sep)
+            # con SELL ORO publicada y SL disparado en el mismo minuto.
+            try:
+                _age_g = time.time() - float(sdata.get("sent_at", 0) or 0)
+                _entry_g = float(signal.get("entry", 0) or 0)
+                _dev_g = abs(price - _entry_g) / _entry_g if _entry_g > 0 else 0.0
+                if _entry_g > 0 and _age_g < 900 and _dev_g > 0.005:
+                    _nm = int(signal.get("_ref_mismatch", 0) or 0) + 1
+                    signal["_ref_mismatch"] = _nm
+                    if _nm in (1, 10, 30):
+                        log.warning(
+                            f"🛡️ GUARD feed: {pair} {direction} precio_ref={price} vs entry={_entry_g} "
+                            f"({_dev_g*100:.2f}% a {_age_g:.0f}s de publicar) — TP/SL NO evaluados (n={_nm})"
+                        )
+                    continue
+                elif signal.get("_ref_mismatch"):
+                    log.info(f"✅ GUARD feed OK: {pair} {direction} precio_ref={price} ya coherente con entry={_entry_g}")
+                    signal["_ref_mismatch"] = 0
+            except Exception as _e_guard:
+                log.debug(f"guard feed error {pair}: {_e_guard}")
 
             # TP/SL hit checks — solo verificar si el valor existe (>0)
             tp_hit = False
@@ -10841,6 +10921,12 @@ def send_to_channel(signal, executed, detail):
             signal["probability_source"] = _prob_result.get("source")
     except Exception as _e_prob:
         log.debug(f"signal_probability error (no crítico): {_e_prob}")
+
+    # FIX 2026-09-17: si la señal llega "muerta" (precio ya mas alla de TP1 al
+    # publicar) el cliente veia una señal normal que nunca tenia desenlace (el
+    # monitor la retiraba en silencio). Ahora lleva una nota visible.
+    if signal.get("_pub_blocked") == "dead-signal":
+        lines.append("\n⚠️ _Precio actual ya en zona de TP1 — señal informativa, sin seguimiento_")
 
     # FIX 2026-05-07: Firma Eli al final de cada señal
     lines.append(f"\n— _Eli · BuySell365 Pro_ 🤖")

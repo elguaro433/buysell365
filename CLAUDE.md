@@ -175,6 +175,41 @@ Reglas que se han ido endureciendo por feedback del usuario:
   antes era "verdad siempre").
 - **XM afiliado SE MANTIENE** — los anuncios programados de XM Global con
   código `BUYSELL365` (bot.py ~16444) son revenue stream, no tocar.
+- **WR (win rate) OCULTO en todo lo público** (2026-06-07) — el WR real es bajo
+  (~19%). Quitado de `daily_promo_publisher.py` (imágenes + captions grupo/IG) y
+  del bloque semanal `_get_weekly_stats_block` en `signal_copier.py`. Se siguen
+  mostrando pts y nº de TPs, pero NUNCA el % de aciertos. (En logs internos sí queda.)
+- **Cadencia de promo del GRUPO recortada** (2026-06-06/07, grupo de ~60, evitar
+  spam-feeling):
+  - Rotación VIP (`loop_publicidad_grupo`, 5 modelos auto-borra): **1×/día a las
+    21:00** (desde 2026-06-21; antes 2×/día).
+  - "2 FREE SIGNALS" (signals_promo): solo 09:00 (el repe 19:00 DESACTIVADO en
+    bot.py ~16956 con `if False`).
+  - Promo IG de las 14:00 en grupo (`signal_copier.py` ~6611): DESACTIVADA (`if False`).
+  - Briefing 07:00 al grupo: caption limpio "Market Briefing" (sin ad "Want VIP").
+  - Eli intro (`signal_copier.py` ~6545): de diaria a **semanal (lunes) y solo EN**.
+  - "Discover all platforms" al GRUPO (`daily_promo_publisher.py`): ELIMINADO
+    (se mantiene SOLO el post de Instagram). Los links viven en un **mensaje
+    FIJADO** del grupo (msg_id 3180).
+  - Lo que NO se toca: señales FREE, celebraciones TP HIT, afiliado XM.
+
+### Precios de referencia (TP/SL, validación de entry, "señal muerta")
+- **NUNCA usar futuros como precio actual** de oro/índices: `GC=F`, `YM=F`, `NQ=F`,
+  `ES=F` van decenas de $ / cientos de pts por encima del CFD de los aliados.
+  Oro → `price_feed.get_spot_gold()`; índices → `^DJI/^NDX/^GSPC` (cash) con
+  futuro−basis cuando el contado está cerrado. Lista en `_SPOT_ROUTED_PAIRS`.
+- Guard del monitor: primeros 15 min con desvío >0,5 % entre precio de referencia
+  y entry → no se evalúa TP/SL (log `GUARD feed`).
+
+### Pips / unidades (display)
+- **Convención por activo** (cuidado: hay ~9 formateadores inline en
+  `signal_copier.py` + `_get_pips_info` + daily tracker, deben coincidir):
+  GOLD ×10 "pips" · OIL/GAS (BRENT/OIL/WTI/USOIL/UKOIL/**NATGAS**/NGAS/XNGUSD)
+  ×100 "pts" · índices ×1 "pts" · JPY ×100 "pips" · forex ×10000 "pips".
+- FIX 2026-06-06: petróleo/gas con precio <100 caían en forex ×10000 (USOIL
+  mostraba "+30000 pips" en vez de "+300 pts"). NATGAS añadido a la lista oil.
+- Reportes diarios categorizan con `stats_normalizer.classify_pair` (NO el
+  heurístico `entry>=100`, que metía AUD/JPY en "Indices" y oil en "Forex").
 
 ### Datos / state
 - `.env` y `*.session` y `*.lock` NUNCA al repo (ya en `.gitignore`).
@@ -218,6 +253,55 @@ Reglas que se han ido endureciendo por feedback del usuario:
 ---
 
 ## 📝 Historial reciente (qué pasó hoy)
+
+**2026-09-17** — Auditoría completa + fix del feed de precios:
+1. **BUG CRÍTICO (desde 29-jul)**: el monitor TP/SL usaba futuros de yfinance
+   (`GC=F`, `YM=F`, `NQ=F`) como precio "actual". El basis futuro-spot subió a
+   +37 $ (oro) / +412 pts (US30) → **171 "SL HIT" falsos** en segundos sobre
+   SELL ORO/US30 y BUY marcados "señal muerta" y retirados en silencio. Arreglo:
+   `price_feed.get_spot_gold()` (gold-api.com → Bitfinex XAUT → Kraken PAXG →
+   GC=F−basis) y `^DJI/^NDX/^GSPC` cash con futuro−basis fuera de sesión;
+   `_SPOT_ROUTED_PAIRS` en `signal_copier._get_current_price`; guard anti-SL/TP
+   instantáneo (15 min, >0,5 % de desvío → no evaluar); velas de gráficos
+   ajustadas por basis; nota visible en señales "muertas".
+   `scripts/clean_false_sl_stats.py` limpia los 171 SL falsos de `copier_stats.json`.
+2. VPS ≠ repo: el VPS corría el branch `fix/rate-limit-collision-y-eod-2026-07-02`
+   + 2 parches manuales (stub `winsound` en launcher, Binance borrado en
+   price_feed que rompía `_TWELVEDATA_MAP`). Ambos portados al repo de forma
+   limpia (Binance se autodesactiva 6 h al recibir 451).
+3. HTTPS interno :8443 del bot colgado desde 03-jul (handshake bloqueante, backlog
+   lleno, 722 CLOSE-WAIT). Nuevo `HTTPS_ENABLED=false` en `.env` del VPS (la web
+   pública es Render). Logs `*_stderr.log` rotan a los 20 MB (había uno de 200 MB).
+4. Resumen EOD admin 18:00 sumaba los SL como positivos → usa `stats_normalizer`.
+   Formato "-150.0 pts" → "-150 pts".
+5. **Pendiente del usuario**: crédito Anthropic agotado (≤ 18-ago, parser LLM,
+   Vision, probabilidad en `tech_only`); TextMeBot: número emisor desconectado
+   (WhatsApp 100 % caído desde ≤ 9-sep); key TwelveData responde vacío;
+   `COPIER_PAIRS_DISABLED=` vacío en `.env` del VPS anula la blacklist de pares.
+6. Recortes de promo del 21-jun que este doc no reflejaba: briefing 07:00 VIP,
+   promo diaria 12:00 y "2 free signals" 09:00 DESACTIVADOS; rotación VIP al
+   grupo **1×/día a las 21:00**. `INSTAGRAM_DISABLED=1` en el VPS.
+
+**2026-06-06 / 07** — Auditoría de señales + limpieza de promo:
+1. **Bug pips OIL/GAS**: USOIL mostraba "+30000 pips" / "-15000 pips" (caía en
+   forex ×10000 por precio <100). Arregladas las ~9 ramas inline de pips +
+   añadido NATGAS a la lista oil. Ahora ×100 "pts".
+2. **Reportes diarios**: categorización con `classify_pair` (AUD/JPY ya es Forex,
+   USOIL/NATGAS son Oil/Gas). Contador "+N trades today" ahora acumulado (antes
+   contaba solo señales abiertas y bajaba al cerrarse). WR oculto en público.
+3. **Recorte de autopromo del grupo** (ver Políticas): rotación VIP 2×/día, quitados
+   07:00, repe 19:00, promo IG 14h, "Discover platforms" del grupo; Eli semanal EN;
+   creado mensaje FIJADO con links (msg 3180).
+4. **Panel admin** (`web_admin/data_access.py`): (a) indicador "Telethon" usaba la
+   antigüedad de `copier_stats.json` (falso "Inactivo" si no había cierres recientes)
+   → ahora mide `.copier.heartbeat`. (b) "Últimas señales" leía `historial_real.json`,
+   archivo MUERTO de la era MT5 (congelado en marzo, sin probabilidad) → ahora lee
+   `copier_stats.json` (vivo, con prob).
+5. WhatsApp: añadido destinatario "piera" (+376691445, filter ALL) — config OK.
+6. Deploys con `deploy-files.ps1` (bot) y scp+restart `buysell365_admin` (panel).
+   Nota: hubo un deploy que colgó el `scp`; el patrón stop→limpiar locks→start
+   funcionó igual. Log lleno de `server accept() SSLError` = escáneres de internet
+   al puerto HTTPS público (ruido inofensivo, pendiente silenciar el logger waitress).
 
 **2026-05-24** — Día de consolidación grande:
 1. Usuario pidió eliminar publi MT5 demo (credenciales investor read-only)
