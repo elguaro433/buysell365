@@ -1,4 +1,5 @@
 """WhatsApp recipients — CRUD completo + test send + bulk actions."""
+import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from ..auth import login_required
 from .. import data_access as da
@@ -111,10 +112,15 @@ def test_send(idx):
         url = f"https://api.textmebot.com/send.php?recipient=+{phone}&apikey={apikey}&text={msg}"
         resp = requests.get(url, timeout=15)
         if "Success" in resp.text or "success" in resp.text.lower():
+            da.record_whatsapp_probe(True, f"{r['name']}")
             flash(f"✅ Mensaje de prueba enviado a '{r['name']}' ({r['phone']}).", "success")
         else:
-            flash(f"⚠️ TextMeBot respondió: {resp.text[:120]}", "error")
+            body = re.sub(r"<[^>]+>", " ", resp.text)
+            body = re.sub(r"\s+", " ", body).strip()
+            da.record_whatsapp_probe(False, f"status={resp.status_code} {body[:120]}")
+            flash(f"⚠️ TextMeBot respondió: {body[:160]}", "error")
     except Exception as e:
+        da.record_whatsapp_probe(False, f"error: {e}")
         flash(f"❌ Error enviando: {e}", "error")
     return redirect(url_for("whatsapp.index"))
 

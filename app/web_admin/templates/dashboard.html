@@ -43,8 +43,9 @@
     <div class="space-y-2 text-sm">
       <div class="flex justify-between"><span>Telegram Bot</span><span class="{% if conns.telegram %}text-bs-green{% else %}text-bs-red{% endif %}">● {% if conns.telegram %}Conectado{% else %}Desconectado{% endif %}</span></div>
       <div class="flex justify-between"><span>Telethon (canales aliados)</span><span class="{% if conns.telethon %}text-bs-green{% else %}text-bs-red{% endif %}">● {% if conns.telethon %}Activo{% else %}Inactivo{% endif %}</span></div>
-      <div class="flex justify-between"><span>WhatsApp ({{ whatsapp_count }} destinatarios)</span><span class="{% if conns.whatsapp %}text-bs-green{% elif conns.whatsapp is none %}text-bs-yellow{% else %}text-bs-red{% endif %}" title="{{ conns.whatsapp_detail }}">● {% if conns.whatsapp %}OK{% elif conns.whatsapp is none %}Sin envíos{% else %}CAÍDO{% endif %}</span></div>
-      {% if conns.whatsapp is sameas false %}<div class="text-xs text-bs-red/80 pl-2">{{ conns.whatsapp_detail }}</div>{% endif %}
+      <div class="flex justify-between"><span>WhatsApp ({{ whatsapp_count }} destinatarios)</span><span class="{% if conns.whatsapp %}text-bs-green{% elif conns.whatsapp is none %}text-bs-yellow{% else %}text-bs-red{% endif %}" title="{{ conns.whatsapp_detail }}">● {% if conns.whatsapp %}OK{% elif conns.whatsapp is none %}{% if 'sin verificar' in conns.whatsapp_detail %}Sin verificar{% else %}Sin envíos{% endif %}{% else %}CAÍDO{% endif %}</span></div>
+      {% if conns.whatsapp is sameas false %}<div class="text-xs text-bs-red/80 pl-2">{{ conns.whatsapp_detail }}</div>
+      {% elif conns.whatsapp is none and 'sin verificar' in conns.whatsapp_detail %}<div class="text-xs text-bs-yellow/80 pl-2">{{ conns.whatsapp_detail }}</div>{% endif %}
       <div class="flex justify-between"><span>Render Dashboard</span><span class="{% if conns.render_sync %}text-bs-green{% else %}text-bs-yellow{% endif %}" title="{{ conns.render_detail }}">● {% if conns.render_sync %}Sync OK{% else %}Stale{% endif %}</span></div>
     </div>
   </div>

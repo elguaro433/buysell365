@@ -419,9 +419,36 @@ def _tail_lines(path, max_bytes: int = 400_000) -> list:
         return []
 
 
+_WSP_PROBE_FILE = APP_DIR / ".wsp_last_probe.json"
+# Un fallo mas viejo que esto sin intentos posteriores no prueba nada: el usuario
+# puede haber reconectado el QR y el panel no se entera hasta el siguiente envio.
+_WSP_STALE_SECS = 6 * 3600
+
+
+def record_whatsapp_probe(ok: bool, detail: str) -> None:
+    """Guarda el resultado del boton 'Test' del panel para que el dashboard lo lea
+    (el panel corre en otro proceso y no escribe en copier.log)."""
+    try:
+        _WSP_PROBE_FILE.write_text(json.dumps({
+            "ts": time.strftime("%Y-%m-%d %H:%M"), "epoch": time.time(),
+            "ok": bool(ok), "detail": str(detail)[:200],
+        }), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _log_ts_epoch(ts: str) -> float:
+    try:
+        return time.mktime(time.strptime(ts, "%Y-%m-%d %H:%M"))
+    except Exception:
+        return 0.0
+
+
 def _whatsapp_status_from_log():
-    """Ultimo resultado real de envio WhatsApp segun logs/copier.log.
-    Devuelve (ok: bool|None, detalle). None = sin envios recientes en el log."""
+    """Ultimo resultado real de envio WhatsApp: el mas reciente entre logs/copier.log
+    y el Test manual del panel (.wsp_last_probe.json).
+    Devuelve (ok: bool|None, detalle). None = sin envios recientes o fallo antiguo
+    sin verificar (ambar en el dashboard)."""
     from .config import LOGS_DIR
     last = None
     # El log del copier es muy verboso (precios cada 30s): mirar la cola de 3 MB
@@ -433,14 +460,35 @@ def _whatsapp_status_from_log():
                 break
         if last:
             break
-    if not last:
+    log_ok, log_ts, log_detail = None, "", ""
+    if last:
+        log_ts = last[:16]
+        if "enviado" in last:
+            log_ok, log_detail = True, f"ultimo envio OK {log_ts}"
+        elif "disconnected" in last.lower():
+            log_ok, log_detail = False, f"TextMeBot: numero emisor desconectado ({log_ts}) — reconectar QR"
+        else:
+            log_ok, log_detail = False, f"ultimo envio fallido {log_ts}"
+
+    probe = None
+    try:
+        if _WSP_PROBE_FILE.exists():
+            probe = json.loads(_WSP_PROBE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        probe = None
+
+    ok, ts, detail, epoch = log_ok, log_ts, log_detail, _log_ts_epoch(log_ts)
+    if probe and float(probe.get("epoch", 0)) > epoch:
+        ok, ts, epoch = bool(probe.get("ok")), probe.get("ts", ""), float(probe["epoch"])
+        detail = ("test manual OK " if ok else "test manual fallido ") + ts + (
+            "" if ok else f" — {probe.get('detail', '')}")
+
+    if ok is None:
         return None, "sin envios recientes"
-    ts = last[:16]
-    if "enviado" in last:
-        return True, f"ultimo envio OK {ts}"
-    if "disconnected" in last.lower():
-        return False, f"TextMeBot: numero emisor desconectado ({ts}) — reconectar QR"
-    return False, f"ultimo envio fallido {ts}"
+    if ok is False and time.time() - epoch > _WSP_STALE_SECS:
+        hrs = int((time.time() - epoch) / 3600)
+        return None, f"sin verificar — ultimo fallo hace {hrs} h ({ts}), sin intentos desde entonces. Usa Test en WhatsApp"
+    return ok, detail
 
 
 def _render_status_from_log():
