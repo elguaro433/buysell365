@@ -72,7 +72,7 @@ C:\Users\hpint\Desktop\
 - **Telegram Bot** `@Andoperandobot` — canal VIP + grupo público `@BUYSELL_365_24_7`
 - **Telethon** — userbot que lee canales aliados de señales
 - **Instagram** `@buysell365.pro_tradingsignals` (vía `instagrapi`)
-- **WhatsApp** (4 destinatarios fijos, vía TextMeBot API)
+- **WhatsApp** (2 destinatarios: Emmanuel +376 y Elibel, vía TextMeBot API; sender +34…6572)
 - **Anthropic Claude API** — `claude-sonnet-4-6` para análisis y % probabilidad
 - **Render** — dashboard web público en `buysell365.pro`
 
@@ -254,6 +254,15 @@ Reglas que se han ido endureciendo por feedback del usuario:
 
 ## 📝 Historial reciente (qué pasó hoy)
 
+**2026-09-19** — WhatsApp reconectado + indicador del panel:
+1. TextMeBot (número emisor +34…6572) estaba desconectado desde ≤ 9-sep (411 en cada
+   envío). El usuario reescaneó el QR el 18/19-sep; test desde el panel llega OK.
+2. El indicador WhatsApp del panel solo miraba el último `[WSP]` de `copier.log` → seguía
+   en rojo aunque ya funcionara. Ahora el botón 🧪 Test guarda `.wsp_last_probe.json`
+   (lo lee el dashboard) y un fallo >6 h sin intentos posteriores se muestra ámbar
+   "Sin verificar" en vez de CAÍDO. Deploy solo de `buysell365_admin` (commit ec74a96).
+3. Sigue pendiente: crédito Anthropic agotado (LLM PRO "SIN CREDITO").
+
 **2026-09-17** — Auditoría completa + fix del feed de precios:
 1. **BUG CRÍTICO (desde 29-jul)**: el monitor TP/SL usaba futuros de yfinance
    (`GC=F`, `YM=F`, `NQ=F`) como precio "actual". El basis futuro-spot subió a
@@ -275,8 +284,7 @@ Reglas que se han ido endureciendo por feedback del usuario:
 4. Resumen EOD admin 18:00 sumaba los SL como positivos → usa `stats_normalizer`.
    Formato "-150.0 pts" → "-150 pts".
 5. **Pendiente del usuario**: crédito Anthropic agotado (≤ 18-ago, parser LLM,
-   Vision, probabilidad en `tech_only`); TextMeBot: número emisor desconectado
-   (WhatsApp 100 % caído desde ≤ 9-sep); key TwelveData responde vacío;
+   Vision, probabilidad en `tech_only`); key TwelveData responde vacío;
    `COPIER_PAIRS_DISABLED=` vacío en `.env` del VPS anula la blacklist de pares.
 6. Recortes de promo del 21-jun que este doc no reflejaba: briefing 07:00 VIP,
    promo diaria 12:00 y "2 free signals" 09:00 DESACTIVADOS; rotación VIP al
