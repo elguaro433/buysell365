@@ -75,8 +75,10 @@ C:\Users\hpint\Desktop\
 - **Render** — dashboard web público en `buysell365.pro`
 
 ### Paneles
-- **Panel admin del bot:** `.\tools\panel.ps1` → abre túnel SSH y `http://localhost:5001`
-  (desde 2026-09-19 el puerto 5001 está CERRADO a internet por firewall; auth básica)
+- **Panel admin del bot:** `http://208.73.204.188:5001` (auth básica + rate limit).
+  El usuario RECHAZÓ el acceso por túnel SSH (2026-09-19): quiere una URL directa, sin
+  ventanas negras. `tools/panel.ps1` queda como alternativa opcional. Mejora pendiente
+  si algún día la quiere: HTTPS con Caddy en `admin.buysell365.pro`.
   - Start/Stop/Restart bot vía systemctl
   - Editar `.env` desde browser
   - Logs en vivo, lista VIPs, WhatsApp, señales recientes
