@@ -1,4 +1,4 @@
-# panel.ps1 — Abre el panel admin del bot a través de un túnel SSH seguro.
+﻿# panel.ps1 - Abre el panel admin del bot a través de un túnel SSH seguro.
 # Uso:  .\tools\panel.ps1
 #
 # Desde 2026-09-19 el puerto 5001 del VPS está cerrado a internet (el panel
@@ -16,7 +16,7 @@ if (-not (Test-Path $Key)) { Write-Host "No encuentro la key SSH: $Key" -Foregro
 # ¿Ya hay un túnel abierto?
 $busy = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($busy) {
-    Write-Host "Ya hay algo escuchando en localhost:$Port — abriendo el navegador directamente." -ForegroundColor Yellow
+    Write-Host "Ya hay algo escuchando en localhost:$Port - abriendo el navegador directamente." -ForegroundColor Yellow
     Start-Process "http://localhost:$Port"
     exit 0
 }

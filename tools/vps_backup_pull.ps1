@@ -1,8 +1,8 @@
-# vps_backup_pull.ps1 — Baja el último backup cifrado del VPS a Desktop\BuySell365_Backups
+﻿# vps_backup_pull.ps1 - Baja el último backup cifrado del VPS a Desktop\BuySell365_Backups
 # Uso:  .\tools\vps_backup_pull.ps1
 # El VPS genera /opt/backups/buysell365/bs365_<fecha>.tar.enc cada día a las 04:10
 # (scripts/vps_backup.sh). La clave para descifrar está en
-# Desktop\BuySell365_Backups\CLAVE_BACKUP_VPS.txt — NO la borres ni la subas a ningún sitio.
+# Desktop\BuySell365_Backups\CLAVE_BACKUP_VPS.txt - NO la borres ni la subas a ningún sitio.
 #
 # Descifrar (en Linux/WSL/Git Bash):
 #   openssl enc -d -aes-256-cbc -pbkdf2 -pass file:CLAVE_BACKUP_VPS.txt -in bs365_X.tar.enc | tar xz -C restore/
