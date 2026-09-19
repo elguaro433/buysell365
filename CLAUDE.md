@@ -52,10 +52,6 @@ C:\Users\hpint\Desktop\
 
 > ⚠️ **Si ves una carpeta `BuySell365_Bot` o `BuySell365_VPS_Migration` en el Desktop,
 > está obsoleta.** La única buena es `BuySell365`.
->
-> Hasta que la sesión actual se cierre, la carpeta sigue llamándose
-> `BuySell365_VPS_Migration` (bloqueada por el cwd del proceso claude).
-> Hay un script `_RENAME_AL_CERRAR_CLAUDE.ps1` para renombrar después.
 
 ---
 
@@ -65,8 +61,10 @@ C:\Users\hpint\Desktop\
 - **Bot vive en:** VPS Linux InterServer KVM, IP `208.73.204.188`
 - **Path:** `/opt/buysell365/` (estructura idéntica a `app/` local)
 - **Servicios systemd:** `buysell365.service` (bot) + `buysell365_admin.service` (panel web)
-- **Stack:** Python 3.11 + Telegram Bot API + Telethon + Flask
+- **Stack:** Python 3.13 (Debian 13) + Telegram Bot API + Telethon + Flask
 - **MT5: DESACTIVADO** (no se ejecutan órdenes reales, solo se publican señales)
+- **LLM: DESACTIVADO desde 2026-09-19** (`LLM_PARSER_ENABLED=false`, `LLM_VISION_ENABLED=false`
+  en `.env` del VPS por crédito agotado). Parser = regex; probabilidad = solo técnica.
 
 ### Conexiones externas
 - **Telegram Bot** `@Andoperandobot` — canal VIP + grupo público `@BUYSELL_365_24_7`
@@ -77,7 +75,8 @@ C:\Users\hpint\Desktop\
 - **Render** — dashboard web público en `buysell365.pro`
 
 ### Paneles
-- **Panel admin del bot:** `http://208.73.204.188:5001` (auth básica)
+- **Panel admin del bot:** `.\tools\panel.ps1` → abre túnel SSH y `http://localhost:5001`
+  (desde 2026-09-19 el puerto 5001 está CERRADO a internet por firewall; auth básica)
   - Start/Stop/Restart bot vía systemctl
   - Editar `.env` desde browser
   - Logs en vivo, lista VIPs, WhatsApp, señales recientes
@@ -118,6 +117,8 @@ Eso hace automáticamente:
 | `.\tools\vps_logs.ps1 -Errors` | Solo errores |
 | `.\tools\vps_status.ps1` | Snapshot (servicios, git, RAM, disco) |
 | `.\tools\vps_restart.ps1` | Restart sin pull (incluye limpieza de locks) |
+| `.\tools\panel.ps1` | Abre el panel admin por túnel SSH (localhost:5001) |
+| `.\tools\vps_backup_pull.ps1` | Baja el último backup cifrado del VPS a `Desktop\BuySell365_Backups` |
 
 ### ⚠️ Lección crítica del 2026-05-24: lock files stale
 
@@ -137,6 +138,27 @@ systemctl stop buysell365 && sleep 4 && \
 
 Ya está integrado en `deploy-files.ps1`, `deploy.ps1` y `tools/vps_restart.ps1`.
 **Nunca uses `systemctl restart buysell365` directo** — usa estos scripts.
+
+### ⚠️ Lección crítica del 2026-09-19: NUNCA `systemctl reload ssh`
+
+En este Debian 13 el reload (SIGHUP) de `sshd` falla con "Cannot bind any address" y
+**mata el servicio** → puerto 22 cerrado, sin acceso. Se recuperó con **Restart del VPS
+desde my.interserver.net** (el bot volvió solo: servicios `enabled`, locks son flock).
+- `reload` está deshabilitado en el unit (drop-in `ssh.service.d/10-run-sshd.conf`).
+  Para aplicar config: `sshd -t && systemctl restart ssh` (no corta sesiones abiertas).
+- El usuario entra a InterServer con Google y **no tiene la password root a mano** →
+  la consola VNC no es un fallback. Pedirle que la fije con `passwd` y la guarde.
+
+### Seguridad VPS (estado desde 2026-09-19)
+- SSH: **solo key** (`PasswordAuthentication no`, `PermitRootLogin prohibit-password`,
+  `MaxAuthTries 3`) + **fail2ban** (4 fallos/10 min → 2 h ban).
+- Firewall ufw: ALLOW 22; DENY 5001 (panel), 8080 (HTTP legacy del bot), 8765/5201
+  (fio/iperf3 de InterServer, servicios deshabilitados). Panel solo por `tools/panel.ps1`.
+- Panel: rate limit login (5 fallos → 15 min), sin SECRET por defecto en código.
+- Backup cifrado diario 04:10 → `/opt/backups/buysell365/bs365_*.tar.enc` (14 días);
+  clave en `/root/.backup_pass` y copia en `Desktop\BuySell365_Backups\CLAVE_BACKUP_VPS.txt`.
+- Alertas Telegram al admin (`admin_alerts.py`, 1/día por tipo): crédito LLM agotado,
+  TextMeBot 411, feed de precios sin datos, copier sin heartbeat >5 min.
 
 ### Flujo manual (si los scripts fallan)
 
@@ -253,6 +275,21 @@ Reglas que se han ido endureciendo por feedback del usuario:
 ---
 
 ## 📝 Historial reciente (qué pasó hoy)
+
+**2026-09-19 (tarde)** — Auditoría completa + hardening (10 puntos autorizados):
+1. Repo: 14 archivos de la universidad movidos a `Desktop\Universidad_archivos`; 2 branches
+   mergeados borrados; `requirements.txt` regenerado del `pip freeze` real del VPS.
+2. `app/docs/informe_aliados_2026-09-19.txt`: por fuente/par/categoría con pips con signo.
+   Hallazgos: SureShotFX pierde en ORO (−3188) y FOREX (−2229); UnitedKings ORO +2939 (WR 65 %);
+   ORO SELL WR 26 % vs BUY 74 %; el % de probabilidad NO discrimina (prob 60+ pierde).
+3. `admin_alerts.py` + enganches; panel rate limit; log copier: precios a DEBUG, fix
+   mapeo `OILCASH`→`CL=F` (1.400 líneas "possibly delisted" por archivo).
+4. `.env` VPS: `LLM_PARSER_ENABLED=false`, `LLM_VISION_ENABLED=false` (sin crédito).
+5. Backup cifrado en cron + `vps_backup_pull.ps1`. Borrado `copier_stderr.log.1` (200 MB).
+6. SSH solo key + fail2ban; ufw; fio/iperf3 apagados; panel por túnel (`panel.ps1`).
+   **Incidente**: un `reload ssh` mató sshd 20 min (ver lección arriba). Bot no afectado
+   salvo 3 min de reinicio del VPS (sábado, mercado cerrado).
+7. Pendiente usuario: fijar password root (`passwd`), crédito Anthropic si quiere LLM.
 
 **2026-09-19** — WhatsApp reconectado + indicador del panel:
 1. TextMeBot (número emisor +34…6572) estaba desconectado desde ≤ 9-sep (411 en cada
