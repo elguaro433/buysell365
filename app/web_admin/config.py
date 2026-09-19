@@ -11,8 +11,11 @@ LOGS_DIR = APP_DIR / "logs"
 WEB_ADMIN_USER = os.getenv("WEB_ADMIN_USER", "admin")
 WEB_ADMIN_PASSWORD = os.getenv("WEB_ADMIN_PASSWORD", "buysell365")
 
-# Secret para sesiones Flask
-SECRET_KEY = os.getenv("WEB_ADMIN_SECRET", "change-me-in-production-please-very-long-random-string-12345")
+# Secret para sesiones Flask.
+# 2026-09-19: sin WEB_ADMIN_SECRET en .env se genera uno aleatorio por arranque
+# (las sesiones caducan al reiniciar, pero nadie puede forjar cookies con la
+# clave por defecto que estaba en el repo). Antes había un default fijo público.
+SECRET_KEY = os.getenv("WEB_ADMIN_SECRET") or os.urandom(32).hex()
 
 # Puerto del panel
 WEB_ADMIN_PORT = int(os.getenv("WEB_ADMIN_PORT", "5001"))

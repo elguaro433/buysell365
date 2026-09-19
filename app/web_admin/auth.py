@@ -15,8 +15,10 @@ def login_required(f):
 
 
 def check_credentials(user: str, password: str) -> bool:
-    """Verifica usuario+password contra .env."""
-    return user == WEB_ADMIN_USER and password == WEB_ADMIN_PASSWORD
+    """Verifica usuario+password contra .env (comparación en tiempo constante)."""
+    import hmac
+    return (hmac.compare_digest(user.encode(), WEB_ADMIN_USER.encode())
+            and hmac.compare_digest(password.encode(), WEB_ADMIN_PASSWORD.encode()))
 
 
 def do_login(user: str) -> None:

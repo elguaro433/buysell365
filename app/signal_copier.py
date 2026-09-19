@@ -3235,7 +3235,35 @@ _SPOT_ROUTED_PAIRS = {
 }
 
 
+_price_fail_streak = 0  # 2026-09-19: fallos consecutivos de precio → aviso admin
+
+
+def _note_price_result(pair: str, price) -> None:
+    """Cuenta fallos consecutivos de _get_current_price; con 30 seguidos (≈15 min
+    de monitor sin precio) avisa al admin 1 vez/día. Un éxito resetea."""
+    global _price_fail_streak
+    try:
+        if price is not None and float(price) > 0:
+            _price_fail_streak = 0
+            return
+        _price_fail_streak += 1
+        if _price_fail_streak == 30:
+            from admin_alerts import alert_admin
+            alert_admin("price_feed_down",
+                        f"Feed de precios sin datos: {_price_fail_streak} fallos "
+                        f"seguidos (último par {pair}). El monitor TP/SL no puede "
+                        f"evaluar señales. Revisar yfinance / gold-api / TwelveData.")
+    except Exception:
+        pass
+
+
 def _get_current_price(pair: str) -> float | None:
+    _p = _get_current_price_impl(pair)
+    _note_price_result(pair, _p)
+    return _p
+
+
+def _get_current_price_impl(pair: str) -> float | None:
     """Fetch current price via yfinance (gratis, sin límite).
     Twelve Data se reserva SOLO para gráficos de velas.
     """
@@ -3290,6 +3318,11 @@ def _get_current_price(pair: str) -> float | None:
         "NZDCAD": "NZDCAD=X", "NZDCHF": "NZDCHF=X", "CADCHF": "CADCHF=X",
     }
     yf_ticker = _yf_map.get(pair)
+    if not yf_ticker:
+        # FIX 2026-09-19: el mapa tiene claves mixtas ("OILCash") y el par llega
+        # en mayúsculas ("OILCASH") → no matcheaba → yfinance pedía "$OILCASH" y
+        # escribía "possibly delisted" 1.400 veces por archivo de log.
+        yf_ticker = {k.upper(): v for k, v in _yf_map.items()}.get(pair.upper())
     if not yf_ticker:
         if len(pair) == 6 and pair.isalpha():
             yf_ticker = f"{pair}=X"
@@ -7015,7 +7048,9 @@ async def _monitor_tp_loop() -> None:
                         )
                         if _changed:
                             _price_log_cache[_resolved_sym] = (_tick.bid, _tick.ask, _now_pl)
-                            log.info(
+                            # 2026-09-19: INFO → DEBUG. Con 10 señales abiertas eran
+                            # 29.000 líneas por archivo (80 % del log) y ahogaban lo útil.
+                            log.debug(
                                 f"💹 Precio MT5 {_resolved_sym}: bid={_tick.bid:.5f} ask={_tick.ask:.5f} -> usando {price:.5f}"
                                 if price < 100
                                 else f"💹 Precio MT5 {_resolved_sym}: bid={_tick.bid:.2f} ask={_tick.ask:.2f} -> usando {price:.2f}"
@@ -7911,6 +7946,19 @@ def _parse_with_llm(text: str, chat_title: str = "", image_bytes: bytes = None) 
     except Exception as _e:
         log.warning(f"⚠️ LLM parser fallo: {_e}")
         _llm_parse_stats["llm_fail"] += 1
+        # 2026-09-19: avisar al admin (1 vez/día) — el crédito estuvo agotado
+        # un mes entero sin que nadie lo viera. 400 + "credit" = sin saldo.
+        _es = str(_e).lower()
+        if "credit" in _es or "billing" in _es:
+            try:
+                from admin_alerts import alert_admin
+                alert_admin("llm_credit",
+                            "Anthropic SIN CRÉDITO: parser LLM y Vision caídos, "
+                            "el copier sigue con regex + score técnico. "
+                            "Recargar en console.anthropic.com o poner "
+                            "LLM_PARSER_ENABLED=false.")
+            except Exception:
+                pass
         return None
 
 

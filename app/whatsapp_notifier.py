@@ -257,6 +257,17 @@ def _send_one(recipient: dict, text: str) -> None:
             # El caso "Phone number is disconnected from the API" quedaba truncado.
             _body_clean = resp.text.replace("\n", " ").replace("\r", " ")[:600]
             log.warning(f"[WSP] {name} ({backend}) fallo status={resp.status_code} body={_body_clean}")
+            # 2026-09-19: número emisor desconectado de TextMeBot → aviso admin
+            # (1/día). Estuvo 10 días caído sin que nadie lo viera.
+            if "disconnected" in _body_clean.lower() or resp.status_code == 411:
+                try:
+                    from admin_alerts import alert_admin
+                    alert_admin("wsp_disconnected",
+                                "WhatsApp CAÍDO: TextMeBot dice que el número emisor "
+                                "está desconectado. Reescanear QR en "
+                                "api.textmebot.com/status.php (link en el log).")
+                except Exception:
+                    pass
     except Exception as e:
         # Si hubo excepcion sin completar HTTP, igual marcamos el timestamp
         # para no acumular intentos rapidos hacia TextMeBot que pueden bannear.

@@ -1,0 +1,67 @@
+# Informe aliados / pares â€” generado 2026-09-19 desde copier_stats.json del VPS (723 trades, 22-jun -> 18-sep)
+# Nota: los SL falsos por basis de futuros (29-jul -> 17-sep) ya estaban limpiados en el VPS (bak_false_sl_20260917).
+# Quedan 94 SL de SELL ORO/US30 cerrados en <10 min en jun-jul (antes de la fecha de limpieza) â€” revisar si tambien eran falsos.
+
+INFORME ALIADOS/PARES — 723 trades cerrados, 2026-06-22 -> 2026-09-18
+net = pips (forex/oro/plata) o pts (indices/oil), con signo. TP=+, SL=-. Unidades mezcladas: comparar solo dentro de la misma categoria.
+
+== POR FUENTE x CATEGORIA (todo el periodo, n>=8)
+                                n   TP   SL  WR%      net
+SureShotFX / ORO              151   40  111   26    -3188
+SureShotFX / FOREX            156   32  124   21    -2229
+SureShotFX / CRIPTO            10    0   10    0     -440
+ProSignalsFx / FOREX           16   10    6   62     +139
+TopTradingSignals / FOREX      47   28   19   60     +350
+SureShotFX / OIL               41   15   26   37     +600
+Unknown / ORO                  35   26    9   74    +1170
+UnitedKings / ORO              92   60   32   65    +2939
+SureShotFX / INDICES          137   45   92   33    +3130
+
+== POR FUENTE x CATEGORIA ultimos 45 dias (282 trades, n>=5)
+                                n   TP   SL  WR%      net
+SureShotFX / FOREX             94   22   72   23    -1200
+SureShotFX / CRIPTO             5    0    5    0     -220
+TopTradingSignals / FOREX      22   13    9   59     +136
+SureShotFX / OIL               23    8   15   35     +150
+SureShotFX / INDICES           72   20   52   28     +174
+Unknown / ORO                   5    5    0  100     +450
+UnitedKings / ORO              35   32    3   91    +5200
+
+== POR CATEGORIA (todo)
+                                n   TP   SL  WR%      net
+FOREX                         219   70  149   32    -1740
+CRIPTO                         17    7   10   41     -242
+PLATA                           9    4    5   44     +204
+OIL                            44   17   27   39     +903
+INDICES                       141   46   95   33    +2567
+ORO                           293  135  158   46    +3144
+
+== POR PAR (n>=8)
+                                n   TP   SL  WR%      net
+EUR/NZD                        25    4   21   16     -583
+GBP/USD                        18    3   15   17     -442
+AUD/USD                         9    0    9    0     -337
+EUR/USD                        10    3    7   30     -250
+NZD/CAD                         9    3    6   33     -232
+AUD/CAD                         9    3    6   33     -219
+EUR/AUD                        16    5   11   31     -192
+USD/JPY                        21    6   15   29     -157
+USD/CAD                        12    5    7   42     -148
+GBP/AUD                        13    4    9   31      -81
+US30                           96   26   70   27       -6
+GBP/JPY                        15    5   10   33     +100
+EUR/JPY                        11    4    7   36     +113
+GBP/NZD                        16    6   10   38     +150
+SIL/VER                         9    4    5   44     +204
+USOIL                          41   15   26   37     +600
+NAS100                         44   19   25   43    +2368
+ORO                           293  135  158   46    +3144
+
+== PROBABILIDAD vs RESULTADO
+prob <40    n= 138 WR= 54%  net=  +1994
+prob 40-59  n= 387 WR= 36%  net=  +4739
+prob 60+    n= 198 WR= 33%  net=  -1898
+
+== BUY vs SELL en ORO
+BUY   n= 122 WR= 74%  net=  +7806 pips
+SELL  n= 171 WR= 26%  net=  -4662 pips

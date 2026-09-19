@@ -83,6 +83,26 @@ def start_sync_loop(get_state_fn, on_signals_fn=None):
             - active_ops_detail
         on_signals_fn: Callable(signal_dict) called for each pending webhook signal.
     """
+    def _check_copier_heartbeat():
+        """2026-09-19: si .copier.heartbeat (lo toca signal_copier cada 20 s) lleva
+        >5 min sin actualizarse, el copier/Telethon está muerto → aviso admin 1/día."""
+        try:
+            from pathlib import Path as _P
+            hb = _P(__file__).resolve().parent / ".copier.heartbeat"
+            if not hb.exists():
+                return
+            age = time.time() - hb.stat().st_mtime
+            from admin_alerts import alert_admin, clear_alert
+            if age > 300:
+                alert_admin("copier_heartbeat",
+                            f"signal_copier SIN HEARTBEAT desde hace {int(age // 60)} min: "
+                            f"no se leen canales aliados ni se monitorizan TP/SL. "
+                            f"Revisar `journalctl -u buysell365` / reiniciar.")
+            elif age < 60:
+                clear_alert("copier_heartbeat")
+        except Exception:
+            pass
+
     def _loop():
         logger.info(f"Web sync started -> {WEB_URL} (base interval {SYNC_INTERVAL}s)")
         time.sleep(10)  # Wait for bot to initialize
@@ -127,6 +147,7 @@ def start_sync_loop(get_state_fn, on_signals_fn=None):
 
             # Health check log every 10 minutes
             if now - last_health_log >= HEALTH_LOG_INTERVAL:
+                _check_copier_heartbeat()
                 status = "healthy" if consecutive_failures == 0 else f"degraded ({consecutive_failures} consecutive failures)"
                 logger.info(
                     f"[Health] Web sync {status} | "
