@@ -152,8 +152,8 @@ desde my.interserver.net** (el bot volvió solo: servicios `enabled`, locks son 
 ### Seguridad VPS (estado desde 2026-09-19)
 - SSH: **solo key** (`PasswordAuthentication no`, `PermitRootLogin prohibit-password`,
   `MaxAuthTries 3`) + **fail2ban** (4 fallos/10 min → 2 h ban).
-- Firewall ufw: ALLOW 22; DENY 5001 (panel), 8080 (HTTP legacy del bot), 8765/5201
-  (fio/iperf3 de InterServer, servicios deshabilitados). Panel solo por `tools/panel.ps1`.
+- Firewall ufw: ALLOW 22; DENY 8080 (HTTP legacy del bot), 8765/5201 (fio/iperf3 de
+  InterServer, deshabilitados). **5001 (panel) ABIERTO** a petición del usuario.
 - Panel: rate limit login (5 fallos → 15 min), sin SECRET por defecto en código.
 - Backup cifrado diario 04:10 → `/opt/backups/buysell365/bs365_*.tar.enc` (14 días);
   clave en `/root/.backup_pass` y copia en `Desktop\BuySell365_Backups\CLAVE_BACKUP_VPS.txt`.
